@@ -1,6 +1,7 @@
 import { parseJsonFromLlm } from '../lib/llm-json'
 import { callFastExtract } from '../lib/openrouter-models'
 import type { StageResult } from '../types'
+import { getActionLogger } from '../lib/action-logger'
 
 export interface BriefExpansionResult {
   originalBrief: string
@@ -55,6 +56,14 @@ export async function runBriefExpansion(
   classification: { confidence: string; technologyDomains: string[] }
 ): Promise<StageResult<BriefExpansionResult>> {
   const startMs = Date.now()
+  const logger = getActionLogger()
+  logger.logStage({
+    step_name: 'brief-expansion',
+    action_type: 'stage_start',
+    brief_length: briefText.length,
+    product_class: productClass,
+    technology_domains: classification.technologyDomains,
+  })
 
   const prompt = buildBriefExpansionPrompt(briefText, productClass, classification.technologyDomains)
 
@@ -68,9 +77,17 @@ export async function runBriefExpansion(
     // groundWithGoogleSearch=true — real-time web check for regulatory
     // standards, market data, certifications drops hallucination near zero on
     // factual claims.
+    const llmT0 = Date.now()
     const content = await callFastExtract(prompt, {
       thinkingLevel: 'high',
       groundWithGoogleSearch: true,
+    })
+    // callFastExtract returns raw text only — no token counts available.
+    logger.logLlm({
+      step_name: 'brief-expansion',
+      model: 'google/gemini-3.1-flash-lite',
+      latency_ms: Date.now() - llmT0,
+      ok: true,
     })
 
     const parsed = await parseJsonFromLlm(content, {
@@ -88,6 +105,14 @@ export async function runBriefExpansion(
 
     const assumptions = parsed.assumptions || []
 
+    logger.logStage({
+      step_name: 'brief-expansion',
+      action_type: 'stage_end',
+      outcome: 'ok',
+      duration_ms: Date.now() - startMs,
+      inferred_fields_count: inferredAssumptions.length,
+      assumptions_count: assumptions.length,
+    })
     return {
       ok: true,
       data: {
@@ -100,6 +125,13 @@ export async function runBriefExpansion(
       durationMs: Date.now() - startMs,
     }
   } catch (err: any) {
+    logger.logStage({
+      step_name: 'brief-expansion',
+      action_type: 'stage_end',
+      outcome: 'fail',
+      duration_ms: Date.now() - startMs,
+      error: err.message,
+    })
     return {
       ok: false,
       error: err.message,

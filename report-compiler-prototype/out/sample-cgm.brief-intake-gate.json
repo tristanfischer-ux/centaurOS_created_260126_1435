@@ -1,0 +1,72 @@
+{
+  "verdict": "brief_ready_for_architecture",
+  "summary": {
+    "rows": 6,
+    "passRows": 6,
+    "reviewRows": 0,
+    "blockedRows": 0,
+    "passRatio": 1,
+    "briefCharacters": 310,
+    "productClass": "cgm",
+    "classificationConfidence": "high",
+    "scratchArchitectureSupported": true,
+    "extractedRequirements": 3,
+    "numericFacts": 3,
+    "coveredRequirements": 3,
+    "partialRequirements": 0,
+    "uncoveredRequirements": 0,
+    "assumptions": 1
+  },
+  "rows": [
+    {
+      "area": "brief_text",
+      "verdict": "pass",
+      "signal": "310 non-whitespace character(s) in the source brief.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Brief text is present."
+    },
+    {
+      "area": "requirement_quantification",
+      "verdict": "pass",
+      "signal": "3 quantified requirement(s), 3 numeric fact(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Quantified requirements are sufficient for a first architecture pass."
+    },
+    {
+      "area": "product_class_selection",
+      "verdict": "pass",
+      "signal": "Selected cgm with high confidence.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Product class selection is strong enough for scratch architecture."
+    },
+    {
+      "area": "scratch_design_support",
+      "verdict": "pass",
+      "signal": "cgm has a deep scratch architecture grammar.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Use scratch universal architecture flow for this brief."
+    },
+    {
+      "area": "requirement_trace_seed",
+      "verdict": "pass",
+      "signal": "3 covered, 0 partial, 0 uncovered requirement trace row(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Extracted requirements have trace seeds into the architecture."
+    },
+    {
+      "area": "assumption_boundary",
+      "verdict": "pass",
+      "signal": "1 brief assumption note(s); no-quantified-default path: no.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Assumption boundary is explicit enough for first-pass architecture."
+    }
+  ],
+  "blockers": [],
+  "nextActions": []
+}

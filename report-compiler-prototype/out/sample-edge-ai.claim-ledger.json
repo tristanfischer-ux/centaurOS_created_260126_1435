@@ -1,0 +1,5280 @@
+{
+  "summary": {
+    "rows": 222,
+    "briefSupplied": 3,
+    "accepted": 0,
+    "sourceBacked": 0,
+    "calculatedNeedsReview": 3,
+    "generatedNeedsReview": 154,
+    "sourceRequired": 62,
+    "blocked": 0,
+    "blocksBom": 62,
+    "blocksPublish": 217
+  },
+  "rows": [
+    {
+      "id": "bom_source_field:compute_acceleration_accelerator_module_ai_accelerator_module:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "AI accelerator module / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_accelerator_module_ai_accelerator_module:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "AI accelerator module / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_accelerator_module_ai_accelerator_module:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "AI accelerator module / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_accelerator_module_ai_accelerator_module:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "AI accelerator module / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_cpu_module:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "CPU module / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "cpu_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_cpu_module:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "CPU module / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "cpu_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_cpu_module:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "CPU module / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "cpu_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_cpu_module:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "CPU module / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "cpu_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_ecc_memory:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "ECC memory / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ecc_memory"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_ecc_memory:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "ECC memory / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ecc_memory"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_ecc_memory:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "ECC memory / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ecc_memory"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_ecc_memory:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "ECC memory / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ecc_memory"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_system_motherboard:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "System motherboard / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "system_motherboard"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_system_motherboard:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "System motherboard / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "system_motherboard"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_system_motherboard:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "System motherboard / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "system_motherboard"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:compute_acceleration_cpu_memory_complex_system_motherboard:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "System motherboard / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "system_motherboard"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_host_control_bmc_management_controller:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "BMC management controller / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bmc_management_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_host_control_bmc_management_controller:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "BMC management controller / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bmc_management_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_host_control_bmc_management_controller:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "BMC management controller / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bmc_management_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_host_control_bmc_management_controller:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "BMC management controller / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bmc_management_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:data_storage_nvme_storage_nvme_ssd:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "NVMe SSD / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "nvme_ssd"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:data_storage_nvme_storage_nvme_ssd:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "NVMe SSD / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "nvme_ssd"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:data_storage_nvme_storage_nvme_ssd:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "NVMe SSD / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "nvme_ssd"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:data_storage_nvme_storage_nvme_ssd:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "NVMe SSD / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "nvme_ssd"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_forced_air_cooling_fan_wall_assembly:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Fan wall assembly / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "fan_wall_assembly"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_forced_air_cooling_fan_wall_assembly:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Fan wall assembly / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "fan_wall_assembly"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_forced_air_cooling_fan_wall_assembly:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Fan wall assembly / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "fan_wall_assembly"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_forced_air_cooling_fan_wall_assembly:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Fan wall assembly / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "fan_wall_assembly"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_heat_transfer_heatsink_cold_plate:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Heatsink cold plate / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "heatsink_cold_plate"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_heat_transfer_heatsink_cold_plate:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Heatsink cold plate / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "heatsink_cold_plate"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_heat_transfer_heatsink_cold_plate:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Heatsink cold plate / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "heatsink_cold_plate"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_heat_transfer_heatsink_cold_plate:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Heatsink cold plate / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "heatsink_cold_plate"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:network_io_high_speed_network_high_speed_nic:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "High-speed NIC / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "high_speed_nic"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:network_io_high_speed_network_high_speed_nic:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "High-speed NIC / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "high_speed_nic"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:network_io_high_speed_network_high_speed_nic:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "High-speed NIC / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "high_speed_nic"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:network_io_high_speed_network_high_speed_nic:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "High-speed NIC / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "high_speed_nic"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_ac_input_conversion_redundant_power_supply:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Redundant power supply / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "redundant_power_supply"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_ac_input_conversion_redundant_power_supply:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Redundant power supply / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "redundant_power_supply"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_ac_input_conversion_redundant_power_supply:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Redundant power supply / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "redundant_power_supply"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_ac_input_conversion_redundant_power_supply:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Redundant power supply / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "redundant_power_supply"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_secure_boot_tpm_security_module:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "TPM security module / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "tpm_security_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_secure_boot_tpm_security_module:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "TPM security module / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "tpm_security_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_secure_boot_tpm_security_module:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "TPM security module / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "tpm_security_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_secure_boot_tpm_security_module:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "TPM security module / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "tpm_security_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_rack_chassis_1u_rack_chassis:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "1U rack chassis / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_rack_chassis_1u_rack_chassis:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "1U rack chassis / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_rack_chassis_1u_rack_chassis:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "1U rack chassis / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_rack_chassis_1u_rack_chassis:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "1U rack chassis / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_accelerator_module_ai_accelerator_module",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "AI accelerator module",
+      "claim": "AI accelerator module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_cpu_memory_complex_cpu_module",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "CPU module",
+      "claim": "CPU module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "cpu_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_cpu_memory_complex_ecc_memory",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "ECC memory",
+      "claim": "ECC memory is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ecc_memory"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_cpu_memory_complex_system_motherboard",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "System motherboard",
+      "claim": "System motherboard is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "system_motherboard"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_host_control_bmc_management_controller",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "BMC management controller",
+      "claim": "BMC management controller is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bmc_management_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:data_storage_nvme_storage_nvme_ssd",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "NVMe SSD",
+      "claim": "NVMe SSD is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "nvme_ssd"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:environmental_interface_forced_air_cooling_fan_wall_assembly",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Fan wall assembly",
+      "claim": "Fan wall assembly is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "fan_wall_assembly"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:environmental_interface_heat_transfer_heatsink_cold_plate",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Heatsink cold plate",
+      "claim": "Heatsink cold plate is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "heatsink_cold_plate"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:network_io_high_speed_network_high_speed_nic",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "High-speed NIC",
+      "claim": "High-speed NIC is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "high_speed_nic"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:power_distribution_ac_input_conversion_redundant_power_supply",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Redundant power supply",
+      "claim": "Redundant power supply is an architecture-derived component candidate with quantity 2 each.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "redundant_power_supply"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:safety_protection_secure_boot_tpm_security_module",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "TPM security module",
+      "claim": "TPM security module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "tpm_security_module"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:structure_containment_rack_chassis_1u_rack_chassis",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "1U rack chassis",
+      "claim": "1U rack chassis is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "headline_metric:capex_gbp",
+      "kind": "headline_metric",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Estimated CAPEX",
+      "claim": "Estimated CAPEX = 0 GBP.",
+      "provenanceRefs": [
+        "formula:capex=sum(bom.totalCostGbp)",
+        "class_pack:edge_ai.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed BoM costs before treating this cost metric as a claim."
+    },
+    {
+      "id": "headline_metric:opex_annual_gbp",
+      "kind": "headline_metric",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Estimated annual OPEX",
+      "claim": "Estimated annual OPEX = 0 GBP/year.",
+      "provenanceRefs": [
+        "formula:opex=capex*0.04"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed BoM costs before treating this cost metric as a claim."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_accelerator_module_accelerator_carrier_board",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "accelerator carrier board",
+      "claim": "accelerator carrier board is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "accelerator_carrier_board"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_accelerator_module_accelerator_retention_latch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "accelerator retention latch",
+      "claim": "accelerator retention latch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "accelerator_retention_latch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_accelerator_module_pcie_edge_connector",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "PCIe edge connector",
+      "claim": "PCIe edge connector is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "pcie_edge_connector"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_cpu_memory_complex_boot_flash_device",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "boot flash device",
+      "claim": "boot flash device is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "boot_flash_device"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_signal_power_integrity_clock_distribution_device",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "clock distribution device",
+      "claim": "clock distribution device is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "clock_distribution_device"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_signal_power_integrity_high_current_vrm_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "high-current VRM module",
+      "claim": "high-current VRM module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "high_current_vrm_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_signal_power_integrity_pcie_retimer_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "PCIe retimer set",
+      "claim": "PCIe retimer set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "pcie_retimer_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:compute_acceleration_signal_power_integrity_power_integrity_capacitor_bank",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "power integrity capacitor bank",
+      "claim": "power integrity capacitor bank is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "power_integrity_capacitor_bank"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_host_control_bios_firmware_image",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "BIOS firmware image",
+      "claim": "BIOS firmware image is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bios_firmware_image"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_host_control_management_ethernet_phy",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "management Ethernet PHY",
+      "claim": "management Ethernet PHY is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "management_ethernet_phy"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_host_control_platform_configuration_eeprom",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "platform configuration EEPROM",
+      "claim": "platform configuration EEPROM is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "platform_configuration_eeprom"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_remote_management_debug_access_lockout",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "debug access lockout",
+      "claim": "debug access lockout is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "debug_access_lockout"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_remote_management_firmware_signing_key_slot",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "firmware signing key slot",
+      "claim": "firmware signing key slot is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "firmware_signing_key_slot"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_remote_management_out_of_band_management_port",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "out-of-band management port",
+      "claim": "out-of-band management port is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "out_of_band_management_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_remote_management_serial_console_header",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "serial console header",
+      "claim": "serial console header is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "serial_console_header"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_runtime_orchestration_accelerator_driver_bundle",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "accelerator driver bundle",
+      "claim": "accelerator driver bundle is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "accelerator_driver_bundle"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_runtime_orchestration_configuration_manifest",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "configuration manifest",
+      "claim": "configuration manifest is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "configuration_manifest"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_runtime_orchestration_inference_runtime_image",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "inference runtime image",
+      "claim": "inference runtime image is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "inference_runtime_image"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_runtime_orchestration_watchdog_service",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "watchdog service",
+      "claim": "watchdog service is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "watchdog_service"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:data_storage_log_buffer_crash_dump_region",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "crash dump region",
+      "claim": "crash dump region is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "crash_dump_region"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:data_storage_log_buffer_event_log_partition",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "event log partition",
+      "claim": "event log partition is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "event_log_partition"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:data_storage_log_buffer_log_export_port",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "log export port",
+      "claim": "log export port is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "log_export_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:data_storage_log_buffer_write_endurance_counter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "write endurance counter",
+      "claim": "write endurance counter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "write_endurance_counter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:data_storage_model_cache_firmware_recovery_image",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "firmware recovery image",
+      "claim": "firmware recovery image is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "firmware_recovery_image"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:data_storage_model_cache_model_cache_partition",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "model cache partition",
+      "claim": "model cache partition is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "model_cache_partition"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:data_storage_model_cache_secure_erase_controller",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "secure erase controller",
+      "claim": "secure erase controller is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "secure_erase_controller"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:data_storage_model_cache_storage_health_monitor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "storage health monitor",
+      "claim": "storage health monitor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "storage_health_monitor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:data_storage_nvme_storage_drive_retention_screw_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "drive retention screw set",
+      "claim": "drive retention screw set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "drive_retention_screw_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:data_storage_nvme_storage_drive_thermal_pad",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "drive thermal pad",
+      "claim": "drive thermal pad is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "drive_thermal_pad"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:data_storage_nvme_storage_m_2_carrier_tray",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "M.2 carrier tray",
+      "claim": "M.2 carrier tray is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "m_2_carrier_tray"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_forced_air_cooling_airflow_straightener",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "airflow straightener",
+      "claim": "airflow straightener is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "airflow_straightener"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_forced_air_cooling_pwm_fan_controller",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "PWM fan controller",
+      "claim": "PWM fan controller is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "pwm_fan_controller"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_forced_air_cooling_replaceable_dust_filter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "replaceable dust filter",
+      "claim": "replaceable dust filter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "replaceable_dust_filter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_heat_transfer_heatpipe_assembly",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "heatpipe assembly",
+      "claim": "heatpipe assembly is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "heatpipe_assembly"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_heat_transfer_rear_exhaust_duct",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "rear exhaust duct",
+      "claim": "rear exhaust duct is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "rear_exhaust_duct"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_heat_transfer_thermal_interface_material_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "thermal interface material set",
+      "claim": "thermal interface material set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "thermal_interface_material_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_inlet_outlet_management_air_seal_foam_kit",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "air seal foam kit",
+      "claim": "air seal foam kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "air_seal_foam_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_inlet_outlet_management_front_inlet_grille",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "front inlet grille",
+      "claim": "front inlet grille is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "front_inlet_grille"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_inlet_outlet_management_rack_pressure_map_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "rack pressure map label",
+      "claim": "rack pressure map label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "rack_pressure_map_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_inlet_outlet_management_rear_exhaust_grille",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "rear exhaust grille",
+      "claim": "rear exhaust grille is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "rear_exhaust_grille"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_field_replaceable_units_accelerator_extraction_handle",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "accelerator extraction handle",
+      "claim": "accelerator extraction handle is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "accelerator_extraction_handle"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_field_replaceable_units_drive_service_handle",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "drive service handle",
+      "claim": "drive service handle is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "drive_service_handle"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_field_replaceable_units_hot_swap_fan_carrier",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "hot-swap fan carrier",
+      "claim": "hot-swap fan carrier is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "hot_swap_fan_carrier"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_field_replaceable_units_psu_latch_mechanism",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "PSU latch mechanism",
+      "claim": "PSU latch mechanism is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "psu_latch_mechanism"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_rack_installation_airflow_blanking_panel",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "airflow blanking panel",
+      "claim": "airflow blanking panel is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "airflow_blanking_panel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_rack_installation_cable_retention_comb",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "cable retention comb",
+      "claim": "cable retention comb is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "cable_retention_comb"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_rack_installation_rack_rail_kit",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "rack rail kit",
+      "claim": "rack rail kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "rack_rail_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_rack_installation_rear_support_bracket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "rear support bracket",
+      "claim": "rear support bracket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "rear_support_bracket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_service_workflow_diagnostics_usb_key",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "diagnostics USB key",
+      "claim": "diagnostics USB key is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "diagnostics_usb_key"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_service_workflow_firmware_version_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "firmware version label",
+      "claim": "firmware version label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "firmware_version_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_service_workflow_service_checklist_card",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "service checklist card",
+      "claim": "service checklist card is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "service_checklist_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_service_workflow_spare_screw_kit",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "spare screw kit",
+      "claim": "spare screw kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "spare_screw_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:network_io_high_speed_network_network_link_led_board",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "network link LED board",
+      "claim": "network link LED board is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "network_link_led_board"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:network_io_high_speed_network_nic_heatsink",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "NIC heatsink",
+      "claim": "NIC heatsink is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "nic_heatsink"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:network_io_high_speed_network_optical_transceiver_cage",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "optical transceiver cage",
+      "claim": "optical transceiver cage is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "optical_transceiver_cage"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:network_io_io_isolation_routing_cable_strain_relief_comb",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "cable strain relief comb",
+      "claim": "cable strain relief comb is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "cable_strain_relief_comb"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:network_io_io_isolation_routing_emi_gasket_strip",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "EMI gasket strip",
+      "claim": "EMI gasket strip is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "emi_gasket_strip"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:network_io_io_isolation_routing_service_loop_tie_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "service loop tie set",
+      "claim": "service loop tie set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "service_loop_tie_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:network_io_io_isolation_routing_shielded_io_bracket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "shielded IO bracket",
+      "claim": "shielded IO bracket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "shielded_io_bracket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:network_io_timing_ingest_data_ingest_connector",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "data ingest connector",
+      "claim": "data ingest connector is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "data_ingest_connector"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:network_io_timing_ingest_gpio_trigger_input",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "GPIO trigger input",
+      "claim": "GPIO trigger input is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "gpio_trigger_input"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:network_io_timing_ingest_network_bypass_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "network bypass relay",
+      "claim": "network bypass relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "network_bypass_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:network_io_timing_ingest_ptp_timing_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "PTP timing module",
+      "claim": "PTP timing module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "ptp_timing_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_ac_input_conversion_ac_inlet_filter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "AC inlet filter",
+      "claim": "AC inlet filter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "ac_inlet_filter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_ac_input_conversion_input_fuse_holder",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "input fuse holder",
+      "claim": "input fuse holder is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "input_fuse_holder"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_ac_input_conversion_power_good_signal_harness",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "power-good signal harness",
+      "claim": "power-good signal harness is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "power_good_signal_harness"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_dc_rail_distribution_12_v_busbar",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "12 V busbar",
+      "claim": "12 V busbar is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "12_v_busbar"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_dc_rail_distribution_accelerator_power_harness",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "accelerator power harness",
+      "claim": "accelerator power harness is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "accelerator_power_harness"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_dc_rail_distribution_fan_power_distribution_loom",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fan power distribution loom",
+      "claim": "fan power distribution loom is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "fan_power_distribution_loom"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_dc_rail_distribution_hot_swap_controller",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "hot-swap controller",
+      "claim": "hot-swap controller is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "hot_swap_controller"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_hold_up_protection_brownout_detector",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "brownout detector",
+      "claim": "brownout detector is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "brownout_detector"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_hold_up_protection_current_shunt_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "current shunt module",
+      "claim": "current shunt module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "current_shunt_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_hold_up_protection_efuse_channel_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "eFuse channel set",
+      "claim": "eFuse channel set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "efuse_channel_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_hold_up_protection_hold_up_capacitor_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "hold-up capacitor module",
+      "claim": "hold-up capacitor module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "hold_up_capacitor_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_electrical_safety_finger_safe_psu_cover",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "finger-safe PSU cover",
+      "claim": "finger-safe PSU cover is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "finger_safe_psu_cover"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_electrical_safety_insulation_barrier_sheet",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "insulation barrier sheet",
+      "claim": "insulation barrier sheet is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "insulation_barrier_sheet"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_electrical_safety_protective_earth_stud",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "protective earth stud",
+      "claim": "protective earth stud is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "protective_earth_stud"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_electrical_safety_warning_label_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "warning label set",
+      "claim": "warning label set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "warning_label_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_secure_boot_chassis_tamper_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "chassis tamper switch",
+      "claim": "chassis tamper switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "chassis_tamper_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_secure_boot_recovery_jumper_cover",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "recovery jumper cover",
+      "claim": "recovery jumper cover is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "recovery_jumper_cover"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_secure_boot_secure_boot_policy",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "secure boot policy",
+      "claim": "secure boot policy is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "secure_boot_policy"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_thermal_shutdown_fan_failure_interlock",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fan failure interlock",
+      "claim": "fan failure interlock is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "fan_failure_interlock"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_thermal_shutdown_hardwired_shutdown_line",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "hardwired shutdown line",
+      "claim": "hardwired shutdown line is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "hardwired_shutdown_line"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_thermal_shutdown_overtemperature_latch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "overtemperature latch",
+      "claim": "overtemperature latch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "overtemperature_latch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_thermal_shutdown_thermal_trip_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "thermal trip relay",
+      "claim": "thermal trip relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "thermal_trip_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_front_panel_status_alarm_buzzer",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "alarm buzzer",
+      "claim": "alarm buzzer is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "alarm_buzzer"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_front_panel_status_front_status_led_board",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "front status LED board",
+      "claim": "front status LED board is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "front_status_led_board"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_front_panel_status_lcd_status_panel",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "LCD status panel",
+      "claim": "LCD status panel is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "lcd_status_panel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_front_panel_status_uid_button",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "UID button",
+      "claim": "UID button is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "uid_button"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_power_fan_telemetry_chassis_intrusion_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "chassis intrusion switch",
+      "claim": "chassis intrusion switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "chassis_intrusion_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_power_fan_telemetry_fan_tachometer_hub",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fan tachometer hub",
+      "claim": "fan tachometer hub is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "fan_tachometer_hub"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_power_fan_telemetry_psu_pmbus_monitor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "PSU PMBus monitor",
+      "claim": "PSU PMBus monitor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "psu_pmbus_monitor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_power_fan_telemetry_rail_current_monitor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "rail current monitor",
+      "claim": "rail current monitor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "rail_current_monitor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_thermal_sensors_accelerator_hotspot_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "accelerator hotspot sensor",
+      "claim": "accelerator hotspot sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "accelerator_hotspot_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_thermal_sensors_board_humidity_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "board humidity sensor",
+      "claim": "board humidity sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "board_humidity_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_thermal_sensors_exhaust_temperature_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "exhaust temperature sensor",
+      "claim": "exhaust temperature sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "exhaust_temperature_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_thermal_sensors_inlet_temperature_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "inlet temperature sensor",
+      "claim": "inlet temperature sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "inlet_temperature_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_accelerator_mounting_accelerator_retention_bracket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "accelerator retention bracket",
+      "claim": "accelerator retention bracket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "accelerator_retention_bracket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_accelerator_mounting_card_stiffener_rail",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "card stiffener rail",
+      "claim": "card stiffener rail is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "card_stiffener_rail"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_accelerator_mounting_gpu_airflow_baffle",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "GPU airflow baffle",
+      "claim": "GPU airflow baffle is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "gpu_airflow_baffle"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_accelerator_mounting_pcie_riser_support",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "PCIe riser support",
+      "claim": "PCIe riser support is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "pcie_riser_support"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_rack_chassis_front_bezel_assembly",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "front bezel assembly",
+      "claim": "front bezel assembly is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "front_bezel_assembly"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_rack_chassis_internal_divider_panel",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "internal divider panel",
+      "claim": "internal divider panel is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "internal_divider_panel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_rack_chassis_slide_rail_kit",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "slide rail kit",
+      "claim": "slide rail kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "slide_rail_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_service_labelling_airflow_direction_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "airflow direction label",
+      "claim": "airflow direction label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "airflow_direction_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_service_labelling_asset_label_plate",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "asset label plate",
+      "claim": "asset label plate is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "asset_label_plate"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_service_labelling_cable_management_arm",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "cable management arm",
+      "claim": "cable management arm is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "cable_management_arm"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_service_labelling_rack_ear_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "rack ear set",
+      "claim": "rack ear set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.edge_ai"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "rack_ear_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "module_allocation:compute_acceleration",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Compute Acceleration",
+      "claim": "Compute Acceleration is a top-level functional module: Provides roughly 200 TOPS of accelerator throughput before model and thermal derating evidence.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard",
+        "boot_flash_device",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication",
+      "claim": "Control Compute Communication is a top-level functional module: Runs host firmware, inference orchestration, management control and secure remote operation.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest",
+        "out_of_band_management_port",
+        "serial_console_header",
+        "debug_access_lockout",
+        "firmware_signing_key_slot"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:data_storage",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Data Storage",
+      "claim": "Data Storage is a top-level functional module: Stores models, runtime images, logs and local inference buffers.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "nvme_ssd",
+        "m_2_carrier_tray",
+        "drive_thermal_pad",
+        "drive_retention_screw_set",
+        "model_cache_partition",
+        "storage_health_monitor",
+        "secure_erase_controller",
+        "firmware_recovery_image",
+        "event_log_partition",
+        "write_endurance_counter",
+        "crash_dump_region",
+        "log_export_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thermal Airflow Interface",
+      "claim": "Thermal Airflow Interface is a top-level functional module: Controls front-to-back airflow and heat transfer from accelerator, CPU, NIC and storage.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "fan_wall_assembly",
+        "pwm_fan_controller",
+        "airflow_straightener",
+        "replaceable_dust_filter",
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct",
+        "front_inlet_grille",
+        "rear_exhaust_grille",
+        "air_seal_foam_kit",
+        "rack_pressure_map_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Field Maintenance Serviceability",
+      "claim": "Field Maintenance Serviceability is a top-level functional module: Supports rack installation, hot-swap FRUs, diagnostics and firmware recovery.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "hot_swap_fan_carrier",
+        "drive_service_handle",
+        "psu_latch_mechanism",
+        "accelerator_extraction_handle",
+        "rack_rail_kit",
+        "rear_support_bracket",
+        "cable_retention_comb",
+        "airflow_blanking_panel",
+        "service_checklist_card",
+        "firmware_version_label",
+        "spare_screw_kit",
+        "diagnostics_usb_key"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:network_io",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Network IO",
+      "claim": "Network IO is a top-level functional module: Moves inference requests, responses and timing data through the appliance boundary.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "high_speed_nic",
+        "optical_transceiver_cage",
+        "nic_heatsink",
+        "network_link_led_board",
+        "ptp_timing_module",
+        "gpio_trigger_input",
+        "data_ingest_connector",
+        "network_bypass_relay",
+        "emi_gasket_strip",
+        "shielded_io_bracket",
+        "cable_strain_relief_comb",
+        "service_loop_tie_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Power Distribution",
+      "claim": "Power Distribution is a top-level functional module: Converts AC input into protected appliance rails for a 700 W power-budget target.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "redundant_power_supply",
+        "ac_inlet_filter",
+        "input_fuse_holder",
+        "power_good_signal_harness",
+        "12_v_busbar",
+        "accelerator_power_harness",
+        "hot_swap_controller",
+        "fan_power_distribution_loom",
+        "hold_up_capacitor_module",
+        "brownout_detector",
+        "current_shunt_module",
+        "efuse_channel_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Security And Safety Protection",
+      "claim": "Security And Safety Protection is a top-level functional module: Protects boot integrity, operator safety and thermal shutdown paths.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "tpm_security_module",
+        "secure_boot_policy",
+        "chassis_tamper_switch",
+        "recovery_jumper_cover",
+        "thermal_trip_relay",
+        "overtemperature_latch",
+        "fan_failure_interlock",
+        "hardwired_shutdown_line",
+        "protective_earth_stud",
+        "insulation_barrier_sheet",
+        "finger_safe_psu_cover",
+        "warning_label_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Telemetry Instrumentation",
+      "claim": "Telemetry Instrumentation is a top-level functional module: Measures temperature, fan, power, intrusion and service state for health management.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "inlet_temperature_sensor",
+        "accelerator_hotspot_sensor",
+        "exhaust_temperature_sensor",
+        "board_humidity_sensor",
+        "psu_pmbus_monitor",
+        "rail_current_monitor",
+        "fan_tachometer_hub",
+        "chassis_intrusion_switch",
+        "front_status_led_board",
+        "uid_button",
+        "alarm_buzzer",
+        "lcd_status_panel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Rack Structure Containment",
+      "claim": "Rack Structure Containment is a top-level functional module: Provides a 1U rack envelope with controlled airflow, card retention and service access.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis",
+        "slide_rail_kit",
+        "internal_divider_panel",
+        "front_bezel_assembly",
+        "accelerator_retention_bracket",
+        "pcie_riser_support",
+        "card_stiffener_rail",
+        "gpu_airflow_baffle",
+        "asset_label_plate",
+        "airflow_direction_label",
+        "rack_ear_set",
+        "cable_management_arm"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "regulatory_standard:CE-EMC",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "CE-EMC",
+      "claim": "CE-EMC: Electromagnetic compatibility technical file is relevant in UK/EU.",
+      "provenanceRefs": [
+        "class_pack:edge_ai.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "EMC design review, pre-compliance or test evidence for rack appliance."
+    },
+    {
+      "id": "regulatory_standard:IEC-62368-1",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "IEC-62368-1",
+      "claim": "IEC-62368-1: Audio/video, ICT and communication equipment safety is relevant in UK/EU/global.",
+      "provenanceRefs": [
+        "class_pack:edge_ai.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Electrical safety, enclosure, temperature and abnormal-operation evidence."
+    },
+    {
+      "id": "regulatory_standard:SECURE-BOOT-REVIEW",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "SECURE-BOOT-REVIEW",
+      "claim": "SECURE-BOOT-REVIEW: Secure boot and fleet-management review is relevant in Project security gate.",
+      "provenanceRefs": [
+        "class_pack:edge_ai.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "TPM, measured boot, firmware signing, recovery and management-access evidence."
+    },
+    {
+      "id": "risk_hazard:1",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Accelerator thermal throttling or shutdown under rack inlet conditions",
+      "claim": "Accelerator thermal throttling or shutdown under rack inlet conditions has provisional RPN 128 with mitigation: Thermal path sizing, inlet derating, fan redundancy and telemetry alarms.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "risk_hazard:2",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Insecure firmware or management interface compromise",
+      "claim": "Insecure firmware or management interface compromise has provisional RPN 135 with mitigation: TPM measured boot, signed firmware, locked debug access and management-network controls.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "risk_hazard:3",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Inference outage from PSU, fan or SSD failure",
+      "claim": "Inference outage from PSU, fan or SSD failure has provisional RPN 112 with mitigation: Redundant PSU path, hot-swap fans, storage health monitoring and runtime failover policy.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "submodule_allocation:compute_acceleration:accelerator_module",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Compute Acceleration / Accelerator module",
+      "claim": "Accelerator module is allocated under Compute Acceleration: Runs neural-network inference workloads at the edge.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:compute_acceleration:cpu_memory_complex",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Compute Acceleration / CPU and memory complex",
+      "claim": "CPU and memory complex is allocated under Compute Acceleration: Hosts preprocessing, runtime orchestration and memory-resident model state.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard",
+        "boot_flash_device"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:compute_acceleration:signal_power_integrity",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Compute Acceleration / Signal and power integrity",
+      "claim": "Signal and power integrity is allocated under Compute Acceleration: Stabilises accelerator clocks, high-speed lanes and transient power demand.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedComponentWordIds": [
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:host_control",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication / Host control",
+      "claim": "Host control is allocated under Control Compute Communication: Coordinates CPU, accelerator, storage and management functions.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:remote_management",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication / Remote management",
+      "claim": "Remote management is allocated under Control Compute Communication: Supports controlled diagnostics and firmware maintenance.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "out_of_band_management_port",
+        "serial_console_header",
+        "debug_access_lockout",
+        "firmware_signing_key_slot"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:runtime_orchestration",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication / Runtime orchestration",
+      "claim": "Runtime orchestration is allocated under Control Compute Communication: Loads inference runtime, accelerator drivers and service policy.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:data_storage:log_buffer",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Data Storage / Log and evidence buffer",
+      "claim": "Log and evidence buffer is allocated under Data Storage: Captures operational evidence for debugging and compliance review.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "event_log_partition",
+        "write_endurance_counter",
+        "crash_dump_region",
+        "log_export_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:data_storage:model_cache",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Data Storage / Model cache and recovery",
+      "claim": "Model cache and recovery is allocated under Data Storage: Keeps model versions, rollback images and erase functions controlled.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "model_cache_partition",
+        "storage_health_monitor",
+        "secure_erase_controller",
+        "firmware_recovery_image"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:data_storage:nvme_storage",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Data Storage / NVMe storage",
+      "claim": "NVMe storage is allocated under Data Storage: Provides local high-throughput storage for models and telemetry.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedComponentWordIds": [
+        "nvme_ssd",
+        "m_2_carrier_tray",
+        "drive_thermal_pad",
+        "drive_retention_screw_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:forced_air_cooling",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thermal Airflow Interface / Forced-air cooling",
+      "claim": "Forced-air cooling is allocated under Thermal Airflow Interface: Maintains rack airflow through compute and power zones.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "fan_wall_assembly",
+        "pwm_fan_controller",
+        "airflow_straightener",
+        "replaceable_dust_filter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:heat_transfer",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thermal Airflow Interface / Heat transfer path",
+      "claim": "Heat transfer path is allocated under Thermal Airflow Interface: Couples accelerator and CPU losses into chassis airflow.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:inlet_outlet_management",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thermal Airflow Interface / Inlet and outlet management",
+      "claim": "Inlet and outlet management is allocated under Thermal Airflow Interface: Protects rack pressure and prevents hot-air recirculation.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "front_inlet_grille",
+        "rear_exhaust_grille",
+        "air_seal_foam_kit",
+        "rack_pressure_map_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:field_replaceable_units",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Field Maintenance Serviceability / Field-replaceable units",
+      "claim": "Field-replaceable units is allocated under Field Maintenance Serviceability: Makes high-wear parts replaceable without removing the whole appliance.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "hot_swap_fan_carrier",
+        "drive_service_handle",
+        "psu_latch_mechanism",
+        "accelerator_extraction_handle"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:rack_installation",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Field Maintenance Serviceability / Rack installation",
+      "claim": "Rack installation is allocated under Field Maintenance Serviceability: Maintains mechanical support and cabling in edge racks.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "rack_rail_kit",
+        "rear_support_bracket",
+        "cable_retention_comb",
+        "airflow_blanking_panel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:service_workflow",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Field Maintenance Serviceability / Service workflow",
+      "claim": "Service workflow is allocated under Field Maintenance Serviceability: Captures field diagnostics and controlled recovery evidence.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "service_checklist_card",
+        "firmware_version_label",
+        "spare_screw_kit",
+        "diagnostics_usb_key"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:network_io:high_speed_network",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Network IO / High-speed network",
+      "claim": "High-speed network is allocated under Network IO: Terminates production inference traffic.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "high_speed_nic",
+        "optical_transceiver_cage",
+        "nic_heatsink",
+        "network_link_led_board"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:network_io:io_isolation_routing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Network IO / IO isolation and routing",
+      "claim": "IO isolation and routing is allocated under Network IO: Controls EMC, strain relief and service routing at high-speed ports.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "emi_gasket_strip",
+        "shielded_io_bracket",
+        "cable_strain_relief_comb",
+        "service_loop_tie_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:network_io:timing_ingest",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Network IO / Timing and ingest",
+      "claim": "Timing and ingest is allocated under Network IO: Synchronises inference streams and accepts trigger inputs where needed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedComponentWordIds": [
+        "ptp_timing_module",
+        "gpio_trigger_input",
+        "data_ingest_connector",
+        "network_bypass_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:ac_input_conversion",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Power Distribution / AC input conversion",
+      "claim": "AC input conversion is allocated under Power Distribution: Accepts rack AC input and provides redundant conversion.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "redundant_power_supply",
+        "ac_inlet_filter",
+        "input_fuse_holder",
+        "power_good_signal_harness"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:dc_rail_distribution",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Power Distribution / DC rail distribution",
+      "claim": "DC rail distribution is allocated under Power Distribution: Distributes 12 V and accelerator rails to boards and fans.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "12_v_busbar",
+        "accelerator_power_harness",
+        "hot_swap_controller",
+        "fan_power_distribution_loom"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:hold_up_protection",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Power Distribution / Hold-up and protection",
+      "claim": "Hold-up and protection is allocated under Power Distribution: Survives short dips and trips unsafe rail faults.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "hold_up_capacitor_module",
+        "brownout_detector",
+        "current_shunt_module",
+        "efuse_channel_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:electrical_safety",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Security And Safety Protection / Electrical safety",
+      "claim": "Electrical safety is allocated under Security And Safety Protection: Maintains operator protection and safe service boundaries.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "protective_earth_stud",
+        "insulation_barrier_sheet",
+        "finger_safe_psu_cover",
+        "warning_label_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:secure_boot",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Security And Safety Protection / Secure boot",
+      "claim": "Secure boot is allocated under Security And Safety Protection: Anchors platform identity and firmware trust.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "tpm_security_module",
+        "secure_boot_policy",
+        "chassis_tamper_switch",
+        "recovery_jumper_cover"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:thermal_shutdown",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Security And Safety Protection / Thermal shutdown",
+      "claim": "Thermal shutdown is allocated under Security And Safety Protection: Trips unsafe thermal or fan-failure states.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "thermal_trip_relay",
+        "overtemperature_latch",
+        "fan_failure_interlock",
+        "hardwired_shutdown_line"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:front_panel_status",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Telemetry Instrumentation / Front panel status",
+      "claim": "Front panel status is allocated under Telemetry Instrumentation: Exposes health and service state to rack technicians.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "front_status_led_board",
+        "uid_button",
+        "alarm_buzzer",
+        "lcd_status_panel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:power_fan_telemetry",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Telemetry Instrumentation / Power and fan telemetry",
+      "claim": "Power and fan telemetry is allocated under Telemetry Instrumentation: Feeds PSU, rail and airflow state into BMC management.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "psu_pmbus_monitor",
+        "rail_current_monitor",
+        "fan_tachometer_hub",
+        "chassis_intrusion_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:thermal_sensors",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Telemetry Instrumentation / Thermal sensors",
+      "claim": "Thermal sensors is allocated under Telemetry Instrumentation: Measures inlet, accelerator, exhaust and board climate state.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "inlet_temperature_sensor",
+        "accelerator_hotspot_sensor",
+        "exhaust_temperature_sensor",
+        "board_humidity_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:accelerator_mounting",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Rack Structure Containment / Accelerator mounting",
+      "claim": "Accelerator mounting is allocated under Rack Structure Containment: Restrains high-power cards and maintains airflow clearance.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "accelerator_retention_bracket",
+        "pcie_riser_support",
+        "card_stiffener_rail",
+        "gpu_airflow_baffle"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:rack_chassis",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Rack Structure Containment / Rack chassis",
+      "claim": "Rack chassis is allocated under Rack Structure Containment: Carries appliance boards, power supplies and front-to-back airflow features.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis",
+        "slide_rail_kit",
+        "internal_divider_panel",
+        "front_bezel_assembly"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:service_labelling",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Rack Structure Containment / Service labelling",
+      "claim": "Service labelling is allocated under Rack Structure Containment: Marks rack identity, airflow direction and field-replaceable units.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "asset_label_plate",
+        "airflow_direction_label",
+        "rack_ear_set",
+        "cable_management_arm"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "engineering_calculation:edge_ai_power_density_w_per_u",
+      "kind": "engineering_calculation",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Rack power density",
+      "claim": "Rack power density: 700 W/U using power_budget_w / rack_units.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w",
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "maintenance_serviceability",
+        "power_distribution",
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis",
+        "fan_wall_assembly",
+        "hot_swap_fan_carrier",
+        "redundant_power_supply",
+        "tpm_security_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm inlet temperature, airflow, fan curve, acoustic limit, PSU derating and service clearance."
+    },
+    {
+      "id": "engineering_calculation:edge_ai_tops_per_watt",
+      "kind": "engineering_calculation",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Edge AI accelerator efficiency",
+      "claim": "Edge AI accelerator efficiency: 0.29 TOPS/W using compute_tops / power_budget_w.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration",
+        "environmental_interface",
+        "control_compute_communication",
+        "power_distribution",
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module",
+        "fan_wall_assembly",
+        "bmc_management_controller",
+        "redundant_power_supply",
+        "tpm_security_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm workload precision, sustained throughput, accelerator SKU, thermal derating and host overhead."
+    },
+    {
+      "id": "headline_metric:headline_output",
+      "kind": "headline_metric",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Inference throughput",
+      "claim": "Inference throughput = 200 TOPS.",
+      "provenanceRefs": [
+        "class_pack:edge_ai.class_pack",
+        "formula:compute_tops"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review the formula, input values and operating envelope before treating this metric as accepted."
+    },
+    {
+      "id": "brief_requirement:compute_tops",
+      "kind": "brief_requirement",
+      "status": "brief_supplied",
+      "basis": "brief",
+      "scope": "Inference throughput",
+      "claim": "Inference throughput = 200 TOPS.",
+      "provenanceRefs": [
+        "brief:input.brief"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration",
+        "environmental_interface",
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module",
+        "fan_wall_assembly",
+        "bmc_management_controller"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm requirement value, tolerance and acceptance condition with the project owner."
+    },
+    {
+      "id": "brief_requirement:power_budget_w",
+      "kind": "brief_requirement",
+      "status": "brief_supplied",
+      "basis": "brief",
+      "scope": "Power budget",
+      "claim": "Power budget = 700 W.",
+      "provenanceRefs": [
+        "brief:input.brief"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "environmental_interface",
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "redundant_power_supply",
+        "fan_wall_assembly",
+        "tpm_security_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm requirement value, tolerance and acceptance condition with the project owner."
+    },
+    {
+      "id": "brief_requirement:rack_units",
+      "kind": "brief_requirement",
+      "status": "brief_supplied",
+      "basis": "brief",
+      "scope": "Rack height",
+      "claim": "Rack height = 1 U.",
+      "provenanceRefs": [
+        "brief:input.brief"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis",
+        "fan_wall_assembly",
+        "hot_swap_fan_carrier"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm requirement value, tolerance and acceptance condition with the project owner."
+    }
+  ]
+}

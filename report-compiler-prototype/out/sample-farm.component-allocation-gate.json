@@ -1,0 +1,1015 @@
+{
+  "verdict": "allocation_ready",
+  "summary": {
+    "modules": 9,
+    "subModules": 28,
+    "componentWords": 122,
+    "readySubModules": 28,
+    "reviewSubModules": 0,
+    "blockedSubModules": 0,
+    "interfaceCarrierSubModules": 28,
+    "interfaceCarrierWithoutComponents": 0,
+    "requiredCriticalParts": 8,
+    "allocatedCriticalParts": 8,
+    "missingCriticalParts": 0,
+    "bomLines": 122,
+    "criticalBomLines": 8,
+    "duplicateComponentGroups": 0,
+    "duplicateCriticalComponentGroups": 0,
+    "allocationRatio": 1,
+    "criticalAllocationRatio": 1
+  },
+  "subModules": [
+    {
+      "id": "structure_containment:growing_rack_stack",
+      "moduleId": "structure_containment",
+      "moduleName": "Growing Structure And Containment",
+      "subModuleId": "growing_rack_stack",
+      "subModuleName": "Growing rack stack",
+      "purpose": "Supports stacked trays, lighting bars and plant mass.",
+      "interfaces": [
+        "tray_support",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "growing_rack_structure",
+        "aluminium_extrusion_upright",
+        "cross_brace_set",
+        "adjustable_levelling_foot",
+        "tray_slide_rail"
+      ],
+      "componentNames": [
+        "Growing rack structure",
+        "aluminium extrusion upright",
+        "cross brace set",
+        "adjustable levelling foot",
+        "tray slide rail"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "growing_rack_structure"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:crop_tray_carriers",
+      "moduleId": "structure_containment",
+      "moduleName": "Growing Structure And Containment",
+      "subModuleId": "crop_tray_carriers",
+      "subModuleName": "Crop tray carriers",
+      "purpose": "Holds channels, mats and seedlings at controlled spacing.",
+      "interfaces": [
+        "tray_support",
+        "nutrient_loop"
+      ],
+      "componentWordIds": [
+        "food_safe_grow_tray",
+        "nft_channel_insert",
+        "seedling_raft",
+        "root_zone_cover",
+        "tray_drain_fitting"
+      ],
+      "componentNames": [
+        "food-safe grow tray",
+        "NFT channel insert",
+        "seedling raft",
+        "root-zone cover",
+        "tray drain fitting"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:enclosure_panels",
+      "moduleId": "structure_containment",
+      "moduleName": "Growing Structure And Containment",
+      "subModuleId": "enclosure_panels",
+      "subModuleName": "Enclosure panels",
+      "purpose": "Separates humid grow volume from room air and service zones.",
+      "interfaces": [
+        "washdown_boundary",
+        "airflow"
+      ],
+      "componentWordIds": [
+        "washdown_side_panel",
+        "clear_inspection_door",
+        "epdm_door_gasket",
+        "condensate_drip_channel"
+      ],
+      "componentNames": [
+        "washdown side panel",
+        "clear inspection door",
+        "EPDM door gasket",
+        "condensate drip channel"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:horticultural_lighting",
+      "moduleId": "environmental_interface",
+      "moduleName": "Light Climate And Gas Environment",
+      "subModuleId": "horticultural_lighting",
+      "subModuleName": "Horticultural lighting",
+      "purpose": "Delivers crop-specific photosynthetic photon flux to each shelf.",
+      "interfaces": [
+        "lighting_control",
+        "mains_supply",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "led_grow_lights",
+        "dimmable_led_driver",
+        "lighting_suspension_bracket",
+        "ppfd_calibration_target",
+        "glare_shield"
+      ],
+      "componentNames": [
+        "LED grow lights",
+        "dimmable LED driver",
+        "lighting suspension bracket",
+        "PPFD calibration target",
+        "glare shield"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "led_grow_lights"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:canopy_air_mixing",
+      "moduleId": "environmental_interface",
+      "moduleName": "Light Climate And Gas Environment",
+      "subModuleId": "canopy_air_mixing",
+      "subModuleName": "Canopy air mixing",
+      "purpose": "Moves air across leaves to reduce stagnant humidity pockets.",
+      "interfaces": [
+        "airflow",
+        "actuator_bus"
+      ],
+      "componentWordIds": [
+        "air_circulation_fans",
+        "fan_guard_grille",
+        "airflow_baffle_plate",
+        "replaceable_intake_filter"
+      ],
+      "componentNames": [
+        "Air circulation fans",
+        "fan guard grille",
+        "airflow baffle plate",
+        "replaceable intake filter"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "air_circulation_fans"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:humidity_temperature_control",
+      "moduleId": "environmental_interface",
+      "moduleName": "Light Climate And Gas Environment",
+      "subModuleId": "humidity_temperature_control",
+      "subModuleName": "Humidity and temperature control",
+      "purpose": "Maintains crop vapor-pressure deficit and sensible heat balance.",
+      "interfaces": [
+        "airflow",
+        "sensor_bus",
+        "actuator_bus"
+      ],
+      "componentWordIds": [
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay"
+      ],
+      "componentNames": [
+        "dehumidifier module",
+        "heat exchanger coil",
+        "condensate pump",
+        "supply air temperature probe",
+        "humidity control relay"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:co2_enrichment",
+      "moduleId": "environmental_interface",
+      "moduleName": "Light Climate And Gas Environment",
+      "subModuleId": "co2_enrichment",
+      "subModuleName": "CO2 enrichment",
+      "purpose": "Measures and doses CO2 when the growing chamber is closed.",
+      "interfaces": [
+        "airflow",
+        "sensor_bus",
+        "actuator_bus"
+      ],
+      "componentWordIds": [
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube"
+      ],
+      "componentNames": [
+        "CO2 sensor or dosing",
+        "NDIR CO2 sensor head",
+        "CO2 solenoid valve",
+        "gas regulator",
+        "CO2 distribution tube"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "co2_sensor_or_dosing"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:reservoir_plumbing",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Nutrient And Water Transport Process",
+      "subModuleId": "reservoir_plumbing",
+      "subModuleName": "Reservoir and plumbing",
+      "purpose": "Contains nutrient solution and routes it to shelves.",
+      "interfaces": [
+        "nutrient_loop",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "reservoir_and_plumbing_set",
+        "opaque_nutrient_reservoir",
+        "bulkhead_fitting_set",
+        "pvc_u_manifold",
+        "return_drain_header"
+      ],
+      "componentNames": [
+        "Reservoir and plumbing set",
+        "opaque nutrient reservoir",
+        "bulkhead fitting set",
+        "PVC-U manifold",
+        "return drain header"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "reservoir_and_plumbing_set"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:fertigation_pumping",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Nutrient And Water Transport Process",
+      "subModuleId": "fertigation_pumping",
+      "subModuleName": "Fertigation pumping",
+      "purpose": "Moves nutrient solution at controlled flow rate.",
+      "interfaces": [
+        "nutrient_loop",
+        "actuator_bus",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount"
+      ],
+      "componentNames": [
+        "Nutrient pump",
+        "pump isolation valve",
+        "check valve",
+        "flow meter",
+        "pump vibration mount"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "nutrient_pump"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:nutrient_dosing",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Nutrient And Water Transport Process",
+      "subModuleId": "nutrient_dosing",
+      "subModuleName": "Nutrient dosing",
+      "purpose": "Adds nutrient concentrates and pH correction to the reservoir.",
+      "interfaces": [
+        "nutrient_loop",
+        "actuator_bus",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor"
+      ],
+      "componentNames": [
+        "peristaltic dosing pump",
+        "pH dosing pump",
+        "chemical suction lance",
+        "anti-siphon valve",
+        "mixing eductor"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:filtration_sanitation",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Nutrient And Water Transport Process",
+      "subModuleId": "filtration_sanitation",
+      "subModuleName": "Filtration and sanitation",
+      "purpose": "Keeps the nutrient loop clean and serviceable.",
+      "interfaces": [
+        "nutrient_loop",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "inline_mesh_filter",
+        "uv_steriliser",
+        "drain_valve",
+        "sample_port"
+      ],
+      "componentNames": [
+        "inline mesh filter",
+        "UV steriliser",
+        "drain valve",
+        "sample port"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:climate_sensors",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Crop And Process Instrumentation",
+      "subModuleId": "climate_sensors",
+      "subModuleName": "Climate sensors",
+      "purpose": "Measures canopy temperature, humidity and light level.",
+      "interfaces": [
+        "sensor_bus",
+        "airflow"
+      ],
+      "componentWordIds": [
+        "temperature_humidity_probe",
+        "par_light_sensor",
+        "leaf_temperature_sensor",
+        "differential_pressure_switch"
+      ],
+      "componentNames": [
+        "temperature humidity probe",
+        "PAR light sensor",
+        "leaf temperature sensor",
+        "differential pressure switch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:nutrient_sensors",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Crop And Process Instrumentation",
+      "subModuleId": "nutrient_sensors",
+      "subModuleName": "Nutrient sensors",
+      "purpose": "Measures solution chemistry and reservoir level.",
+      "interfaces": [
+        "sensor_bus",
+        "nutrient_loop"
+      ],
+      "componentWordIds": [
+        "ph_probe",
+        "ec_probe",
+        "reservoir_level_sensor",
+        "solution_temperature_probe"
+      ],
+      "componentNames": [
+        "pH probe",
+        "EC probe",
+        "reservoir level sensor",
+        "solution temperature probe"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:crop_observation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Crop And Process Instrumentation",
+      "subModuleId": "crop_observation",
+      "subModuleName": "Crop observation",
+      "purpose": "Captures visual crop evidence and growth state.",
+      "interfaces": [
+        "video_link",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "rgb_crop_camera",
+        "camera_light_shield",
+        "time_lapse_controller",
+        "calibration_colour_card"
+      ],
+      "componentNames": [
+        "RGB crop camera",
+        "camera light shield",
+        "time-lapse controller",
+        "calibration colour card"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:environmental_controller",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Recipe Control And Communications",
+      "subModuleId": "environmental_controller",
+      "subModuleName": "Environmental controller",
+      "purpose": "Coordinates lighting, fertigation, climate and alarms.",
+      "interfaces": [
+        "sensor_bus",
+        "actuator_bus",
+        "lighting_control"
+      ],
+      "componentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module"
+      ],
+      "componentNames": [
+        "Environmental controller",
+        "DIN-rail PLC",
+        "analog input module",
+        "relay output module",
+        "real-time clock module"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "environmental_controller"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:recipe_management",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Recipe Control And Communications",
+      "subModuleId": "recipe_management",
+      "subModuleName": "Recipe management",
+      "purpose": "Stores crop recipes and set-point schedules.",
+      "interfaces": [
+        "operator_network",
+        "lighting_control"
+      ],
+      "componentWordIds": [
+        "recipe_database",
+        "set_point_scheduler",
+        "alarm_historian",
+        "data_export_module"
+      ],
+      "componentNames": [
+        "recipe database",
+        "set-point scheduler",
+        "alarm historian",
+        "data export module"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:remote_monitoring",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Recipe Control And Communications",
+      "subModuleId": "remote_monitoring",
+      "subModuleName": "Remote monitoring",
+      "purpose": "Provides operator status and alerts outside the unit.",
+      "interfaces": [
+        "operator_network",
+        "video_link"
+      ],
+      "componentWordIds": [
+        "industrial_ethernet_switch",
+        "wi_fi_gateway",
+        "mqtt_telemetry_bridge",
+        "sms_alarm_modem"
+      ],
+      "componentNames": [
+        "industrial Ethernet switch",
+        "Wi-Fi gateway",
+        "MQTT telemetry bridge",
+        "SMS alarm modem"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:mains_panel",
+      "moduleId": "power_distribution",
+      "moduleName": "Wet-Zone Power Distribution",
+      "subModuleId": "mains_panel",
+      "subModuleName": "Mains isolation panel",
+      "purpose": "Provides incoming isolation and branch protection.",
+      "interfaces": [
+        "mains_supply",
+        "protective_earth",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "rcd_isolator_panel",
+        "lockable_main_isolator",
+        "rcbo_breaker_bank",
+        "protective_earth_bar",
+        "surge_protection_device"
+      ],
+      "componentNames": [
+        "RCD isolator panel",
+        "lockable main isolator",
+        "RCBO breaker bank",
+        "protective earth bar",
+        "surge protection device"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "rcd_isolator_panel"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:lighting_power",
+      "moduleId": "power_distribution",
+      "moduleName": "Wet-Zone Power Distribution",
+      "subModuleId": "lighting_power",
+      "subModuleName": "Lighting power distribution",
+      "purpose": "Feeds and switches LED drivers by shelf.",
+      "interfaces": [
+        "mains_supply",
+        "lighting_control"
+      ],
+      "componentWordIds": [
+        "lighting_bus_trunk",
+        "ip65_cable_gland_set",
+        "driver_mounting_rail",
+        "fused_spur_module"
+      ],
+      "componentNames": [
+        "lighting bus trunk",
+        "IP65 cable gland set",
+        "driver mounting rail",
+        "fused spur module"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:low_voltage_power",
+      "moduleId": "power_distribution",
+      "moduleName": "Wet-Zone Power Distribution",
+      "subModuleId": "low_voltage_power",
+      "subModuleName": "Low-voltage control power",
+      "purpose": "Feeds sensors, controller and communication devices.",
+      "interfaces": [
+        "actuator_bus",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "24_v_dc_power_supply",
+        "dc_distribution_terminal",
+        "ups_buffer_module",
+        "control_cabinet_heater"
+      ],
+      "componentNames": [
+        "24 V DC power supply",
+        "DC distribution terminal",
+        "UPS buffer module",
+        "control cabinet heater"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:leak_containment",
+      "moduleId": "safety_protection",
+      "moduleName": "Food-Safe Safety And Protection",
+      "subModuleId": "leak_containment",
+      "subModuleName": "Leak containment",
+      "purpose": "Detects and contains nutrient leaks before they reach electrical zones.",
+      "interfaces": [
+        "washdown_boundary",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "leak_detection_rope",
+        "bunded_base_tray",
+        "overflow_standpipe",
+        "floor_drain_adapter"
+      ],
+      "componentNames": [
+        "leak detection rope",
+        "bunded base tray",
+        "overflow standpipe",
+        "floor drain adapter"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:operator_interlocks",
+      "moduleId": "safety_protection",
+      "moduleName": "Food-Safe Safety And Protection",
+      "subModuleId": "operator_interlocks",
+      "subModuleName": "Operator interlocks",
+      "purpose": "Reduces exposure to bright light, moving fans and chemicals during service.",
+      "interfaces": [
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "door_interlock_switch",
+        "lighting_inhibit_relay",
+        "chemical_storage_latch",
+        "emergency_stop_button"
+      ],
+      "componentNames": [
+        "door interlock switch",
+        "lighting inhibit relay",
+        "chemical storage latch",
+        "emergency stop button"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:food_contact_controls",
+      "moduleId": "safety_protection",
+      "moduleName": "Food-Safe Safety And Protection",
+      "subModuleId": "food_contact_controls",
+      "subModuleName": "Food contact controls",
+      "purpose": "Keeps crop-facing components cleanable and traceable.",
+      "interfaces": [
+        "washdown_boundary",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "food_grade_tubing_set",
+        "cleaning_validation_swab_kit",
+        "material_traceability_label",
+        "washdown_sop_placard"
+      ],
+      "componentNames": [
+        "food-grade tubing set",
+        "cleaning validation swab kit",
+        "material traceability label",
+        "washdown SOP placard"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:harvest_access",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Harvest Cleaning And Serviceability",
+      "subModuleId": "harvest_access",
+      "subModuleName": "Harvest access",
+      "purpose": "Allows ergonomic crop removal and replanting.",
+      "interfaces": [
+        "service_access",
+        "tray_support"
+      ],
+      "componentWordIds": [
+        "slide_out_tray_handle",
+        "shelf_stop_latch",
+        "harvest_work_ledge",
+        "removable_seedling_cassette"
+      ],
+      "componentNames": [
+        "slide-out tray handle",
+        "shelf stop latch",
+        "harvest work ledge",
+        "removable seedling cassette"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:cleaning_access",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Harvest Cleaning And Serviceability",
+      "subModuleId": "cleaning_access",
+      "subModuleName": "Cleaning access",
+      "purpose": "Allows sanitation of wet and crop-contact areas.",
+      "interfaces": [
+        "washdown_boundary",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "quick_release_manifold_union",
+        "removable_sump_screen",
+        "washdown_hose_connection",
+        "drying_fan_mode_switch"
+      ],
+      "componentNames": [
+        "quick-release manifold union",
+        "removable sump screen",
+        "washdown hose connection",
+        "drying fan mode switch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:consumable_service",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Harvest Cleaning And Serviceability",
+      "subModuleId": "consumable_service",
+      "subModuleName": "Consumable service",
+      "purpose": "Makes filters, probes and dosing consumables replaceable.",
+      "interfaces": [
+        "service_access",
+        "nutrient_loop"
+      ],
+      "componentWordIds": [
+        "filter_service_hatch",
+        "probe_calibration_cup",
+        "dosing_bottle_tray",
+        "spare_gasket_kit"
+      ],
+      "componentNames": [
+        "filter service hatch",
+        "probe calibration cup",
+        "dosing bottle tray",
+        "spare gasket kit"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:local_hmi",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Operator HMI And Labelling",
+      "subModuleId": "local_hmi",
+      "subModuleName": "Local HMI",
+      "purpose": "Provides local status, recipe selection and alarm acknowledgement.",
+      "interfaces": [
+        "operator_network",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "touchscreen_hmi",
+        "recipe_selector_control",
+        "alarm_buzzer_beacon",
+        "usb_data_export_port"
+      ],
+      "componentNames": [
+        "touchscreen HMI",
+        "recipe selector control",
+        "alarm buzzer beacon",
+        "USB data export port"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:labelling_workflows",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Operator HMI And Labelling",
+      "subModuleId": "labelling_workflows",
+      "subModuleName": "Labelling and workflows",
+      "purpose": "Communicates hazards, cleaning steps and crop lot identity.",
+      "interfaces": [
+        "service_access"
+      ],
+      "componentWordIds": [
+        "crop_lot_label_holder",
+        "chemical_hazard_label_set",
+        "cleaning_checklist_card",
+        "electrical_isolation_placard"
+      ],
+      "componentNames": [
+        "crop lot label holder",
+        "chemical hazard label set",
+        "cleaning checklist card",
+        "electrical isolation placard"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    }
+  ],
+  "criticalParts": [
+    {
+      "componentWordId": "led_grow_lights",
+      "label": "LED grow lights",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "horticultural_lighting"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "nutrient_pump",
+      "label": "Nutrient pump",
+      "allocated": true,
+      "moduleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "subModuleIds": [
+        "fertigation_pumping"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "co2_sensor_or_dosing",
+      "label": "CO2 sensor or dosing",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "co2_enrichment"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "growing_rack_structure",
+      "label": "Growing rack structure",
+      "allocated": true,
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "subModuleIds": [
+        "growing_rack_stack"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "air_circulation_fans",
+      "label": "Air circulation fans",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "canopy_air_mixing"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "environmental_controller",
+      "label": "Environmental controller",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "environmental_controller"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "reservoir_and_plumbing_set",
+      "label": "Reservoir and plumbing set",
+      "allocated": true,
+      "moduleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "subModuleIds": [
+        "reservoir_plumbing"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "rcd_isolator_panel",
+      "label": "RCD isolator panel",
+      "allocated": true,
+      "moduleIds": [
+        "power_distribution"
+      ],
+      "subModuleIds": [
+        "mains_panel"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    }
+  ],
+  "duplicateGroups": [],
+  "blockers": [],
+  "nextActions": []
+}

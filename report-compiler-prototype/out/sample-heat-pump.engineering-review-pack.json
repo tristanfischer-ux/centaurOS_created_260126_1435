@@ -1,0 +1,2438 @@
+{
+  "summary": {
+    "rows": 69,
+    "accepted": 0,
+    "readyForReview": 47,
+    "needsReview": 22,
+    "blocked": 0,
+    "moduleQuestions": 10,
+    "subModuleQuestions": 31,
+    "interfaceQuestions": 4,
+    "calculationQuestions": 2,
+    "assumptionQuestions": 22
+  },
+  "questions": [
+    {
+      "id": "assumption_resolution:compliance:EN-14511",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "EN-14511",
+      "reviewerQuestion": "Can the EN-14511 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Capacity, COP and operating-point test evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:EN-378",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "EN-378",
+      "reviewerQuestion": "Can the EN-378 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Refrigerant charge, pressure protection and safety assessment.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:EN-60335-2-40",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "EN-60335-2-40",
+      "reviewerQuestion": "Can the EN-60335-2-40 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Electrical safety, leakage, temperature and abnormal-operation evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_main_controller_heat_pump_controller_pcb",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Heat pump controller PCB",
+      "reviewerQuestion": "Can the Heat pump controller PCB assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "heat_pump_controller_pcb"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_conversion_transduction_compressor_inverter_stage_inverter_scroll_compressor",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Inverter scroll compressor",
+      "reviewerQuestion": "Can the Inverter scroll compressor assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_conversion_transduction_expansion_metering_stage_electronic_expansion_valve",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Electronic expansion valve",
+      "reviewerQuestion": "Can the Electronic expansion valve assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "electronic_expansion_valve"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_fan_air_path_variable_speed_fan_assembly",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Variable-speed fan assembly",
+      "reviewerQuestion": "Can the Variable-speed fan assembly assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "variable_speed_fan_assembly"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_outdoor_evaporator_outdoor_finned_evaporator_coil",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Outdoor finned evaporator coil",
+      "reviewerQuestion": "Can the Outdoor finned evaporator coil assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "outdoor_finned_evaporator_coil"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:mass_fluid_transport_process_circulation_pump_group_hydronic_circulation_pump",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Hydronic circulation pump",
+      "reviewerQuestion": "Can the Hydronic circulation pump assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "hydronic_circulation_pump"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:mass_fluid_transport_process_condenser_heat_exchanger_brazed_plate_heat_exchanger",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Brazed plate heat exchanger",
+      "reviewerQuestion": "Can the Brazed plate heat exchanger assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "brazed_plate_heat_exchanger"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:mass_fluid_transport_process_hydronic_safety_group_hydronic_safety_valve_kit",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Hydronic safety valve kit",
+      "reviewerQuestion": "Can the Hydronic safety valve kit assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "hydronic_safety_valve_kit"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_refrigerant_sensing_refrigerant_sensor_and_pressure_transducers",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Refrigerant sensor and pressure transducers",
+      "reviewerQuestion": "Can the Refrigerant sensor and pressure transducers assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:energy_conversion_transduction:control_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> energy_conversion_transduction",
+      "reviewerQuestion": "Can the control_compute_communication -> energy_conversion_transduction assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:energy_conversion_transduction:mass_fluid_transport_process:hydronic_loop",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "energy_conversion_transduction -> mass_fluid_transport_process",
+      "reviewerQuestion": "Can the energy_conversion_transduction -> mass_fluid_transport_process assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "hydronic_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:environmental_interface:energy_conversion_transduction:refrigerant_loop",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "environmental_interface -> energy_conversion_transduction",
+      "reviewerQuestion": "Can the environmental_interface -> energy_conversion_transduction assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "refrigerant_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "reviewerQuestion": "Can the sensing_instrumentation -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:capex_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated CAPEX",
+      "reviewerQuestion": "Can the Estimated CAPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:headline_output",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Annual useful heat output",
+      "reviewerQuestion": "Can the Annual useful heat output assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:opex_annual_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated annual OPEX",
+      "reviewerQuestion": "Can the Estimated annual OPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:heatpump_cop_input_power",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "COP And Input Power",
+      "reviewerQuestion": "Can the COP And Input Power assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction",
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "control_compute_communication",
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:heatpump_refrigerant_hydronic_closure",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Refrigerant/Hydronic Closure",
+      "reviewerQuestion": "Can the Refrigerant/Hydronic Closure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction",
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "control_compute_communication",
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:heatpump_safety_serviceability",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Safety And Serviceability Interfaces",
+      "reviewerQuestion": "Can the Safety And Serviceability Interfaces assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:heat_pump_cop_envelope",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Heat pump COP envelope",
+      "reviewerQuestion": "Does the Heat pump COP envelope calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm EN 14511 or local rating point, flow temperature, refrigerant and ambient condition.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction",
+        "control_compute_communication",
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "heat_pump_cop_envelope"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:heat_pump_electrical_input_kw",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Heat pump electrical input",
+      "reviewerQuestion": "Does the Heat pump electrical input calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm COP rating condition, compressor input power, pump/fan auxiliaries and defrost allowance.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction",
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "control_compute_communication",
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "heat_pump_electrical_input_kw"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_contract:control_compute_communication:energy_conversion_transduction:control_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication -> Refrigerant Energy Conversion via control_bus",
+      "reviewerQuestion": "Is the control_bus interface between Control Compute Communication and Refrigerant Energy Conversion correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "main_controller",
+        "power_driver_io",
+        "compressor_inverter_stage",
+        "expansion_metering_stage"
+      ],
+      "linkedComponentWordIds": [
+        "heat_pump_controller_pcb",
+        "controller_enclosure",
+        "real_time_clock_module",
+        "non_volatile_fault_memory",
+        "compressor_contactor",
+        "pump_relay_output",
+        "fan_pwm_output_board",
+        "safety_chain_input_terminal",
+        "inverter_scroll_compressor",
+        "compressor_inverter_drive",
+        "compressor_mounting_grommet_set",
+        "crankcase_heater_band",
+        "electronic_expansion_valve",
+        "eev_stepper_harness",
+        "liquid_line_filter_drier",
+        "sight_glass_indicator"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:energy_conversion_transduction:mass_fluid_transport_process:hydronic_loop",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Refrigerant Energy Conversion -> Hydronic Heat Delivery via hydronic_loop",
+      "reviewerQuestion": "Is the hydronic_loop interface between Refrigerant Energy Conversion and Hydronic Heat Delivery correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction",
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "condenser_coupling_boundary",
+        "condenser_heat_exchanger",
+        "circulation_pump_group",
+        "hydronic_safety_group"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_stub_out_pair",
+        "hydronic_stub_out_pair",
+        "plate_heat_exchanger_mounting_bracket",
+        "condenser_insulation_sleeve",
+        "brazed_plate_heat_exchanger",
+        "plate_exchanger_insulation_jacket",
+        "water_outlet_temperature_sensor",
+        "refrigerant_outlet_temperature_sensor",
+        "hydronic_circulation_pump",
+        "pump_isolation_valve_pair",
+        "flow_proving_switch",
+        "strainer_filter",
+        "hydronic_safety_valve_kit",
+        "expansion_vessel",
+        "automatic_air_vent",
+        "fill_and_drain_valve_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "hydronic_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:environmental_interface:energy_conversion_transduction:refrigerant_loop",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Outdoor Air Interface -> Refrigerant Energy Conversion via refrigerant_loop",
+      "reviewerQuestion": "Is the refrigerant_loop interface between Outdoor Air Interface and Refrigerant Energy Conversion correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface",
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "outdoor_evaporator",
+        "compressor_inverter_stage",
+        "expansion_metering_stage",
+        "refrigerant_manifold",
+        "condenser_coupling_boundary"
+      ],
+      "linkedComponentWordIds": [
+        "outdoor_finned_evaporator_coil",
+        "coil_temperature_sensor",
+        "coil_guard_grille",
+        "hydrophilic_fin_coating",
+        "inverter_scroll_compressor",
+        "compressor_inverter_drive",
+        "compressor_mounting_grommet_set",
+        "crankcase_heater_band",
+        "electronic_expansion_valve",
+        "eev_stepper_harness",
+        "liquid_line_filter_drier",
+        "sight_glass_indicator",
+        "copper_refrigerant_tube_set",
+        "service_valve_pair",
+        "brazed_joint_sleeve_set",
+        "refrigerant_charge_label",
+        "refrigerant_stub_out_pair",
+        "hydronic_stub_out_pair",
+        "plate_heat_exchanger_mounting_bracket",
+        "condenser_insulation_sleeve"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "refrigerant_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Sensing Instrumentation -> Control Compute Communication via sensor_bus",
+      "reviewerQuestion": "Is the sensor_bus interface between Sensing Instrumentation and Control Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "refrigerant_sensing",
+        "water_sensing",
+        "ambient_sensing",
+        "main_controller",
+        "service_communications"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers",
+        "suction_temperature_probe",
+        "discharge_temperature_probe",
+        "refrigerant_leak_sensor",
+        "flow_temperature_sensor",
+        "return_temperature_sensor",
+        "flow_meter_cartridge",
+        "water_pressure_transducer",
+        "ambient_temperature_sensor",
+        "ambient_humidity_sensor",
+        "air_pressure_switch",
+        "rain_ingress_sensor",
+        "heat_pump_controller_pcb",
+        "controller_enclosure",
+        "real_time_clock_module",
+        "non_volatile_fault_memory",
+        "modbus_service_port",
+        "usb_commissioning_adapter",
+        "fault_led_stack",
+        "installer_qr_code_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication",
+      "reviewerQuestion": "Does Control Compute Communication have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "main_controller",
+        "power_driver_io",
+        "service_communications"
+      ],
+      "linkedComponentWordIds": [
+        "heat_pump_controller_pcb",
+        "controller_enclosure",
+        "real_time_clock_module",
+        "non_volatile_fault_memory",
+        "compressor_contactor",
+        "pump_relay_output",
+        "fan_pwm_output_board",
+        "safety_chain_input_terminal",
+        "modbus_service_port",
+        "usb_commissioning_adapter",
+        "fault_led_stack",
+        "installer_qr_code_label"
+      ],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "control_bus",
+        "sensor_bus",
+        "service_port",
+        "alarm_bus",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:energy_conversion_transduction",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Refrigerant Energy Conversion",
+      "reviewerQuestion": "Does Refrigerant Energy Conversion have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "compressor_inverter_stage",
+        "expansion_metering_stage",
+        "refrigerant_manifold",
+        "condenser_coupling_boundary"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor",
+        "compressor_inverter_drive",
+        "compressor_mounting_grommet_set",
+        "crankcase_heater_band",
+        "electronic_expansion_valve",
+        "eev_stepper_harness",
+        "liquid_line_filter_drier",
+        "sight_glass_indicator",
+        "copper_refrigerant_tube_set",
+        "service_valve_pair",
+        "brazed_joint_sleeve_set",
+        "refrigerant_charge_label",
+        "refrigerant_stub_out_pair",
+        "hydronic_stub_out_pair",
+        "plate_heat_exchanger_mounting_bracket",
+        "condenser_insulation_sleeve"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "refrigerant_loop",
+        "hydronic_loop",
+        "control_bus",
+        "protective_earth",
+        "service_access",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Outdoor Air Interface",
+      "reviewerQuestion": "Does Outdoor Air Interface have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "outdoor_evaporator",
+        "fan_air_path",
+        "defrost_condensate"
+      ],
+      "linkedComponentWordIds": [
+        "outdoor_finned_evaporator_coil",
+        "coil_temperature_sensor",
+        "coil_guard_grille",
+        "hydrophilic_fin_coating",
+        "variable_speed_fan_assembly",
+        "ec_fan_motor_controller",
+        "fan_shroud",
+        "inlet_debris_screen",
+        "condensate_drain_tray",
+        "trace_heater_cable",
+        "defrost_temperature_probe",
+        "drain_hose_barb"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedInterfaceIds": [
+        "refrigerant_loop",
+        "airflow_path",
+        "condensate_drain",
+        "sensor_bus",
+        "control_bus",
+        "protective_earth",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:hmi_ergonomics",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "User And Installer Interface",
+      "reviewerQuestion": "Does User And Installer Interface have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "local_display",
+        "remote_thermostat_interface",
+        "alarm_and_user_guidance"
+      ],
+      "linkedComponentWordIds": [
+        "lcd_status_display",
+        "menu_button_membrane",
+        "weatherproof_display_window",
+        "mode_indicator_led_set",
+        "thermostat_input_terminal",
+        "modbus_room_controller_link",
+        "demand_signal_opto_isolator",
+        "installer_wiring_label",
+        "alarm_relay_output",
+        "user_quick_start_label",
+        "fault_reset_button",
+        "qr_service_documentation_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_port",
+        "alarm_bus",
+        "control_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Maintenance And Commissioning",
+      "reviewerQuestion": "Does Maintenance And Commissioning have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "commissioning_ports",
+        "filter_service",
+        "diagnostic_access"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_service_port_cap_set",
+        "hydronic_drain_cock",
+        "pressure_gauge_pocket",
+        "commissioning_checklist_card",
+        "cleanable_y_strainer_basket",
+        "coil_cleaning_access_cover",
+        "service_interval_label",
+        "spare_gasket_kit",
+        "diagnostic_test_header",
+        "fault_code_label",
+        "data_log_export_button",
+        "installer_handover_record"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "service_port",
+        "refrigerant_loop",
+        "hydronic_loop",
+        "airflow_path",
+        "sensor_bus",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:mass_fluid_transport_process",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Hydronic Heat Delivery",
+      "reviewerQuestion": "Does Hydronic Heat Delivery have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "condenser_heat_exchanger",
+        "circulation_pump_group",
+        "hydronic_safety_group"
+      ],
+      "linkedComponentWordIds": [
+        "brazed_plate_heat_exchanger",
+        "plate_exchanger_insulation_jacket",
+        "water_outlet_temperature_sensor",
+        "refrigerant_outlet_temperature_sensor",
+        "hydronic_circulation_pump",
+        "pump_isolation_valve_pair",
+        "flow_proving_switch",
+        "strainer_filter",
+        "hydronic_safety_valve_kit",
+        "expansion_vessel",
+        "automatic_air_vent",
+        "fill_and_drain_valve_set"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedInterfaceIds": [
+        "hydronic_loop",
+        "pressure_relief",
+        "sensor_bus",
+        "service_access",
+        "refrigerant_loop",
+        "control_bus",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Electrical Power Distribution",
+      "reviewerQuestion": "Does Electrical Power Distribution have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "mains_input_protection",
+        "internal_power_rails",
+        "cable_management"
+      ],
+      "linkedComponentWordIds": [
+        "lockable_isolator_switch",
+        "mcb_breaker_set",
+        "rcd_protection_device",
+        "surge_protection_device",
+        "24_v_dc_power_supply",
+        "terminal_rail_assembly",
+        "fused_auxiliary_terminal",
+        "protective_earth_bar",
+        "segregated_cable_duct",
+        "ip_rated_cable_gland_set",
+        "emc_ferrite_clamp_set",
+        "wiring_diagram_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mains_supply",
+        "protective_earth",
+        "control_bus",
+        "service_access",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Safety Protection",
+      "reviewerQuestion": "Does Safety Protection have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "refrigerant_safety",
+        "hydronic_freeze_protection",
+        "electrical_safety"
+      ],
+      "linkedComponentWordIds": [
+        "high_pressure_cut_out_switch",
+        "low_pressure_cut_out_switch",
+        "refrigerant_leak_alarm_output",
+        "refrigerant_warning_label",
+        "anti_freeze_thermostat",
+        "backup_immersion_heater_relay",
+        "drain_down_instruction_label",
+        "glycol_compatibility_tag",
+        "earth_continuity_test_point",
+        "touch_safe_terminal_cover",
+        "over_temperature_cut_out",
+        "safety_compliance_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "pressure_relief",
+        "alarm_bus",
+        "protective_earth",
+        "sensor_bus",
+        "refrigerant_loop",
+        "hydronic_loop",
+        "control_bus",
+        "mains_supply"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Sensing Instrumentation",
+      "reviewerQuestion": "Does Sensing Instrumentation have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "refrigerant_sensing",
+        "water_sensing",
+        "ambient_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers",
+        "suction_temperature_probe",
+        "discharge_temperature_probe",
+        "refrigerant_leak_sensor",
+        "flow_temperature_sensor",
+        "return_temperature_sensor",
+        "flow_meter_cartridge",
+        "water_pressure_transducer",
+        "ambient_temperature_sensor",
+        "ambient_humidity_sensor",
+        "air_pressure_switch",
+        "rain_ingress_sensor"
+      ],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "refrigerant_loop",
+        "hydronic_loop",
+        "airflow_path"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Monobloc Structure And Containment",
+      "reviewerQuestion": "Does Monobloc Structure And Containment have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "weatherproof_cabinet",
+        "mounting_base",
+        "service_access_panels"
+      ],
+      "linkedComponentWordIds": [
+        "galvanised_steel_cabinet",
+        "powder_coated_access_panel",
+        "epdm_door_gasket",
+        "ip_rated_fastener_set",
+        "anti_vibration_foot_set",
+        "base_rail_pair",
+        "condensate_fall_spacer",
+        "lifting_lug_set",
+        "removable_service_panel",
+        "hinged_controller_cover",
+        "quarter_turn_latch_set",
+        "service_clearance_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "airflow_path",
+        "condensate_drain",
+        "service_access",
+        "mechanical_mounts",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:main_controller",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Main controller",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Main controller make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "main_controller"
+      ],
+      "linkedComponentWordIds": [
+        "heat_pump_controller_pcb",
+        "controller_enclosure",
+        "real_time_clock_module",
+        "non_volatile_fault_memory"
+      ],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "control_bus",
+        "sensor_bus",
+        "service_port"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:power_driver_io",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Power driver IO",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Power driver IO make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "power_driver_io"
+      ],
+      "linkedComponentWordIds": [
+        "compressor_contactor",
+        "pump_relay_output",
+        "fan_pwm_output_board",
+        "safety_chain_input_terminal"
+      ],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "control_bus",
+        "protective_earth",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:service_communications",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Service communications",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Service communications make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "service_communications"
+      ],
+      "linkedComponentWordIds": [
+        "modbus_service_port",
+        "usb_commissioning_adapter",
+        "fault_led_stack",
+        "installer_qr_code_label"
+      ],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "service_port",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:compressor_inverter_stage",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Refrigerant Energy Conversion / Compressor inverter stage",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Compressor inverter stage make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "compressor_inverter_stage"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor",
+        "compressor_inverter_drive",
+        "compressor_mounting_grommet_set",
+        "crankcase_heater_band"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "refrigerant_loop",
+        "control_bus",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:condenser_coupling_boundary",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Refrigerant Energy Conversion / Condenser coupling boundary",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Condenser coupling boundary make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "condenser_coupling_boundary"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_stub_out_pair",
+        "hydronic_stub_out_pair",
+        "plate_heat_exchanger_mounting_bracket",
+        "condenser_insulation_sleeve"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "refrigerant_loop",
+        "hydronic_loop",
+        "sensor_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:expansion_metering_stage",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Refrigerant Energy Conversion / Expansion metering stage",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Expansion metering stage make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "expansion_metering_stage"
+      ],
+      "linkedComponentWordIds": [
+        "electronic_expansion_valve",
+        "eev_stepper_harness",
+        "liquid_line_filter_drier",
+        "sight_glass_indicator"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "refrigerant_loop",
+        "control_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:refrigerant_manifold",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Refrigerant Energy Conversion / Refrigerant manifold",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Refrigerant manifold make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "refrigerant_manifold"
+      ],
+      "linkedComponentWordIds": [
+        "copper_refrigerant_tube_set",
+        "service_valve_pair",
+        "brazed_joint_sleeve_set",
+        "refrigerant_charge_label"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "refrigerant_loop",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:defrost_condensate",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Outdoor Air Interface / Defrost and condensate path",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Defrost and condensate path make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "defrost_condensate"
+      ],
+      "linkedComponentWordIds": [
+        "condensate_drain_tray",
+        "trace_heater_cable",
+        "defrost_temperature_probe",
+        "drain_hose_barb"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedInterfaceIds": [
+        "condensate_drain",
+        "sensor_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:fan_air_path",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Outdoor Air Interface / Fan air path",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Fan air path make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "fan_air_path"
+      ],
+      "linkedComponentWordIds": [
+        "variable_speed_fan_assembly",
+        "ec_fan_motor_controller",
+        "fan_shroud",
+        "inlet_debris_screen"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedInterfaceIds": [
+        "airflow_path",
+        "control_bus",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:outdoor_evaporator",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Outdoor Air Interface / Outdoor evaporator",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Outdoor evaporator make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "outdoor_evaporator"
+      ],
+      "linkedComponentWordIds": [
+        "outdoor_finned_evaporator_coil",
+        "coil_temperature_sensor",
+        "coil_guard_grille",
+        "hydrophilic_fin_coating"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedInterfaceIds": [
+        "refrigerant_loop",
+        "airflow_path",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:alarm_and_user_guidance",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "User And Installer Interface / Alarm and user guidance",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Alarm and user guidance make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "alarm_and_user_guidance"
+      ],
+      "linkedComponentWordIds": [
+        "alarm_relay_output",
+        "user_quick_start_label",
+        "fault_reset_button",
+        "qr_service_documentation_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "alarm_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:local_display",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "User And Installer Interface / Local display",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Local display make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "local_display"
+      ],
+      "linkedComponentWordIds": [
+        "lcd_status_display",
+        "menu_button_membrane",
+        "weatherproof_display_window",
+        "mode_indicator_led_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "control_bus",
+        "service_port"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:remote_thermostat_interface",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "User And Installer Interface / Remote thermostat interface",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Remote thermostat interface make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "remote_thermostat_interface"
+      ],
+      "linkedComponentWordIds": [
+        "thermostat_input_terminal",
+        "modbus_room_controller_link",
+        "demand_signal_opto_isolator",
+        "installer_wiring_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "control_bus",
+        "service_port"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:commissioning_ports",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Maintenance And Commissioning / Commissioning ports",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Commissioning ports make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "commissioning_ports"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_service_port_cap_set",
+        "hydronic_drain_cock",
+        "pressure_gauge_pocket",
+        "commissioning_checklist_card"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "refrigerant_loop",
+        "hydronic_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:diagnostic_access",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Maintenance And Commissioning / Diagnostic access",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Diagnostic access make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "diagnostic_access"
+      ],
+      "linkedComponentWordIds": [
+        "diagnostic_test_header",
+        "fault_code_label",
+        "data_log_export_button",
+        "installer_handover_record"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_port",
+        "sensor_bus",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:filter_service",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Maintenance And Commissioning / Filter service",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Filter service make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "filter_service"
+      ],
+      "linkedComponentWordIds": [
+        "cleanable_y_strainer_basket",
+        "coil_cleaning_access_cover",
+        "service_interval_label",
+        "spare_gasket_kit"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "hydronic_loop",
+        "airflow_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:circulation_pump_group",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Hydronic Heat Delivery / Circulation pump group",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Circulation pump group make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "circulation_pump_group"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_circulation_pump",
+        "pump_isolation_valve_pair",
+        "flow_proving_switch",
+        "strainer_filter"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedInterfaceIds": [
+        "hydronic_loop",
+        "control_bus",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:condenser_heat_exchanger",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Hydronic Heat Delivery / Condenser heat exchanger",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Condenser heat exchanger make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "condenser_heat_exchanger"
+      ],
+      "linkedComponentWordIds": [
+        "brazed_plate_heat_exchanger",
+        "plate_exchanger_insulation_jacket",
+        "water_outlet_temperature_sensor",
+        "refrigerant_outlet_temperature_sensor"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedInterfaceIds": [
+        "refrigerant_loop",
+        "hydronic_loop",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:hydronic_safety_group",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Hydronic Heat Delivery / Hydronic safety group",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Hydronic safety group make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "hydronic_safety_group"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_safety_valve_kit",
+        "expansion_vessel",
+        "automatic_air_vent",
+        "fill_and_drain_valve_set"
+      ],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedInterfaceIds": [
+        "hydronic_loop",
+        "pressure_relief",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:cable_management",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Electrical Power Distribution / Cable management",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Cable management make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "cable_management"
+      ],
+      "linkedComponentWordIds": [
+        "segregated_cable_duct",
+        "ip_rated_cable_gland_set",
+        "emc_ferrite_clamp_set",
+        "wiring_diagram_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "sensor_bus",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:internal_power_rails",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Electrical Power Distribution / Internal power rails",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Internal power rails make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "internal_power_rails"
+      ],
+      "linkedComponentWordIds": [
+        "24_v_dc_power_supply",
+        "terminal_rail_assembly",
+        "fused_auxiliary_terminal",
+        "protective_earth_bar"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mains_supply",
+        "control_bus",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:mains_input_protection",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Electrical Power Distribution / Mains input protection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Mains input protection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "mains_input_protection"
+      ],
+      "linkedComponentWordIds": [
+        "lockable_isolator_switch",
+        "mcb_breaker_set",
+        "rcd_protection_device",
+        "surge_protection_device"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mains_supply",
+        "protective_earth",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:electrical_safety",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Safety Protection / Electrical safety",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Electrical safety make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "electrical_safety"
+      ],
+      "linkedComponentWordIds": [
+        "earth_continuity_test_point",
+        "touch_safe_terminal_cover",
+        "over_temperature_cut_out",
+        "safety_compliance_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "protective_earth",
+        "mains_supply",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:hydronic_freeze_protection",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Safety Protection / Hydronic freeze protection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Hydronic freeze protection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "hydronic_freeze_protection"
+      ],
+      "linkedComponentWordIds": [
+        "anti_freeze_thermostat",
+        "backup_immersion_heater_relay",
+        "drain_down_instruction_label",
+        "glycol_compatibility_tag"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "hydronic_loop",
+        "sensor_bus",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:refrigerant_safety",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Safety Protection / Refrigerant safety",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Refrigerant safety make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "refrigerant_safety"
+      ],
+      "linkedComponentWordIds": [
+        "high_pressure_cut_out_switch",
+        "low_pressure_cut_out_switch",
+        "refrigerant_leak_alarm_output",
+        "refrigerant_warning_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "refrigerant_loop",
+        "sensor_bus",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:ambient_sensing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Sensing Instrumentation / Ambient sensing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Ambient sensing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "ambient_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "ambient_temperature_sensor",
+        "ambient_humidity_sensor",
+        "air_pressure_switch",
+        "rain_ingress_sensor"
+      ],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "airflow_path"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:refrigerant_sensing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Sensing Instrumentation / Refrigerant sensing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Refrigerant sensing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "refrigerant_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers",
+        "suction_temperature_probe",
+        "discharge_temperature_probe",
+        "refrigerant_leak_sensor"
+      ],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "refrigerant_loop"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:water_sensing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Sensing Instrumentation / Water sensing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Water sensing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "water_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "flow_temperature_sensor",
+        "return_temperature_sensor",
+        "flow_meter_cartridge",
+        "water_pressure_transducer"
+      ],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "hydronic_loop"
+      ],
+      "linkedCalculationIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:mounting_base",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Monobloc Structure And Containment / Mounting base",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Mounting base make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "mounting_base"
+      ],
+      "linkedComponentWordIds": [
+        "anti_vibration_foot_set",
+        "base_rail_pair",
+        "condensate_fall_spacer",
+        "lifting_lug_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mechanical_mounts",
+        "condensate_drain"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:service_access_panels",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Monobloc Structure And Containment / Service access panels",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Service access panels make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "service_access_panels"
+      ],
+      "linkedComponentWordIds": [
+        "removable_service_panel",
+        "hinged_controller_cover",
+        "quarter_turn_latch_set",
+        "service_clearance_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:weatherproof_cabinet",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Monobloc Structure And Containment / Weatherproof cabinet",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Weatherproof cabinet make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "weatherproof_cabinet"
+      ],
+      "linkedComponentWordIds": [
+        "galvanised_steel_cabinet",
+        "powder_coated_access_panel",
+        "epdm_door_gasket",
+        "ip_rated_fastener_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "airflow_path",
+        "service_access",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    }
+  ]
+}

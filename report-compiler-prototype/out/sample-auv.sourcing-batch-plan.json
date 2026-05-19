@@ -1,0 +1,3232 @@
+{
+  "summary": {
+    "closureRows": 108,
+    "batches": 2,
+    "activeBatches": 1,
+    "waitingBatches": 0,
+    "deferredBatches": 1,
+    "activeRows": 12,
+    "waitingRows": 0,
+    "deferredRows": 96,
+    "procurementBlockingRows": 12,
+    "criticalSourceRows": 12,
+    "repairRows": 0,
+    "protocolReplacementRows": 0,
+    "identityRows": 0,
+    "candidateDeferredRows": 96,
+    "nextBatchId": "sourcing-batch:2:critical_source_collection",
+    "nextItemId": "critical_source_collection:1:thruster_set",
+    "canUseForProcurement": false
+  },
+  "batches": [
+    {
+      "id": "sourcing-batch:2:critical_source_collection",
+      "sequence": 2,
+      "kind": "critical_source_collection",
+      "title": "Collect Critical Source Evidence",
+      "status": "active",
+      "rowCount": 12,
+      "readyRows": 12,
+      "blockedRows": 0,
+      "deferredRows": 0,
+      "procurementBlockingRows": 12,
+      "entryCriteria": [
+        "Architecture has identified critical BoM lines that are not source-backed."
+      ],
+      "exitCriteria": [
+        "Every critical line has admitted supplier/manufacturer/MPN/unit-cost evidence."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "critical_source_collection:1:thruster_set",
+          "closureRowId": "bom-close:actuation_kinematics_thruster_array_thruster_set",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "thruster_set",
+          "description": "Thruster set",
+          "searchTerms": [
+            "Thruster set",
+            "Thruster set manufacturer part number",
+            "Thruster set catalogue price GBP",
+            "Thruster set datasheet",
+            "Thruster set AUV underwater",
+            "Thruster set subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:2:acoustic_modem",
+          "closureRowId": "bom-close:control_compute_communication_acoustic_communications_acoustic_modem",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "acoustic_modem",
+          "description": "Acoustic modem",
+          "searchTerms": [
+            "Acoustic modem",
+            "Acoustic modem manufacturer part number",
+            "Acoustic modem catalogue price GBP",
+            "Acoustic modem datasheet",
+            "Acoustic modem AUV underwater",
+            "Acoustic modem subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:3:mission_computer",
+          "closureRowId": "bom-close:control_compute_communication_mission_computer_stack_mission_computer",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "mission_computer",
+          "description": "Mission computer",
+          "searchTerms": [
+            "Mission computer",
+            "Mission computer manufacturer part number",
+            "Mission computer catalogue price GBP",
+            "Mission computer datasheet",
+            "Mission computer AUV underwater",
+            "Mission computer subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:4:battery_pack",
+          "closureRowId": "bom-close:energy_storage_source_subsea_battery_pack_battery_pack",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "battery_pack",
+          "description": "Battery pack",
+          "searchTerms": [
+            "Battery pack",
+            "Battery pack manufacturer part number",
+            "Battery pack catalogue price GBP",
+            "Battery pack datasheet",
+            "Battery pack AUV underwater",
+            "Battery pack subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:5:wet_mate_connector_set",
+          "closureRowId": "bom-close:power_distribution_dc_distribution_wet_mate_connector_set",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "wet_mate_connector_set",
+          "description": "Wet-mate connector set",
+          "searchTerms": [
+            "Wet-mate connector set",
+            "Wet-mate connector set manufacturer part number",
+            "Wet-mate connector set catalogue price GBP",
+            "Wet-mate connector set datasheet",
+            "Wet-mate connector set AUV underwater",
+            "Wet-mate connector set subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:6:recovery_beacon",
+          "closureRowId": "bom-close:safety_protection_abort_recovery_recovery_beacon",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "recovery_beacon",
+          "description": "Recovery beacon",
+          "searchTerms": [
+            "Recovery beacon",
+            "Recovery beacon manufacturer part number",
+            "Recovery beacon catalogue price GBP",
+            "Recovery beacon datasheet",
+            "Recovery beacon AUV underwater",
+            "Recovery beacon subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:7:leak_detection_sensor",
+          "closureRowId": "bom-close:safety_protection_leak_detection_leak_detection_sensor",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "leak_detection_sensor",
+          "description": "Leak detection sensor",
+          "searchTerms": [
+            "Leak detection sensor",
+            "Leak detection sensor manufacturer part number",
+            "Leak detection sensor catalogue price GBP",
+            "Leak detection sensor datasheet",
+            "Leak detection sensor AUV underwater",
+            "Leak detection sensor subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:8:depth_and_pressure_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_depth_environment_sensors_depth_and_pressure_sensor",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "depth_and_pressure_sensor",
+          "description": "Depth and pressure sensor",
+          "searchTerms": [
+            "Depth and pressure sensor",
+            "Depth and pressure sensor manufacturer part number",
+            "Depth and pressure sensor catalogue price GBP",
+            "Depth and pressure sensor datasheet",
+            "Depth and pressure sensor AUV underwater",
+            "Depth and pressure sensor subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:9:dvl",
+          "closureRowId": "bom-close:sensing_instrumentation_navigation_sensor_suite_dvl",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "dvl",
+          "description": "DVL",
+          "searchTerms": [
+            "DVL",
+            "DVL manufacturer part number",
+            "DVL catalogue price GBP",
+            "DVL datasheet",
+            "DVL AUV underwater",
+            "DVL subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:10:inertial_navigation_unit",
+          "closureRowId": "bom-close:sensing_instrumentation_navigation_sensor_suite_inertial_navigation_unit",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "inertial_navigation_unit",
+          "description": "Inertial navigation unit",
+          "searchTerms": [
+            "Inertial navigation unit",
+            "Inertial navigation unit manufacturer part number",
+            "Inertial navigation unit catalogue price GBP",
+            "Inertial navigation unit datasheet",
+            "Inertial navigation unit AUV underwater",
+            "Inertial navigation unit subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:11:forward_sonar_payload",
+          "closureRowId": "bom-close:sensing_instrumentation_payload_sensor_bay_forward_sonar_payload",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "forward_sonar_payload",
+          "description": "Forward sonar payload",
+          "searchTerms": [
+            "Forward sonar payload",
+            "Forward sonar payload manufacturer part number",
+            "Forward sonar payload catalogue price GBP",
+            "Forward sonar payload datasheet",
+            "Forward sonar payload AUV underwater",
+            "Forward sonar payload subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:12:pressure_hull",
+          "closureRowId": "bom-close:structure_containment_pressure_hull_shell_pressure_hull",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "pressure_hull",
+          "description": "Pressure hull",
+          "searchTerms": [
+            "Pressure hull",
+            "Pressure hull manufacturer part number",
+            "Pressure hull catalogue price GBP",
+            "Pressure hull datasheet",
+            "Pressure hull AUV underwater",
+            "Pressure hull subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        }
+      ]
+    },
+    {
+      "id": "sourcing-batch:6:candidate_sourcing_deferred",
+      "sequence": 6,
+      "kind": "candidate_sourcing_deferred",
+      "title": "Defer Candidate-Only Sourcing",
+      "status": "deferred",
+      "rowCount": 96,
+      "readyRows": 0,
+      "blockedRows": 0,
+      "deferredRows": 96,
+      "procurementBlockingRows": 0,
+      "entryCriteria": [
+        "Candidate lines remain outside immediate procurement scope."
+      ],
+      "exitCriteria": [
+        "Candidate lines are either still explicitly deferred or promoted to critical sourcing scope."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "candidate_sourcing_deferred:1:controller_heat_spreader",
+          "closureRowId": "bom-close:actuation_kinematics_drive_electronics_controller_heat_spreader",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "controller_heat_spreader",
+          "description": "controller heat spreader",
+          "searchTerms": [
+            "controller heat spreader",
+            "controller heat spreader manufacturer part number",
+            "controller heat spreader catalogue price GBP",
+            "controller heat spreader datasheet",
+            "controller heat spreader AUV underwater",
+            "controller heat spreader subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:2:current_sensor_channel_set",
+          "closureRowId": "bom-close:actuation_kinematics_drive_electronics_current_sensor_channel_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "current_sensor_channel_set",
+          "description": "current sensor channel set",
+          "searchTerms": [
+            "current sensor channel set",
+            "current sensor channel set manufacturer part number",
+            "current sensor channel set catalogue price GBP",
+            "current sensor channel set datasheet",
+            "current sensor channel set AUV underwater",
+            "current sensor channel set subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:3:thrust_calibration_table",
+          "closureRowId": "bom-close:actuation_kinematics_drive_electronics_thrust_calibration_table",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "thrust_calibration_table",
+          "description": "thrust calibration table",
+          "searchTerms": [
+            "thrust calibration table",
+            "thrust calibration table manufacturer part number",
+            "thrust calibration table catalogue price GBP",
+            "thrust calibration table datasheet",
+            "thrust calibration table AUV underwater",
+            "thrust calibration table subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:4:thruster_motor_controller_stack",
+          "closureRowId": "bom-close:actuation_kinematics_drive_electronics_thruster_motor_controller_stack",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "thruster_motor_controller_stack",
+          "description": "thruster motor controller stack",
+          "searchTerms": [
+            "thruster motor controller stack",
+            "thruster motor controller stack manufacturer part number",
+            "thruster motor controller stack catalogue price GBP",
+            "thruster motor controller stack datasheet",
+            "thruster motor controller stack AUV underwater",
+            "thruster motor controller stack subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:5:motor_phase_harness",
+          "closureRowId": "bom-close:actuation_kinematics_thruster_array_motor_phase_harness",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "motor_phase_harness",
+          "description": "motor phase harness",
+          "searchTerms": [
+            "motor phase harness",
+            "motor phase harness manufacturer part number",
+            "motor phase harness catalogue price GBP",
+            "motor phase harness datasheet",
+            "motor phase harness AUV underwater",
+            "motor phase harness subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:6:thruster_mounting_bracket",
+          "closureRowId": "bom-close:actuation_kinematics_thruster_array_thruster_mounting_bracket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "thruster_mounting_bracket",
+          "description": "thruster mounting bracket",
+          "searchTerms": [
+            "thruster mounting bracket",
+            "thruster mounting bracket manufacturer part number",
+            "thruster mounting bracket catalogue price GBP",
+            "thruster mounting bracket datasheet",
+            "thruster mounting bracket AUV underwater",
+            "thruster mounting bracket subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:7:thruster_nozzle_guard",
+          "closureRowId": "bom-close:actuation_kinematics_thruster_array_thruster_nozzle_guard",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "thruster_nozzle_guard",
+          "description": "thruster nozzle guard",
+          "searchTerms": [
+            "thruster nozzle guard",
+            "thruster nozzle guard manufacturer part number",
+            "thruster nozzle guard catalogue price GBP",
+            "thruster nozzle guard datasheet",
+            "thruster nozzle guard AUV underwater",
+            "thruster nozzle guard subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:8:adjustable_trim_fin",
+          "closureRowId": "bom-close:actuation_kinematics_trim_surfaces_adjustable_trim_fin",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "adjustable_trim_fin",
+          "description": "adjustable trim fin",
+          "searchTerms": [
+            "adjustable trim fin",
+            "adjustable trim fin manufacturer part number",
+            "adjustable trim fin catalogue price GBP",
+            "adjustable trim fin datasheet",
+            "adjustable trim fin AUV underwater",
+            "adjustable trim fin subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:9:ballast_trim_block",
+          "closureRowId": "bom-close:actuation_kinematics_trim_surfaces_ballast_trim_block",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ballast_trim_block",
+          "description": "ballast trim block",
+          "searchTerms": [
+            "ballast trim block",
+            "ballast trim block manufacturer part number",
+            "ballast trim block catalogue price GBP",
+            "ballast trim block datasheet",
+            "ballast trim block AUV underwater",
+            "ballast trim block subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:10:roll_trim_screw_set",
+          "closureRowId": "bom-close:actuation_kinematics_trim_surfaces_roll_trim_screw_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "roll_trim_screw_set",
+          "description": "roll trim screw set",
+          "searchTerms": [
+            "roll trim screw set",
+            "roll trim screw set manufacturer part number",
+            "roll trim screw set catalogue price GBP",
+            "roll trim screw set datasheet",
+            "roll trim screw set AUV underwater",
+            "roll trim screw set subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:11:tow_tank_trim_mark",
+          "closureRowId": "bom-close:actuation_kinematics_trim_surfaces_tow_tank_trim_mark",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "tow_tank_trim_mark",
+          "description": "tow-tank trim mark",
+          "searchTerms": [
+            "tow-tank trim mark",
+            "tow-tank trim mark manufacturer part number",
+            "tow-tank trim mark catalogue price GBP",
+            "tow-tank trim mark datasheet",
+            "tow-tank trim mark AUV underwater",
+            "tow-tank trim mark subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:12:acoustic_isolation_pad",
+          "closureRowId": "bom-close:control_compute_communication_acoustic_communications_acoustic_isolation_pad",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "acoustic_isolation_pad",
+          "description": "acoustic isolation pad",
+          "searchTerms": [
+            "acoustic isolation pad",
+            "acoustic isolation pad manufacturer part number",
+            "acoustic isolation pad catalogue price GBP",
+            "acoustic isolation pad datasheet",
+            "acoustic isolation pad AUV underwater",
+            "acoustic isolation pad subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:13:acoustic_transducer_mount",
+          "closureRowId": "bom-close:control_compute_communication_acoustic_communications_acoustic_transducer_mount",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "acoustic_transducer_mount",
+          "description": "acoustic transducer mount",
+          "searchTerms": [
+            "acoustic transducer mount",
+            "acoustic transducer mount manufacturer part number",
+            "acoustic transducer mount catalogue price GBP",
+            "acoustic transducer mount datasheet",
+            "acoustic transducer mount AUV underwater",
+            "acoustic transducer mount subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:14:surface_command_protocol_adapter",
+          "closureRowId": "bom-close:control_compute_communication_acoustic_communications_surface_command_protocol_adapter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "surface_command_protocol_adapter",
+          "description": "surface command protocol adapter",
+          "searchTerms": [
+            "surface command protocol adapter",
+            "surface command protocol adapter manufacturer part number",
+            "surface command protocol adapter catalogue price GBP",
+            "surface command protocol adapter datasheet",
+            "surface command protocol adapter AUV underwater",
+            "surface command protocol adapter subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:15:mission_data_recorder",
+          "closureRowId": "bom-close:control_compute_communication_mission_computer_stack_mission_data_recorder",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "mission_data_recorder",
+          "description": "mission data recorder",
+          "searchTerms": [
+            "mission data recorder",
+            "mission data recorder manufacturer part number",
+            "mission data recorder catalogue price GBP",
+            "mission data recorder datasheet",
+            "mission data recorder AUV underwater",
+            "mission data recorder subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:16:real_time_control_board",
+          "closureRowId": "bom-close:control_compute_communication_mission_computer_stack_real_time_control_board",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "real_time_control_board",
+          "description": "real-time control board",
+          "searchTerms": [
+            "real-time control board",
+            "real-time control board manufacturer part number",
+            "real-time control board catalogue price GBP",
+            "real-time control board datasheet",
+            "real-time control board AUV underwater",
+            "real-time control board subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:17:watchdog_supervisor_module",
+          "closureRowId": "bom-close:control_compute_communication_mission_computer_stack_watchdog_supervisor_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "watchdog_supervisor_module",
+          "description": "watchdog supervisor module",
+          "searchTerms": [
+            "watchdog supervisor module",
+            "watchdog supervisor module manufacturer part number",
+            "watchdog supervisor module catalogue price GBP",
+            "watchdog supervisor module datasheet",
+            "watchdog supervisor module AUV underwater",
+            "watchdog supervisor module subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:18:configuration_backup_storage",
+          "closureRowId": "bom-close:control_compute_communication_software_health_management_configuration_backup_storage",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "configuration_backup_storage",
+          "description": "configuration backup storage",
+          "searchTerms": [
+            "configuration backup storage",
+            "configuration backup storage manufacturer part number",
+            "configuration backup storage catalogue price GBP",
+            "configuration backup storage datasheet",
+            "configuration backup storage AUV underwater",
+            "configuration backup storage subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:19:debug_service_port",
+          "closureRowId": "bom-close:control_compute_communication_software_health_management_debug_service_port",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "debug_service_port",
+          "description": "debug service port",
+          "searchTerms": [
+            "debug service port",
+            "debug service port manufacturer part number",
+            "debug service port catalogue price GBP",
+            "debug service port datasheet",
+            "debug service port AUV underwater",
+            "debug service port subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:20:failsafe_state_machine",
+          "closureRowId": "bom-close:control_compute_communication_software_health_management_failsafe_state_machine",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "failsafe_state_machine",
+          "description": "failsafe state machine",
+          "searchTerms": [
+            "failsafe state machine",
+            "failsafe state machine manufacturer part number",
+            "failsafe state machine catalogue price GBP",
+            "failsafe state machine datasheet",
+            "failsafe state machine AUV underwater",
+            "failsafe state machine subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:21:time_sync_module",
+          "closureRowId": "bom-close:control_compute_communication_software_health_management_time_sync_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "time_sync_module",
+          "description": "time sync module",
+          "searchTerms": [
+            "time sync module",
+            "time sync module manufacturer part number",
+            "time sync module catalogue price GBP",
+            "time sync module datasheet",
+            "time sync module AUV underwater",
+            "time sync module subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:22:battery_vent_inspection_plug",
+          "closureRowId": "bom-close:energy_storage_source_charging_interface_battery_vent_inspection_plug",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_vent_inspection_plug",
+          "description": "battery vent inspection plug",
+          "searchTerms": [
+            "battery vent inspection plug",
+            "battery vent inspection plug manufacturer part number",
+            "battery vent inspection plug catalogue price GBP",
+            "battery vent inspection plug datasheet",
+            "battery vent inspection plug AUV underwater",
+            "battery vent inspection plug subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:23:charge_interlock_plug",
+          "closureRowId": "bom-close:energy_storage_source_charging_interface_charge_interlock_plug",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "charge_interlock_plug",
+          "description": "charge interlock plug",
+          "searchTerms": [
+            "charge interlock plug",
+            "charge interlock plug manufacturer part number",
+            "charge interlock plug catalogue price GBP",
+            "charge interlock plug datasheet",
+            "charge interlock plug AUV underwater",
+            "charge interlock plug subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:24:shore_charger_adapter",
+          "closureRowId": "bom-close:energy_storage_source_charging_interface_shore_charger_adapter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "shore_charger_adapter",
+          "description": "shore charger adapter",
+          "searchTerms": [
+            "shore charger adapter",
+            "shore charger adapter manufacturer part number",
+            "shore charger adapter catalogue price GBP",
+            "shore charger adapter datasheet",
+            "shore charger adapter AUV underwater",
+            "shore charger adapter subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:25:state_of_charge_display_puck",
+          "closureRowId": "bom-close:energy_storage_source_charging_interface_state_of_charge_display_puck",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "state_of_charge_display_puck",
+          "description": "state-of-charge display puck",
+          "searchTerms": [
+            "state-of-charge display puck",
+            "state-of-charge display puck manufacturer part number",
+            "state-of-charge display puck catalogue price GBP",
+            "state-of-charge display puck datasheet",
+            "state-of-charge display puck AUV underwater",
+            "state-of-charge display puck subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:26:battery_telemetry_isolator",
+          "closureRowId": "bom-close:energy_storage_source_energy_monitoring_battery_telemetry_isolator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_telemetry_isolator",
+          "description": "battery telemetry isolator",
+          "searchTerms": [
+            "battery telemetry isolator",
+            "battery telemetry isolator manufacturer part number",
+            "battery telemetry isolator catalogue price GBP",
+            "battery telemetry isolator datasheet",
+            "battery telemetry isolator AUV underwater",
+            "battery telemetry isolator subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:27:coulomb_counter_module",
+          "closureRowId": "bom-close:energy_storage_source_energy_monitoring_coulomb_counter_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "coulomb_counter_module",
+          "description": "coulomb counter module",
+          "searchTerms": [
+            "coulomb counter module",
+            "coulomb counter module manufacturer part number",
+            "coulomb counter module catalogue price GBP",
+            "coulomb counter module datasheet",
+            "coulomb counter module AUV underwater",
+            "coulomb counter module subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:28:energy_reserve_indicator",
+          "closureRowId": "bom-close:energy_storage_source_energy_monitoring_energy_reserve_indicator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "energy_reserve_indicator",
+          "description": "energy reserve indicator",
+          "searchTerms": [
+            "energy reserve indicator",
+            "energy reserve indicator manufacturer part number",
+            "energy reserve indicator catalogue price GBP",
+            "energy reserve indicator datasheet",
+            "energy reserve indicator AUV underwater",
+            "energy reserve indicator subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:29:pack_temperature_sensor_strip",
+          "closureRowId": "bom-close:energy_storage_source_energy_monitoring_pack_temperature_sensor_strip",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pack_temperature_sensor_strip",
+          "description": "pack temperature sensor strip",
+          "searchTerms": [
+            "pack temperature sensor strip",
+            "pack temperature sensor strip manufacturer part number",
+            "pack temperature sensor strip catalogue price GBP",
+            "pack temperature sensor strip datasheet",
+            "pack temperature sensor strip AUV underwater",
+            "pack temperature sensor strip subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:30:battery_management_board",
+          "closureRowId": "bom-close:energy_storage_source_subsea_battery_pack_battery_management_board",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_management_board",
+          "description": "battery management board",
+          "searchTerms": [
+            "battery management board",
+            "battery management board manufacturer part number",
+            "battery management board catalogue price GBP",
+            "battery management board datasheet",
+            "battery management board AUV underwater",
+            "battery management board subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:31:pack_isolation_fuse",
+          "closureRowId": "bom-close:energy_storage_source_subsea_battery_pack_pack_isolation_fuse",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pack_isolation_fuse",
+          "description": "pack isolation fuse",
+          "searchTerms": [
+            "pack isolation fuse",
+            "pack isolation fuse manufacturer part number",
+            "pack isolation fuse catalogue price GBP",
+            "pack isolation fuse datasheet",
+            "pack isolation fuse AUV underwater",
+            "pack isolation fuse subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:32:pressure_rated_battery_enclosure",
+          "closureRowId": "bom-close:energy_storage_source_subsea_battery_pack_pressure_rated_battery_enclosure",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pressure_rated_battery_enclosure",
+          "description": "pressure-rated battery enclosure",
+          "searchTerms": [
+            "pressure-rated battery enclosure",
+            "pressure-rated battery enclosure manufacturer part number",
+            "pressure-rated battery enclosure catalogue price GBP",
+            "pressure-rated battery enclosure datasheet",
+            "pressure-rated battery enclosure AUV underwater",
+            "pressure-rated battery enclosure subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:33:ballast_rail",
+          "closureRowId": "bom-close:environmental_interface_buoyancy_trim_ballast_rail",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ballast_rail",
+          "description": "ballast rail",
+          "searchTerms": [
+            "ballast rail",
+            "ballast rail manufacturer part number",
+            "ballast rail catalogue price GBP",
+            "ballast rail datasheet",
+            "ballast rail AUV underwater",
+            "ballast rail subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:34:buoyancy_calibration_tag",
+          "closureRowId": "bom-close:environmental_interface_buoyancy_trim_buoyancy_calibration_tag",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "buoyancy_calibration_tag",
+          "description": "buoyancy calibration tag",
+          "searchTerms": [
+            "buoyancy calibration tag",
+            "buoyancy calibration tag manufacturer part number",
+            "buoyancy calibration tag catalogue price GBP",
+            "buoyancy calibration tag datasheet",
+            "buoyancy calibration tag AUV underwater",
+            "buoyancy calibration tag subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:35:field_trim_worksheet",
+          "closureRowId": "bom-close:environmental_interface_buoyancy_trim_field_trim_worksheet",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "field_trim_worksheet",
+          "description": "field trim worksheet",
+          "searchTerms": [
+            "field trim worksheet",
+            "field trim worksheet manufacturer part number",
+            "field trim worksheet catalogue price GBP",
+            "field trim worksheet datasheet",
+            "field trim worksheet AUV underwater",
+            "field trim worksheet subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:36:syntactic_foam_block_set",
+          "closureRowId": "bom-close:environmental_interface_buoyancy_trim_syntactic_foam_block_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "syntactic_foam_block_set",
+          "description": "syntactic foam block set",
+          "searchTerms": [
+            "syntactic foam block set",
+            "syntactic foam block set manufacturer part number",
+            "syntactic foam block set catalogue price GBP",
+            "syntactic foam block set datasheet",
+            "syntactic foam block set AUV underwater",
+            "syntactic foam block set subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:37:cable_penetrator_seal",
+          "closureRowId": "bom-close:environmental_interface_pressure_boundary_management_cable_penetrator_seal",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "cable_penetrator_seal",
+          "description": "cable penetrator seal",
+          "searchTerms": [
+            "cable penetrator seal",
+            "cable penetrator seal manufacturer part number",
+            "cable penetrator seal catalogue price GBP",
+            "cable penetrator seal datasheet",
+            "cable penetrator seal AUV underwater",
+            "cable penetrator seal subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:38:oil_fill_service_port",
+          "closureRowId": "bom-close:environmental_interface_pressure_boundary_management_oil_fill_service_port",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "oil_fill_service_port",
+          "description": "oil-fill service port",
+          "searchTerms": [
+            "oil-fill service port",
+            "oil-fill service port manufacturer part number",
+            "oil-fill service port catalogue price GBP",
+            "oil-fill service port datasheet",
+            "oil-fill service port AUV underwater",
+            "oil-fill service port subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:39:pressure_compensation_bladder",
+          "closureRowId": "bom-close:environmental_interface_pressure_boundary_management_pressure_compensation_bladder",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pressure_compensation_bladder",
+          "description": "pressure compensation bladder",
+          "searchTerms": [
+            "pressure compensation bladder",
+            "pressure compensation bladder manufacturer part number",
+            "pressure compensation bladder catalogue price GBP",
+            "pressure compensation bladder datasheet",
+            "pressure compensation bladder AUV underwater",
+            "pressure compensation bladder subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:40:pressure_equalisation_valve",
+          "closureRowId": "bom-close:environmental_interface_pressure_boundary_management_pressure_equalisation_valve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pressure_equalisation_valve",
+          "description": "pressure equalisation valve",
+          "searchTerms": [
+            "pressure equalisation valve",
+            "pressure equalisation valve manufacturer part number",
+            "pressure equalisation valve catalogue price GBP",
+            "pressure equalisation valve datasheet",
+            "pressure equalisation valve AUV underwater",
+            "pressure equalisation valve subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:41:battery_thermal_pad",
+          "closureRowId": "bom-close:environmental_interface_thermal_path_battery_thermal_pad",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_thermal_pad",
+          "description": "battery thermal pad",
+          "searchTerms": [
+            "battery thermal pad",
+            "battery thermal pad manufacturer part number",
+            "battery thermal pad catalogue price GBP",
+            "battery thermal pad datasheet",
+            "battery thermal pad AUV underwater",
+            "battery thermal pad subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:42:electronics_thermal_bridge",
+          "closureRowId": "bom-close:environmental_interface_thermal_path_electronics_thermal_bridge",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "electronics_thermal_bridge",
+          "description": "electronics thermal bridge",
+          "searchTerms": [
+            "electronics thermal bridge",
+            "electronics thermal bridge manufacturer part number",
+            "electronics thermal bridge catalogue price GBP",
+            "electronics thermal bridge datasheet",
+            "electronics thermal bridge AUV underwater",
+            "electronics thermal bridge subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:43:hull_heat_spreader_plate",
+          "closureRowId": "bom-close:environmental_interface_thermal_path_hull_heat_spreader_plate",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hull_heat_spreader_plate",
+          "description": "hull heat spreader plate",
+          "searchTerms": [
+            "hull heat spreader plate",
+            "hull heat spreader plate manufacturer part number",
+            "hull heat spreader plate catalogue price GBP",
+            "hull heat spreader plate datasheet",
+            "hull heat spreader plate AUV underwater",
+            "hull heat spreader plate subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:44:thruster_heat_sink_collar",
+          "closureRowId": "bom-close:environmental_interface_thermal_path_thruster_heat_sink_collar",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "thruster_heat_sink_collar",
+          "description": "thruster heat sink collar",
+          "searchTerms": [
+            "thruster heat sink collar",
+            "thruster heat sink collar manufacturer part number",
+            "thruster heat sink collar catalogue price GBP",
+            "thruster heat sink collar datasheet",
+            "thruster heat sink collar AUV underwater",
+            "thruster heat sink collar subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:45:deck_recovery_handle",
+          "closureRowId": "bom-close:maintenance_serviceability_deck_recovery_deck_recovery_handle",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "deck_recovery_handle",
+          "description": "deck recovery handle",
+          "searchTerms": [
+            "deck recovery handle",
+            "deck recovery handle manufacturer part number",
+            "deck recovery handle catalogue price GBP",
+            "deck recovery handle datasheet",
+            "deck recovery handle AUV underwater",
+            "deck recovery handle subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:46:launch_cradle_interface",
+          "closureRowId": "bom-close:maintenance_serviceability_deck_recovery_launch_cradle_interface",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "launch_cradle_interface",
+          "description": "launch cradle interface",
+          "searchTerms": [
+            "launch cradle interface",
+            "launch cradle interface manufacturer part number",
+            "launch cradle interface catalogue price GBP",
+            "launch cradle interface datasheet",
+            "launch cradle interface AUV underwater",
+            "launch cradle interface subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:47:lifting_bridle",
+          "closureRowId": "bom-close:maintenance_serviceability_deck_recovery_lifting_bridle",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lifting_bridle",
+          "description": "lifting bridle",
+          "searchTerms": [
+            "lifting bridle",
+            "lifting bridle manufacturer part number",
+            "lifting bridle catalogue price GBP",
+            "lifting bridle datasheet",
+            "lifting bridle AUV underwater",
+            "lifting bridle subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:48:tow_point_fitting",
+          "closureRowId": "bom-close:maintenance_serviceability_deck_recovery_tow_point_fitting",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "tow_point_fitting",
+          "description": "tow point fitting",
+          "searchTerms": [
+            "tow point fitting",
+            "tow point fitting manufacturer part number",
+            "tow point fitting catalogue price GBP",
+            "tow point fitting datasheet",
+            "tow point fitting AUV underwater",
+            "tow point fitting subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:49:desiccant_cartridge",
+          "closureRowId": "bom-close:maintenance_serviceability_field_transport_desiccant_cartridge",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "desiccant_cartridge",
+          "description": "desiccant cartridge",
+          "searchTerms": [
+            "desiccant cartridge",
+            "desiccant cartridge manufacturer part number",
+            "desiccant cartridge catalogue price GBP",
+            "desiccant cartridge datasheet",
+            "desiccant cartridge AUV underwater",
+            "desiccant cartridge subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:50:maintenance_log_tag",
+          "closureRowId": "bom-close:maintenance_serviceability_field_transport_maintenance_log_tag",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "maintenance_log_tag",
+          "description": "maintenance log tag",
+          "searchTerms": [
+            "maintenance log tag",
+            "maintenance log tag manufacturer part number",
+            "maintenance log tag catalogue price GBP",
+            "maintenance log tag datasheet",
+            "maintenance log tag AUV underwater",
+            "maintenance log tag subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:51:protective_nose_cover",
+          "closureRowId": "bom-close:maintenance_serviceability_field_transport_protective_nose_cover",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "protective_nose_cover",
+          "description": "protective nose cover",
+          "searchTerms": [
+            "protective nose cover",
+            "protective nose cover manufacturer part number",
+            "protective nose cover catalogue price GBP",
+            "protective nose cover datasheet",
+            "protective nose cover AUV underwater",
+            "protective nose cover subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:52:transport_cradle",
+          "closureRowId": "bom-close:maintenance_serviceability_field_transport_transport_cradle",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "transport_cradle",
+          "description": "transport cradle",
+          "searchTerms": [
+            "transport cradle",
+            "transport cradle manufacturer part number",
+            "transport cradle catalogue price GBP",
+            "transport cradle datasheet",
+            "transport cradle AUV underwater",
+            "transport cradle subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:53:diagnostic_connector",
+          "closureRowId": "bom-close:maintenance_serviceability_service_access_diagnostic_connector",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "diagnostic_connector",
+          "description": "diagnostic connector",
+          "searchTerms": [
+            "diagnostic connector",
+            "diagnostic connector manufacturer part number",
+            "diagnostic connector catalogue price GBP",
+            "diagnostic connector datasheet",
+            "diagnostic connector AUV underwater",
+            "diagnostic connector subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:54:o_ring_grease_kit",
+          "closureRowId": "bom-close:maintenance_serviceability_service_access_o_ring_grease_kit",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "o_ring_grease_kit",
+          "description": "O-ring grease kit",
+          "searchTerms": [
+            "O-ring grease kit",
+            "O-ring grease kit manufacturer part number",
+            "O-ring grease kit catalogue price GBP",
+            "O-ring grease kit datasheet",
+            "O-ring grease kit AUV underwater",
+            "O-ring grease kit subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:55:service_checklist_card",
+          "closureRowId": "bom-close:maintenance_serviceability_service_access_service_checklist_card",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "service_checklist_card",
+          "description": "service checklist card",
+          "searchTerms": [
+            "service checklist card",
+            "service checklist card manufacturer part number",
+            "service checklist card catalogue price GBP",
+            "service checklist card datasheet",
+            "service checklist card AUV underwater",
+            "service checklist card subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:56:vacuum_leak_test_port",
+          "closureRowId": "bom-close:maintenance_serviceability_service_access_vacuum_leak_test_port",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "vacuum_leak_test_port",
+          "description": "vacuum leak test port",
+          "searchTerms": [
+            "vacuum leak test port",
+            "vacuum leak test port manufacturer part number",
+            "vacuum leak test port catalogue price GBP",
+            "vacuum leak test port datasheet",
+            "vacuum leak test port AUV underwater",
+            "vacuum leak test port subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:57:bus_voltage_monitor",
+          "closureRowId": "bom-close:power_distribution_dc_distribution_bus_voltage_monitor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "bus_voltage_monitor",
+          "description": "bus voltage monitor",
+          "searchTerms": [
+            "bus voltage monitor",
+            "bus voltage monitor manufacturer part number",
+            "bus voltage monitor catalogue price GBP",
+            "bus voltage monitor datasheet",
+            "bus voltage monitor AUV underwater",
+            "bus voltage monitor subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:58:fused_dc_distribution_board",
+          "closureRowId": "bom-close:power_distribution_dc_distribution_fused_dc_distribution_board",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fused_dc_distribution_board",
+          "description": "fused DC distribution board",
+          "searchTerms": [
+            "fused DC distribution board",
+            "fused DC distribution board manufacturer part number",
+            "fused DC distribution board catalogue price GBP",
+            "fused DC distribution board datasheet",
+            "fused DC distribution board AUV underwater",
+            "fused DC distribution board subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:59:main_power_enable_relay",
+          "closureRowId": "bom-close:power_distribution_dc_distribution_main_power_enable_relay",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "main_power_enable_relay",
+          "description": "main power enable relay",
+          "searchTerms": [
+            "main power enable relay",
+            "main power enable relay manufacturer part number",
+            "main power enable relay catalogue price GBP",
+            "main power enable relay datasheet",
+            "main power enable relay AUV underwater",
+            "main power enable relay subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:60:chassis_bonding_strap",
+          "closureRowId": "bom-close:power_distribution_isolation_grounding_chassis_bonding_strap",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "chassis_bonding_strap",
+          "description": "chassis bonding strap",
+          "searchTerms": [
+            "chassis bonding strap",
+            "chassis bonding strap manufacturer part number",
+            "chassis bonding strap catalogue price GBP",
+            "chassis bonding strap datasheet",
+            "chassis bonding strap AUV underwater",
+            "chassis bonding strap subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:61:fault_annunciator_module",
+          "closureRowId": "bom-close:power_distribution_isolation_grounding_fault_annunciator_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fault_annunciator_module",
+          "description": "fault annunciator module",
+          "searchTerms": [
+            "fault annunciator module",
+            "fault annunciator module manufacturer part number",
+            "fault annunciator module catalogue price GBP",
+            "fault annunciator module datasheet",
+            "fault annunciator module AUV underwater",
+            "fault annunciator module subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:62:ground_fault_monitor",
+          "closureRowId": "bom-close:power_distribution_isolation_grounding_ground_fault_monitor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ground_fault_monitor",
+          "description": "ground fault monitor",
+          "searchTerms": [
+            "ground fault monitor",
+            "ground fault monitor manufacturer part number",
+            "ground fault monitor catalogue price GBP",
+            "ground fault monitor datasheet",
+            "ground fault monitor AUV underwater",
+            "ground fault monitor subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:63:service_isolation_key",
+          "closureRowId": "bom-close:power_distribution_isolation_grounding_service_isolation_key",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "service_isolation_key",
+          "description": "service isolation key",
+          "searchTerms": [
+            "service isolation key",
+            "service isolation key manufacturer part number",
+            "service isolation key catalogue price GBP",
+            "service isolation key datasheet",
+            "service isolation key AUV underwater",
+            "service isolation key subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:64:12_v_payload_converter",
+          "closureRowId": "bom-close:power_distribution_low_voltage_rails_12_v_payload_converter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "12_v_payload_converter",
+          "description": "12 V payload converter",
+          "searchTerms": [
+            "12 V payload converter",
+            "12 V payload converter manufacturer part number",
+            "12 V payload converter catalogue price GBP",
+            "12 V payload converter datasheet",
+            "12 V payload converter AUV underwater",
+            "12 V payload converter subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:65:24_v_dc_converter",
+          "closureRowId": "bom-close:power_distribution_low_voltage_rails_24_v_dc_converter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "24_v_dc_converter",
+          "description": "24 V DC converter",
+          "searchTerms": [
+            "24 V DC converter",
+            "24 V DC converter manufacturer part number",
+            "24 V DC converter catalogue price GBP",
+            "24 V DC converter datasheet",
+            "24 V DC converter AUV underwater",
+            "24 V DC converter subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:66:5_v_avionics_converter",
+          "closureRowId": "bom-close:power_distribution_low_voltage_rails_5_v_avionics_converter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "5_v_avionics_converter",
+          "description": "5 V avionics converter",
+          "searchTerms": [
+            "5 V avionics converter",
+            "5 V avionics converter manufacturer part number",
+            "5 V avionics converter catalogue price GBP",
+            "5 V avionics converter datasheet",
+            "5 V avionics converter AUV underwater",
+            "5 V avionics converter subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:67:emi_power_filter",
+          "closureRowId": "bom-close:power_distribution_low_voltage_rails_emi_power_filter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "emi_power_filter",
+          "description": "EMI power filter",
+          "searchTerms": [
+            "EMI power filter",
+            "EMI power filter manufacturer part number",
+            "EMI power filter catalogue price GBP",
+            "EMI power filter datasheet",
+            "EMI power filter AUV underwater",
+            "EMI power filter subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:68:drop_weight_release",
+          "closureRowId": "bom-close:safety_protection_abort_recovery_drop_weight_release",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "drop_weight_release",
+          "description": "drop-weight release",
+          "searchTerms": [
+            "drop-weight release",
+            "drop-weight release manufacturer part number",
+            "drop-weight release catalogue price GBP",
+            "drop-weight release datasheet",
+            "drop-weight release AUV underwater",
+            "drop-weight release subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:69:emergency_strobe",
+          "closureRowId": "bom-close:safety_protection_abort_recovery_emergency_strobe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "emergency_strobe",
+          "description": "emergency strobe",
+          "searchTerms": [
+            "emergency strobe",
+            "emergency strobe manufacturer part number",
+            "emergency strobe catalogue price GBP",
+            "emergency strobe datasheet",
+            "emergency strobe AUV underwater",
+            "emergency strobe subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:70:surface_flag_float",
+          "closureRowId": "bom-close:safety_protection_abort_recovery_surface_flag_float",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "surface_flag_float",
+          "description": "surface flag float",
+          "searchTerms": [
+            "surface flag float",
+            "surface flag float manufacturer part number",
+            "surface flag float catalogue price GBP",
+            "surface flag float datasheet",
+            "surface flag float AUV underwater",
+            "surface flag float subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:71:absorbent_witness_pad",
+          "closureRowId": "bom-close:safety_protection_leak_detection_absorbent_witness_pad",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "absorbent_witness_pad",
+          "description": "absorbent witness pad",
+          "searchTerms": [
+            "absorbent witness pad",
+            "absorbent witness pad manufacturer part number",
+            "absorbent witness pad catalogue price GBP",
+            "absorbent witness pad datasheet",
+            "absorbent witness pad AUV underwater",
+            "absorbent witness pad subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:72:bilge_moisture_strip",
+          "closureRowId": "bom-close:safety_protection_leak_detection_bilge_moisture_strip",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "bilge_moisture_strip",
+          "description": "bilge moisture strip",
+          "searchTerms": [
+            "bilge moisture strip",
+            "bilge moisture strip manufacturer part number",
+            "bilge moisture strip catalogue price GBP",
+            "bilge moisture strip datasheet",
+            "bilge moisture strip AUV underwater",
+            "bilge moisture strip subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:73:leak_alarm_relay",
+          "closureRowId": "bom-close:safety_protection_leak_detection_leak_alarm_relay",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "leak_alarm_relay",
+          "description": "leak alarm relay",
+          "searchTerms": [
+            "leak alarm relay",
+            "leak alarm relay manufacturer part number",
+            "leak alarm relay catalogue price GBP",
+            "leak alarm relay datasheet",
+            "leak alarm relay AUV underwater",
+            "leak alarm relay subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:74:battery_isolation_contactor",
+          "closureRowId": "bom-close:safety_protection_pressure_fail_safe_battery_isolation_contactor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_isolation_contactor",
+          "description": "battery isolation contactor",
+          "searchTerms": [
+            "battery isolation contactor",
+            "battery isolation contactor manufacturer part number",
+            "battery isolation contactor catalogue price GBP",
+            "battery isolation contactor datasheet",
+            "battery isolation contactor AUV underwater",
+            "battery isolation contactor subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:75:over_depth_abort_switch",
+          "closureRowId": "bom-close:safety_protection_pressure_fail_safe_over_depth_abort_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "over_depth_abort_switch",
+          "description": "over-depth abort switch",
+          "searchTerms": [
+            "over-depth abort switch",
+            "over-depth abort switch manufacturer part number",
+            "over-depth abort switch catalogue price GBP",
+            "over-depth abort switch datasheet",
+            "over-depth abort switch AUV underwater",
+            "over-depth abort switch subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:76:pressure_relief_service_plug",
+          "closureRowId": "bom-close:safety_protection_pressure_fail_safe_pressure_relief_service_plug",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pressure_relief_service_plug",
+          "description": "pressure relief service plug",
+          "searchTerms": [
+            "pressure relief service plug",
+            "pressure relief service plug manufacturer part number",
+            "pressure relief service plug catalogue price GBP",
+            "pressure relief service plug datasheet",
+            "pressure relief service plug AUV underwater",
+            "pressure relief service plug subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:77:watchdog_kill_relay",
+          "closureRowId": "bom-close:safety_protection_pressure_fail_safe_watchdog_kill_relay",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "watchdog_kill_relay",
+          "description": "watchdog kill relay",
+          "searchTerms": [
+            "watchdog kill relay",
+            "watchdog kill relay manufacturer part number",
+            "watchdog kill relay catalogue price GBP",
+            "watchdog kill relay datasheet",
+            "watchdog kill relay AUV underwater",
+            "watchdog kill relay subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:78:conductivity_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_depth_environment_sensors_conductivity_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "conductivity_sensor",
+          "description": "conductivity sensor",
+          "searchTerms": [
+            "conductivity sensor",
+            "conductivity sensor manufacturer part number",
+            "conductivity sensor catalogue price GBP",
+            "conductivity sensor datasheet",
+            "conductivity sensor AUV underwater",
+            "conductivity sensor subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:79:internal_humidity_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_depth_environment_sensors_internal_humidity_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "internal_humidity_sensor",
+          "description": "internal humidity sensor",
+          "searchTerms": [
+            "internal humidity sensor",
+            "internal humidity sensor manufacturer part number",
+            "internal humidity sensor catalogue price GBP",
+            "internal humidity sensor datasheet",
+            "internal humidity sensor AUV underwater",
+            "internal humidity sensor subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:80:water_temperature_probe",
+          "closureRowId": "bom-close:sensing_instrumentation_depth_environment_sensors_water_temperature_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "water_temperature_probe",
+          "description": "water temperature probe",
+          "searchTerms": [
+            "water temperature probe",
+            "water temperature probe manufacturer part number",
+            "water temperature probe catalogue price GBP",
+            "water temperature probe datasheet",
+            "water temperature probe AUV underwater",
+            "water temperature probe subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:81:gnss_surface_receiver",
+          "closureRowId": "bom-close:sensing_instrumentation_navigation_sensor_suite_gnss_surface_receiver",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "gnss_surface_receiver",
+          "description": "GNSS surface receiver",
+          "searchTerms": [
+            "GNSS surface receiver",
+            "GNSS surface receiver manufacturer part number",
+            "GNSS surface receiver catalogue price GBP",
+            "GNSS surface receiver datasheet",
+            "GNSS surface receiver AUV underwater",
+            "GNSS surface receiver subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:82:magnetic_compass_module",
+          "closureRowId": "bom-close:sensing_instrumentation_navigation_sensor_suite_magnetic_compass_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "magnetic_compass_module",
+          "description": "magnetic compass module",
+          "searchTerms": [
+            "magnetic compass module",
+            "magnetic compass module manufacturer part number",
+            "magnetic compass module catalogue price GBP",
+            "magnetic compass module datasheet",
+            "magnetic compass module AUV underwater",
+            "magnetic compass module subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:83:camera_viewport_window",
+          "closureRowId": "bom-close:sensing_instrumentation_payload_sensor_bay_camera_viewport_window",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "camera_viewport_window",
+          "description": "camera viewport window",
+          "searchTerms": [
+            "camera viewport window",
+            "camera viewport window manufacturer part number",
+            "camera viewport window catalogue price GBP",
+            "camera viewport window datasheet",
+            "camera viewport window AUV underwater",
+            "camera viewport window subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:84:payload_data_link_module",
+          "closureRowId": "bom-close:sensing_instrumentation_payload_sensor_bay_payload_data_link_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "payload_data_link_module",
+          "description": "payload data link module",
+          "searchTerms": [
+            "payload data link module",
+            "payload data link module manufacturer part number",
+            "payload data link module catalogue price GBP",
+            "payload data link module datasheet",
+            "payload data link module AUV underwater",
+            "payload data link module subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:85:payload_sync_trigger",
+          "closureRowId": "bom-close:sensing_instrumentation_payload_sensor_bay_payload_sync_trigger",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "payload_sync_trigger",
+          "description": "payload sync trigger",
+          "searchTerms": [
+            "payload sync trigger",
+            "payload sync trigger manufacturer part number",
+            "payload sync trigger catalogue price GBP",
+            "payload sync trigger datasheet",
+            "payload sync trigger AUV underwater",
+            "payload sync trigger subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:86:access_hatch_latch_set",
+          "closureRowId": "bom-close:structure_containment_hydrodynamic_fairing_access_hatch_latch_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "access_hatch_latch_set",
+          "description": "access hatch latch set",
+          "searchTerms": [
+            "access hatch latch set",
+            "access hatch latch set manufacturer part number",
+            "access hatch latch set catalogue price GBP",
+            "access hatch latch set datasheet",
+            "access hatch latch set AUV underwater",
+            "access hatch latch set subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:87:nose_fairing",
+          "closureRowId": "bom-close:structure_containment_hydrodynamic_fairing_nose_fairing",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "nose_fairing",
+          "description": "nose fairing",
+          "searchTerms": [
+            "nose fairing",
+            "nose fairing manufacturer part number",
+            "nose fairing catalogue price GBP",
+            "nose fairing datasheet",
+            "nose fairing AUV underwater",
+            "nose fairing subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:88:stabilising_fin_set",
+          "closureRowId": "bom-close:structure_containment_hydrodynamic_fairing_stabilising_fin_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "stabilising_fin_set",
+          "description": "stabilising fin set",
+          "searchTerms": [
+            "stabilising fin set",
+            "stabilising fin set manufacturer part number",
+            "stabilising fin set catalogue price GBP",
+            "stabilising fin set datasheet",
+            "stabilising fin set AUV underwater",
+            "stabilising fin set subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:89:tail_cone_fairing",
+          "closureRowId": "bom-close:structure_containment_hydrodynamic_fairing_tail_cone_fairing",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "tail_cone_fairing",
+          "description": "tail cone fairing",
+          "searchTerms": [
+            "tail cone fairing",
+            "tail cone fairing manufacturer part number",
+            "tail cone fairing catalogue price GBP",
+            "tail cone fairing datasheet",
+            "tail cone fairing AUV underwater",
+            "tail cone fairing subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:90:battery_cradle_frame",
+          "closureRowId": "bom-close:structure_containment_internal_mounting_frame_battery_cradle_frame",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_cradle_frame",
+          "description": "battery cradle frame",
+          "searchTerms": [
+            "battery cradle frame",
+            "battery cradle frame manufacturer part number",
+            "battery cradle frame catalogue price GBP",
+            "battery cradle frame datasheet",
+            "battery cradle frame AUV underwater",
+            "battery cradle frame subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:91:electronics_tray_rail",
+          "closureRowId": "bom-close:structure_containment_internal_mounting_frame_electronics_tray_rail",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "electronics_tray_rail",
+          "description": "electronics tray rail",
+          "searchTerms": [
+            "electronics tray rail",
+            "electronics tray rail manufacturer part number",
+            "electronics tray rail catalogue price GBP",
+            "electronics tray rail datasheet",
+            "electronics tray rail AUV underwater",
+            "electronics tray rail subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:92:payload_mounting_rail",
+          "closureRowId": "bom-close:structure_containment_internal_mounting_frame_payload_mounting_rail",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "payload_mounting_rail",
+          "description": "payload mounting rail",
+          "searchTerms": [
+            "payload mounting rail",
+            "payload mounting rail manufacturer part number",
+            "payload mounting rail catalogue price GBP",
+            "payload mounting rail datasheet",
+            "payload mounting rail AUV underwater",
+            "payload mounting rail subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:93:trim_weight_pocket",
+          "closureRowId": "bom-close:structure_containment_internal_mounting_frame_trim_weight_pocket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "trim_weight_pocket",
+          "description": "trim weight pocket",
+          "searchTerms": [
+            "trim weight pocket",
+            "trim weight pocket manufacturer part number",
+            "trim weight pocket catalogue price GBP",
+            "trim weight pocket datasheet",
+            "trim weight pocket AUV underwater",
+            "trim weight pocket subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:94:double_o_ring_gland_set",
+          "closureRowId": "bom-close:structure_containment_pressure_hull_shell_double_o_ring_gland_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "double_o_ring_gland_set",
+          "description": "double O-ring gland set",
+          "searchTerms": [
+            "double O-ring gland set",
+            "double O-ring gland set manufacturer part number",
+            "double O-ring gland set catalogue price GBP",
+            "double O-ring gland set datasheet",
+            "double O-ring gland set AUV underwater",
+            "double O-ring gland set subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:95:endcap_clamp_ring",
+          "closureRowId": "bom-close:structure_containment_pressure_hull_shell_endcap_clamp_ring",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "endcap_clamp_ring",
+          "description": "endcap clamp ring",
+          "searchTerms": [
+            "endcap clamp ring",
+            "endcap clamp ring manufacturer part number",
+            "endcap clamp ring catalogue price GBP",
+            "endcap clamp ring datasheet",
+            "endcap clamp ring AUV underwater",
+            "endcap clamp ring subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:96:hull_proof_test_port",
+          "closureRowId": "bom-close:structure_containment_pressure_hull_shell_hull_proof_test_port",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hull_proof_test_port",
+          "description": "hull proof-test port",
+          "searchTerms": [
+            "hull proof-test port",
+            "hull proof-test port manufacturer part number",
+            "hull proof-test port catalogue price GBP",
+            "hull proof-test port datasheet",
+            "hull proof-test port AUV underwater",
+            "hull proof-test port subsea pressure rated"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        }
+      ]
+    }
+  ]
+}

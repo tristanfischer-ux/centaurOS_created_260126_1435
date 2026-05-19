@@ -24,6 +24,7 @@ import type { StructuredBriefJSON, RegulatoryExtraction, RegulatoryEntry, StageR
 import type { ProductClassification } from '../product-classifier'
 import { REGULATORY_EXTRACTION_SYSTEM } from '../prompts'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
+import { getActionLogger } from '../lib/action-logger'
 
 // ── OpenRouter call ──────────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
   for (const model of models) {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 300_000)
+    const t0 = Date.now()
 
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -70,10 +72,20 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
 
       if (!response.ok) {
         const text = await response.text()
+        getActionLogger().logLlm({ step_name: 'regulatory_extraction', model, latency_ms: Date.now() - t0, ok: false, error: `OpenRouter ${response.status}` })
         throw new Error(`OpenRouter API returned status ${response.status}: ${text.slice(0, 200)}`)
       }
 
       const json = await response.json()
+      getActionLogger().logLlm({
+        step_name: 'regulatory_extraction',
+        model,
+        prompt_tokens: json?.usage?.prompt_tokens,
+        completion_tokens: json?.usage?.completion_tokens,
+        latency_ms: Date.now() - t0,
+        finish_reason: json?.choices?.[0]?.finish_reason,
+        ok: true,
+      })
       const msg = json.choices?.[0]?.message
       let raw: string = msg?.content || ''
       // Handle reasoning models that split content/reasoning

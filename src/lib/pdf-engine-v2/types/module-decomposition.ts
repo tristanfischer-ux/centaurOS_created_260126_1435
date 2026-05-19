@@ -394,6 +394,16 @@ export interface WordSpec {
    * character. Empty array is valid (plain character with no modifiers).
    */
   modifier_characters: ModifyingCharacter[]
+  /**
+   * Phase C (2026-05-15): when this word corresponds to a character_registry
+   * row reused from prior pipeline runs, the LLM (or post-hoc fuzzy match)
+   * tags it with the registry's character_id. `registry_match` distinguishes
+   * an LLM-confirmed exact reuse from a post-hoc fuzzy substring match.
+   * Absence of registry_id means the word is a candidate for registry
+   * admission after run completion.
+   */
+  registry_id?: string
+  registry_match?: 'exact' | 'fuzzy' | 'candidate'
 }
 
 /**
@@ -701,6 +711,31 @@ export interface ModuleSpec {
    *  Provides 1 MW C-rate discharge for grid-balancing duty.").
    */
   module_brief: string
+
+  /**
+   * Unified-prose addition (Tristan directive 2026-05-13): 4-6 sentence
+   * detailed English overview written by the SAME emitter as the structured
+   * decomposition, in the SAME call. Replaces the downstream Piece 1F
+   * (Grok 4.3 free-write) which introduced arithmetic drift.
+   *
+   * HARD CONSTRAINTS the emitter must honour:
+   *   1. Mention every sub_module in this module by its name_human at least once.
+   *   2. EVERY numerical claim must come from `derived_parameters` OR from a
+   *      sub_module's words[].content_character or modifier qty/spec. NO new
+   *      numbers invented at write time.
+   *   3. The arithmetic must close on the unit relationships the module
+   *      relies on. For energy storage: cell_count × cell_voltage_v ×
+   *      cell_capacity_ah ≈ capacity_wh_total ± 2 %. For power conversion:
+   *      rated_power_w × duty_cycle = expected_throughput. Etc.
+   *   4. Plain English — never the underscored sub_module/word/character ids.
+   *      Use the name_human field on each entity.
+   *
+   * Coherence is enforced by `scoreVariantForAnchor` in
+   * radical/council-synthesis.ts — variants whose arithmetic does not close
+   * (capacity, series voltage, usable-energy, topology) receive negative
+   * scores and cannot win the global-anchor selection.
+   */
+  overview_paragraph_en?: string
 
   /**
    * Quantitative parameters Stage 2 needs to size this module.
@@ -1140,6 +1175,8 @@ export interface ModuleRadicalSubTreeValidation {
 export interface ModuleBrief {
   module: UniversalModule
   module_brief: string
+  /** Unified-prose addition (Tristan 2026-05-13). Mirrors ModuleSpec.overview_paragraph_en. */
+  overview_paragraph_en?: string
   derived_parameters: DerivedParameters
   allowed_radicals: string[]
   applicability_confidence: ApplicabilityConfidence
@@ -1244,4 +1281,129 @@ export interface PartsRadEmission {
   council_seats: CouncilSeatReview[]
   council_notes: string[]
   telemetry: ModuleDecompositionTelemetry
+}
+
+// ---------------------------------------------------------------------------
+// Brief revision history — Phase 0 refinement loop (Tristan 2026-05-15)
+// ---------------------------------------------------------------------------
+
+/**
+ * One alternative relaxation path considered but not chosen for a given
+ * contradiction. Surfaced in the PDF so the reader knows what other paths
+ * would have worked — enabling them to write a new brief locking the
+ * constraint they want to keep.
+ */
+export interface BriefRevisionAlternative {
+  target_constraint: string
+  proposed_value: string
+  relax_factor: string
+  rationale: string
+}
+
+/**
+ * One iteration's chosen revision in the brief refinement loop. Records:
+ * what was changed, why, which contradictions it resolved, and the
+ * alternatives we considered before picking this path.
+ */
+export interface BriefRevisionEntry {
+  iter: number
+  target_constraint: string
+  original_value: string
+  revised_value: string
+  relax_factor: string
+  rationale: string
+  contradictions_resolved: string[]
+  alternatives_considered: BriefRevisionAlternative[]
+  /**
+   * True only when the brief was actually rewritten + re-parsed for this
+   * revision. False when the loop logged the LLM's proposal but did not apply
+   * it (e.g. relax_factor exceeded MAX_RELAX_FACTOR=100×, rewriter returned
+   * null, re-parse of the revised brief failed). Renderer must distinguish so
+   * "Revised" rows don't show values that were never applied to the brief.
+   */
+  applied: boolean
+}
+
+/**
+ * Brief block in state.json. Always present; was_revised=false means the
+ * original brief was already viable. When was_revised=true the revision_history
+ * captures every step of the refinement loop.
+ */
+export interface BriefBlock {
+  original_text: string
+  parsed_original: unknown            // ParsedBrief shape — domain not enforced here
+  revised_text: string | null
+  parsed_revised: unknown | null
+  revision_history: BriefRevisionEntry[]
+  was_revised: boolean
+}
+
+// ---------------------------------------------------------------------------
+// KeyMetrics — Phase D-prep (2026-05-15)
+// ---------------------------------------------------------------------------
+
+/**
+ * Productivity / yield / ROI headline for the design. Generated AFTER research
+ * synthesis (Phase 0.5) by Flash-Lite with Google grounding, BEFORE the
+ * generator runs. Reviewers receive this as context so the design optimises
+ * toward the stated targets. Renderer surfaces it as the top-of-PDF headline
+ * before the brief section.
+ *
+ * Units are intentionally free-text (with `unit` field) so the same shape
+ * covers BESS (MWh / year), heatpump (kW heating), vertical farm (kg / m² / yr),
+ * CGM (samples / day), HAPS (flight-days / launch), etc.
+ *
+ * The LLM is instructed to populate `notes` with the back-of-envelope reasoning
+ * for each number so the reader can sanity-check.
+ */
+export interface KeyMetric {
+  /** Short slug for renderer use (e.g. "annual_yield_kg"). */
+  id: string
+  /** Human label rendered in the PDF (e.g. "Annual leafy-green yield"). */
+  label: string
+  /** Numeric or numeric-string value. LLM emits "12000" not "12,000". */
+  value: string
+  /** Optional unit, e.g. "kg / year", "MWh", "£", "%". */
+  unit?: string
+  /** One-sentence rationale (input × utilisation × efficiency × cycles, etc.). */
+  notes?: string
+}
+
+export interface KeyMetrics {
+  /** Headline output of the system (BoM-grade product purpose). */
+  headline_output: KeyMetric
+  /** Estimated annual revenue at typical price + utilisation. */
+  revenue_gbp_per_year: KeyMetric
+  /** Capital expenditure (sum of BoM costs at unit prices, before assembly). */
+  capex_gbp: KeyMetric
+  /** Annual operating expenditure (energy + consumables + maintenance + labour). */
+  opex_gbp_per_year: KeyMetric
+  /** Simple payback in years: capex / (revenue - opex). */
+  roi_payback_years: KeyMetric
+  /** Class-appropriate utilisation metric — e.g. "yield_per_m2_per_year", "kWh_throughput_per_kWh_capex". */
+  utilisation: KeyMetric
+  /** Brief-stated headline constraint (e.g. "12 m² growing area", "100 kWh capacity ceiling"). */
+  headline_constraint: KeyMetric
+  /** Any additional metrics worth surfacing (1-3 entries max). */
+  supporting_metrics: KeyMetric[]
+  /**
+   * Deployment context — short narrative describing how the unit is deployed
+   * at installation scale, with scales-to multiplier where relevant. Examples:
+   *   VF:       "1 unit fits inside a 40-ft refrigerated container OR free-standing in light industrial space. Customer installations: 8-21 units per site (100-250 m²)."
+   *   BESS:     "1 system housed in a 40-ft ISO container; utility-scale sites typically deploy 4-40 containers in parallel."
+   *   drone:    "Single vehicle for BVLOS Open category; commercial fleets up to 20 concurrent vehicles under operational authorisation."
+   *
+   * Universal pattern (2026-05-15): every class that ships as a unit AND is
+   * typically deployed multi-unit at the customer site needs this so the
+   * reader doesn't mistake the per-unit envelope for the installation scale.
+   * Tristan iter-56 VF feedback: "12 m² footprint is ridiculously small" was
+   * caused by exactly this missing-context render gap.
+   *
+   * NULL when the brief is for a single, standalone deployment with no
+   * meaningful scales-to multiplier (most CGM-type single-patient products).
+   */
+  deployment_context: string | null
+  /** LLM model + timestamp for traceability. */
+  generated_by: string
+  generated_at: string
 }

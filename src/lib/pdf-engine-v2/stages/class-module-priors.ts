@@ -69,8 +69,9 @@ export const CLASS_MODULE_PRIORS: ClassModulePriors = {
       'environmental_interface',
       'power_distribution',
     ],
-    optional: ['maintenance_serviceability', 'hmi_ergonomics'],
-    forbidden: ['actuation_kinematics', 'mass_fluid_transport_process'],
+    // Megapack 3 + most ≥1 MWh BESS use water-glycol thermal management; fluid module is OPTIONAL not forbidden
+    optional: ['maintenance_serviceability', 'hmi_ergonomics', 'mass_fluid_transport_process'],
+    forbidden: ['actuation_kinematics'],
   },
 
   heat_pump: {

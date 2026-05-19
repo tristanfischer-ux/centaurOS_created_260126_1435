@@ -1,0 +1,299 @@
+{
+  "summary": {
+    "activities": 28,
+    "evidenceEligibleActivities": 23,
+    "sourceEvidenceActivities": 5,
+    "accepted": 0,
+    "rejected": 0,
+    "deferred": 0,
+    "pending": 23,
+    "blockedWithoutEvidence": 0,
+    "reviewCoverageRatio": 0,
+    "acceptanceRatio": 0,
+    "ignoredRecords": 0,
+    "supersededRecords": 0
+  },
+  "ignoredRecords": [],
+  "rows": [
+    {
+      "activityId": "design_review:energy_storage_source",
+      "activity": "Review Energy Storage Source architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:energy_storage_source",
+      "activity": "Verify Energy Storage Source requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:energy_storage_source",
+      "activity": "Collect source-backed evidence for Energy Storage Source critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:energy_conversion_transduction",
+      "activity": "Review Power Conversion System architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion System",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:energy_conversion_transduction",
+      "activity": "Verify Power Conversion System requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion System",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:energy_conversion_transduction",
+      "activity": "Collect source-backed evidence for Power Conversion System critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion System",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:structure_containment",
+      "activity": "Review Container Structure And Fit-Out architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "structure_containment",
+      "moduleName": "Container Structure And Fit-Out",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:structure_containment",
+      "activity": "Verify Container Structure And Fit-Out requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "structure_containment",
+      "moduleName": "Container Structure And Fit-Out",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:sensing_instrumentation",
+      "activity": "Review Sensing And Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing And Instrumentation",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:control_compute_communication",
+      "activity": "Review Control Compute And Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute And Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:control_compute_communication",
+      "activity": "Verify Control Compute And Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute And Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:control_compute_communication",
+      "activity": "Collect source-backed evidence for Control Compute And Communication critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute And Communication",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:safety_protection",
+      "activity": "Review Safety Protection And Interlocks architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection And Interlocks",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:safety_protection",
+      "activity": "Collect source-backed evidence for Safety Protection And Interlocks critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection And Interlocks",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:environmental_interface",
+      "activity": "Review Environmental Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface",
+      "moduleName": "Environmental Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:power_distribution",
+      "activity": "Review DC And AC Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution",
+      "moduleName": "DC And AC Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:power_distribution",
+      "activity": "Verify DC And AC Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution",
+      "moduleName": "DC And AC Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:maintenance_serviceability",
+      "activity": "Review Maintenance And Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Serviceability",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:maintenance_serviceability",
+      "activity": "Verify Maintenance And Serviceability requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Serviceability",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:mass_fluid_transport_process",
+      "activity": "Review Coolant Circulation Process architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Coolant Circulation Process",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:mass_fluid_transport_process",
+      "activity": "Collect source-backed evidence for Coolant Circulation Process critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Coolant Circulation Process",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:hmi_ergonomics",
+      "activity": "Review Operator HMI And Labelling architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Operator HMI And Labelling",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:energy_storage_source:energy_conversion_transduction:dc_bus",
+      "activity": "Verify dc_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_storage_source:energy_conversion_transduction",
+      "moduleName": "Energy Storage Source -> Power Conversion System",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:energy_storage_source:environmental_interface:thermal_loop",
+      "activity": "Verify thermal_loop interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_storage_source:environmental_interface",
+      "moduleName": "Energy Storage Source -> Environmental Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:energy_storage_source:control_compute_communication:bms_network",
+      "activity": "Verify bms_network interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_storage_source:control_compute_communication",
+      "moduleName": "Energy Storage Source -> Control Compute And Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:IEC-62619",
+      "activity": "Plan evidence for IEC-62619",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:UL-9540A",
+      "activity": "Plan evidence for UL-9540A",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:G99",
+      "activity": "Plan evidence for G99",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    }
+  ]
+}

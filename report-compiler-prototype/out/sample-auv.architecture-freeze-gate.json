@@ -1,0 +1,82 @@
+{
+  "verdict": "architecture_freeze_review_required",
+  "summary": {
+    "rows": 6,
+    "passRows": 2,
+    "reviewRows": 4,
+    "blockedRows": 0,
+    "passRatio": 0.33,
+    "modules": 9,
+    "subModules": 27,
+    "componentWords": 108,
+    "architectureAdmissionVerdict": "architecture_generation_admitted",
+    "stageIntegrityVerdict": "stage_trace_accepted",
+    "scratchLineageVerdict": "scratch_lineage_clean",
+    "componentAllocationVerdict": "allocation_ready",
+    "moduleEngineeringVerdict": "module_engineering_review_required",
+    "interfaceVerificationVerdict": "interface_review_ready",
+    "requirementCoverageVerdict": "coverage_review_ready",
+    "preBomEngineeringVerdict": "engineering_review_ready",
+    "provenanceViolations": 0,
+    "structurallyReadyForSourcing": true,
+    "independentReviewAccepted": false,
+    "nextAction": "Treat the architecture as review-ready until module review questions and critical sourcing blocks close."
+  },
+  "rows": [
+    {
+      "area": "admission_and_lineage",
+      "verdict": "pass",
+      "signal": "Architecture admission architecture_generation_admitted; stage integrity stage_trace_accepted; scratch lineage scratch_lineage_clean.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Architecture was admitted from the scratch flow with clean stage and lineage evidence."
+    },
+    {
+      "area": "module_structure",
+      "verdict": "review",
+      "signal": "Component allocation allocation_ready; module engineering module_engineering_review_required; 0/9 modules pass; 7 modules still have critical sourcing blocks.",
+      "passRatio": 0.75,
+      "blockers": [],
+      "requiredAction": "Treat the architecture as review-ready until module review questions and critical sourcing blocks close."
+    },
+    {
+      "area": "interface_contracts",
+      "verdict": "review",
+      "signal": "Interface verification interface_review_ready; 8/8 required interfaces have carriers; 0 accepted.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Collect or accept interface-review evidence before calling the architecture fully frozen."
+    },
+    {
+      "area": "requirement_coverage",
+      "verdict": "review",
+      "signal": "Requirement coverage coverage_review_ready; 2/2 requirements structurally ready or accepted; accepted ratio 0.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Requirement coverage is structurally ready; collect accepted reviewer evidence before full freeze."
+    },
+    {
+      "area": "engineering_review_state",
+      "verdict": "review",
+      "signal": "Pre-BoM engineering engineering_review_ready; 4/6 areas pass; calculations needing review 1; assumptions needing review 22.",
+      "passRatio": 0.67,
+      "blockers": [],
+      "requiredAction": "Keep architecture labelled review-ready until calculations, assumptions and verification evidence are accepted."
+    },
+    {
+      "area": "sourcing_boundary",
+      "verdict": "pass",
+      "signal": "108 candidate BoM lines; 0 admitted sourcing evidence rows; 0 provenance violation(s); 48 critical missing source claim(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Sourcing and BoM claims remain behind explicit admitted source evidence."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Treat the architecture as review-ready until module review questions and critical sourcing blocks close.",
+    "Collect or accept interface-review evidence before calling the architecture fully frozen.",
+    "Requirement coverage is structurally ready; collect accepted reviewer evidence before full freeze.",
+    "Keep architecture labelled review-ready until calculations, assumptions and verification evidence are accepted."
+  ]
+}

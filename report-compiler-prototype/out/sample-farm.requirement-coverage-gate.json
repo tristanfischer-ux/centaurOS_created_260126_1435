@@ -1,0 +1,242 @@
+{
+  "verdict": "coverage_review_ready",
+  "summary": {
+    "rows": 3,
+    "acceptedEvidenceRows": 0,
+    "reviewReadyRows": 3,
+    "needsReviewRows": 0,
+    "blockedRows": 0,
+    "unlinkedRows": 0,
+    "architectureLinkedRows": 3,
+    "subModuleLinkedRows": 3,
+    "componentLinkedRows": 3,
+    "calculationLinkedRows": 3,
+    "reviewQuestionRows": 3,
+    "verificationActivityRows": 3,
+    "structuralCoverageRatio": 1,
+    "acceptedEvidenceRatio": 0
+  },
+  "rows": [
+    {
+      "requirementId": "envelope_length_m",
+      "label": "Envelope length",
+      "value": "2.4 m",
+      "status": "covered_review_ready",
+      "presentSignals": [
+        "architecture_link",
+        "submodule_link",
+        "component_link",
+        "calculation_link",
+        "review_question",
+        "verification_activity"
+      ],
+      "missingSignals": [
+        "accepted_verification"
+      ],
+      "architectureModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "growing_rack_stack",
+        "harvest_access",
+        "horticultural_lighting"
+      ],
+      "componentWordIds": [
+        "growing_rack_structure",
+        "slide_out_tray_handle",
+        "led_grow_lights"
+      ],
+      "calculationIds": [
+        "farm_footprint_check_m2"
+      ],
+      "reviewQuestionIds": [
+        "assumption_resolution:component:environmental_interface_canopy_air_mixing_air_circulation_fans",
+        "assumption_resolution:component:environmental_interface_co2_enrichment_co2_sensor_or_dosing",
+        "assumption_resolution:component:environmental_interface_horticultural_lighting_led_grow_lights",
+        "assumption_resolution:component:structure_containment_growing_rack_stack_growing_rack_structure",
+        "assumption_resolution:sanity:farm_footprint",
+        "assumption_resolution:sanity:farm_process_closure",
+        "assumption_resolution:sanity:farm_wet_electrical_separation",
+        "calculation_envelope:farm_service_clearance_area_m2",
+        "calculation_envelope:farm_footprint_check_m2",
+        "interface_contract:control_compute_communication:environmental_interface:actuator_bus",
+        "interface_contract:environmental_interface:mass_fluid_transport_process:sensor_bus",
+        "module_allocation:environmental_interface",
+        "module_allocation:maintenance_serviceability",
+        "module_allocation:structure_containment",
+        "submodule_allocation:environmental_interface:canopy_air_mixing",
+        "submodule_allocation:environmental_interface:co2_enrichment",
+        "submodule_allocation:environmental_interface:horticultural_lighting",
+        "submodule_allocation:environmental_interface:humidity_temperature_control",
+        "submodule_allocation:maintenance_serviceability:cleaning_access",
+        "submodule_allocation:maintenance_serviceability:consumable_service",
+        "submodule_allocation:maintenance_serviceability:harvest_access",
+        "submodule_allocation:structure_containment:crop_tray_carriers",
+        "submodule_allocation:structure_containment:enclosure_panels",
+        "submodule_allocation:structure_containment:growing_rack_stack"
+      ],
+      "verificationActivityIds": [
+        "design_review:structure_containment",
+        "calculation:structure_containment",
+        "design_review:environmental_interface",
+        "calculation:environmental_interface",
+        "design_review:maintenance_serviceability",
+        "calculation:maintenance_serviceability"
+      ],
+      "acceptedVerificationActivityIds": [],
+      "blockers": [],
+      "requiredAction": "Collect accepted reviewer evidence; structural requirement coverage is ready for review."
+    },
+    {
+      "requirementId": "envelope_width_m",
+      "label": "Envelope width",
+      "value": "1.4 m",
+      "status": "covered_review_ready",
+      "presentSignals": [
+        "architecture_link",
+        "submodule_link",
+        "component_link",
+        "calculation_link",
+        "review_question",
+        "verification_activity"
+      ],
+      "missingSignals": [
+        "accepted_verification"
+      ],
+      "architectureModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "growing_rack_stack",
+        "harvest_access",
+        "horticultural_lighting"
+      ],
+      "componentWordIds": [
+        "growing_rack_structure",
+        "slide_out_tray_handle",
+        "led_grow_lights"
+      ],
+      "calculationIds": [
+        "farm_footprint_check_m2"
+      ],
+      "reviewQuestionIds": [
+        "assumption_resolution:component:environmental_interface_canopy_air_mixing_air_circulation_fans",
+        "assumption_resolution:component:environmental_interface_co2_enrichment_co2_sensor_or_dosing",
+        "assumption_resolution:component:environmental_interface_horticultural_lighting_led_grow_lights",
+        "assumption_resolution:component:structure_containment_growing_rack_stack_growing_rack_structure",
+        "assumption_resolution:sanity:farm_footprint",
+        "assumption_resolution:sanity:farm_process_closure",
+        "assumption_resolution:sanity:farm_wet_electrical_separation",
+        "calculation_envelope:farm_service_clearance_area_m2",
+        "calculation_envelope:farm_footprint_check_m2",
+        "interface_contract:control_compute_communication:environmental_interface:actuator_bus",
+        "interface_contract:environmental_interface:mass_fluid_transport_process:sensor_bus",
+        "module_allocation:environmental_interface",
+        "module_allocation:maintenance_serviceability",
+        "module_allocation:structure_containment",
+        "submodule_allocation:environmental_interface:canopy_air_mixing",
+        "submodule_allocation:environmental_interface:co2_enrichment",
+        "submodule_allocation:environmental_interface:horticultural_lighting",
+        "submodule_allocation:environmental_interface:humidity_temperature_control",
+        "submodule_allocation:maintenance_serviceability:cleaning_access",
+        "submodule_allocation:maintenance_serviceability:consumable_service",
+        "submodule_allocation:maintenance_serviceability:harvest_access",
+        "submodule_allocation:structure_containment:crop_tray_carriers",
+        "submodule_allocation:structure_containment:enclosure_panels",
+        "submodule_allocation:structure_containment:growing_rack_stack"
+      ],
+      "verificationActivityIds": [
+        "design_review:structure_containment",
+        "calculation:structure_containment",
+        "design_review:environmental_interface",
+        "calculation:environmental_interface",
+        "design_review:maintenance_serviceability",
+        "calculation:maintenance_serviceability"
+      ],
+      "acceptedVerificationActivityIds": [],
+      "blockers": [],
+      "requiredAction": "Collect accepted reviewer evidence; structural requirement coverage is ready for review."
+    },
+    {
+      "requirementId": "footprint_m2",
+      "label": "Footprint",
+      "value": "3.36 m2",
+      "status": "covered_review_ready",
+      "presentSignals": [
+        "architecture_link",
+        "submodule_link",
+        "component_link",
+        "calculation_link",
+        "review_question",
+        "verification_activity"
+      ],
+      "missingSignals": [
+        "accepted_verification"
+      ],
+      "architectureModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "growing_rack_stack",
+        "harvest_access",
+        "horticultural_lighting"
+      ],
+      "componentWordIds": [
+        "growing_rack_structure",
+        "slide_out_tray_handle",
+        "led_grow_lights"
+      ],
+      "calculationIds": [
+        "farm_footprint_check_m2",
+        "farm_service_clearance_area_m2"
+      ],
+      "reviewQuestionIds": [
+        "assumption_resolution:component:environmental_interface_canopy_air_mixing_air_circulation_fans",
+        "assumption_resolution:component:environmental_interface_co2_enrichment_co2_sensor_or_dosing",
+        "assumption_resolution:component:environmental_interface_horticultural_lighting_led_grow_lights",
+        "assumption_resolution:component:structure_containment_growing_rack_stack_growing_rack_structure",
+        "assumption_resolution:sanity:farm_footprint",
+        "assumption_resolution:sanity:farm_process_closure",
+        "assumption_resolution:sanity:farm_wet_electrical_separation",
+        "calculation_envelope:farm_service_clearance_area_m2",
+        "calculation_envelope:farm_footprint_check_m2",
+        "interface_contract:control_compute_communication:environmental_interface:actuator_bus",
+        "interface_contract:environmental_interface:mass_fluid_transport_process:sensor_bus",
+        "module_allocation:environmental_interface",
+        "module_allocation:maintenance_serviceability",
+        "module_allocation:structure_containment",
+        "submodule_allocation:environmental_interface:canopy_air_mixing",
+        "submodule_allocation:environmental_interface:co2_enrichment",
+        "submodule_allocation:environmental_interface:horticultural_lighting",
+        "submodule_allocation:environmental_interface:humidity_temperature_control",
+        "submodule_allocation:maintenance_serviceability:cleaning_access",
+        "submodule_allocation:maintenance_serviceability:consumable_service",
+        "submodule_allocation:maintenance_serviceability:harvest_access",
+        "submodule_allocation:structure_containment:crop_tray_carriers",
+        "submodule_allocation:structure_containment:enclosure_panels",
+        "submodule_allocation:structure_containment:growing_rack_stack"
+      ],
+      "verificationActivityIds": [
+        "design_review:structure_containment",
+        "calculation:structure_containment",
+        "design_review:environmental_interface",
+        "calculation:environmental_interface",
+        "design_review:maintenance_serviceability",
+        "calculation:maintenance_serviceability"
+      ],
+      "acceptedVerificationActivityIds": [],
+      "blockers": [],
+      "requiredAction": "Collect accepted reviewer evidence; structural requirement coverage is ready for review."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Collect accepted reviewer evidence; structural requirement coverage is ready for review."
+  ]
+}

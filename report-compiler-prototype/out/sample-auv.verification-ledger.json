@@ -1,0 +1,389 @@
+{
+  "summary": {
+    "activities": 37,
+    "evidenceEligibleActivities": 30,
+    "sourceEvidenceActivities": 7,
+    "accepted": 0,
+    "rejected": 0,
+    "deferred": 0,
+    "pending": 30,
+    "blockedWithoutEvidence": 0,
+    "reviewCoverageRatio": 0,
+    "acceptanceRatio": 0,
+    "ignoredRecords": 0,
+    "supersededRecords": 0
+  },
+  "ignoredRecords": [],
+  "rows": [
+    {
+      "activityId": "design_review:structure_containment",
+      "activity": "Review Pressure Structure Containment architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "structure_containment",
+      "moduleName": "Pressure Structure Containment",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:structure_containment",
+      "activity": "Verify Pressure Structure Containment requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "structure_containment",
+      "moduleName": "Pressure Structure Containment",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:structure_containment",
+      "activity": "Collect source-backed evidence for Pressure Structure Containment critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "structure_containment",
+      "moduleName": "Pressure Structure Containment",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:energy_storage_source",
+      "activity": "Review Subsea Energy Storage architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Subsea Energy Storage",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:energy_storage_source",
+      "activity": "Verify Subsea Energy Storage requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Subsea Energy Storage",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:energy_storage_source",
+      "activity": "Collect source-backed evidence for Subsea Energy Storage critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Subsea Energy Storage",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:power_distribution",
+      "activity": "Review Subsea Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution",
+      "moduleName": "Subsea Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:power_distribution",
+      "activity": "Verify Subsea Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution",
+      "moduleName": "Subsea Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:power_distribution",
+      "activity": "Collect source-backed evidence for Subsea Power Distribution critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "power_distribution",
+      "moduleName": "Subsea Power Distribution",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:actuation_kinematics",
+      "activity": "Review Thruster Actuation Kinematics architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Thruster Actuation Kinematics",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:actuation_kinematics",
+      "activity": "Verify Thruster Actuation Kinematics requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Thruster Actuation Kinematics",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:actuation_kinematics",
+      "activity": "Collect source-backed evidence for Thruster Actuation Kinematics critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Thruster Actuation Kinematics",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:control_compute_communication",
+      "activity": "Review Autonomy Compute Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:control_compute_communication",
+      "activity": "Verify Autonomy Compute Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:control_compute_communication",
+      "activity": "Collect source-backed evidence for Autonomy Compute Communication critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Compute Communication",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:sensing_instrumentation",
+      "activity": "Review Navigation And Payload Sensing architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Payload Sensing",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:sensing_instrumentation",
+      "activity": "Collect source-backed evidence for Navigation And Payload Sensing critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Payload Sensing",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:environmental_interface",
+      "activity": "Review Pressure Thermal Buoyancy Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface",
+      "moduleName": "Pressure Thermal Buoyancy Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:environmental_interface",
+      "activity": "Verify Pressure Thermal Buoyancy Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface",
+      "moduleName": "Pressure Thermal Buoyancy Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:safety_protection",
+      "activity": "Review Leak Abort And Recovery Safety architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection",
+      "moduleName": "Leak Abort And Recovery Safety",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:safety_protection",
+      "activity": "Verify Leak Abort And Recovery Safety requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection",
+      "moduleName": "Leak Abort And Recovery Safety",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:safety_protection",
+      "activity": "Collect source-backed evidence for Leak Abort And Recovery Safety critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "safety_protection",
+      "moduleName": "Leak Abort And Recovery Safety",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:maintenance_serviceability",
+      "activity": "Review Deck Recovery And Service architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Deck Recovery And Service",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:energy_storage_source:power_distribution:dc_power_bus",
+      "activity": "Verify dc_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_storage_source:power_distribution",
+      "moduleName": "Subsea Energy Storage -> Subsea Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:power_distribution:actuation_kinematics:thruster_power_bus",
+      "activity": "Verify thruster_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution:actuation_kinematics",
+      "moduleName": "Subsea Power Distribution -> Thruster Actuation Kinematics",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "activity": "Verify thrust_command_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication:actuation_kinematics",
+      "moduleName": "Autonomy Compute Communication -> Thruster Actuation Kinematics",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "activity": "Verify navigation_sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Navigation And Payload Sensing -> Autonomy Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "activity": "Verify payload_data_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Navigation And Payload Sensing -> Autonomy Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:environmental_interface:structure_containment:pressure_boundary",
+      "activity": "Verify pressure_boundary interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface:structure_containment",
+      "moduleName": "Pressure Thermal Buoyancy Interface -> Pressure Structure Containment",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:safety_protection:control_compute_communication:alarm_bus",
+      "activity": "Verify alarm_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection:control_compute_communication",
+      "moduleName": "Leak Abort And Recovery Safety -> Autonomy Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:safety_protection:structure_containment:pressure_boundary",
+      "activity": "Verify pressure_boundary interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection:structure_containment",
+      "moduleName": "Leak Abort And Recovery Safety -> Pressure Structure Containment",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:PRESSURE-BOUNDARY-REVIEW",
+      "activity": "Plan evidence for PRESSURE-BOUNDARY-REVIEW",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:SUBSEA-LEAK-ABORT-REVIEW",
+      "activity": "Plan evidence for SUBSEA-LEAK-ABORT-REVIEW",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:EMC-MARINE-COMMS-REVIEW",
+      "activity": "Plan evidence for EMC-MARINE-COMMS-REVIEW",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:1",
+      "activity": "Review risk control for Pressure hull or seal failure at depth",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:2",
+      "activity": "Review risk control for Loss of navigation or communications underwater",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:3",
+      "activity": "Review risk control for Unable to recover vehicle after abort",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    }
+  ]
+}

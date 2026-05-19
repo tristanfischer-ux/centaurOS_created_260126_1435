@@ -1,0 +1,460 @@
+{
+  "summary": {
+    "requiredContracts": 3,
+    "presentContracts": 3,
+    "missingContracts": 0,
+    "sharedInterfaces": 16,
+    "localOnlyInterfaces": 0
+  },
+  "requiredContracts": [
+    {
+      "id": "required:energy_storage_source:energy_conversion_transduction:dc_bus",
+      "interfaceId": "dc_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "energy_storage_source",
+        "moduleName": "Energy Storage Source",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "cell_string",
+            "subModuleName": "Cell string",
+            "componentWordIds": [
+              "lfp_prismatic_cells",
+              "cell_to_cell_busbar",
+              "cell_terminal_hardware_set",
+              "cell_insulation_pad",
+              "module_fuse"
+            ]
+          },
+          {
+            "subModuleId": "dc_string_output",
+            "subModuleName": "DC string output",
+            "componentWordIds": [
+              "dc_contactor_or_breaker",
+              "precharge_resistor",
+              "hv_fuse_holder",
+              "pack_current_sensor",
+              "service_disconnect"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "energy_conversion_transduction",
+        "moduleName": "Power Conversion System",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "pcs_inverter",
+            "subModuleName": "PCS inverter bridge",
+            "componentWordIds": [
+              "pcs_inverter",
+              "igbt_power_module",
+              "dc_link_capacitor_bank",
+              "gate_driver_board",
+              "inverter_control_board",
+              "liquid_cooled_heatsink"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Battery racks must feed the PCS over a declared DC bus.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:energy_storage_source:environmental_interface:thermal_loop",
+      "interfaceId": "thermal_loop",
+      "status": "present",
+      "from": {
+        "moduleId": "energy_storage_source",
+        "moduleName": "Energy Storage Source",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "cell_string",
+            "subModuleName": "Cell string",
+            "componentWordIds": [
+              "lfp_prismatic_cells",
+              "cell_to_cell_busbar",
+              "cell_terminal_hardware_set",
+              "cell_insulation_pad",
+              "module_fuse"
+            ]
+          },
+          {
+            "subModuleId": "rack_thermal_interface",
+            "subModuleName": "Rack thermal interface",
+            "componentWordIds": [
+              "rack_cold_plate_manifold",
+              "thermally_conductive_gap_pad",
+              "coolant_quick_connector_pair",
+              "rack_drip_tray",
+              "leak_detection_rope"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "environmental_interface",
+        "moduleName": "Environmental Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "hvac_unit",
+            "subModuleName": "HVAC unit",
+            "componentWordIds": [
+              "container_hvac_unit",
+              "air_filter_element",
+              "condensate_drain_kit",
+              "hvac_controller"
+            ]
+          },
+          {
+            "subModuleId": "ventilation_path",
+            "subModuleName": "Ventilation path",
+            "componentWordIds": [
+              "intake_louvre",
+              "exhaust_louvre",
+              "ec_fan_assembly",
+              "airflow_baffle"
+            ]
+          },
+          {
+            "subModuleId": "heat_rejection_coil",
+            "subModuleName": "Heat rejection coil",
+            "componentWordIds": [
+              "dry_cooler_coil",
+              "ec_condenser_fan",
+              "fan_contactor",
+              "coil_guard_grille",
+              "drain_safe_condensate_pan"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Cell heat must be coupled to the thermal management loop.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:energy_storage_source:control_compute_communication:bms_network",
+      "interfaceId": "bms_network",
+      "status": "present",
+      "from": {
+        "moduleId": "energy_storage_source",
+        "moduleName": "Energy Storage Source",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "bms_slave",
+            "subModuleName": "BMS slave board",
+            "componentWordIds": [
+              "bms_slave_pcb",
+              "afe_monitor_ic",
+              "ntc_thermistor_harness",
+              "isolated_can_transceiver",
+              "conformal_coating"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute And Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "bms_master",
+            "subModuleName": "BMS master controller",
+            "componentWordIds": [
+              "bms_master_controller",
+              "isolation_interface",
+              "contactor_driver_output",
+              "soc_estimation_firmware"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Cell/rack state must be visible to BMS and EMS supervision.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    }
+  ],
+  "sharedInterfaces": [
+    {
+      "interfaceId": "ac_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "safety_protection",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Power Conversion System",
+        "Safety Protection And Interlocks",
+        "DC And AC Power Distribution"
+      ],
+      "carrierSubModuleCount": 7
+    },
+    {
+      "interfaceId": "alarm_bus",
+      "status": "shared",
+      "moduleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "safety_protection",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Sensing And Instrumentation",
+        "Control Compute And Communication",
+        "Safety Protection And Interlocks",
+        "Operator HMI And Labelling"
+      ],
+      "carrierSubModuleCount": 6
+    },
+    {
+      "interfaceId": "bms_network",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Energy Storage Source",
+        "Sensing And Instrumentation",
+        "Control Compute And Communication"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "dc_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "energy_conversion_transduction",
+        "sensing_instrumentation",
+        "safety_protection",
+        "power_distribution",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Energy Storage Source",
+        "Power Conversion System",
+        "Sensing And Instrumentation",
+        "Safety Protection And Interlocks",
+        "DC And AC Power Distribution",
+        "Maintenance And Serviceability"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "electrical_power",
+      "status": "shared",
+      "moduleIds": [
+        "environmental_interface",
+        "power_distribution",
+        "maintenance_serviceability",
+        "mass_fluid_transport_process"
+      ],
+      "moduleNames": [
+        "Environmental Interface",
+        "DC And AC Power Distribution",
+        "Maintenance And Serviceability",
+        "Coolant Circulation Process"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "fire_boundary",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "safety_protection",
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Container Structure And Fit-Out",
+        "Safety Protection And Interlocks",
+        "Environmental Interface"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "hardwired_trip",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "energy_conversion_transduction",
+        "control_compute_communication",
+        "safety_protection",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Energy Storage Source",
+        "Power Conversion System",
+        "Control Compute And Communication",
+        "Safety Protection And Interlocks",
+        "DC And AC Power Distribution"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "lifting_points",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Container Structure And Fit-Out",
+        "Maintenance And Serviceability"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "mechanical_mounts",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "structure_containment",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Energy Storage Source",
+        "Container Structure And Fit-Out",
+        "Maintenance And Serviceability"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "modbus_tcp",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Power Conversion System",
+        "Control Compute And Communication"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "protective_earth",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "structure_containment",
+        "safety_protection",
+        "power_distribution",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Power Conversion System",
+        "Container Structure And Fit-Out",
+        "Safety Protection And Interlocks",
+        "DC And AC Power Distribution",
+        "Maintenance And Serviceability"
+      ],
+      "carrierSubModuleCount": 7
+    },
+    {
+      "interfaceId": "sensor_bus",
+      "status": "shared",
+      "moduleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "environmental_interface",
+        "maintenance_serviceability",
+        "mass_fluid_transport_process"
+      ],
+      "moduleNames": [
+        "Sensing And Instrumentation",
+        "Control Compute And Communication",
+        "Environmental Interface",
+        "Maintenance And Serviceability",
+        "Coolant Circulation Process"
+      ],
+      "carrierSubModuleCount": 9
+    },
+    {
+      "interfaceId": "service_access",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "structure_containment",
+        "control_compute_communication",
+        "safety_protection",
+        "environmental_interface",
+        "power_distribution",
+        "maintenance_serviceability",
+        "mass_fluid_transport_process",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Energy Storage Source",
+        "Container Structure And Fit-Out",
+        "Control Compute And Communication",
+        "Safety Protection And Interlocks",
+        "Environmental Interface",
+        "DC And AC Power Distribution",
+        "Maintenance And Serviceability",
+        "Coolant Circulation Process",
+        "Operator HMI And Labelling"
+      ],
+      "carrierSubModuleCount": 21
+    },
+    {
+      "interfaceId": "site_scada",
+      "status": "shared",
+      "moduleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Sensing And Instrumentation",
+        "Control Compute And Communication",
+        "Operator HMI And Labelling"
+      ],
+      "carrierSubModuleCount": 6
+    },
+    {
+      "interfaceId": "thermal_loop",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "sensing_instrumentation",
+        "environmental_interface",
+        "mass_fluid_transport_process"
+      ],
+      "moduleNames": [
+        "Energy Storage Source",
+        "Sensing And Instrumentation",
+        "Environmental Interface",
+        "Coolant Circulation Process"
+      ],
+      "carrierSubModuleCount": 10
+    },
+    {
+      "interfaceId": "thermal_path",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Power Conversion System",
+        "Environmental Interface"
+      ],
+      "carrierSubModuleCount": 5
+    }
+  ]
+}

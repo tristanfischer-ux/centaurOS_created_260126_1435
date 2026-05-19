@@ -1,0 +1,982 @@
+{
+  "summary": {
+    "rows": 57,
+    "blockers": 18,
+    "majors": 39,
+    "minors": 0,
+    "architectureBlockingRows": 0,
+    "bomBlockingRows": 15,
+    "publishBlockingRows": 57,
+    "sourcingIntakeRows": 15,
+    "verificationIntakeRows": 32,
+    "engineeringReviewRows": 9,
+    "architectureRevisionRows": 0
+  },
+  "rows": [
+    {
+      "id": "readiness:1",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "bom score 1 is below 8.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "score_repair",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:2",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "12 critical BoM line(s) lack source-backed cost evidence.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:3",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "7 verification activity/activities remain blocked.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:4",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "0/30 non-sourcing verification activity/activities have accepted reviewer evidence.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "calculation:auv_endurance_minutes",
+      "kind": "calculation_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "AUV endurance minutes",
+      "issue": "480 minutes mission endurance before energy-budget proof.",
+      "requiredEvidence": "Confirm speed profile, payload load, reserve margin, battery derating and recovery scenario.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "endurance_hours"
+      ],
+      "source": "engineering_calculation_ledger"
+    },
+    {
+      "id": "assumption:metric:headline_output",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Survey endurance",
+      "issue": "Survey endurance uses endurance_hours with medium confidence.",
+      "requiredEvidence": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:metric:capex_gbp",
+      "kind": "assumption_review",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Estimated CAPEX",
+      "issue": "Estimated CAPEX uses an implicit model with low confidence.",
+      "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:metric:opex_annual_gbp",
+      "kind": "assumption_review",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Estimated annual OPEX",
+      "issue": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:auv_depth_rating",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Depth Rating",
+      "issue": "Depth Rating currently evaluates as pass against 10 to 600 m for inspection-class AUV prototypes; deeper missions need dedicated pressure-vessel, seal and recovery evidence.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "depth_rating_m"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:auv_endurance_target",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Survey Endurance Target",
+      "issue": "Survey Endurance Target currently evaluates as pass against <=12 h plausible for compact inspection AUV concept, 12-24 h needs battery/drag budget, >24 h is high risk without a detailed energy model.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "endurance_hours"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:auv_navigation_control_closure",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Navigation/Control Closure",
+      "issue": "Navigation/Control Closure currently evaluates as pass against navigation sensor bus, payload data bus, acoustic link and thrust command bus present.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "endurance_hours"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:auv_pressure_power_recovery_safety",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Pressure/Power/Recovery Safety",
+      "issue": "Pressure/Power/Recovery Safety currently evaluates as pass against pressure boundary, leak alarm, alarm bus, DC power, service access and recovery beacon present.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "endurance_hours",
+        "depth_rating_m"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:PRESSURE-BOUNDARY-REVIEW",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "PRESSURE-BOUNDARY-REVIEW",
+      "issue": "Depth-rated pressure boundary review is relevant to this product class in Project engineering gate.",
+      "requiredEvidence": "Depth rating calculation, hull material allowables, endcap seal design and proof-pressure plan.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:SUBSEA-LEAK-ABORT-REVIEW",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "SUBSEA-LEAK-ABORT-REVIEW",
+      "issue": "Leak detection and abort-state review is relevant to this product class in Project engineering gate.",
+      "requiredEvidence": "Leak sensor placement, abort state machine, battery isolation and recovery procedure.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:EMC-MARINE-COMMS-REVIEW",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "EMC-MARINE-COMMS-REVIEW",
+      "issue": "Marine communications and EMC review is relevant to this product class in Project engineering gate.",
+      "requiredEvidence": "Acoustic modem integration, antenna/transducer mounting, cable shielding and data-loss behaviour.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "sourcing:pressure_hull",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Pressure hull",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "pressure_hull"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:battery_pack",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Battery pack",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "battery_pack"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:wet_mate_connector_set",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Wet-mate connector set",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "wet_mate_connector_set"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:thruster_set",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Thruster set",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "thruster_set"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:mission_computer",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Mission computer",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "mission_computer"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:acoustic_modem",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Acoustic modem",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "acoustic_modem"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:dvl",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "DVL",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "dvl"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:inertial_navigation_unit",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Inertial navigation unit",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "inertial_navigation_unit"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:depth_and_pressure_sensor",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Depth and pressure sensor",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "depth_and_pressure_sensor"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:forward_sonar_payload",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Forward sonar payload",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "forward_sonar_payload"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:leak_detection_sensor",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Leak detection sensor",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "leak_detection_sensor"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:recovery_beacon",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Recovery beacon",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "recovery_beacon"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "verification:design_review:structure_containment",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Pressure Structure Containment",
+      "issue": "Review Pressure Structure Containment architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:structure_containment"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:structure_containment",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Pressure Structure Containment",
+      "issue": "Verify Pressure Structure Containment requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:structure_containment"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:energy_storage_source",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Subsea Energy Storage",
+      "issue": "Review Subsea Energy Storage architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:energy_storage_source"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:energy_storage_source",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Subsea Energy Storage",
+      "issue": "Verify Subsea Energy Storage requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:energy_storage_source"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:power_distribution",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Subsea Power Distribution",
+      "issue": "Review Subsea Power Distribution architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:power_distribution"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:power_distribution",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Subsea Power Distribution",
+      "issue": "Verify Subsea Power Distribution requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:power_distribution"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:actuation_kinematics",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Thruster Actuation Kinematics",
+      "issue": "Review Thruster Actuation Kinematics architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:actuation_kinematics"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:actuation_kinematics",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Thruster Actuation Kinematics",
+      "issue": "Verify Thruster Actuation Kinematics requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:actuation_kinematics"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:control_compute_communication",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Autonomy Compute Communication",
+      "issue": "Review Autonomy Compute Communication architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:control_compute_communication"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:control_compute_communication",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Autonomy Compute Communication",
+      "issue": "Verify Autonomy Compute Communication requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:control_compute_communication"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:sensing_instrumentation",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Navigation And Payload Sensing",
+      "issue": "Review Navigation And Payload Sensing architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:sensing_instrumentation"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:environmental_interface",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Pressure Thermal Buoyancy Interface",
+      "issue": "Review Pressure Thermal Buoyancy Interface architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:environmental_interface"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:environmental_interface",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Pressure Thermal Buoyancy Interface",
+      "issue": "Verify Pressure Thermal Buoyancy Interface requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:environmental_interface"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:safety_protection",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Leak Abort And Recovery Safety",
+      "issue": "Review Leak Abort And Recovery Safety architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:safety_protection"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:safety_protection",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Leak Abort And Recovery Safety",
+      "issue": "Verify Leak Abort And Recovery Safety requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:safety_protection"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:maintenance_serviceability",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Deck Recovery And Service",
+      "issue": "Review Deck Recovery And Service architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:maintenance_serviceability"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:energy_storage_source:power_distribution:dc_power_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Subsea Energy Storage -> Subsea Power Distribution",
+      "issue": "Verify dc_power_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:energy_storage_source:power_distribution:dc_power_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:power_distribution:actuation_kinematics:thruster_power_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Subsea Power Distribution -> Thruster Actuation Kinematics",
+      "issue": "Verify thruster_power_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:power_distribution:actuation_kinematics:thruster_power_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Autonomy Compute Communication -> Thruster Actuation Kinematics",
+      "issue": "Verify thrust_command_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:control_compute_communication:actuation_kinematics:thrust_command_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Navigation And Payload Sensing -> Autonomy Compute Communication",
+      "issue": "Verify navigation_sensor_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:sensing_instrumentation:control_compute_communication:navigation_sensor_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Navigation And Payload Sensing -> Autonomy Compute Communication",
+      "issue": "Verify payload_data_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:sensing_instrumentation:control_compute_communication:payload_data_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:environmental_interface:structure_containment:pressure_boundary",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Pressure Thermal Buoyancy Interface -> Pressure Structure Containment",
+      "issue": "Verify pressure_boundary interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:environmental_interface:structure_containment:pressure_boundary"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:safety_protection:control_compute_communication:alarm_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Leak Abort And Recovery Safety -> Autonomy Compute Communication",
+      "issue": "Verify alarm_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:safety_protection:control_compute_communication:alarm_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:safety_protection:structure_containment:pressure_boundary",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Leak Abort And Recovery Safety -> Pressure Structure Containment",
+      "issue": "Verify pressure_boundary interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:safety_protection:structure_containment:pressure_boundary"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:PRESSURE-BOUNDARY-REVIEW",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for PRESSURE-BOUNDARY-REVIEW",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:PRESSURE-BOUNDARY-REVIEW"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:SUBSEA-LEAK-ABORT-REVIEW",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for SUBSEA-LEAK-ABORT-REVIEW",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:SUBSEA-LEAK-ABORT-REVIEW"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:EMC-MARINE-COMMS-REVIEW",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for EMC-MARINE-COMMS-REVIEW",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:EMC-MARINE-COMMS-REVIEW"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:1",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Pressure hull or seal failure at depth",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:1"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:2",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Loss of navigation or communications underwater",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:2"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:3",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Unable to recover vehicle after abort",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:3"
+      ],
+      "source": "verification_evidence_ledger"
+    }
+  ]
+}

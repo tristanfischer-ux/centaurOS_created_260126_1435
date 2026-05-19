@@ -1,0 +1,257 @@
+{
+  "summary": {
+    "modules": 10,
+    "readyModules": 2,
+    "sourcingBlockedModules": 8,
+    "attentionModules": 0,
+    "criticalUnpricedLines": 12,
+    "issueCount": 0
+  },
+  "modules": [
+    {
+      "moduleId": "skin_patient_interface",
+      "moduleName": "Skin Patient Interface",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 3,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "wear_days"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "criticalUnpricedLines": [
+        "adhesive_skin_patch"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Glucose Sensing Instrumentation",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 4,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "criticalUnpricedLines": [
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode"
+      ],
+      "candidateUnpricedLines": 9,
+      "issueCodes": [],
+      "notes": [
+        "3 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Applicator Insertion Mechanism",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "disposable_applicator"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "structure_containment",
+      "moduleName": "Transmitter Housing Structure",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "protective_transmitter_housing"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "energy_storage_source",
+      "moduleName": "Wearable Energy Source",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 3,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "wear_days"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "criticalUnpricedLines": [
+        "thin_film_battery"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "power_distribution",
+      "moduleName": "Low-Power Distribution",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 3,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "reading_interval_minutes"
+      ],
+      "sanityCheckIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety"
+      ],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 5,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "criticalUnpricedLines": [
+        "low_power_microcontroller",
+        "ble_radio_module"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "environmental_interface",
+      "moduleName": "Wear Environment Compensation",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "wear_days",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target",
+        "cgm_biofluid_signal_closure"
+      ],
+      "criticalUnpricedLines": [
+        "temperature_sensor"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "safety_protection",
+      "moduleName": "Patient Safety Protection",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "wear_days"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Packaging Traceability Serviceability",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "sterile_barrier_pouch",
+        "udi_label_set"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    }
+  ]
+}

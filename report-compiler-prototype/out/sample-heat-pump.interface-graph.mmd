@@ -1,0 +1,16 @@
+flowchart LR
+  energy_conversion_transduction["Refrigerant Energy Conversion"]
+  environmental_interface["Outdoor Air Interface"]
+  mass_fluid_transport_process["Hydronic Heat Delivery"]
+  control_compute_communication["Control Compute Communication"]
+  sensing_instrumentation["Sensing Instrumentation"]
+  power_distribution["Electrical Power Distribution"]
+  structure_containment["Monobloc Structure And Containment"]
+  safety_protection["Safety Protection"]
+  maintenance_serviceability["Maintenance And Commissioning"]
+  hmi_ergonomics["User And Installer Interface"]
+  environmental_interface -->|"refrigerant_loop"| energy_conversion_transduction
+  energy_conversion_transduction -->|"hydronic_loop"| mass_fluid_transport_process
+  control_compute_communication -->|"control_bus"| energy_conversion_transduction
+  sensing_instrumentation -->|"sensor_bus"| control_compute_communication
+  classDef missing stroke:#a32626,stroke-width:3px,color:#a32626;

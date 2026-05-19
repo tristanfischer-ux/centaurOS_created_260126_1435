@@ -1,0 +1,319 @@
+{
+  "summary": {
+    "activities": 30,
+    "evidenceEligibleActivities": 25,
+    "sourceEvidenceActivities": 5,
+    "accepted": 0,
+    "rejected": 0,
+    "deferred": 0,
+    "pending": 25,
+    "blockedWithoutEvidence": 0,
+    "reviewCoverageRatio": 0,
+    "acceptanceRatio": 0,
+    "ignoredRecords": 0,
+    "supersededRecords": 0
+  },
+  "ignoredRecords": [],
+  "rows": [
+    {
+      "activityId": "design_review:energy_conversion_transduction",
+      "activity": "Review Refrigerant Energy Conversion architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Refrigerant Energy Conversion",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:energy_conversion_transduction",
+      "activity": "Verify Refrigerant Energy Conversion requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Refrigerant Energy Conversion",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:energy_conversion_transduction",
+      "activity": "Collect source-backed evidence for Refrigerant Energy Conversion critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Refrigerant Energy Conversion",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:environmental_interface",
+      "activity": "Review Outdoor Air Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface",
+      "moduleName": "Outdoor Air Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:environmental_interface",
+      "activity": "Verify Outdoor Air Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface",
+      "moduleName": "Outdoor Air Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:environmental_interface",
+      "activity": "Collect source-backed evidence for Outdoor Air Interface critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "environmental_interface",
+      "moduleName": "Outdoor Air Interface",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:mass_fluid_transport_process",
+      "activity": "Review Hydronic Heat Delivery architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Hydronic Heat Delivery",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:mass_fluid_transport_process",
+      "activity": "Verify Hydronic Heat Delivery requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Hydronic Heat Delivery",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:mass_fluid_transport_process",
+      "activity": "Collect source-backed evidence for Hydronic Heat Delivery critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Hydronic Heat Delivery",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:control_compute_communication",
+      "activity": "Review Control Compute Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:control_compute_communication",
+      "activity": "Verify Control Compute Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:control_compute_communication",
+      "activity": "Collect source-backed evidence for Control Compute Communication critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:sensing_instrumentation",
+      "activity": "Review Sensing Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing Instrumentation",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:sensing_instrumentation",
+      "activity": "Verify Sensing Instrumentation requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing Instrumentation",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:sensing_instrumentation",
+      "activity": "Collect source-backed evidence for Sensing Instrumentation critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing Instrumentation",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:power_distribution",
+      "activity": "Review Electrical Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution",
+      "moduleName": "Electrical Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:structure_containment",
+      "activity": "Review Monobloc Structure And Containment architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "structure_containment",
+      "moduleName": "Monobloc Structure And Containment",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:safety_protection",
+      "activity": "Review Safety Protection architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:maintenance_serviceability",
+      "activity": "Review Maintenance And Commissioning architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Commissioning",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:hmi_ergonomics",
+      "activity": "Review User And Installer Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "User And Installer Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:environmental_interface:energy_conversion_transduction:refrigerant_loop",
+      "activity": "Verify refrigerant_loop interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface:energy_conversion_transduction",
+      "moduleName": "Outdoor Air Interface -> Refrigerant Energy Conversion",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:energy_conversion_transduction:mass_fluid_transport_process:hydronic_loop",
+      "activity": "Verify hydronic_loop interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_conversion_transduction:mass_fluid_transport_process",
+      "moduleName": "Refrigerant Energy Conversion -> Hydronic Heat Delivery",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:control_compute_communication:energy_conversion_transduction:control_bus",
+      "activity": "Verify control_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication:energy_conversion_transduction",
+      "moduleName": "Control Compute Communication -> Refrigerant Energy Conversion",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Sensing Instrumentation -> Control Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:EN-14511",
+      "activity": "Plan evidence for EN-14511",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:EN-378",
+      "activity": "Plan evidence for EN-378",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:EN-60335-2-40",
+      "activity": "Plan evidence for EN-60335-2-40",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:1",
+      "activity": "Review risk control for Refrigerant leak or flammability hazard",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:2",
+      "activity": "Review risk control for Frozen outdoor coil reduces capacity",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:3",
+      "activity": "Review risk control for Hydronic overpressure or low flow",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    }
+  ]
+}

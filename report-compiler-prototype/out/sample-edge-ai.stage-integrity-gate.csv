@@ -1,0 +1,6 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+stage_sequence,pass,8/8 expected compiler stages are present in order.,1,,Stage sequence matches the scratch compiler contract.
+stage_payloads,pass,8/8 stages have metrics; 8/8 have evidence or explicit limitation; 8/8 have limitations.,1,,"Every stage carries metrics, evidence or explicit limitation, and limitations."
+scratch_architecture_source,pass,Product class edge_ai; architecture source scratch_universal_architecture; scratch grammar supported: yes.,1,,Architecture came from the scratch universal grammar.
+architecture_before_sourcing,pass,Architecture ready: yes; readiness stage passed; sourcing stage warning.,1,,Sourcing stage is downstream of architecture readiness and has a consistent status.
+sourcing_provenance_boundary,pass,"0 admitted source evidence row(s), 0 admitted priced line(s), 0 provenance violation(s).",1,,"Supplier, manufacturer, MPN and cost fields stay behind admitted sourcing evidence."

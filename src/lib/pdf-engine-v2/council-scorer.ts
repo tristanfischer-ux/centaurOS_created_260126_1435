@@ -8,6 +8,7 @@
 
 import type { PipelineState, SectionScore, StageResult } from './types'
 import { sanitiseLlmOutput } from './sanitiser'
+import { getActionLogger } from './lib/action-logger'
 
 // ─── B1: Product-class → domain expert mapping ─────────────────────────────
 // Used to inject the right persona into the judge prompt so judges evaluate
@@ -200,6 +201,9 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
   const startTime = Date.now()
   console.log('[council-scorer] Starting council scoring of all sections...')
 
+  const logger = getActionLogger()
+  logger.logStage({ step_name: 'council_scoring', action_type: 'stage_start' })
+
   const sectionData = extractSectionData(state)
   const scores: CouncilScore[] = []
 
@@ -227,6 +231,16 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
         code_change_recommendations: [`Improve ${section} stage to produce more data`],
         source_attributions: [],
       })
+      // Gate-evaluation record: 1/10 with "insufficient data" is the
+      // diagnostic CLAUDE.md MEMORY entry `low_score_diagnostic_insufficient_data`
+      // points to — surface it in the action log so diagnose-run.tsx picks it up.
+      logger.logGate({
+        step_name: 'council_scoring',
+        gate_name: `council_scorer:${section}`,
+        verdict: 'INSUFFICIENT_DATA',
+        score: 1,
+        reasons: ['Section has insufficient data to evaluate'],
+      })
       continue
     }
 
@@ -236,8 +250,25 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
         const councilScore = await scoreSectionWithCouncil(section, data, state.productClass)
         scores.push(councilScore)
         console.log(`[council-scorer] ${section}: ${councilScore.score}/10 (council)`)
+        logger.logGate({
+          step_name: 'council_scoring',
+          gate_name: `council_scorer:${section}`,
+          verdict: councilScore.score >= 8 ? 'PASS' : councilScore.score >= 5 ? 'WARN' : 'FAIL',
+          score: councilScore.score,
+          reasons: councilScore.overall_reasons,
+          judges: councilScore.judgeBreakdown?.map(j => ({ model: j.model, score: j.score })),
+          scorer: 'council',
+        })
       } catch (err) {
         console.error(`[council-scorer] ${section} council scoring failed:`, (err as Error).message)
+        logger.logGate({
+          step_name: 'council_scoring',
+          gate_name: `council_scorer:${section}`,
+          verdict: 'COUNCIL_FAILED',
+          score: -1,
+          reasons: [`Council scoring failed: ${(err as Error).message}`],
+          scorer: 'council',
+        })
         // SCORE-005 (2026-05-07): Suppliers + Risks have a reliable
         // deterministic scorer — fall back to it when council fails.
         // Brief / BOM / Cost have no meaningful deterministic fallback
@@ -272,6 +303,14 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
       const score = deterministicScore(section, data)
       scores.push(score)
       console.log(`[council-scorer] ${section}: ${score.score}/10 (deterministic)`)
+      logger.logGate({
+        step_name: 'council_scoring',
+        gate_name: `council_scorer:${section}`,
+        verdict: score.score >= 8 ? 'PASS' : score.score >= 5 ? 'WARN' : 'FAIL',
+        score: score.score,
+        reasons: score.overall_reasons,
+        scorer: 'deterministic',
+      })
     }
   }
 
@@ -287,6 +326,16 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
     `[council-scorer] Complete. Average: ${avg.toFixed(1)}/10 ` +
     `(${scored.length} scored, ${failed} failed-to-score${failed > 0 ? ' — see logs' : ''})`
   )
+
+  logger.logStage({
+    step_name: 'council_scoring',
+    action_type: 'stage_end',
+    outcome: 'ok',
+    duration_ms: Date.now() - startTime,
+    average_score: Number(avg.toFixed(2)),
+    sections_scored: scored.length,
+    sections_failed: failed,
+  })
 
   return {
     ok: true,
@@ -469,6 +518,7 @@ Return ONLY valid JSON:
 async function callJudge(model: string, prompt: string, timeoutMs = 60_000): Promise<any> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
+  const t0 = Date.now()
 
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -500,9 +550,31 @@ async function callJudge(model: string, prompt: string, timeoutMs = 60_000): Pro
 
     clearTimeout(timeout)
 
-    if (!response.ok) throw new Error(`API ${response.status}`)
+    if (!response.ok) {
+      getActionLogger().logLlm({
+        step_name: 'council_scoring',
+        model,
+        latency_ms: Date.now() - t0,
+        ok: false,
+        error: `API ${response.status}`,
+        role: 'judge',
+      })
+      throw new Error(`API ${response.status}`)
+    }
 
     const json = await response.json()
+    // Emit per-judge LLM record (gap #4 in audit). Captures finish_reason +
+    // tokens + cost_usd via the shared estimator.
+    getActionLogger().logLlm({
+      step_name: 'council_scoring',
+      model,
+      prompt_tokens: json?.usage?.prompt_tokens,
+      completion_tokens: json?.usage?.completion_tokens,
+      latency_ms: Date.now() - t0,
+      finish_reason: json?.choices?.[0]?.finish_reason,
+      ok: true,
+      role: 'judge',
+    })
     const msg = json.choices?.[0]?.message
     let raw = msg?.content || msg?.reasoning || ''
     if (!raw && msg?.reasoning_details?.length) {

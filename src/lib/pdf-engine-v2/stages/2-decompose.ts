@@ -17,6 +17,7 @@ import type {
 } from '../types/module-decomposition'
 import { MODULE_DEFAULT_ALLOWED_RADICALS } from '../types/module-decomposition'
 import { candidateSentencesForModule } from '../radical/module-to-sentence-mapping.js'
+import { getActionLogger } from '../lib/action-logger'
 
 // Stage 2: Module Decomposition — uses MODULE_DECOMPOSITION_SYSTEM from prompts.ts
 // PA path: uses MODULE_DECOMPOSITION_SYSTEM_PA and validateDecomposeResultPA().
@@ -258,6 +259,7 @@ async function callOpenRouterLeaves(systemPrompt: string, userContent: string): 
   for (const model of models) {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 300_000)
+    const t0Leaves = Date.now()
 
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -291,6 +293,15 @@ async function callOpenRouterLeaves(systemPrompt: string, userContent: string): 
       if (finishReason && finishReason !== 'stop' && finishReason !== 'tool_calls') {
         console.error(`[decompose-radical-leaves] TRUNCATION DETECTED: finish_reason='${finishReason}' (raised max_tokens?) — model: ${model}`)
       }
+      getActionLogger().logLlm({
+        step_name: 'decompose-radical-leaves',
+        model,
+        prompt_tokens: json?.usage?.prompt_tokens,
+        completion_tokens: json?.usage?.completion_tokens,
+        latency_ms: Date.now() - t0Leaves,
+        finish_reason: finishReason,
+        ok: true,
+      })
       const msg = json.choices?.[0]?.message
       let raw = msg?.content || msg?.reasoning || ''
       if (!raw && msg?.reasoning_details?.length) {
@@ -379,6 +390,12 @@ export async function runDecomposeRadical(
   regulatoryExtraction?: RegulatoryExtraction,
 ): Promise<StageResult<RadicalTreeResult>> {
   const startTime = Date.now()
+  getActionLogger().logStage({
+    step_name: 'decompose-radical',
+    action_type: 'stage_start',
+    classification,
+    has_regulatory: !!(regulatoryExtraction?.regulatory_entries?.length),
+  })
   console.log('[decompose-radical] Starting Radical Phase 1.5 two-stage decomposition...')
   console.log(`[decompose-radical] Hierarchy: ${HIERARCHY_STATS.sentences} sentences, ${HIERARCHY_STATS.words} words, ${HIERARCHY_STATS.characterMappings} character mappings`)
 
@@ -399,6 +416,13 @@ export async function runDecomposeRadical(
   try {
     rawLeafList = await callOpenRouterLeaves(MODULE_DECOMPOSITION_LEAVES_PROMPT, userContent)
   } catch (err) {
+    getActionLogger().logStage({
+      step_name: 'decompose-radical',
+      action_type: 'stage_end',
+      outcome: 'fail',
+      duration_ms: Date.now() - startTime,
+      error: `Stage 1 leaf identification failed: ${(err as Error).message}`,
+    })
     return {
       ok: false,
       error: `Stage 1 leaf identification failed: ${(err as Error).message}`,
@@ -410,6 +434,13 @@ export async function runDecomposeRadical(
   try {
     leaves = validateLeafList(rawLeafList)
   } catch (err) {
+    getActionLogger().logStage({
+      step_name: 'decompose-radical',
+      action_type: 'stage_end',
+      outcome: 'fail',
+      duration_ms: Date.now() - startTime,
+      error: `Stage 1 leaf-list validation failed: ${(err as Error).message}`,
+    })
     return {
       ok: false,
       error: `Stage 1 leaf-list validation failed: ${(err as Error).message}`,
@@ -455,6 +486,13 @@ export async function runDecomposeRadical(
   try {
     buildResult = buildTreeFromLeaves(leaves, productSlug, classification, quantityOverrides, mandatoryCharacters, preferredWordIds)
   } catch (err) {
+    getActionLogger().logStage({
+      step_name: 'decompose-radical',
+      action_type: 'stage_end',
+      outcome: 'fail',
+      duration_ms: Date.now() - startTime,
+      error: `Stage 2 tree build failed: ${(err as Error).message}`,
+    })
     return {
       ok: false,
       error: `Stage 2 tree build failed: ${(err as Error).message}`,
@@ -477,6 +515,15 @@ export async function runDecomposeRadical(
     ...unmappedCharacters.filter(c => !c.startsWith('<UNKNOWN>')).map(c => `unmapped:${c}`),
   ]
 
+  getActionLogger().logStage({
+    step_name: 'decompose-radical',
+    action_type: 'stage_end',
+    outcome: 'ok',
+    duration_ms: Date.now() - startTime,
+    leaf_count: leaves.length,
+    unknown_count: unknownLeaves.length,
+    unmapped_count: stats.unmapped,
+  })
   return {
     ok: true,
     data: {
@@ -755,10 +802,11 @@ export function validateDecomposeResultPA(data: any): ModulePA[] {
 async function callOpenRouter(systemPrompt: string, userContent: string): Promise<any> {
   // Try multiple models with fallback
   const models = ['google/gemini-3.1-pro-preview', 'x-ai/grok-4.3', 'xiaomi/mimo-v2.5-pro']
-  
+
   for (const model of models) {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 300_000)
+    const t0Decompose = Date.now()
 
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -783,6 +831,13 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
     clearTimeout(timeout)
 
     if (!response.ok) {
+      getActionLogger().logLlm({
+        step_name: 'decompose',
+        model,
+        latency_ms: Date.now() - t0Decompose,
+        ok: false,
+        error: `OpenRouter ${response.status}`,
+      })
       throw new Error(`OpenRouter API returned status: ${response.status}`)
     }
 
@@ -792,6 +847,15 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
     if (finishReason && finishReason !== 'stop' && finishReason !== 'tool_calls') {
       console.error(`[decompose] TRUNCATION DETECTED: finish_reason='${finishReason}' (raised max_tokens?) — model: ${model}`)
     }
+    getActionLogger().logLlm({
+      step_name: 'decompose',
+      model,
+      prompt_tokens: json?.usage?.prompt_tokens,
+      completion_tokens: json?.usage?.completion_tokens,
+      latency_ms: Date.now() - t0Decompose,
+      finish_reason: finishReason,
+      ok: true,
+    })
     const msg = json.choices?.[0]?.message
     let raw = msg?.content || msg?.reasoning || ''
     if (!raw && msg?.reasoning_details?.length) {
@@ -929,6 +993,13 @@ export async function runDecomposePA(
   regulatoryExtraction?: RegulatoryExtraction,
 ): Promise<StageResult<ModulePA[]>> {
   const startTime = Date.now()
+  const _decomposeLogger = getActionLogger()
+  _decomposeLogger.logStage({
+    step_name: 'decompose-pa',
+    action_type: 'stage_start',
+    classification,
+    has_regulatory: !!(regulatoryExtraction?.regulatory_entries?.length),
+  })
   console.log('[decompose-pa] Starting PA Stage 5: Module Decomposition...')
 
   // D1 council BLOCKER-D1-2 fix (4/6 seats: Gemini, Grok, Kimi, MiMo):
@@ -970,6 +1041,13 @@ export async function runDecomposePA(
       const modules = validateDecomposeResultPA(parsedJson)
 
       console.log(`[decompose-pa] PA validation successful: ${modules.length} modules.`)
+      _decomposeLogger.logStage({
+        step_name: 'decompose-pa',
+        action_type: 'stage_end',
+        outcome: 'ok',
+        duration_ms: Date.now() - startTime,
+        module_count: modules.length,
+      })
       return {
         ok: true,
         data: modules,
@@ -994,6 +1072,14 @@ export async function runDecomposePA(
       const modules = validateDecomposeResultPA(parsedJson)
 
       console.log(`[decompose-pa] PA validation successful on retry: ${modules.length} modules.`)
+      _decomposeLogger.logStage({
+        step_name: 'decompose-pa',
+        action_type: 'stage_end',
+        outcome: 'ok',
+        duration_ms: Date.now() - startTime,
+        module_count: modules.length,
+        retried: true,
+      })
       return {
         ok: true,
         data: modules,
@@ -1001,6 +1087,13 @@ export async function runDecomposePA(
       }
     }
   } catch (error) {
+    _decomposeLogger.logStage({
+      step_name: 'decompose-pa',
+      action_type: 'stage_end',
+      outcome: 'fail',
+      duration_ms: Date.now() - startTime,
+      error: error instanceof Error ? error.message : String(error),
+    })
     console.error('[decompose-pa] PA Stage 5 failed:', error)
     return {
       ok: false,
@@ -1024,6 +1117,11 @@ export async function runDecompose(
   options?: { trainingDataDossier?: string }
 ): Promise<StageResult<Module[]>> {
   const startTime = Date.now()
+  const _legacyDecomposeLogger = getActionLogger()
+  _legacyDecomposeLogger.logStage({
+    step_name: 'decompose',
+    action_type: 'stage_start',
+  })
   console.log('[decompose] Starting decompose stage...')
 
   const userContent = options?.trainingDataDossier
@@ -1033,13 +1131,20 @@ export async function runDecompose(
   try {
     console.log('[decompose] Calling Gemini via OpenRouter...')
     let parsedJson = await callOpenRouter(MODULE_DECOMPOSITION_SYSTEM, userContent)
-    
+
     try {
       console.log('[decompose] Got response, validating...')
       let modules = validateDecomposeResult(parsedJson)
       modules = applyFmeaPadding(modules)
 
       console.log('[decompose] Validation successful.')
+      _legacyDecomposeLogger.logStage({
+        step_name: 'decompose',
+        action_type: 'stage_end',
+        outcome: 'ok',
+        duration_ms: Date.now() - startTime,
+        module_count: modules.length,
+      })
       return {
         ok: true,
         data: modules,
@@ -1052,6 +1157,14 @@ export async function runDecompose(
       parsedJson = await callOpenRouter(simplerPrompt, userContent)
       let modules = validateDecomposeResult(parsedJson)
       modules = applyFmeaPadding(modules)
+      _legacyDecomposeLogger.logStage({
+        step_name: 'decompose',
+        action_type: 'stage_end',
+        outcome: 'ok',
+        duration_ms: Date.now() - startTime,
+        module_count: modules.length,
+        retried: true,
+      })
       return {
         ok: true,
         data: modules,
@@ -1059,6 +1172,13 @@ export async function runDecompose(
       }
     }
   } catch (error) {
+    _legacyDecomposeLogger.logStage({
+      step_name: 'decompose',
+      action_type: 'stage_end',
+      outcome: 'fail',
+      duration_ms: Date.now() - startTime,
+      error: error instanceof Error ? error.message : String(error),
+    })
     console.error('[decompose] Stage failed:', error)
     return {
       ok: false,
@@ -1221,6 +1341,15 @@ async function callOpenRouterPerModule(
       if (finishReason && finishReason !== 'stop' && finishReason !== 'tool_calls') {
         console.error(`[decompose-per-module] TRUNCATION DETECTED: finish_reason='${finishReason}' (raised max_tokens?) — model: ${model}`)
       }
+      getActionLogger().logLlm({
+        step_name: 'decompose-per-module',
+        model,
+        prompt_tokens: json?.usage?.prompt_tokens,
+        completion_tokens: json?.usage?.completion_tokens,
+        latency_ms: Date.now() - startedAt,
+        finish_reason: finishReason,
+        ok: true,
+      })
       const msg = json.choices?.[0]?.message
       let raw = msg?.content || msg?.reasoning || ''
       if (!raw && msg?.reasoning_details?.length) {

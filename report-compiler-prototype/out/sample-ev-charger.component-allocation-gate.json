@@ -1,0 +1,1197 @@
+{
+  "verdict": "allocation_review_required",
+  "summary": {
+    "modules": 10,
+    "subModules": 30,
+    "componentWords": 120,
+    "readySubModules": 24,
+    "reviewSubModules": 6,
+    "blockedSubModules": 0,
+    "interfaceCarrierSubModules": 30,
+    "interfaceCarrierWithoutComponents": 0,
+    "requiredCriticalParts": 10,
+    "allocatedCriticalParts": 10,
+    "missingCriticalParts": 0,
+    "bomLines": 120,
+    "criticalBomLines": 13,
+    "duplicateComponentGroups": 3,
+    "duplicateCriticalComponentGroups": 3,
+    "allocationRatio": 1,
+    "criticalAllocationRatio": 1
+  },
+  "subModules": [
+    {
+      "id": "power_distribution:ac_input_switchgear",
+      "moduleId": "power_distribution",
+      "moduleName": "AC Input And DC Output Distribution",
+      "subModuleId": "ac_input_switchgear",
+      "subModuleName": "AC input switchgear",
+      "purpose": "Protects and isolates the grid connection before conversion.",
+      "interfaces": [
+        "ac_input_bus",
+        "protective_earth",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "ac_input_breaker_and_spd",
+        "lockable_ac_isolator",
+        "surge_arrestor_cartridge",
+        "input_terminal_shroud"
+      ],
+      "componentNames": [
+        "AC input breaker and SPD",
+        "lockable AC isolator",
+        "surge arrestor cartridge",
+        "input terminal shroud"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "ac_input_breaker_and_spd"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:dc_output_switchgear",
+      "moduleId": "power_distribution",
+      "moduleName": "AC Input And DC Output Distribution",
+      "subModuleId": "dc_output_switchgear",
+      "subModuleName": "DC output switchgear",
+      "purpose": "Connects and isolates the charging output path.",
+      "interfaces": [
+        "dc_output_bus",
+        "control_bus",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "dc_output_contactor_set",
+        "precharge_resistor_module",
+        "dc_output_fuse_carrier",
+        "output_polarity_label"
+      ],
+      "componentNames": [
+        "DC output contactor set",
+        "precharge resistor module",
+        "DC output fuse carrier",
+        "output polarity label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "dc_output_contactor_set"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:billing_metering_branch",
+      "moduleId": "power_distribution",
+      "moduleName": "AC Input And DC Output Distribution",
+      "subModuleId": "billing_metering_branch",
+      "subModuleName": "Billing metering branch",
+      "purpose": "Measures delivered energy and exposes metering data to control.",
+      "interfaces": [
+        "metering_bus",
+        "dc_output_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "mid_energy_meter",
+        "meter_ct_shunt_set",
+        "meter_seal_kit",
+        "meter_calibration_label"
+      ],
+      "componentNames": [
+        "MID energy meter",
+        "meter CT shunt set",
+        "meter seal kit",
+        "meter calibration label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "mid_energy_meter"
+      ],
+      "duplicateComponentWordIds": [
+        "mid_energy_meter"
+      ],
+      "status": "review",
+      "blockers": [],
+      "requiredAction": "Resolve duplicate component identity before sourcing: mid_energy_meter."
+    },
+    {
+      "id": "energy_conversion_transduction:rectifier_power_modules",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion Stack",
+      "subModuleId": "rectifier_power_modules",
+      "subModuleName": "Rectifier power modules",
+      "purpose": "Performs modular AC/DC conversion.",
+      "interfaces": [
+        "ac_input_bus",
+        "dc_output_bus",
+        "coolant_loop",
+        "control_bus"
+      ],
+      "componentWordIds": [
+        "power_module_stack",
+        "power_module_backplane",
+        "module_locking_rail",
+        "dc_link_capacitor_bank"
+      ],
+      "componentNames": [
+        "Power module stack",
+        "power module backplane",
+        "module locking rail",
+        "DC-link capacitor bank"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "power_module_stack"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_conversion_transduction:output_filtering",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion Stack",
+      "subModuleId": "output_filtering",
+      "subModuleName": "Output filtering",
+      "purpose": "Reduces ripple and conducted emissions on charging output.",
+      "interfaces": [
+        "dc_output_bus",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "dc_output_choke",
+        "emi_filter_assembly",
+        "snubber_network_board",
+        "thermal_interface_pad_set"
+      ],
+      "componentNames": [
+        "DC output choke",
+        "EMI filter assembly",
+        "snubber network board",
+        "thermal interface pad set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_conversion_transduction:converter_supervision",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion Stack",
+      "subModuleId": "converter_supervision",
+      "subModuleName": "Converter supervision",
+      "purpose": "Monitors module health and coordinates derating.",
+      "interfaces": [
+        "control_bus",
+        "sensor_bus",
+        "coolant_loop"
+      ],
+      "componentWordIds": [
+        "module_health_monitor_board",
+        "heatsink_temperature_probe",
+        "fan_coolant_derating_table",
+        "firmware_recovery_jumper"
+      ],
+      "componentNames": [
+        "module health monitor board",
+        "heatsink temperature probe",
+        "fan/coolant derating table",
+        "firmware recovery jumper"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "charging_connector_interface:ccs2_cable_connector",
+      "moduleId": "charging_connector_interface",
+      "moduleName": "Vehicle Charging Interface",
+      "subModuleId": "ccs2_cable_connector",
+      "subModuleName": "CCS2 cable connector",
+      "purpose": "Routes high-current DC and proximity/pilot connections.",
+      "interfaces": [
+        "dc_output_bus",
+        "ccs2_vehicle_interface",
+        "control_pilot",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "ccs2_liquid_cooled_cable_and_connector",
+        "connector_temperature_sensor_pair",
+        "proximity_pilot_resistor_set",
+        "cable_strain_relief_boot"
+      ],
+      "componentNames": [
+        "CCS2 liquid-cooled cable and connector",
+        "connector temperature sensor pair",
+        "proximity pilot resistor set",
+        "cable strain relief boot"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "ccs2_liquid_cooled_cable_and_connector"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "charging_connector_interface:connector_cooling_coupling",
+      "moduleId": "charging_connector_interface",
+      "moduleName": "Vehicle Charging Interface",
+      "subModuleId": "connector_cooling_coupling",
+      "subModuleName": "Connector cooling coupling",
+      "purpose": "Connects high-current cable cooling to the charger thermal loop.",
+      "interfaces": [
+        "coolant_loop",
+        "ccs2_vehicle_interface",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "liquid_cooled_cable_manifold",
+        "quick_connect_coolant_coupler",
+        "coolant_leak_catch_tray",
+        "cable_coolant_temperature_probe"
+      ],
+      "componentNames": [
+        "liquid-cooled cable manifold",
+        "quick-connect coolant coupler",
+        "coolant leak catch tray",
+        "cable coolant temperature probe"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "charging_connector_interface:vehicle_communication_frontend",
+      "moduleId": "charging_connector_interface",
+      "moduleName": "Vehicle Charging Interface",
+      "subModuleId": "vehicle_communication_frontend",
+      "subModuleName": "Vehicle communication frontend",
+      "purpose": "Handles control pilot and PLC communication with the vehicle.",
+      "interfaces": [
+        "iso15118_plc",
+        "control_pilot",
+        "control_bus"
+      ],
+      "componentWordIds": [
+        "iso_15118_plc_modem",
+        "control_pilot_interface_board",
+        "proximity_detection_input",
+        "vehicle_comms_isolation_transformer"
+      ],
+      "componentNames": [
+        "ISO 15118 PLC modem",
+        "control pilot interface board",
+        "proximity detection input",
+        "vehicle comms isolation transformer"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "iso_15118_plc_modem"
+      ],
+      "duplicateComponentWordIds": [
+        "iso_15118_plc_modem"
+      ],
+      "status": "review",
+      "blockers": [],
+      "requiredAction": "Resolve duplicate component identity before sourcing: iso_15118_plc_modem."
+    },
+    {
+      "id": "control_compute_communication:charge_controller",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "charge_controller",
+      "subModuleName": "Charge controller",
+      "purpose": "Runs session state, output limits and fault transitions.",
+      "interfaces": [
+        "control_bus",
+        "metering_bus",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "charge_controller_pcb",
+        "safety_io_terminal_block",
+        "real_time_clock_module",
+        "nonvolatile_event_log_memory"
+      ],
+      "componentNames": [
+        "charge controller PCB",
+        "safety IO terminal block",
+        "real-time clock module",
+        "nonvolatile event log memory"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:backend_gateway",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "backend_gateway",
+      "subModuleName": "Backend gateway",
+      "purpose": "Connects the charge point to operator systems.",
+      "interfaces": [
+        "ocpp_network",
+        "service_port"
+      ],
+      "componentWordIds": [
+        "ocpp_communications_gateway",
+        "lte_router_module",
+        "ethernet_surge_protector",
+        "secure_element_module"
+      ],
+      "componentNames": [
+        "OCPP communications gateway",
+        "LTE router module",
+        "ethernet surge protector",
+        "secure element module"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "ocpp_communications_gateway"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:protocol_stack",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "protocol_stack",
+      "subModuleName": "Vehicle protocol stack",
+      "purpose": "Coordinates ISO 15118, cable limits and metering sessions.",
+      "interfaces": [
+        "iso15118_plc",
+        "control_bus",
+        "metering_bus"
+      ],
+      "componentWordIds": [
+        "iso_15118_plc_modem",
+        "plug_and_charge_certificate_store",
+        "charging_session_firmware_image",
+        "protocol_debug_header"
+      ],
+      "componentNames": [
+        "ISO 15118 PLC modem",
+        "Plug and Charge certificate store",
+        "charging session firmware image",
+        "protocol debug header"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "iso_15118_plc_modem"
+      ],
+      "duplicateComponentWordIds": [
+        "iso_15118_plc_modem"
+      ],
+      "status": "review",
+      "blockers": [],
+      "requiredAction": "Resolve duplicate component identity before sourcing: iso_15118_plc_modem."
+    },
+    {
+      "id": "sensing_instrumentation:energy_metering",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Metering And Electrical Sensing",
+      "subModuleId": "energy_metering",
+      "subModuleName": "Energy metering",
+      "purpose": "Measures energy delivered to the vehicle.",
+      "interfaces": [
+        "metering_bus",
+        "dc_output_bus"
+      ],
+      "componentWordIds": [
+        "mid_energy_meter",
+        "dc_voltage_transducer",
+        "dc_current_shunt",
+        "meter_pulse_output_isolator"
+      ],
+      "componentNames": [
+        "MID energy meter",
+        "DC voltage transducer",
+        "DC current shunt",
+        "meter pulse output isolator"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "mid_energy_meter"
+      ],
+      "duplicateComponentWordIds": [
+        "mid_energy_meter"
+      ],
+      "status": "review",
+      "blockers": [],
+      "requiredAction": "Resolve duplicate component identity before sourcing: mid_energy_meter."
+    },
+    {
+      "id": "sensing_instrumentation:insulation_fault_detection",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Metering And Electrical Sensing",
+      "subModuleId": "insulation_fault_detection",
+      "subModuleName": "Insulation fault detection",
+      "purpose": "Detects loss of isolation on the DC charging path.",
+      "interfaces": [
+        "insulation_monitoring",
+        "dc_output_bus",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "insulation_monitoring_device",
+        "imd_coupling_network",
+        "fault_status_relay",
+        "test_resistor_plug"
+      ],
+      "componentNames": [
+        "Insulation monitoring device",
+        "IMD coupling network",
+        "fault status relay",
+        "test resistor plug"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "insulation_monitoring_device"
+      ],
+      "duplicateComponentWordIds": [
+        "insulation_monitoring_device"
+      ],
+      "status": "review",
+      "blockers": [],
+      "requiredAction": "Resolve duplicate component identity before sourcing: insulation_monitoring_device."
+    },
+    {
+      "id": "sensing_instrumentation:connector_sensing",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Metering And Electrical Sensing",
+      "subModuleId": "connector_sensing",
+      "subModuleName": "Connector sensing",
+      "purpose": "Monitors cable, latch and temperature states.",
+      "interfaces": [
+        "sensor_bus",
+        "ccs2_vehicle_interface",
+        "control_pilot"
+      ],
+      "componentWordIds": [
+        "connector_latch_microswitch",
+        "handle_temperature_sensor",
+        "cable_identification_resistor_reader",
+        "holster_presence_switch"
+      ],
+      "componentNames": [
+        "connector latch microswitch",
+        "handle temperature sensor",
+        "cable identification resistor reader",
+        "holster presence switch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:liquid_cooling_loop",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal And Environmental Interface",
+      "subModuleId": "liquid_cooling_loop",
+      "subModuleName": "Liquid cooling loop",
+      "purpose": "Circulates coolant through power modules and liquid-cooled cable.",
+      "interfaces": [
+        "coolant_loop",
+        "sensor_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "cooling_loop_assembly",
+        "coolant_pump",
+        "plate_radiator",
+        "coolant_reservoir"
+      ],
+      "componentNames": [
+        "Cooling loop assembly",
+        "coolant pump",
+        "plate radiator",
+        "coolant reservoir"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "cooling_loop_assembly"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:thermal_air_path",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal And Environmental Interface",
+      "subModuleId": "thermal_air_path",
+      "subModuleName": "Thermal air path",
+      "purpose": "Moves air through cabinet heat exchangers and filters.",
+      "interfaces": [
+        "airflow_path",
+        "coolant_loop",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "cabinet_fan_tray",
+        "inlet_filter_mat",
+        "exhaust_louvre_assembly",
+        "airflow_proving_switch"
+      ],
+      "componentNames": [
+        "cabinet fan tray",
+        "inlet filter mat",
+        "exhaust louvre assembly",
+        "airflow proving switch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:weatherproofing",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal And Environmental Interface",
+      "subModuleId": "weatherproofing",
+      "subModuleName": "Weatherproofing",
+      "purpose": "Protects the charger from rain, condensation and UV exposure.",
+      "interfaces": [
+        "condensate_drain",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "cabinet_drain_grommet",
+        "door_gasket_set",
+        "anti_condensation_heater",
+        "uv_rated_cable_cover"
+      ],
+      "componentNames": [
+        "cabinet drain grommet",
+        "door gasket set",
+        "anti-condensation heater",
+        "UV-rated cable cover"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:outdoor_cabinet",
+      "moduleId": "structure_containment",
+      "moduleName": "Cabinet Structure And Containment",
+      "subModuleId": "outdoor_cabinet",
+      "subModuleName": "Outdoor cabinet",
+      "purpose": "Carries power electronics and protects against weather and impact.",
+      "interfaces": [
+        "mechanical_mounts",
+        "service_access",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "powder_coated_steel_cabinet",
+        "front_service_door",
+        "anti_vandal_hinge_set",
+        "plinth_mounting_kit"
+      ],
+      "componentNames": [
+        "powder-coated steel cabinet",
+        "front service door",
+        "anti-vandal hinge set",
+        "plinth mounting kit"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:cable_holster_boom",
+      "moduleId": "structure_containment",
+      "moduleName": "Cabinet Structure And Containment",
+      "subModuleId": "cable_holster_boom",
+      "subModuleName": "Cable holster and boom",
+      "purpose": "Manages heavy high-current cable during user operation.",
+      "interfaces": [
+        "ccs2_vehicle_interface",
+        "mechanical_mounts"
+      ],
+      "componentWordIds": [
+        "connector_holster",
+        "cable_retractor_arm",
+        "cable_bend_limiter",
+        "parking_status_flag"
+      ],
+      "componentNames": [
+        "connector holster",
+        "cable retractor arm",
+        "cable bend limiter",
+        "parking status flag"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:internal_compartmentation",
+      "moduleId": "structure_containment",
+      "moduleName": "Cabinet Structure And Containment",
+      "subModuleId": "internal_compartmentation",
+      "subModuleName": "Internal compartmentation",
+      "purpose": "Separates AC input, DC output, control and user zones.",
+      "interfaces": [
+        "service_access",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "segregated_ac_dc_barrier",
+        "control_compartment_shield",
+        "service_warning_placard",
+        "earthing_braid_set"
+      ],
+      "componentNames": [
+        "segregated AC/DC barrier",
+        "control compartment shield",
+        "service warning placard",
+        "earthing braid set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:emergency_stop_chain",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection",
+      "subModuleId": "emergency_stop_chain",
+      "subModuleName": "Emergency stop chain",
+      "purpose": "Trips output contactors and records user/service stop events.",
+      "interfaces": [
+        "emergency_stop",
+        "alarm_bus",
+        "control_bus"
+      ],
+      "componentWordIds": [
+        "emergency_stop_and_safety_interlock_set",
+        "e_stop_mushroom_button",
+        "door_interlock_switch",
+        "safety_relay_module"
+      ],
+      "componentNames": [
+        "Emergency stop and safety interlock set",
+        "E-stop mushroom button",
+        "door interlock switch",
+        "safety relay module"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "emergency_stop_and_safety_interlock_set"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:dc_fault_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection",
+      "subModuleId": "dc_fault_protection",
+      "subModuleName": "DC fault protection",
+      "purpose": "Detects and interrupts DC-side electrical faults.",
+      "interfaces": [
+        "dc_output_bus",
+        "insulation_monitoring",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "insulation_monitoring_device",
+        "dc_arc_detection_board",
+        "output_contactor_weld_check_circuit",
+        "fault_discharge_resistor"
+      ],
+      "componentNames": [
+        "Insulation monitoring device",
+        "DC arc detection board",
+        "output contactor weld check circuit",
+        "fault discharge resistor"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "insulation_monitoring_device"
+      ],
+      "duplicateComponentWordIds": [
+        "insulation_monitoring_device"
+      ],
+      "status": "review",
+      "blockers": [],
+      "requiredAction": "Resolve duplicate component identity before sourcing: insulation_monitoring_device."
+    },
+    {
+      "id": "safety_protection:user_access_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection",
+      "subModuleId": "user_access_protection",
+      "subModuleName": "User access protection",
+      "purpose": "Prevents user contact with live parts and communicates safe operation.",
+      "interfaces": [
+        "protective_earth",
+        "ccs2_vehicle_interface"
+      ],
+      "componentWordIds": [
+        "touch_safe_connector_shutter",
+        "protective_earth_continuity_strap",
+        "charging_status_beacon",
+        "safety_instruction_label"
+      ],
+      "componentNames": [
+        "touch-safe connector shutter",
+        "protective earth continuity strap",
+        "charging status beacon",
+        "safety instruction label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:commissioning_access",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Commissioning",
+      "subModuleId": "commissioning_access",
+      "subModuleName": "Commissioning access",
+      "purpose": "Exposes safe setup and verification points.",
+      "interfaces": [
+        "service_access",
+        "service_port",
+        "metering_bus"
+      ],
+      "componentWordIds": [
+        "commissioning_terminal_block",
+        "meter_test_port",
+        "output_test_socket_cover",
+        "commissioning_checklist_card"
+      ],
+      "componentNames": [
+        "commissioning terminal block",
+        "meter test port",
+        "output test socket cover",
+        "commissioning checklist card"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:replaceable_modules",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Commissioning",
+      "subModuleId": "replaceable_modules",
+      "subModuleName": "Replaceable modules",
+      "purpose": "Makes high-failure assemblies field swappable.",
+      "interfaces": [
+        "service_access",
+        "control_bus",
+        "coolant_loop"
+      ],
+      "componentWordIds": [
+        "slide_out_power_module_rail",
+        "quick_disconnect_coolant_fitting",
+        "gateway_din_rail_carrier",
+        "spare_fuse_and_link_kit"
+      ],
+      "componentNames": [
+        "slide-out power module rail",
+        "quick-disconnect coolant fitting",
+        "gateway DIN rail carrier",
+        "spare fuse and link kit"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:remote_diagnostics",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Commissioning",
+      "subModuleId": "remote_diagnostics",
+      "subModuleName": "Remote diagnostics",
+      "purpose": "Collects and exports health data for service teams.",
+      "interfaces": [
+        "ocpp_network",
+        "service_port",
+        "control_bus"
+      ],
+      "componentWordIds": [
+        "diagnostic_log_exporter",
+        "remote_firmware_update_agent",
+        "health_telemetry_packet_schema",
+        "service_vpn_profile"
+      ],
+      "componentNames": [
+        "diagnostic log exporter",
+        "remote firmware update agent",
+        "health telemetry packet schema",
+        "service VPN profile"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:user_display_panel",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "User Payment And HMI",
+      "subModuleId": "user_display_panel",
+      "subModuleName": "User display panel",
+      "purpose": "Presents session state, price, energy and fault messages.",
+      "interfaces": [
+        "control_bus",
+        "ocpp_network"
+      ],
+      "componentWordIds": [
+        "touchscreen_hmi_panel",
+        "status_led_light_bar",
+        "audio_buzzer",
+        "sunlight_readable_display_cover"
+      ],
+      "componentNames": [
+        "touchscreen HMI panel",
+        "status LED light bar",
+        "audio buzzer",
+        "sunlight-readable display cover"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:payment_identity",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "User Payment And HMI",
+      "subModuleId": "payment_identity",
+      "subModuleName": "Payment and identity",
+      "purpose": "Supports card, RFID or app-based authorisation.",
+      "interfaces": [
+        "ocpp_network",
+        "control_bus"
+      ],
+      "componentWordIds": [
+        "rfid_reader_module",
+        "contactless_payment_terminal",
+        "receipt_qr_code_generator",
+        "privacy_label"
+      ],
+      "componentNames": [
+        "RFID reader module",
+        "contactless payment terminal",
+        "receipt QR code generator",
+        "privacy label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:user_cable_guidance",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "User Payment And HMI",
+      "subModuleId": "user_cable_guidance",
+      "subModuleName": "User cable guidance",
+      "purpose": "Helps users lift, park and confirm the heavy CCS2 connector.",
+      "interfaces": [
+        "ccs2_vehicle_interface",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "connector_instruction_graphic",
+        "cable_park_indicator",
+        "accessibility_reach_label",
+        "session_stop_button"
+      ],
+      "componentNames": [
+        "connector instruction graphic",
+        "cable park indicator",
+        "accessibility reach label",
+        "session stop button"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    }
+  ],
+  "criticalParts": [
+    {
+      "componentWordId": "power_module_stack",
+      "label": "Power module stack",
+      "allocated": true,
+      "moduleIds": [
+        "energy_conversion_transduction"
+      ],
+      "subModuleIds": [
+        "rectifier_power_modules"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "ccs2_liquid_cooled_cable_and_connector",
+      "label": "CCS2 liquid-cooled cable and connector",
+      "allocated": true,
+      "moduleIds": [
+        "charging_connector_interface"
+      ],
+      "subModuleIds": [
+        "ccs2_cable_connector"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "dc_output_contactor_set",
+      "label": "DC output contactor set",
+      "allocated": true,
+      "moduleIds": [
+        "power_distribution"
+      ],
+      "subModuleIds": [
+        "dc_output_switchgear"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "insulation_monitoring_device",
+      "label": "Insulation monitoring device",
+      "allocated": true,
+      "moduleIds": [
+        "safety_protection",
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "dc_fault_protection",
+        "insulation_fault_detection"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "mid_energy_meter",
+      "label": "MID energy meter",
+      "allocated": true,
+      "moduleIds": [
+        "power_distribution",
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "billing_metering_branch",
+        "energy_metering"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "ocpp_communications_gateway",
+      "label": "OCPP communications gateway",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "backend_gateway"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "iso_15118_plc_modem",
+      "label": "ISO 15118 PLC modem",
+      "allocated": true,
+      "moduleIds": [
+        "charging_connector_interface",
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "protocol_stack",
+        "vehicle_communication_frontend"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "ac_input_breaker_and_spd",
+      "label": "AC input breaker and SPD",
+      "allocated": true,
+      "moduleIds": [
+        "power_distribution"
+      ],
+      "subModuleIds": [
+        "ac_input_switchgear"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "cooling_loop_assembly",
+      "label": "Cooling loop assembly",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "liquid_cooling_loop"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "emergency_stop_and_safety_interlock_set",
+      "label": "Emergency stop and safety interlock set",
+      "allocated": true,
+      "moduleIds": [
+        "safety_protection"
+      ],
+      "subModuleIds": [
+        "emergency_stop_chain"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    }
+  ],
+  "duplicateGroups": [
+    {
+      "componentWordId": "insulation_monitoring_device",
+      "descriptions": [
+        "Insulation monitoring device"
+      ],
+      "lineIds": [
+        "sensing_instrumentation_insulation_fault_detection_insulation_monitoring_device",
+        "safety_protection_dc_fault_protection_insulation_monitoring_device"
+      ],
+      "criticalLineIds": [
+        "sensing_instrumentation_insulation_fault_detection_insulation_monitoring_device",
+        "safety_protection_dc_fault_protection_insulation_monitoring_device"
+      ],
+      "quantityByUnit": [
+        {
+          "unit": "candidate",
+          "quantity": 2
+        }
+      ],
+      "lineCount": 2,
+      "recommendation": "Resolve whether these allocations are one shared physical item or separate install locations before sourcing, costing or deduplicating."
+    },
+    {
+      "componentWordId": "iso_15118_plc_modem",
+      "descriptions": [
+        "ISO 15118 PLC modem"
+      ],
+      "lineIds": [
+        "charging_connector_interface_vehicle_communication_frontend_iso_15118_plc_modem",
+        "control_compute_communication_protocol_stack_iso_15118_plc_modem"
+      ],
+      "criticalLineIds": [
+        "charging_connector_interface_vehicle_communication_frontend_iso_15118_plc_modem",
+        "control_compute_communication_protocol_stack_iso_15118_plc_modem"
+      ],
+      "quantityByUnit": [
+        {
+          "unit": "candidate",
+          "quantity": 2
+        }
+      ],
+      "lineCount": 2,
+      "recommendation": "Resolve whether these allocations are one shared physical item or separate install locations before sourcing, costing or deduplicating."
+    },
+    {
+      "componentWordId": "mid_energy_meter",
+      "descriptions": [
+        "MID energy meter"
+      ],
+      "lineIds": [
+        "power_distribution_billing_metering_branch_mid_energy_meter",
+        "sensing_instrumentation_energy_metering_mid_energy_meter"
+      ],
+      "criticalLineIds": [
+        "power_distribution_billing_metering_branch_mid_energy_meter",
+        "sensing_instrumentation_energy_metering_mid_energy_meter"
+      ],
+      "quantityByUnit": [
+        {
+          "unit": "candidate",
+          "quantity": 2
+        }
+      ],
+      "lineCount": 2,
+      "recommendation": "Resolve whether these allocations are one shared physical item or separate install locations before sourcing, costing or deduplicating."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Resolve duplicate component identity before sourcing: mid_energy_meter.",
+    "Resolve duplicate component identity before sourcing: iso_15118_plc_modem.",
+    "Resolve duplicate component identity before sourcing: insulation_monitoring_device.",
+    "Resolve whether these allocations are one shared physical item or separate install locations before sourcing, costing or deduplicating."
+  ]
+}

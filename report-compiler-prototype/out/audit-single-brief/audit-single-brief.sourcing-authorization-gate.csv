@@ -1,0 +1,7 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+architecture_authorization,review,"architecture_generation_review_required; review yes, BoM no.",0.5,,Keep sourcing as review-only until architecture admission is fully cleared.
+component_candidate_authorization,review,"component_candidates_review_required; 120 candidate line(s), 120 sourcing-worklist row(s), 0 provenance violation(s).",0.86,,Resolve candidate review rows before admitting sourcing evidence.
+critical_intake_scope,pass,13/13 critical unpriced line(s) appear in the critical sourcing intake template.,1,,Critical sourcing intake scope is complete.
+full_worklist_scope,pass,120/120 total unpriced line(s) appear in the full sourcing intake template.,1,,Full sourcing intake scope matches the unpriced worklist.
+evidence_admission_boundary,pass,"0 admitted source evidence row(s), 0 rejected source evidence row(s).",1,,No rejected sourcing evidence is waiting for repair.
+provenance_boundary,pass,"0 source-backed BoM claim(s), 0 provenance violation(s).",1,,"Supplier, manufacturer, MPN, lead-time and cost fields remain behind admitted evidence."

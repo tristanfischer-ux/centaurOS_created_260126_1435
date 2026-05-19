@@ -1,0 +1,970 @@
+{
+  "nodes": [
+    {
+      "id": "energy_conversion_transduction",
+      "label": "Refrigerant Energy Conversion",
+      "kind": "module"
+    },
+    {
+      "id": "energy_conversion_transduction.compressor_inverter_stage",
+      "label": "Compressor inverter stage",
+      "kind": "submodule",
+      "moduleId": "energy_conversion_transduction"
+    },
+    {
+      "id": "energy_conversion_transduction.expansion_metering_stage",
+      "label": "Expansion metering stage",
+      "kind": "submodule",
+      "moduleId": "energy_conversion_transduction"
+    },
+    {
+      "id": "energy_conversion_transduction.refrigerant_manifold",
+      "label": "Refrigerant manifold",
+      "kind": "submodule",
+      "moduleId": "energy_conversion_transduction"
+    },
+    {
+      "id": "energy_conversion_transduction.condenser_coupling_boundary",
+      "label": "Condenser coupling boundary",
+      "kind": "submodule",
+      "moduleId": "energy_conversion_transduction"
+    },
+    {
+      "id": "environmental_interface",
+      "label": "Outdoor Air Interface",
+      "kind": "module"
+    },
+    {
+      "id": "environmental_interface.outdoor_evaporator",
+      "label": "Outdoor evaporator",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.fan_air_path",
+      "label": "Fan air path",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.defrost_condensate",
+      "label": "Defrost and condensate path",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "mass_fluid_transport_process",
+      "label": "Hydronic Heat Delivery",
+      "kind": "module"
+    },
+    {
+      "id": "mass_fluid_transport_process.condenser_heat_exchanger",
+      "label": "Condenser heat exchanger",
+      "kind": "submodule",
+      "moduleId": "mass_fluid_transport_process"
+    },
+    {
+      "id": "mass_fluid_transport_process.circulation_pump_group",
+      "label": "Circulation pump group",
+      "kind": "submodule",
+      "moduleId": "mass_fluid_transport_process"
+    },
+    {
+      "id": "mass_fluid_transport_process.hydronic_safety_group",
+      "label": "Hydronic safety group",
+      "kind": "submodule",
+      "moduleId": "mass_fluid_transport_process"
+    },
+    {
+      "id": "control_compute_communication",
+      "label": "Control Compute Communication",
+      "kind": "module"
+    },
+    {
+      "id": "control_compute_communication.main_controller",
+      "label": "Main controller",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.power_driver_io",
+      "label": "Power driver IO",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.service_communications",
+      "label": "Service communications",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "sensing_instrumentation",
+      "label": "Sensing Instrumentation",
+      "kind": "module"
+    },
+    {
+      "id": "sensing_instrumentation.refrigerant_sensing",
+      "label": "Refrigerant sensing",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.water_sensing",
+      "label": "Water sensing",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.ambient_sensing",
+      "label": "Ambient sensing",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "power_distribution",
+      "label": "Electrical Power Distribution",
+      "kind": "module"
+    },
+    {
+      "id": "power_distribution.mains_input_protection",
+      "label": "Mains input protection",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.internal_power_rails",
+      "label": "Internal power rails",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.cable_management",
+      "label": "Cable management",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "structure_containment",
+      "label": "Monobloc Structure And Containment",
+      "kind": "module"
+    },
+    {
+      "id": "structure_containment.weatherproof_cabinet",
+      "label": "Weatherproof cabinet",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.mounting_base",
+      "label": "Mounting base",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.service_access_panels",
+      "label": "Service access panels",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "safety_protection",
+      "label": "Safety Protection",
+      "kind": "module"
+    },
+    {
+      "id": "safety_protection.refrigerant_safety",
+      "label": "Refrigerant safety",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.hydronic_freeze_protection",
+      "label": "Hydronic freeze protection",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.electrical_safety",
+      "label": "Electrical safety",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "maintenance_serviceability",
+      "label": "Maintenance And Commissioning",
+      "kind": "module"
+    },
+    {
+      "id": "maintenance_serviceability.commissioning_ports",
+      "label": "Commissioning ports",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.filter_service",
+      "label": "Filter service",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.diagnostic_access",
+      "label": "Diagnostic access",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "hmi_ergonomics",
+      "label": "User And Installer Interface",
+      "kind": "module"
+    },
+    {
+      "id": "hmi_ergonomics.local_display",
+      "label": "Local display",
+      "kind": "submodule",
+      "moduleId": "hmi_ergonomics"
+    },
+    {
+      "id": "hmi_ergonomics.remote_thermostat_interface",
+      "label": "Remote thermostat interface",
+      "kind": "submodule",
+      "moduleId": "hmi_ergonomics"
+    },
+    {
+      "id": "hmi_ergonomics.alarm_and_user_guidance",
+      "label": "Alarm and user guidance",
+      "kind": "submodule",
+      "moduleId": "hmi_ergonomics"
+    }
+  ],
+  "edges": [
+    {
+      "id": "contains:energy_conversion_transduction:energy_conversion_transduction.compressor_inverter_stage:compressor_inverter_stage",
+      "from": "energy_conversion_transduction",
+      "to": "energy_conversion_transduction.compressor_inverter_stage",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Compressor inverter stage is contained by Refrigerant Energy Conversion."
+    },
+    {
+      "id": "contains:energy_conversion_transduction:energy_conversion_transduction.expansion_metering_stage:expansion_metering_stage",
+      "from": "energy_conversion_transduction",
+      "to": "energy_conversion_transduction.expansion_metering_stage",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Expansion metering stage is contained by Refrigerant Energy Conversion."
+    },
+    {
+      "id": "contains:energy_conversion_transduction:energy_conversion_transduction.refrigerant_manifold:refrigerant_manifold",
+      "from": "energy_conversion_transduction",
+      "to": "energy_conversion_transduction.refrigerant_manifold",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Refrigerant manifold is contained by Refrigerant Energy Conversion."
+    },
+    {
+      "id": "contains:energy_conversion_transduction:energy_conversion_transduction.condenser_coupling_boundary:condenser_coupling_boundary",
+      "from": "energy_conversion_transduction",
+      "to": "energy_conversion_transduction.condenser_coupling_boundary",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Condenser coupling boundary is contained by Refrigerant Energy Conversion."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.outdoor_evaporator:outdoor_evaporator",
+      "from": "environmental_interface",
+      "to": "environmental_interface.outdoor_evaporator",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Outdoor evaporator is contained by Outdoor Air Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.fan_air_path:fan_air_path",
+      "from": "environmental_interface",
+      "to": "environmental_interface.fan_air_path",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Fan air path is contained by Outdoor Air Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.defrost_condensate:defrost_condensate",
+      "from": "environmental_interface",
+      "to": "environmental_interface.defrost_condensate",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Defrost and condensate path is contained by Outdoor Air Interface."
+    },
+    {
+      "id": "contains:mass_fluid_transport_process:mass_fluid_transport_process.condenser_heat_exchanger:condenser_heat_exchanger",
+      "from": "mass_fluid_transport_process",
+      "to": "mass_fluid_transport_process.condenser_heat_exchanger",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Condenser heat exchanger is contained by Hydronic Heat Delivery."
+    },
+    {
+      "id": "contains:mass_fluid_transport_process:mass_fluid_transport_process.circulation_pump_group:circulation_pump_group",
+      "from": "mass_fluid_transport_process",
+      "to": "mass_fluid_transport_process.circulation_pump_group",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Circulation pump group is contained by Hydronic Heat Delivery."
+    },
+    {
+      "id": "contains:mass_fluid_transport_process:mass_fluid_transport_process.hydronic_safety_group:hydronic_safety_group",
+      "from": "mass_fluid_transport_process",
+      "to": "mass_fluid_transport_process.hydronic_safety_group",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Hydronic safety group is contained by Hydronic Heat Delivery."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.main_controller:main_controller",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.main_controller",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Main controller is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.power_driver_io:power_driver_io",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.power_driver_io",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Power driver IO is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.service_communications:service_communications",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.service_communications",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Service communications is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.refrigerant_sensing:refrigerant_sensing",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.refrigerant_sensing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Refrigerant sensing is contained by Sensing Instrumentation."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.water_sensing:water_sensing",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.water_sensing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Water sensing is contained by Sensing Instrumentation."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.ambient_sensing:ambient_sensing",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.ambient_sensing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Ambient sensing is contained by Sensing Instrumentation."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.mains_input_protection:mains_input_protection",
+      "from": "power_distribution",
+      "to": "power_distribution.mains_input_protection",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Mains input protection is contained by Electrical Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.internal_power_rails:internal_power_rails",
+      "from": "power_distribution",
+      "to": "power_distribution.internal_power_rails",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Internal power rails is contained by Electrical Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.cable_management:cable_management",
+      "from": "power_distribution",
+      "to": "power_distribution.cable_management",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Cable management is contained by Electrical Power Distribution."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.weatherproof_cabinet:weatherproof_cabinet",
+      "from": "structure_containment",
+      "to": "structure_containment.weatherproof_cabinet",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Weatherproof cabinet is contained by Monobloc Structure And Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.mounting_base:mounting_base",
+      "from": "structure_containment",
+      "to": "structure_containment.mounting_base",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Mounting base is contained by Monobloc Structure And Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.service_access_panels:service_access_panels",
+      "from": "structure_containment",
+      "to": "structure_containment.service_access_panels",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Service access panels is contained by Monobloc Structure And Containment."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.refrigerant_safety:refrigerant_safety",
+      "from": "safety_protection",
+      "to": "safety_protection.refrigerant_safety",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Refrigerant safety is contained by Safety Protection."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.hydronic_freeze_protection:hydronic_freeze_protection",
+      "from": "safety_protection",
+      "to": "safety_protection.hydronic_freeze_protection",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Hydronic freeze protection is contained by Safety Protection."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.electrical_safety:electrical_safety",
+      "from": "safety_protection",
+      "to": "safety_protection.electrical_safety",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Electrical safety is contained by Safety Protection."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.commissioning_ports:commissioning_ports",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.commissioning_ports",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Commissioning ports is contained by Maintenance And Commissioning."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.filter_service:filter_service",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.filter_service",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Filter service is contained by Maintenance And Commissioning."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.diagnostic_access:diagnostic_access",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.diagnostic_access",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Diagnostic access is contained by Maintenance And Commissioning."
+    },
+    {
+      "id": "contains:hmi_ergonomics:hmi_ergonomics.local_display:local_display",
+      "from": "hmi_ergonomics",
+      "to": "hmi_ergonomics.local_display",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Local display is contained by User And Installer Interface."
+    },
+    {
+      "id": "contains:hmi_ergonomics:hmi_ergonomics.remote_thermostat_interface:remote_thermostat_interface",
+      "from": "hmi_ergonomics",
+      "to": "hmi_ergonomics.remote_thermostat_interface",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Remote thermostat interface is contained by User And Installer Interface."
+    },
+    {
+      "id": "contains:hmi_ergonomics:hmi_ergonomics.alarm_and_user_guidance:alarm_and_user_guidance",
+      "from": "hmi_ergonomics",
+      "to": "hmi_ergonomics.alarm_and_user_guidance",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Alarm and user guidance is contained by User And Installer Interface."
+    },
+    {
+      "id": "shared_interface:energy_conversion_transduction:environmental_interface:refrigerant_loop",
+      "from": "energy_conversion_transduction",
+      "to": "environmental_interface",
+      "via": "refrigerant_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare refrigerant_loop."
+    },
+    {
+      "id": "shared_interface:environmental_interface:mass_fluid_transport_process:refrigerant_loop",
+      "from": "environmental_interface",
+      "to": "mass_fluid_transport_process",
+      "via": "refrigerant_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare refrigerant_loop."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:sensing_instrumentation:refrigerant_loop",
+      "from": "mass_fluid_transport_process",
+      "to": "sensing_instrumentation",
+      "via": "refrigerant_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare refrigerant_loop."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:refrigerant_loop",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "refrigerant_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare refrigerant_loop."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:refrigerant_loop",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "refrigerant_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare refrigerant_loop."
+    },
+    {
+      "id": "shared_interface:energy_conversion_transduction:mass_fluid_transport_process:hydronic_loop",
+      "from": "energy_conversion_transduction",
+      "to": "mass_fluid_transport_process",
+      "via": "hydronic_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare hydronic_loop."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:sensing_instrumentation:hydronic_loop",
+      "from": "mass_fluid_transport_process",
+      "to": "sensing_instrumentation",
+      "via": "hydronic_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare hydronic_loop."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:hydronic_loop",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "hydronic_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare hydronic_loop."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:hydronic_loop",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "hydronic_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare hydronic_loop."
+    },
+    {
+      "id": "shared_interface:energy_conversion_transduction:environmental_interface:control_bus",
+      "from": "energy_conversion_transduction",
+      "to": "environmental_interface",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:environmental_interface:mass_fluid_transport_process:control_bus",
+      "from": "environmental_interface",
+      "to": "mass_fluid_transport_process",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:control_compute_communication:control_bus",
+      "from": "mass_fluid_transport_process",
+      "to": "control_compute_communication",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:power_distribution:control_bus",
+      "from": "control_compute_communication",
+      "to": "power_distribution",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:control_bus",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:control_bus",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:maintenance_serviceability:hmi_ergonomics:control_bus",
+      "from": "maintenance_serviceability",
+      "to": "hmi_ergonomics",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:energy_conversion_transduction:environmental_interface:protective_earth",
+      "from": "energy_conversion_transduction",
+      "to": "environmental_interface",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:environmental_interface:mass_fluid_transport_process:protective_earth",
+      "from": "environmental_interface",
+      "to": "mass_fluid_transport_process",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:control_compute_communication:protective_earth",
+      "from": "mass_fluid_transport_process",
+      "to": "control_compute_communication",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:power_distribution:protective_earth",
+      "from": "control_compute_communication",
+      "to": "power_distribution",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:power_distribution:structure_containment:protective_earth",
+      "from": "power_distribution",
+      "to": "structure_containment",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:structure_containment:safety_protection:protective_earth",
+      "from": "structure_containment",
+      "to": "safety_protection",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:energy_conversion_transduction:environmental_interface:service_access",
+      "from": "energy_conversion_transduction",
+      "to": "environmental_interface",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:environmental_interface:mass_fluid_transport_process:service_access",
+      "from": "environmental_interface",
+      "to": "mass_fluid_transport_process",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:power_distribution:service_access",
+      "from": "mass_fluid_transport_process",
+      "to": "power_distribution",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:power_distribution:structure_containment:service_access",
+      "from": "power_distribution",
+      "to": "structure_containment",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:structure_containment:maintenance_serviceability:service_access",
+      "from": "structure_containment",
+      "to": "maintenance_serviceability",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:maintenance_serviceability:hmi_ergonomics:service_access",
+      "from": "maintenance_serviceability",
+      "to": "hmi_ergonomics",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:environmental_interface:sensing_instrumentation:airflow_path",
+      "from": "environmental_interface",
+      "to": "sensing_instrumentation",
+      "via": "airflow_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare airflow_path."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:structure_containment:airflow_path",
+      "from": "sensing_instrumentation",
+      "to": "structure_containment",
+      "via": "airflow_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare airflow_path."
+    },
+    {
+      "id": "shared_interface:structure_containment:maintenance_serviceability:airflow_path",
+      "from": "structure_containment",
+      "to": "maintenance_serviceability",
+      "via": "airflow_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare airflow_path."
+    },
+    {
+      "id": "shared_interface:environmental_interface:structure_containment:condensate_drain",
+      "from": "environmental_interface",
+      "to": "structure_containment",
+      "via": "condensate_drain",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare condensate_drain."
+    },
+    {
+      "id": "shared_interface:energy_conversion_transduction:environmental_interface:sensor_bus",
+      "from": "energy_conversion_transduction",
+      "to": "environmental_interface",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:environmental_interface:mass_fluid_transport_process:sensor_bus",
+      "from": "environmental_interface",
+      "to": "mass_fluid_transport_process",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:control_compute_communication:sensor_bus",
+      "from": "mass_fluid_transport_process",
+      "to": "control_compute_communication",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:sensor_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:power_distribution:sensor_bus",
+      "from": "sensing_instrumentation",
+      "to": "power_distribution",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:sensor_bus",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:sensor_bus",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:safety_protection:pressure_relief",
+      "from": "mass_fluid_transport_process",
+      "to": "safety_protection",
+      "via": "pressure_relief",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pressure_relief."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:maintenance_serviceability:service_port",
+      "from": "control_compute_communication",
+      "to": "maintenance_serviceability",
+      "via": "service_port",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_port."
+    },
+    {
+      "id": "shared_interface:maintenance_serviceability:hmi_ergonomics:service_port",
+      "from": "maintenance_serviceability",
+      "to": "hmi_ergonomics",
+      "via": "service_port",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_port."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:safety_protection:alarm_bus",
+      "from": "control_compute_communication",
+      "to": "safety_protection",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:safety_protection:hmi_ergonomics:alarm_bus",
+      "from": "safety_protection",
+      "to": "hmi_ergonomics",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:mains_supply",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "mains_supply",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare mains_supply."
+    },
+    {
+      "id": "required_interface:environmental_interface:energy_conversion_transduction:refrigerant_loop",
+      "from": "environmental_interface",
+      "to": "energy_conversion_transduction",
+      "via": "refrigerant_loop",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Outdoor evaporator must connect to compressor and expansion circuit over a closed refrigerant loop."
+    },
+    {
+      "id": "required_interface:energy_conversion_transduction:mass_fluid_transport_process:hydronic_loop",
+      "from": "energy_conversion_transduction",
+      "to": "mass_fluid_transport_process",
+      "via": "hydronic_loop",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Condenser heat must transfer into the hydronic delivery loop."
+    },
+    {
+      "id": "required_interface:control_compute_communication:energy_conversion_transduction:control_bus",
+      "from": "control_compute_communication",
+      "to": "energy_conversion_transduction",
+      "via": "control_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Controller must command compressor and expansion valve operation."
+    },
+    {
+      "id": "required_interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "sensor_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Controller must receive pressure and temperature feedback for protection and efficiency."
+    }
+  ],
+  "summary": {
+    "moduleNodes": 10,
+    "subModuleNodes": 31,
+    "containsEdges": 31,
+    "sharedInterfaceEdges": 45,
+    "requiredInterfaceEdges": 4,
+    "missingRequiredInterfaceEdges": 0
+  }
+}

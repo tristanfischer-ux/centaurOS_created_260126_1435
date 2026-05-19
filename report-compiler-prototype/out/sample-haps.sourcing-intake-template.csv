@@ -1,0 +1,13 @@
+componentWordId,description,priority,supplierName,manufacturer,mpn,unitCostGbp,leadTimeWeeks,sourceGrade,evidence.ref,evidence.quote,retrievedAt
+high_aspect_ratio_wing_structure,High-aspect-ratio wing structure,critical,,,,,,catalogue,,,
+solar_cell_array,Solar cell array,critical,,,,,,catalogue,,,
+mppt_power_tracker,MPPT power tracker,critical,,,,,,catalogue,,,
+stratospheric_battery_pack,Stratospheric battery pack,critical,,,,,,catalogue,,,
+electric_propulsion_pod,Electric propulsion pod,critical,,,,,,catalogue,,,
+flight_control_computer,Flight control computer,critical,,,,,,catalogue,,,
+ground_control_link,Ground control link,critical,,,,,,catalogue,,,
+gnss_ins_navigation_unit,GNSS INS navigation unit,critical,,,,,,catalogue,,,
+stratospheric_communications_payload,Stratospheric communications payload,critical,,,,,,catalogue,,,
+payload_antenna_array,Payload antenna array,critical,,,,,,catalogue,,,
+thermal_insulation_blanket,Thermal insulation blanket,critical,,,,,,catalogue,,,
+recovery_parachute_system,Recovery parachute system,critical,,,,,,catalogue,,,

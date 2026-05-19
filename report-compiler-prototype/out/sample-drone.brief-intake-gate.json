@@ -1,0 +1,74 @@
+{
+  "verdict": "brief_intake_review_required",
+  "summary": {
+    "rows": 6,
+    "passRows": 5,
+    "reviewRows": 1,
+    "blockedRows": 0,
+    "passRatio": 0.83,
+    "briefCharacters": 138,
+    "productClass": "drone",
+    "classificationConfidence": "high",
+    "scratchArchitectureSupported": true,
+    "extractedRequirements": 1,
+    "numericFacts": 1,
+    "coveredRequirements": 1,
+    "partialRequirements": 0,
+    "uncoveredRequirements": 0,
+    "assumptions": 1
+  },
+  "rows": [
+    {
+      "area": "brief_text",
+      "verdict": "pass",
+      "signal": "138 non-whitespace character(s) in the source brief.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Brief text is present."
+    },
+    {
+      "area": "requirement_quantification",
+      "verdict": "review",
+      "signal": "1 quantified requirement(s), 1 numeric fact(s).",
+      "passRatio": 0.5,
+      "blockers": [],
+      "requiredAction": "Proceed only as assumption-heavy review; ask for more quantified requirements before treating outputs as stable."
+    },
+    {
+      "area": "product_class_selection",
+      "verdict": "pass",
+      "signal": "Selected drone with high confidence.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Product class selection is strong enough for scratch architecture."
+    },
+    {
+      "area": "scratch_design_support",
+      "verdict": "pass",
+      "signal": "drone has a deep scratch architecture grammar.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Use scratch universal architecture flow for this brief."
+    },
+    {
+      "area": "requirement_trace_seed",
+      "verdict": "pass",
+      "signal": "1 covered, 0 partial, 0 uncovered requirement trace row(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Extracted requirements have trace seeds into the architecture."
+    },
+    {
+      "area": "assumption_boundary",
+      "verdict": "pass",
+      "signal": "1 brief assumption note(s); no-quantified-default path: no.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Assumption boundary is explicit enough for first-pass architecture."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Proceed only as assumption-heavy review; ask for more quantified requirements before treating outputs as stable."
+  ]
+}

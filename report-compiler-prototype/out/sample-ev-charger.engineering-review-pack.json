@@ -1,0 +1,2625 @@
+{
+  "summary": {
+    "rows": 77,
+    "accepted": 0,
+    "readyForReview": 47,
+    "needsReview": 30,
+    "blocked": 0,
+    "moduleQuestions": 10,
+    "subModuleQuestions": 30,
+    "interfaceQuestions": 6,
+    "calculationQuestions": 2,
+    "assumptionQuestions": 29
+  },
+  "questions": [
+    {
+      "id": "assumption_resolution:compliance:IEC-61851",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "IEC-61851",
+      "reviewerQuestion": "Can the IEC-61851 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Charging modes, control pilot and safety-function evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:IEC-62196-3",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "IEC-62196-3",
+      "reviewerQuestion": "Can the IEC-62196-3 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "CCS2 connector rating, cable assembly and temperature evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:ISO-15118",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "ISO-15118",
+      "reviewerQuestion": "Can the ISO-15118 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "PLC communication, Plug and Charge and session-state evidence where applicable.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:OCPP-1.6J/2.0.1",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "OCPP-1.6J/2.0.1",
+      "reviewerQuestion": "Can the OCPP-1.6J/2.0.1 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Backend session, metering, fault and firmware-management evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:charging_connector_interface_ccs2_cable_connector_ccs2_liquid_cooled_cable_and_connector",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "CCS2 liquid-cooled cable and connector",
+      "reviewerQuestion": "Can the CCS2 liquid-cooled cable and connector assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "charging_connector_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "ccs2_liquid_cooled_cable_and_connector"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:charging_connector_interface_vehicle_communication_frontend_iso_15118_plc_modem",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "ISO 15118 PLC modem",
+      "reviewerQuestion": "Can the ISO 15118 PLC modem assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "charging_connector_interface",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "iso_15118_plc_modem"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_backend_gateway_ocpp_communications_gateway",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "OCPP communications gateway",
+      "reviewerQuestion": "Can the OCPP communications gateway assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "ocpp_communications_gateway"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_protocol_stack_iso_15118_plc_modem",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "ISO 15118 PLC modem",
+      "reviewerQuestion": "Can the ISO 15118 PLC modem assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "charging_connector_interface",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "iso_15118_plc_modem"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_conversion_transduction_rectifier_power_modules_power_module_stack",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Power module stack",
+      "reviewerQuestion": "Can the Power module stack assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "power_module_stack"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_liquid_cooling_loop_cooling_loop_assembly",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Cooling loop assembly",
+      "reviewerQuestion": "Can the Cooling loop assembly assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "cooling_loop_assembly"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:power_distribution_ac_input_switchgear_ac_input_breaker_and_spd",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "AC input breaker and SPD",
+      "reviewerQuestion": "Can the AC input breaker and SPD assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "ac_input_breaker_and_spd"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:power_distribution_billing_metering_branch_mid_energy_meter",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "MID energy meter",
+      "reviewerQuestion": "Can the MID energy meter assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "mid_energy_meter"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:power_distribution_dc_output_switchgear_dc_output_contactor_set",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "DC output contactor set",
+      "reviewerQuestion": "Can the DC output contactor set assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "dc_output_contactor_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:safety_protection_dc_fault_protection_insulation_monitoring_device",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Insulation monitoring device",
+      "reviewerQuestion": "Can the Insulation monitoring device assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "insulation_monitoring_device"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:safety_protection_emergency_stop_chain_emergency_stop_and_safety_interlock_set",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Emergency stop and safety interlock set",
+      "reviewerQuestion": "Can the Emergency stop and safety interlock set assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "emergency_stop_and_safety_interlock_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_energy_metering_mid_energy_meter",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "MID energy meter",
+      "reviewerQuestion": "Can the MID energy meter assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "mid_energy_meter"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_insulation_fault_detection_insulation_monitoring_device",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Insulation monitoring device",
+      "reviewerQuestion": "Can the Insulation monitoring device assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "insulation_monitoring_device"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:charging_connector_interface:iso15118_plc",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> charging_connector_interface",
+      "reviewerQuestion": "Can the control_compute_communication -> charging_connector_interface assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "iso15118_plc"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:energy_conversion_transduction:control_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> energy_conversion_transduction",
+      "reviewerQuestion": "Can the control_compute_communication -> energy_conversion_transduction assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:energy_conversion_transduction:charging_connector_interface:dc_output_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "energy_conversion_transduction -> charging_connector_interface",
+      "reviewerQuestion": "Can the energy_conversion_transduction -> charging_connector_interface assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "dc_output_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:environmental_interface:energy_conversion_transduction:coolant_loop",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "environmental_interface -> energy_conversion_transduction",
+      "reviewerQuestion": "Can the environmental_interface -> energy_conversion_transduction assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "coolant_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:power_distribution:energy_conversion_transduction:ac_input_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "power_distribution -> energy_conversion_transduction",
+      "reviewerQuestion": "Can the power_distribution -> energy_conversion_transduction assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "ac_input_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:sensing_instrumentation:control_compute_communication:metering_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "reviewerQuestion": "Can the sensing_instrumentation -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "metering_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:capex_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated CAPEX",
+      "reviewerQuestion": "Can the Estimated CAPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:headline_output",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Annual energy dispensed",
+      "reviewerQuestion": "Can the Annual energy dispensed assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:opex_annual_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated annual OPEX",
+      "reviewerQuestion": "Can the Estimated annual OPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:evcharger_power_level",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "DC Charger Power Level",
+      "reviewerQuestion": "Can the DC Charger Power Level assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "energy_conversion_transduction",
+        "charging_connector_interface",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:evcharger_power_safety_chain",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Power And Safety Chain",
+      "reviewerQuestion": "Can the Power And Safety Chain assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "energy_conversion_transduction",
+        "charging_connector_interface",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:evcharger_protocol_closure",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Vehicle/Backend Protocol Closure",
+      "reviewerQuestion": "Can the Vehicle/Backend Protocol Closure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "energy_conversion_transduction",
+        "charging_connector_interface",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:ev_charger_daily_full_power_energy_kwh",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "EV charger daily full-power energy",
+      "reviewerQuestion": "Does the EV charger daily full-power energy calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm expected sessions per day, dwell time, grid capacity, charger derating and tariff assumptions.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "energy_conversion_transduction",
+        "charging_connector_interface",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "ev_charger_daily_full_power_energy_kwh"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:ev_charger_800v_current_a",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "EV charger current at 800 V",
+      "reviewerQuestion": "Does the EV charger current at 800 V calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm output voltage range, cable thermal rating, connector current limit, contactor rating and derating.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "energy_conversion_transduction",
+        "charging_connector_interface",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "ev_charger_800v_current_a"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_contract:control_compute_communication:charging_connector_interface:iso15118_plc",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication -> Vehicle Charging Interface via iso15118_plc",
+      "reviewerQuestion": "Is the iso15118_plc interface between Control Compute Communication and Vehicle Charging Interface correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "charging_connector_interface"
+      ],
+      "linkedSubModuleIds": [
+        "protocol_stack",
+        "vehicle_communication_frontend"
+      ],
+      "linkedComponentWordIds": [
+        "iso_15118_plc_modem",
+        "plug_and_charge_certificate_store",
+        "charging_session_firmware_image",
+        "protocol_debug_header",
+        "iso_15118_plc_modem",
+        "control_pilot_interface_board",
+        "proximity_detection_input",
+        "vehicle_comms_isolation_transformer"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "iso15118_plc"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:control_compute_communication:energy_conversion_transduction:control_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication -> Power Conversion Stack via control_bus",
+      "reviewerQuestion": "Is the control_bus interface between Control Compute Communication and Power Conversion Stack correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "charge_controller",
+        "protocol_stack",
+        "rectifier_power_modules",
+        "converter_supervision"
+      ],
+      "linkedComponentWordIds": [
+        "charge_controller_pcb",
+        "safety_io_terminal_block",
+        "real_time_clock_module",
+        "nonvolatile_event_log_memory",
+        "iso_15118_plc_modem",
+        "plug_and_charge_certificate_store",
+        "charging_session_firmware_image",
+        "protocol_debug_header",
+        "power_module_stack",
+        "power_module_backplane",
+        "module_locking_rail",
+        "dc_link_capacitor_bank",
+        "module_health_monitor_board",
+        "heatsink_temperature_probe",
+        "fan_coolant_derating_table",
+        "firmware_recovery_jumper"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:energy_conversion_transduction:charging_connector_interface:dc_output_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Conversion Stack -> Vehicle Charging Interface via dc_output_bus",
+      "reviewerQuestion": "Is the dc_output_bus interface between Power Conversion Stack and Vehicle Charging Interface correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction",
+        "charging_connector_interface"
+      ],
+      "linkedSubModuleIds": [
+        "rectifier_power_modules",
+        "output_filtering",
+        "ccs2_cable_connector"
+      ],
+      "linkedComponentWordIds": [
+        "power_module_stack",
+        "power_module_backplane",
+        "module_locking_rail",
+        "dc_link_capacitor_bank",
+        "dc_output_choke",
+        "emi_filter_assembly",
+        "snubber_network_board",
+        "thermal_interface_pad_set",
+        "ccs2_liquid_cooled_cable_and_connector",
+        "connector_temperature_sensor_pair",
+        "proximity_pilot_resistor_set",
+        "cable_strain_relief_boot"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "dc_output_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:environmental_interface:energy_conversion_transduction:coolant_loop",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal And Environmental Interface -> Power Conversion Stack via coolant_loop",
+      "reviewerQuestion": "Is the coolant_loop interface between Thermal And Environmental Interface and Power Conversion Stack correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface",
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "liquid_cooling_loop",
+        "thermal_air_path",
+        "rectifier_power_modules",
+        "converter_supervision"
+      ],
+      "linkedComponentWordIds": [
+        "cooling_loop_assembly",
+        "coolant_pump",
+        "plate_radiator",
+        "coolant_reservoir",
+        "cabinet_fan_tray",
+        "inlet_filter_mat",
+        "exhaust_louvre_assembly",
+        "airflow_proving_switch",
+        "power_module_stack",
+        "power_module_backplane",
+        "module_locking_rail",
+        "dc_link_capacitor_bank",
+        "module_health_monitor_board",
+        "heatsink_temperature_probe",
+        "fan_coolant_derating_table",
+        "firmware_recovery_jumper"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "coolant_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:power_distribution:energy_conversion_transduction:ac_input_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "AC Input And DC Output Distribution -> Power Conversion Stack via ac_input_bus",
+      "reviewerQuestion": "Is the ac_input_bus interface between AC Input And DC Output Distribution and Power Conversion Stack correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "ac_input_switchgear",
+        "rectifier_power_modules"
+      ],
+      "linkedComponentWordIds": [
+        "ac_input_breaker_and_spd",
+        "lockable_ac_isolator",
+        "surge_arrestor_cartridge",
+        "input_terminal_shroud",
+        "power_module_stack",
+        "power_module_backplane",
+        "module_locking_rail",
+        "dc_link_capacitor_bank"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "ac_input_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:sensing_instrumentation:control_compute_communication:metering_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Metering And Electrical Sensing -> Control Compute Communication via metering_bus",
+      "reviewerQuestion": "Is the metering_bus interface between Metering And Electrical Sensing and Control Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "energy_metering",
+        "charge_controller",
+        "protocol_stack"
+      ],
+      "linkedComponentWordIds": [
+        "mid_energy_meter",
+        "dc_voltage_transducer",
+        "dc_current_shunt",
+        "meter_pulse_output_isolator",
+        "charge_controller_pcb",
+        "safety_io_terminal_block",
+        "real_time_clock_module",
+        "nonvolatile_event_log_memory",
+        "iso_15118_plc_modem",
+        "plug_and_charge_certificate_store",
+        "charging_session_firmware_image",
+        "protocol_debug_header"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "metering_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "module_allocation:charging_connector_interface",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Vehicle Charging Interface",
+      "reviewerQuestion": "Does Vehicle Charging Interface have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "charging_connector_interface"
+      ],
+      "linkedSubModuleIds": [
+        "ccs2_cable_connector",
+        "connector_cooling_coupling",
+        "vehicle_communication_frontend"
+      ],
+      "linkedComponentWordIds": [
+        "ccs2_liquid_cooled_cable_and_connector",
+        "connector_temperature_sensor_pair",
+        "proximity_pilot_resistor_set",
+        "cable_strain_relief_boot",
+        "liquid_cooled_cable_manifold",
+        "quick_connect_coolant_coupler",
+        "coolant_leak_catch_tray",
+        "cable_coolant_temperature_probe",
+        "iso_15118_plc_modem",
+        "control_pilot_interface_board",
+        "proximity_detection_input",
+        "vehicle_comms_isolation_transformer"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "dc_output_bus",
+        "ccs2_vehicle_interface",
+        "iso15118_plc",
+        "control_pilot",
+        "protective_earth",
+        "coolant_loop",
+        "service_access",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication",
+      "reviewerQuestion": "Does Control Compute Communication have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "charge_controller",
+        "backend_gateway",
+        "protocol_stack"
+      ],
+      "linkedComponentWordIds": [
+        "charge_controller_pcb",
+        "safety_io_terminal_block",
+        "real_time_clock_module",
+        "nonvolatile_event_log_memory",
+        "ocpp_communications_gateway",
+        "lte_router_module",
+        "ethernet_surge_protector",
+        "secure_element_module",
+        "iso_15118_plc_modem",
+        "plug_and_charge_certificate_store",
+        "charging_session_firmware_image",
+        "protocol_debug_header"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "control_bus",
+        "iso15118_plc",
+        "ocpp_network",
+        "metering_bus",
+        "alarm_bus",
+        "service_port"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:energy_conversion_transduction",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Conversion Stack",
+      "reviewerQuestion": "Does Power Conversion Stack have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "rectifier_power_modules",
+        "output_filtering",
+        "converter_supervision"
+      ],
+      "linkedComponentWordIds": [
+        "power_module_stack",
+        "power_module_backplane",
+        "module_locking_rail",
+        "dc_link_capacitor_bank",
+        "dc_output_choke",
+        "emi_filter_assembly",
+        "snubber_network_board",
+        "thermal_interface_pad_set",
+        "module_health_monitor_board",
+        "heatsink_temperature_probe",
+        "fan_coolant_derating_table",
+        "firmware_recovery_jumper"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "ac_input_bus",
+        "dc_output_bus",
+        "coolant_loop",
+        "control_bus",
+        "protective_earth",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal And Environmental Interface",
+      "reviewerQuestion": "Does Thermal And Environmental Interface have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "liquid_cooling_loop",
+        "thermal_air_path",
+        "weatherproofing"
+      ],
+      "linkedComponentWordIds": [
+        "cooling_loop_assembly",
+        "coolant_pump",
+        "plate_radiator",
+        "coolant_reservoir",
+        "cabinet_fan_tray",
+        "inlet_filter_mat",
+        "exhaust_louvre_assembly",
+        "airflow_proving_switch",
+        "cabinet_drain_grommet",
+        "door_gasket_set",
+        "anti_condensation_heater",
+        "uv_rated_cable_cover"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "coolant_loop",
+        "airflow_path",
+        "condensate_drain",
+        "service_access",
+        "protective_earth",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:hmi_ergonomics",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "User Payment And HMI",
+      "reviewerQuestion": "Does User Payment And HMI have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "user_display_panel",
+        "payment_identity",
+        "user_cable_guidance"
+      ],
+      "linkedComponentWordIds": [
+        "touchscreen_hmi_panel",
+        "status_led_light_bar",
+        "audio_buzzer",
+        "sunlight_readable_display_cover",
+        "rfid_reader_module",
+        "contactless_payment_terminal",
+        "receipt_qr_code_generator",
+        "privacy_label",
+        "connector_instruction_graphic",
+        "cable_park_indicator",
+        "accessibility_reach_label",
+        "session_stop_button"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "ocpp_network",
+        "control_bus",
+        "ccs2_vehicle_interface",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Maintenance And Commissioning",
+      "reviewerQuestion": "Does Maintenance And Commissioning have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "commissioning_access",
+        "replaceable_modules",
+        "remote_diagnostics"
+      ],
+      "linkedComponentWordIds": [
+        "commissioning_terminal_block",
+        "meter_test_port",
+        "output_test_socket_cover",
+        "commissioning_checklist_card",
+        "slide_out_power_module_rail",
+        "quick_disconnect_coolant_fitting",
+        "gateway_din_rail_carrier",
+        "spare_fuse_and_link_kit",
+        "diagnostic_log_exporter",
+        "remote_firmware_update_agent",
+        "health_telemetry_packet_schema",
+        "service_vpn_profile"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "service_port",
+        "ocpp_network",
+        "metering_bus",
+        "coolant_loop",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "AC Input And DC Output Distribution",
+      "reviewerQuestion": "Does AC Input And DC Output Distribution have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "ac_input_switchgear",
+        "dc_output_switchgear",
+        "billing_metering_branch"
+      ],
+      "linkedComponentWordIds": [
+        "ac_input_breaker_and_spd",
+        "lockable_ac_isolator",
+        "surge_arrestor_cartridge",
+        "input_terminal_shroud",
+        "dc_output_contactor_set",
+        "precharge_resistor_module",
+        "dc_output_fuse_carrier",
+        "output_polarity_label",
+        "mid_energy_meter",
+        "meter_ct_shunt_set",
+        "meter_seal_kit",
+        "meter_calibration_label"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "ac_input_bus",
+        "dc_output_bus",
+        "protective_earth",
+        "metering_bus",
+        "service_access",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Safety Protection",
+      "reviewerQuestion": "Does Safety Protection have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "emergency_stop_chain",
+        "dc_fault_protection",
+        "user_access_protection"
+      ],
+      "linkedComponentWordIds": [
+        "emergency_stop_and_safety_interlock_set",
+        "e_stop_mushroom_button",
+        "door_interlock_switch",
+        "safety_relay_module",
+        "insulation_monitoring_device",
+        "dc_arc_detection_board",
+        "output_contactor_weld_check_circuit",
+        "fault_discharge_resistor",
+        "touch_safe_connector_shutter",
+        "protective_earth_continuity_strap",
+        "charging_status_beacon",
+        "safety_instruction_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "emergency_stop",
+        "insulation_monitoring",
+        "protective_earth",
+        "alarm_bus",
+        "dc_output_bus",
+        "control_bus",
+        "ccs2_vehicle_interface"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Metering And Electrical Sensing",
+      "reviewerQuestion": "Does Metering And Electrical Sensing have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "energy_metering",
+        "insulation_fault_detection",
+        "connector_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "mid_energy_meter",
+        "dc_voltage_transducer",
+        "dc_current_shunt",
+        "meter_pulse_output_isolator",
+        "insulation_monitoring_device",
+        "imd_coupling_network",
+        "fault_status_relay",
+        "test_resistor_plug",
+        "connector_latch_microswitch",
+        "handle_temperature_sensor",
+        "cable_identification_resistor_reader",
+        "holster_presence_switch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "metering_bus",
+        "dc_output_bus",
+        "insulation_monitoring",
+        "sensor_bus",
+        "control_bus",
+        "alarm_bus",
+        "ccs2_vehicle_interface",
+        "control_pilot"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Cabinet Structure And Containment",
+      "reviewerQuestion": "Does Cabinet Structure And Containment have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "outdoor_cabinet",
+        "cable_holster_boom",
+        "internal_compartmentation"
+      ],
+      "linkedComponentWordIds": [
+        "powder_coated_steel_cabinet",
+        "front_service_door",
+        "anti_vandal_hinge_set",
+        "plinth_mounting_kit",
+        "connector_holster",
+        "cable_retractor_arm",
+        "cable_bend_limiter",
+        "parking_status_flag",
+        "segregated_ac_dc_barrier",
+        "control_compartment_shield",
+        "service_warning_placard",
+        "earthing_braid_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mechanical_mounts",
+        "service_access",
+        "protective_earth",
+        "ccs2_vehicle_interface"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:charging_connector_interface:ccs2_cable_connector",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Vehicle Charging Interface / CCS2 cable connector",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to CCS2 cable connector make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "charging_connector_interface"
+      ],
+      "linkedSubModuleIds": [
+        "ccs2_cable_connector"
+      ],
+      "linkedComponentWordIds": [
+        "ccs2_liquid_cooled_cable_and_connector",
+        "connector_temperature_sensor_pair",
+        "proximity_pilot_resistor_set",
+        "cable_strain_relief_boot"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "dc_output_bus",
+        "ccs2_vehicle_interface",
+        "control_pilot",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:charging_connector_interface:connector_cooling_coupling",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Vehicle Charging Interface / Connector cooling coupling",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Connector cooling coupling make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "charging_connector_interface"
+      ],
+      "linkedSubModuleIds": [
+        "connector_cooling_coupling"
+      ],
+      "linkedComponentWordIds": [
+        "liquid_cooled_cable_manifold",
+        "quick_connect_coolant_coupler",
+        "coolant_leak_catch_tray",
+        "cable_coolant_temperature_probe"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "coolant_loop",
+        "ccs2_vehicle_interface",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:charging_connector_interface:vehicle_communication_frontend",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Vehicle Charging Interface / Vehicle communication frontend",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Vehicle communication frontend make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "charging_connector_interface"
+      ],
+      "linkedSubModuleIds": [
+        "vehicle_communication_frontend"
+      ],
+      "linkedComponentWordIds": [
+        "iso_15118_plc_modem",
+        "control_pilot_interface_board",
+        "proximity_detection_input",
+        "vehicle_comms_isolation_transformer"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "iso15118_plc",
+        "control_pilot",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:backend_gateway",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Backend gateway",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Backend gateway make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "backend_gateway"
+      ],
+      "linkedComponentWordIds": [
+        "ocpp_communications_gateway",
+        "lte_router_module",
+        "ethernet_surge_protector",
+        "secure_element_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "ocpp_network",
+        "service_port"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:charge_controller",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Charge controller",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Charge controller make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "charge_controller"
+      ],
+      "linkedComponentWordIds": [
+        "charge_controller_pcb",
+        "safety_io_terminal_block",
+        "real_time_clock_module",
+        "nonvolatile_event_log_memory"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "control_bus",
+        "metering_bus",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:protocol_stack",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Vehicle protocol stack",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Vehicle protocol stack make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "protocol_stack"
+      ],
+      "linkedComponentWordIds": [
+        "iso_15118_plc_modem",
+        "plug_and_charge_certificate_store",
+        "charging_session_firmware_image",
+        "protocol_debug_header"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "iso15118_plc",
+        "control_bus",
+        "metering_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:converter_supervision",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Conversion Stack / Converter supervision",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Converter supervision make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "converter_supervision"
+      ],
+      "linkedComponentWordIds": [
+        "module_health_monitor_board",
+        "heatsink_temperature_probe",
+        "fan_coolant_derating_table",
+        "firmware_recovery_jumper"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "control_bus",
+        "sensor_bus",
+        "coolant_loop"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:output_filtering",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Conversion Stack / Output filtering",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Output filtering make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "output_filtering"
+      ],
+      "linkedComponentWordIds": [
+        "dc_output_choke",
+        "emi_filter_assembly",
+        "snubber_network_board",
+        "thermal_interface_pad_set"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "dc_output_bus",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:rectifier_power_modules",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Conversion Stack / Rectifier power modules",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Rectifier power modules make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "rectifier_power_modules"
+      ],
+      "linkedComponentWordIds": [
+        "power_module_stack",
+        "power_module_backplane",
+        "module_locking_rail",
+        "dc_link_capacitor_bank"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "ac_input_bus",
+        "dc_output_bus",
+        "coolant_loop",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:liquid_cooling_loop",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal And Environmental Interface / Liquid cooling loop",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Liquid cooling loop make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "liquid_cooling_loop"
+      ],
+      "linkedComponentWordIds": [
+        "cooling_loop_assembly",
+        "coolant_pump",
+        "plate_radiator",
+        "coolant_reservoir"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "coolant_loop",
+        "sensor_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:thermal_air_path",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal And Environmental Interface / Thermal air path",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Thermal air path make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_air_path"
+      ],
+      "linkedComponentWordIds": [
+        "cabinet_fan_tray",
+        "inlet_filter_mat",
+        "exhaust_louvre_assembly",
+        "airflow_proving_switch"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "airflow_path",
+        "coolant_loop",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:weatherproofing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal And Environmental Interface / Weatherproofing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Weatherproofing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "weatherproofing"
+      ],
+      "linkedComponentWordIds": [
+        "cabinet_drain_grommet",
+        "door_gasket_set",
+        "anti_condensation_heater",
+        "uv_rated_cable_cover"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "condensate_drain",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:payment_identity",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "User Payment And HMI / Payment and identity",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Payment and identity make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "payment_identity"
+      ],
+      "linkedComponentWordIds": [
+        "rfid_reader_module",
+        "contactless_payment_terminal",
+        "receipt_qr_code_generator",
+        "privacy_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "ocpp_network",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:user_cable_guidance",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "User Payment And HMI / User cable guidance",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to User cable guidance make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "user_cable_guidance"
+      ],
+      "linkedComponentWordIds": [
+        "connector_instruction_graphic",
+        "cable_park_indicator",
+        "accessibility_reach_label",
+        "session_stop_button"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "ccs2_vehicle_interface",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:user_display_panel",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "User Payment And HMI / User display panel",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to User display panel make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "user_display_panel"
+      ],
+      "linkedComponentWordIds": [
+        "touchscreen_hmi_panel",
+        "status_led_light_bar",
+        "audio_buzzer",
+        "sunlight_readable_display_cover"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "control_bus",
+        "ocpp_network"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:commissioning_access",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Maintenance And Commissioning / Commissioning access",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Commissioning access make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "commissioning_access"
+      ],
+      "linkedComponentWordIds": [
+        "commissioning_terminal_block",
+        "meter_test_port",
+        "output_test_socket_cover",
+        "commissioning_checklist_card"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "service_port",
+        "metering_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:remote_diagnostics",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Maintenance And Commissioning / Remote diagnostics",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Remote diagnostics make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "remote_diagnostics"
+      ],
+      "linkedComponentWordIds": [
+        "diagnostic_log_exporter",
+        "remote_firmware_update_agent",
+        "health_telemetry_packet_schema",
+        "service_vpn_profile"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "ocpp_network",
+        "service_port",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:replaceable_modules",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Maintenance And Commissioning / Replaceable modules",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Replaceable modules make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "replaceable_modules"
+      ],
+      "linkedComponentWordIds": [
+        "slide_out_power_module_rail",
+        "quick_disconnect_coolant_fitting",
+        "gateway_din_rail_carrier",
+        "spare_fuse_and_link_kit"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "control_bus",
+        "coolant_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:ac_input_switchgear",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "AC Input And DC Output Distribution / AC input switchgear",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to AC input switchgear make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "ac_input_switchgear"
+      ],
+      "linkedComponentWordIds": [
+        "ac_input_breaker_and_spd",
+        "lockable_ac_isolator",
+        "surge_arrestor_cartridge",
+        "input_terminal_shroud"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "ac_input_bus",
+        "protective_earth",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:billing_metering_branch",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "AC Input And DC Output Distribution / Billing metering branch",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Billing metering branch make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "billing_metering_branch"
+      ],
+      "linkedComponentWordIds": [
+        "mid_energy_meter",
+        "meter_ct_shunt_set",
+        "meter_seal_kit",
+        "meter_calibration_label"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "metering_bus",
+        "dc_output_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:dc_output_switchgear",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "AC Input And DC Output Distribution / DC output switchgear",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to DC output switchgear make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "dc_output_switchgear"
+      ],
+      "linkedComponentWordIds": [
+        "dc_output_contactor_set",
+        "precharge_resistor_module",
+        "dc_output_fuse_carrier",
+        "output_polarity_label"
+      ],
+      "linkedRequirementIds": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaceIds": [
+        "dc_output_bus",
+        "control_bus",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:dc_fault_protection",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Safety Protection / DC fault protection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to DC fault protection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "dc_fault_protection"
+      ],
+      "linkedComponentWordIds": [
+        "insulation_monitoring_device",
+        "dc_arc_detection_board",
+        "output_contactor_weld_check_circuit",
+        "fault_discharge_resistor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "dc_output_bus",
+        "insulation_monitoring",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:emergency_stop_chain",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Safety Protection / Emergency stop chain",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Emergency stop chain make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "emergency_stop_chain"
+      ],
+      "linkedComponentWordIds": [
+        "emergency_stop_and_safety_interlock_set",
+        "e_stop_mushroom_button",
+        "door_interlock_switch",
+        "safety_relay_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "emergency_stop",
+        "alarm_bus",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:user_access_protection",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Safety Protection / User access protection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to User access protection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "user_access_protection"
+      ],
+      "linkedComponentWordIds": [
+        "touch_safe_connector_shutter",
+        "protective_earth_continuity_strap",
+        "charging_status_beacon",
+        "safety_instruction_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "protective_earth",
+        "ccs2_vehicle_interface"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:connector_sensing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Metering And Electrical Sensing / Connector sensing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Connector sensing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "connector_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "connector_latch_microswitch",
+        "handle_temperature_sensor",
+        "cable_identification_resistor_reader",
+        "holster_presence_switch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "ccs2_vehicle_interface",
+        "control_pilot"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:energy_metering",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Metering And Electrical Sensing / Energy metering",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Energy metering make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "energy_metering"
+      ],
+      "linkedComponentWordIds": [
+        "mid_energy_meter",
+        "dc_voltage_transducer",
+        "dc_current_shunt",
+        "meter_pulse_output_isolator"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "metering_bus",
+        "dc_output_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:insulation_fault_detection",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Metering And Electrical Sensing / Insulation fault detection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Insulation fault detection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "insulation_fault_detection"
+      ],
+      "linkedComponentWordIds": [
+        "insulation_monitoring_device",
+        "imd_coupling_network",
+        "fault_status_relay",
+        "test_resistor_plug"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "insulation_monitoring",
+        "dc_output_bus",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:cable_holster_boom",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Cabinet Structure And Containment / Cable holster and boom",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Cable holster and boom make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "cable_holster_boom"
+      ],
+      "linkedComponentWordIds": [
+        "connector_holster",
+        "cable_retractor_arm",
+        "cable_bend_limiter",
+        "parking_status_flag"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "ccs2_vehicle_interface",
+        "mechanical_mounts"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:internal_compartmentation",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Cabinet Structure And Containment / Internal compartmentation",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Internal compartmentation make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "internal_compartmentation"
+      ],
+      "linkedComponentWordIds": [
+        "segregated_ac_dc_barrier",
+        "control_compartment_shield",
+        "service_warning_placard",
+        "earthing_braid_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:outdoor_cabinet",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Cabinet Structure And Containment / Outdoor cabinet",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Outdoor cabinet make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "outdoor_cabinet"
+      ],
+      "linkedComponentWordIds": [
+        "powder_coated_steel_cabinet",
+        "front_service_door",
+        "anti_vandal_hinge_set",
+        "plinth_mounting_kit"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mechanical_mounts",
+        "service_access",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    }
+  ]
+}

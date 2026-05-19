@@ -1,0 +1,4709 @@
+{
+  "summary": {
+    "rows": 201,
+    "briefSupplied": 1,
+    "accepted": 0,
+    "sourceBacked": 0,
+    "calculatedNeedsReview": 3,
+    "generatedNeedsReview": 140,
+    "sourceRequired": 57,
+    "blocked": 0,
+    "blocksBom": 57,
+    "blocksPublish": 200
+  },
+  "rows": [
+    {
+      "id": "bom_source_field:actuation_kinematics_agitation_drive_train_agitation_drive:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Agitation drive / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "agitation_drive"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:actuation_kinematics_agitation_drive_train_agitation_drive:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Agitation drive / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "agitation_drive"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:actuation_kinematics_agitation_drive_train_agitation_drive:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Agitation drive / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "agitation_drive"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:actuation_kinematics_agitation_drive_train_agitation_drive:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Agitation drive / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "agitation_drive"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_process_controller_bioreactor_controller:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Bioreactor controller / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bioreactor_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_process_controller_bioreactor_controller:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Bioreactor controller / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bioreactor_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_process_controller_bioreactor_controller:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Bioreactor controller / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bioreactor_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_process_controller_bioreactor_controller:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Bioreactor controller / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bioreactor_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_exhaust_filter_train_exhaust_filter_and_pressure_relief_set:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Exhaust filter and pressure relief set / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "exhaust_filter_and_pressure_relief_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_exhaust_filter_train_exhaust_filter_and_pressure_relief_set:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Exhaust filter and pressure relief set / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "exhaust_filter_and_pressure_relief_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_exhaust_filter_train_exhaust_filter_and_pressure_relief_set:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Exhaust filter and pressure relief set / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "exhaust_filter_and_pressure_relief_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_exhaust_filter_train_exhaust_filter_and_pressure_relief_set:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Exhaust filter and pressure relief set / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "exhaust_filter_and_pressure_relief_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_temperature_control_loop_temperature_control_loop:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Temperature control loop / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_control_loop"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_temperature_control_loop_temperature_control_loop:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Temperature control loop / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_control_loop"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_temperature_control_loop_temperature_control_loop:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Temperature control loop / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_control_loop"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_temperature_control_loop_temperature_control_loop:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Temperature control loop / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_control_loop"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_feed_pump_manifold_peristaltic_feed_pump:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Peristaltic feed pump / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_feed_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_feed_pump_manifold_peristaltic_feed_pump:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Peristaltic feed pump / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_feed_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_feed_pump_manifold_peristaltic_feed_pump:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Peristaltic feed pump / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_feed_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_feed_pump_manifold_peristaltic_feed_pump:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Peristaltic feed pump / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_feed_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_sparger_gas_mixing_sparger_and_gas_mix_manifold:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Sparger and gas-mix manifold / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "sparger_and_gas_mix_manifold"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_sparger_gas_mixing_sparger_and_gas_mix_manifold:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Sparger and gas-mix manifold / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "sparger_and_gas_mix_manifold"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_sparger_gas_mixing_sparger_and_gas_mix_manifold:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Sparger and gas-mix manifold / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "sparger_and_gas_mix_manifold"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_sparger_gas_mixing_sparger_and_gas_mix_manifold:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Sparger and gas-mix manifold / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "sparger_and_gas_mix_manifold"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_do_ph_sensing_dissolved_oxygen_optical_sensor:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Dissolved oxygen optical sensor / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dissolved_oxygen_optical_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_do_ph_sensing_dissolved_oxygen_optical_sensor:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Dissolved oxygen optical sensor / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dissolved_oxygen_optical_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_do_ph_sensing_dissolved_oxygen_optical_sensor:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Dissolved oxygen optical sensor / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dissolved_oxygen_optical_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_do_ph_sensing_dissolved_oxygen_optical_sensor:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Dissolved oxygen optical sensor / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dissolved_oxygen_optical_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_do_ph_sensing_single_use_ph_sensor:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Single-use pH sensor / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_ph_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_do_ph_sensing_single_use_ph_sensor:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Single-use pH sensor / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_ph_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_do_ph_sensing_single_use_ph_sensor:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Single-use pH sensor / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_ph_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_do_ph_sensing_single_use_ph_sensor:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Single-use pH sensor / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_ph_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_pressure_mass_temperature_sensing_load_cell_set:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Load cell set / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "load_cell_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_pressure_mass_temperature_sensing_load_cell_set:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Load cell set / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "load_cell_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_pressure_mass_temperature_sensing_load_cell_set:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Load cell set / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "load_cell_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_pressure_mass_temperature_sensing_load_cell_set:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Load cell set / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "load_cell_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_single_use_bag_chamber_single_use_bioreactor_bag:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Single-use bioreactor bag / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_single_use_bag_chamber_single_use_bioreactor_bag:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Single-use bioreactor bag / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_single_use_bag_chamber_single_use_bioreactor_bag:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Single-use bioreactor bag / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_single_use_bag_chamber_single_use_bioreactor_bag:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Single-use bioreactor bag / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_sterile_connector_panel_sterile_tubing_and_connector_set:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Sterile tubing and connector set / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_tubing_and_connector_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_sterile_connector_panel_sterile_tubing_and_connector_set:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Sterile tubing and connector set / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_tubing_and_connector_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_sterile_connector_panel_sterile_tubing_and_connector_set:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Sterile tubing and connector set / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_tubing_and_connector_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_sterile_connector_panel_sterile_tubing_and_connector_set:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Sterile tubing and connector set / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_tubing_and_connector_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_agitation_drive_train_agitation_drive",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Agitation drive",
+      "claim": "Agitation drive is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "agitation_drive"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_process_controller_bioreactor_controller",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Bioreactor controller",
+      "claim": "Bioreactor controller is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bioreactor_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:environmental_interface_exhaust_filter_train_exhaust_filter_and_pressure_relief_set",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Exhaust filter and pressure relief set",
+      "claim": "Exhaust filter and pressure relief set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "exhaust_filter_and_pressure_relief_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:environmental_interface_temperature_control_loop_temperature_control_loop",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Temperature control loop",
+      "claim": "Temperature control loop is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_control_loop"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_feed_pump_manifold_peristaltic_feed_pump",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Peristaltic feed pump",
+      "claim": "Peristaltic feed pump is an architecture-derived component candidate with quantity 3 each.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_feed_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_sparger_gas_mixing_sparger_and_gas_mix_manifold",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Sparger and gas-mix manifold",
+      "claim": "Sparger and gas-mix manifold is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "sparger_and_gas_mix_manifold"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_do_ph_sensing_dissolved_oxygen_optical_sensor",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Dissolved oxygen optical sensor",
+      "claim": "Dissolved oxygen optical sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dissolved_oxygen_optical_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_do_ph_sensing_single_use_ph_sensor",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Single-use pH sensor",
+      "claim": "Single-use pH sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_ph_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_pressure_mass_temperature_sensing_load_cell_set",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Load cell set",
+      "claim": "Load cell set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "load_cell_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:structure_containment_single_use_bag_chamber_single_use_bioreactor_bag",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Single-use bioreactor bag",
+      "claim": "Single-use bioreactor bag is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:structure_containment_sterile_connector_panel_sterile_tubing_and_connector_set",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Sterile tubing and connector set",
+      "claim": "Sterile tubing and connector set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_tubing_and_connector_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "headline_metric:capex_gbp",
+      "kind": "headline_metric",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Estimated CAPEX",
+      "claim": "Estimated CAPEX = 0 GBP.",
+      "provenanceRefs": [
+        "formula:capex=sum(bom.totalCostGbp)",
+        "class_pack:bioreactor.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed BoM costs before treating this cost metric as a claim."
+    },
+    {
+      "id": "headline_metric:opex_annual_gbp",
+      "kind": "headline_metric",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Estimated annual OPEX",
+      "claim": "Estimated annual OPEX = 0 GBP/year.",
+      "provenanceRefs": [
+        "formula:opex=capex*0.04"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed BoM costs before treating this cost metric as a claim."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_agitation_drive_train_drive_encoder",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "drive encoder",
+      "claim": "drive encoder is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "drive_encoder"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_agitation_drive_train_magnetic_coupling_hub",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "magnetic coupling hub",
+      "claim": "magnetic coupling hub is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "magnetic_coupling_hub"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_agitation_drive_train_motor_mounting_plate",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "motor mounting plate",
+      "claim": "motor mounting plate is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "motor_mounting_plate"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_agitation_safety_feedback_drive_fault_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "drive fault relay",
+      "claim": "drive fault relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "drive_fault_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_agitation_safety_feedback_emergency_drive_stop_contactor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "emergency drive stop contactor",
+      "claim": "emergency drive stop contactor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "emergency_drive_stop_contactor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_agitation_safety_feedback_motor_current_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "motor current sensor",
+      "claim": "motor current sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "motor_current_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_agitation_safety_feedback_overspeed_interlock_input",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "overspeed interlock input",
+      "claim": "overspeed interlock input is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "overspeed_interlock_input"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_mixing_impeller_interface_impeller_guard_insert",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "impeller guard insert",
+      "claim": "impeller guard insert is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "impeller_guard_insert"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_mixing_impeller_interface_mixing_validation_coupon",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "mixing validation coupon",
+      "claim": "mixing validation coupon is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "mixing_validation_coupon"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_mixing_impeller_interface_rocker_angle_stop",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "rocker angle stop",
+      "claim": "rocker angle stop is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "rocker_angle_stop"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_mixing_impeller_interface_single_use_impeller_coupling",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "single-use impeller coupling",
+      "claim": "single-use impeller coupling is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_impeller_coupling"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_batch_record_gateway_audit_trail_storage",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "audit trail storage",
+      "claim": "audit trail storage is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "audit_trail_storage"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_batch_record_gateway_batch_historian_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "batch historian module",
+      "claim": "batch historian module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "batch_historian_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_batch_record_gateway_ethernet_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "ethernet switch",
+      "claim": "ethernet switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "ethernet_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_batch_record_gateway_secure_time_source",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "secure time source",
+      "claim": "secure time source is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "secure_time_source"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_operator_alarm_logic_alarm_annunciator",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "alarm annunciator",
+      "claim": "alarm annunciator is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "alarm_annunciator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_operator_alarm_logic_batch_acknowledge_button",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "batch acknowledge button",
+      "claim": "batch acknowledge button is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "batch_acknowledge_button"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_operator_alarm_logic_operator_hmi_panel",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "operator HMI panel",
+      "claim": "operator HMI panel is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "operator_hmi_panel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_operator_alarm_logic_role_access_key_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "role access key switch",
+      "claim": "role access key switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "role_access_key_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_process_controller_control_enclosure",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "control enclosure",
+      "claim": "control enclosure is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "control_enclosure"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_process_controller_i_o_terminal_slice_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "I/O terminal slice set",
+      "claim": "I/O terminal slice set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "i_o_terminal_slice_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_process_controller_recipe_execution_firmware",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "recipe execution firmware",
+      "claim": "recipe execution firmware is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "recipe_execution_firmware"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_ambient_enclosure_conditions_ambient_temperature_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "ambient temperature probe",
+      "claim": "ambient temperature probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "ambient_temperature_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_ambient_enclosure_conditions_clean_zone_status_beacon",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "clean-zone status beacon",
+      "claim": "clean-zone status beacon is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "clean_zone_status_beacon"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_ambient_enclosure_conditions_splash_guard_panel",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "splash guard panel",
+      "claim": "splash guard panel is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "splash_guard_panel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_ambient_enclosure_conditions_wipe_down_surface_kit",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "wipe-down surface kit",
+      "claim": "wipe-down surface kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "wipe_down_surface_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_exhaust_filter_train_condensate_knock_out_bottle",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "condensate knock-out bottle",
+      "claim": "condensate knock-out bottle is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "condensate_knock_out_bottle"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_exhaust_filter_train_exhaust_heater_sleeve",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "exhaust heater sleeve",
+      "claim": "exhaust heater sleeve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "exhaust_heater_sleeve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_exhaust_filter_train_pressure_relief_indicator",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pressure relief indicator",
+      "claim": "pressure relief indicator is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_relief_indicator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_temperature_control_loop_cooling_plate",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "cooling plate",
+      "claim": "cooling plate is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "cooling_plate"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_temperature_control_loop_heater_blanket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "heater blanket",
+      "claim": "heater blanket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "heater_blanket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_temperature_control_loop_thermal_interface_mat",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "thermal interface mat",
+      "claim": "thermal interface mat is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "thermal_interface_mat"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_cleaning_turnaround_spent_bag_removal_cart_interface",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "spent bag removal cart interface",
+      "claim": "spent bag removal cart interface is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "spent_bag_removal_cart_interface"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_cleaning_turnaround_spill_tray_liner",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "spill tray liner",
+      "claim": "spill tray liner is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "spill_tray_liner"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_cleaning_turnaround_turnaround_checklist_card",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "turnaround checklist card",
+      "claim": "turnaround checklist card is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "turnaround_checklist_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_cleaning_turnaround_wipe_down_kit_holder",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "wipe-down kit holder",
+      "claim": "wipe-down kit holder is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "wipe_down_kit_holder"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_sensor_calibration_access_calibration_data_entry_hmi_page",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "calibration data entry HMI page",
+      "claim": "calibration data entry HMI page is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "calibration_data_entry_hmi_page"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_sensor_calibration_access_do_zero_span_adapter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "DO zero span adapter",
+      "claim": "DO zero span adapter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "do_zero_span_adapter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_sensor_calibration_access_ph_calibration_buffer_holder",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pH calibration buffer holder",
+      "claim": "pH calibration buffer holder is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "ph_calibration_buffer_holder"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_sensor_calibration_access_sensor_replacement_guide_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "sensor replacement guide label",
+      "claim": "sensor replacement guide label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "sensor_replacement_guide_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_single_use_setup_bag_loading_fixture",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "bag loading fixture",
+      "claim": "bag loading fixture is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "bag_loading_fixture"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_single_use_setup_connector_cap_organiser",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "connector cap organiser",
+      "claim": "connector cap organiser is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "connector_cap_organiser"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_single_use_setup_setup_verification_barcode_sheet",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "setup verification barcode sheet",
+      "claim": "setup verification barcode sheet is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "setup_verification_barcode_sheet"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_single_use_setup_tube_routing_template",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "tube routing template",
+      "claim": "tube routing template is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "tube_routing_template"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_feed_pump_manifold_feed_line_pinch_clamp",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "feed line pinch clamp",
+      "claim": "feed line pinch clamp is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "feed_line_pinch_clamp"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_feed_pump_manifold_media_bag_hanger",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "media bag hanger",
+      "claim": "media bag hanger is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "media_bag_hanger"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_feed_pump_manifold_pump_tubing_cassette_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pump tubing cassette set",
+      "claim": "pump tubing cassette set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "pump_tubing_cassette_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_harvest_sampling_path_harvest_transfer_tubing_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "harvest transfer tubing set",
+      "claim": "harvest transfer tubing set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "harvest_transfer_tubing_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_harvest_sampling_path_low_hold_up_connector",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "low-hold-up connector",
+      "claim": "low-hold-up connector is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "low_hold_up_connector"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_harvest_sampling_path_single_use_sample_valve",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "single-use sample valve",
+      "claim": "single-use sample valve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_sample_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_harvest_sampling_path_waste_collection_bag",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "waste collection bag",
+      "claim": "waste collection bag is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "waste_collection_bag"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_sparger_gas_mixing_mass_flow_controller_bank",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "mass-flow controller bank",
+      "claim": "mass-flow controller bank is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "mass_flow_controller_bank"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_sparger_gas_mixing_sparger_check_valve",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "sparger check valve",
+      "claim": "sparger check valve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "sparger_check_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_sparger_gas_mixing_sterile_gas_filter_capsule",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "sterile gas filter capsule",
+      "claim": "sterile gas filter capsule is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_gas_filter_capsule"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_actuator_power_feeds_agitation_drive_breaker",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "agitation drive breaker",
+      "claim": "agitation drive breaker is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "agitation_drive_breaker"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_actuator_power_feeds_cable_gland_plate",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "cable gland plate",
+      "claim": "cable gland plate is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "cable_gland_plate"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_actuator_power_feeds_heater_output_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "heater output relay",
+      "claim": "heater output relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "heater_output_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_actuator_power_feeds_pump_power_distribution_loom",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pump power distribution loom",
+      "claim": "pump power distribution loom is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "pump_power_distribution_loom"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_backup_power_and_shutdown_power_fail_input_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "power-fail input module",
+      "claim": "power-fail input module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "power_fail_input_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_backup_power_and_shutdown_safe_shutdown_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "safe shutdown relay",
+      "claim": "safe shutdown relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "safe_shutdown_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_backup_power_and_shutdown_shutdown_status_lamp",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "shutdown status lamp",
+      "claim": "shutdown status lamp is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "shutdown_status_lamp"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_backup_power_and_shutdown_ups_buffer_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "UPS buffer module",
+      "claim": "UPS buffer module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "ups_buffer_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_control_power_panel_24_v_dc_power_supply",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "24 V DC power supply",
+      "claim": "24 V DC power supply is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "24_v_dc_power_supply"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_control_power_panel_panel_earth_bar",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "panel earth bar",
+      "claim": "panel earth bar is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "panel_earth_bar"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_control_power_panel_rcd_mains_isolator",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "RCD mains isolator",
+      "claim": "RCD mains isolator is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_mains_isolator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_control_power_panel_terminal_block_rail",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "terminal block rail",
+      "claim": "terminal block rail is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "terminal_block_rail"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_aseptic_setup_controls_connector_tamper_seal_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "connector tamper seal set",
+      "claim": "connector tamper seal set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "connector_tamper_seal_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_aseptic_setup_controls_operator_gowning_placard",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "operator gowning placard",
+      "claim": "operator gowning placard is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "operator_gowning_placard"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_aseptic_setup_controls_pre_use_integrity_test_kit",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pre-use integrity test kit",
+      "claim": "pre-use integrity test kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "pre_use_integrity_test_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_aseptic_setup_controls_sterile_connection_checklist_card",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "sterile connection checklist card",
+      "claim": "sterile connection checklist card is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_connection_checklist_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_operator_electrical_safety_door_interlock_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "door interlock switch",
+      "claim": "door interlock switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "door_interlock_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_operator_electrical_safety_emergency_stop_button",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "emergency stop button",
+      "claim": "emergency stop button is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "emergency_stop_button"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_operator_electrical_safety_leak_tray_float_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "leak tray float switch",
+      "claim": "leak tray float switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_tray_float_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_operator_electrical_safety_protective_earth_test_point",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "protective earth test point",
+      "claim": "protective earth test point is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "protective_earth_test_point"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_sterile_pressure_safety_bag_burst_shield",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "bag burst shield",
+      "claim": "bag burst shield is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "bag_burst_shield"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_sterile_pressure_safety_pressure_alarm_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pressure alarm relay",
+      "claim": "pressure alarm relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_alarm_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_sterile_pressure_safety_single_use_pressure_relief_valve",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "single-use pressure relief valve",
+      "claim": "single-use pressure relief valve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_pressure_relief_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_sterile_pressure_safety_vent_filter_integrity_tag",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "vent filter integrity tag",
+      "claim": "vent filter integrity tag is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "vent_filter_integrity_tag"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_do_ph_sensing_sensor_calibration_record_card",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "sensor calibration record card",
+      "claim": "sensor calibration record card is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "sensor_calibration_record_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_do_ph_sensing_sensor_patch_reader",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "sensor patch reader",
+      "claim": "sensor patch reader is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "sensor_patch_reader"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_gas_flow_sensing_co2_analyser_cell",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "CO2 analyser cell",
+      "claim": "CO2 analyser cell is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "co2_analyser_cell"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_gas_flow_sensing_exhaust_pressure_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "exhaust pressure sensor",
+      "claim": "exhaust pressure sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "exhaust_pressure_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_gas_flow_sensing_gas_flow_sensor_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "gas flow sensor set",
+      "claim": "gas flow sensor set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "gas_flow_sensor_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_gas_flow_sensing_oxygen_analyser_cell",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "oxygen analyser cell",
+      "claim": "oxygen analyser cell is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "oxygen_analyser_cell"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_pressure_mass_temperature_sensing_bag_pressure_transducer",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "bag pressure transducer",
+      "claim": "bag pressure transducer is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "bag_pressure_transducer"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_pressure_mass_temperature_sensing_culture_temperature_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "culture temperature probe",
+      "claim": "culture temperature probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "culture_temperature_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_pressure_mass_temperature_sensing_foam_detection_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "foam detection probe",
+      "claim": "foam detection probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "foam_detection_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_single_use_bag_chamber_bag_integrity_test_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "bag integrity test label",
+      "claim": "bag integrity test label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "bag_integrity_test_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_single_use_bag_chamber_bag_support_tray",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "bag support tray",
+      "claim": "bag support tray is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "bag_support_tray"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_single_use_bag_chamber_port_clamp_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "port clamp set",
+      "claim": "port clamp set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "port_clamp_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_sterile_connector_panel_aseptic_sampling_port",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "aseptic sampling port",
+      "claim": "aseptic sampling port is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "aseptic_sampling_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_sterile_connector_panel_clamp_rail",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "clamp rail",
+      "claim": "clamp rail is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "clamp_rail"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_sterile_connector_panel_connector_parking_bracket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "connector parking bracket",
+      "claim": "connector parking bracket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "connector_parking_bracket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_support_frame_load_path_levelling_foot_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "levelling foot set",
+      "claim": "levelling foot set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "levelling_foot_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_support_frame_load_path_lifting_eye_kit",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "lifting eye kit",
+      "claim": "lifting eye kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "lifting_eye_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_support_frame_load_path_load_cell_mounting_bracket_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "load cell mounting bracket set",
+      "claim": "load cell mounting bracket set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "load_cell_mounting_bracket_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_support_frame_load_path_stainless_support_frame",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "stainless support frame",
+      "claim": "stainless support frame is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.bioreactor"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "stainless_support_frame"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "module_allocation:actuation_kinematics",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Mixing And Agitation",
+      "claim": "Mixing And Agitation is a top-level functional module: Transfers controllable mixing energy into the culture without compromising the disposable boundary.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "agitation_drive",
+        "magnetic_coupling_hub",
+        "drive_encoder",
+        "motor_mounting_plate",
+        "single_use_impeller_coupling",
+        "impeller_guard_insert",
+        "rocker_angle_stop",
+        "mixing_validation_coupon",
+        "motor_current_sensor",
+        "overspeed_interlock_input",
+        "drive_fault_relay",
+        "emergency_drive_stop_contactor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication",
+      "claim": "Control Compute Communication is a top-level functional module: Runs recipe, process control, alarms, historian and batch-record communication.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware",
+        "batch_historian_module",
+        "audit_trail_storage",
+        "ethernet_switch",
+        "secure_time_source",
+        "alarm_annunciator",
+        "operator_hmi_panel",
+        "role_access_key_switch",
+        "batch_acknowledge_button"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thermal Gas Exhaust Interface",
+      "claim": "Thermal Gas Exhaust Interface is a top-level functional module: Controls culture temperature and sterile exhaust conditions.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_control_loop",
+        "heater_blanket",
+        "cooling_plate",
+        "thermal_interface_mat",
+        "exhaust_filter_and_pressure_relief_set",
+        "condensate_knock_out_bottle",
+        "exhaust_heater_sleeve",
+        "pressure_relief_indicator",
+        "ambient_temperature_probe",
+        "clean_zone_status_beacon",
+        "splash_guard_panel",
+        "wipe_down_surface_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Setup Calibration And Service",
+      "claim": "Setup Calibration And Service is a top-level functional module: Supports bag loading, sensor calibration, sterile turnaround and controlled service access.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "bag_loading_fixture",
+        "tube_routing_template",
+        "connector_cap_organiser",
+        "setup_verification_barcode_sheet",
+        "ph_calibration_buffer_holder",
+        "do_zero_span_adapter",
+        "calibration_data_entry_hmi_page",
+        "sensor_replacement_guide_label",
+        "wipe_down_kit_holder",
+        "spill_tray_liner",
+        "spent_bag_removal_cart_interface",
+        "turnaround_checklist_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:mass_fluid_transport_process",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Media Gas And Harvest Transport",
+      "claim": "Media Gas And Harvest Transport is a top-level functional module: Moves sterile media, feeds, harvest and process gases through controlled disposable paths.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp",
+        "harvest_transfer_tubing_set",
+        "single_use_sample_valve",
+        "waste_collection_bag",
+        "low_hold_up_connector",
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Power Distribution",
+      "claim": "Power Distribution is a top-level functional module: Supplies protected mains and low-voltage power to pumps, controller, agitation and thermal hardware.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_mains_isolator",
+        "24_v_dc_power_supply",
+        "terminal_block_rail",
+        "panel_earth_bar",
+        "pump_power_distribution_loom",
+        "agitation_drive_breaker",
+        "heater_output_relay",
+        "cable_gland_plate",
+        "ups_buffer_module",
+        "safe_shutdown_relay",
+        "power_fail_input_module",
+        "shutdown_status_lamp"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Aseptic And Pressure Safety",
+      "claim": "Aseptic And Pressure Safety is a top-level functional module: Protects culture sterility, disposable pressure limits and operator exposure.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_pressure_relief_valve",
+        "vent_filter_integrity_tag",
+        "pressure_alarm_relay",
+        "bag_burst_shield",
+        "sterile_connection_checklist_card",
+        "connector_tamper_seal_set",
+        "pre_use_integrity_test_kit",
+        "operator_gowning_placard",
+        "emergency_stop_button",
+        "door_interlock_switch",
+        "leak_tray_float_switch",
+        "protective_earth_test_point"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Process Sensing Instrumentation",
+      "claim": "Process Sensing Instrumentation is a top-level functional module: Measures culture and equipment state needed for closed-loop control and batch release evidence.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor",
+        "sensor_patch_reader",
+        "sensor_calibration_record_card",
+        "load_cell_set",
+        "bag_pressure_transducer",
+        "culture_temperature_probe",
+        "foam_detection_probe",
+        "gas_flow_sensor_set",
+        "exhaust_pressure_sensor",
+        "oxygen_analyser_cell",
+        "co2_analyser_cell"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Sterile Structure Containment",
+      "claim": "Sterile Structure Containment is a top-level functional module: Supports a 50 L single-use culture volume while preserving the sterile disposable boundary.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label",
+        "stainless_support_frame",
+        "load_cell_mounting_bracket_set",
+        "levelling_foot_set",
+        "lifting_eye_kit",
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "regulatory_standard:EU-GMP-ANNEX-11",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "EU-GMP-ANNEX-11",
+      "claim": "EU-GMP-ANNEX-11: Computerised systems for GMP records is relevant in EU / pharma operations.",
+      "provenanceRefs": [
+        "class_pack:bioreactor.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Batch record integrity, audit trail and access-control evidence."
+    },
+    {
+      "id": "regulatory_standard:IEC-61010",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "IEC-61010",
+      "claim": "IEC-61010: Electrical safety for laboratory control equipment is relevant in UK/EU/global.",
+      "provenanceRefs": [
+        "class_pack:bioreactor.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Electrical safety design, protective earth and abnormal operation evidence."
+    },
+    {
+      "id": "regulatory_standard:ISO-13485",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "ISO-13485",
+      "claim": "ISO-13485: Quality management for medical-device-adjacent manufacturing systems is relevant in Global / supplier quality.",
+      "provenanceRefs": [
+        "class_pack:bioreactor.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Supplier quality evidence, change control and traceability where applicable."
+    },
+    {
+      "id": "regulatory_standard:USP-CLASS-VI",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "USP-CLASS-VI",
+      "claim": "USP-CLASS-VI: Biocompatibility for polymer contact materials is relevant in US / global supplier evidence.",
+      "provenanceRefs": [
+        "class_pack:bioreactor.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Material certificates for single-use bag and tubing contact surfaces."
+    },
+    {
+      "id": "risk_hazard:1",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Loss of sterility through connector or bag handling",
+      "claim": "Loss of sterility through connector or bag handling has provisional RPN 180 with mitigation: Closed sterile connectors, pre-use integrity checks and operator setup checklist.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "risk_hazard:2",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Cell culture loss from DO or pH control failure",
+      "claim": "Cell culture loss from DO or pH control failure has provisional RPN 128 with mitigation: Redundant alarming, sensor calibration and conservative gas/feed control limits.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "risk_hazard:3",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Disposable bag overpressure",
+      "claim": "Disposable bag overpressure has provisional RPN 72 with mitigation: Pressure relief, vent filter monitoring and pump/gas interlocks.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:agitation_drive_train",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Mixing And Agitation / Agitation drive train",
+      "claim": "Agitation drive train is allocated under Mixing And Agitation: Controls impeller or rocking motion for suspension culture.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "agitation_drive",
+        "magnetic_coupling_hub",
+        "drive_encoder",
+        "motor_mounting_plate"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:agitation_safety_feedback",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Mixing And Agitation / Agitation safety feedback",
+      "claim": "Agitation safety feedback is allocated under Mixing And Agitation: Detects stalled or excessive mixing conditions.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "motor_current_sensor",
+        "overspeed_interlock_input",
+        "drive_fault_relay",
+        "emergency_drive_stop_contactor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:mixing_impeller_interface",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Mixing And Agitation / Mixing impeller interface",
+      "claim": "Mixing impeller interface is allocated under Mixing And Agitation: Keeps the disposable impeller or rocker coupling aligned to the bag.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_impeller_coupling",
+        "impeller_guard_insert",
+        "rocker_angle_stop",
+        "mixing_validation_coupon"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:batch_record_gateway",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication / Batch record gateway",
+      "claim": "Batch record gateway is allocated under Control Compute Communication: Exports process history and audit data.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "batch_historian_module",
+        "audit_trail_storage",
+        "ethernet_switch",
+        "secure_time_source"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:operator_alarm_logic",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication / Operator and alarm logic",
+      "claim": "Operator and alarm logic is allocated under Control Compute Communication: Presents alarms and controlled operator actions.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "alarm_annunciator",
+        "operator_hmi_panel",
+        "role_access_key_switch",
+        "batch_acknowledge_button"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:process_controller",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication / Process controller",
+      "claim": "Process controller is allocated under Control Compute Communication: Coordinates agitation, gas, pH, DO, temperature and pump loops.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:ambient_enclosure_conditions",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thermal Gas Exhaust Interface / Ambient enclosure conditions",
+      "claim": "Ambient enclosure conditions is allocated under Thermal Gas Exhaust Interface: Manages local clean-bench or enclosure support conditions.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "ambient_temperature_probe",
+        "clean_zone_status_beacon",
+        "splash_guard_panel",
+        "wipe_down_surface_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:exhaust_filter_train",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thermal Gas Exhaust Interface / Exhaust filter train",
+      "claim": "Exhaust filter train is allocated under Thermal Gas Exhaust Interface: Maintains sterile exhaust and overpressure relief path.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "exhaust_filter_and_pressure_relief_set",
+        "condensate_knock_out_bottle",
+        "exhaust_heater_sleeve",
+        "pressure_relief_indicator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:temperature_control_loop",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thermal Gas Exhaust Interface / Temperature control loop",
+      "claim": "Temperature control loop is allocated under Thermal Gas Exhaust Interface: Transfers heat into or out of the disposable culture vessel.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_control_loop",
+        "heater_blanket",
+        "cooling_plate",
+        "thermal_interface_mat"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:cleaning_turnaround",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Setup Calibration And Service / Cleaning and turnaround",
+      "claim": "Cleaning and turnaround is allocated under Setup Calibration And Service: Supports non-product-contact cleaning and post-batch reset.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "wipe_down_kit_holder",
+        "spill_tray_liner",
+        "spent_bag_removal_cart_interface",
+        "turnaround_checklist_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:sensor_calibration_access",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Setup Calibration And Service / Sensor calibration access",
+      "claim": "Sensor calibration access is allocated under Setup Calibration And Service: Makes pre-batch sensor checks repeatable.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "ph_calibration_buffer_holder",
+        "do_zero_span_adapter",
+        "calibration_data_entry_hmi_page",
+        "sensor_replacement_guide_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:single_use_setup",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Setup Calibration And Service / Single-use setup",
+      "claim": "Single-use setup is allocated under Setup Calibration And Service: Guides bag installation and sterile connector management.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "bag_loading_fixture",
+        "tube_routing_template",
+        "connector_cap_organiser",
+        "setup_verification_barcode_sheet"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:feed_pump_manifold",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Media Gas And Harvest Transport / Feed pump manifold",
+      "claim": "Feed pump manifold is allocated under Media Gas And Harvest Transport: Meters media, nutrient and base additions into the culture.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:harvest_sampling_path",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Media Gas And Harvest Transport / Harvest and sampling path",
+      "claim": "Harvest and sampling path is allocated under Media Gas And Harvest Transport: Routes harvest and samples without opening the culture boundary.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "harvest_transfer_tubing_set",
+        "single_use_sample_valve",
+        "waste_collection_bag",
+        "low_hold_up_connector"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:sparger_gas_mixing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Media Gas And Harvest Transport / Sparger gas mixing",
+      "claim": "Sparger gas mixing is allocated under Media Gas And Harvest Transport: Meters air, oxygen, nitrogen and CO2 into the disposable sparger path.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:actuator_power_feeds",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Power Distribution / Actuator power feeds",
+      "claim": "Actuator power feeds is allocated under Power Distribution: Feeds agitation, pumps and thermal actuators.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "pump_power_distribution_loom",
+        "agitation_drive_breaker",
+        "heater_output_relay",
+        "cable_gland_plate"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:backup_power_and_shutdown",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Power Distribution / Backup power and shutdown",
+      "claim": "Backup power and shutdown is allocated under Power Distribution: Keeps control alive long enough for safe process stop.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "ups_buffer_module",
+        "safe_shutdown_relay",
+        "power_fail_input_module",
+        "shutdown_status_lamp"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:control_power_panel",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Power Distribution / Control power panel",
+      "claim": "Control power panel is allocated under Power Distribution: Distributes mains and DC control power to the bioreactor skid.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_mains_isolator",
+        "24_v_dc_power_supply",
+        "terminal_block_rail",
+        "panel_earth_bar"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:aseptic_setup_controls",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Aseptic And Pressure Safety / Aseptic setup controls",
+      "claim": "Aseptic setup controls is allocated under Aseptic And Pressure Safety: Reduces setup contamination risk.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_connection_checklist_card",
+        "connector_tamper_seal_set",
+        "pre_use_integrity_test_kit",
+        "operator_gowning_placard"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:operator_electrical_safety",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Aseptic And Pressure Safety / Operator electrical safety",
+      "claim": "Operator electrical safety is allocated under Aseptic And Pressure Safety: Keeps wet-process electrical risks controlled.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "emergency_stop_button",
+        "door_interlock_switch",
+        "leak_tray_float_switch",
+        "protective_earth_test_point"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:sterile_pressure_safety",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Aseptic And Pressure Safety / Sterile pressure safety",
+      "claim": "Sterile pressure safety is allocated under Aseptic And Pressure Safety: Prevents bag overpressure and sterile vent blockage.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_pressure_relief_valve",
+        "vent_filter_integrity_tag",
+        "pressure_alarm_relay",
+        "bag_burst_shield"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:do_ph_sensing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Process Sensing Instrumentation / DO and pH sensing",
+      "claim": "DO and pH sensing is allocated under Process Sensing Instrumentation: Measures dissolved oxygen and pH through aseptic or single-use sensor paths.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor",
+        "sensor_patch_reader",
+        "sensor_calibration_record_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:gas_flow_sensing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Process Sensing Instrumentation / Gas flow sensing",
+      "claim": "Gas flow sensing is allocated under Process Sensing Instrumentation: Verifies inlet gas delivery and exhaust path condition.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "gas_flow_sensor_set",
+        "exhaust_pressure_sensor",
+        "oxygen_analyser_cell",
+        "co2_analyser_cell"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:pressure_mass_temperature_sensing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Process Sensing Instrumentation / Pressure, mass and temperature sensing",
+      "claim": "Pressure, mass and temperature sensing is allocated under Process Sensing Instrumentation: Tracks working volume, pressure and thermal state.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "load_cell_set",
+        "bag_pressure_transducer",
+        "culture_temperature_probe",
+        "foam_detection_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:single_use_bag_chamber",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Sterile Structure Containment / Single-use bag chamber",
+      "claim": "Single-use bag chamber is allocated under Sterile Structure Containment: Carries the disposable culture bag and keeps ports accessible for sterile setup.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:sterile_connector_panel",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Sterile Structure Containment / Sterile connector panel",
+      "claim": "Sterile connector panel is allocated under Sterile Structure Containment: Organises aseptic feed, harvest, sampling and gas connections.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:support_frame_load_path",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Sterile Structure Containment / Support frame and load path",
+      "claim": "Support frame and load path is allocated under Sterile Structure Containment: Carries fluid mass, agitation loads and service handling forces.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "stainless_support_frame",
+        "load_cell_mounting_bracket_set",
+        "levelling_foot_set",
+        "lifting_eye_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "engineering_calculation:bioreactor_annual_working_volume_l",
+      "kind": "engineering_calculation",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Bioreactor annual working volume",
+      "claim": "Bioreactor annual working volume: 2000 L/year using working_volume_l * 40.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process",
+        "actuation_kinematics",
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag",
+        "peristaltic_feed_pump",
+        "agitation_drive",
+        "temperature_control_loop"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Confirm batch duration, turnaround, cleaning/assembly time, hold steps and campaign model."
+    },
+    {
+      "id": "engineering_calculation:bioreactor_nominal_bag_volume_l",
+      "kind": "engineering_calculation",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Bioreactor nominal bag volume",
+      "claim": "Bioreactor nominal bag volume: 62.5 L using working_volume_l / 0.8.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process",
+        "actuation_kinematics",
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag",
+        "peristaltic_feed_pump",
+        "agitation_drive",
+        "temperature_control_loop"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Confirm bag platform, mixing turndown, foam allowance, sparging rate and working-volume range."
+    },
+    {
+      "id": "headline_metric:headline_output",
+      "kind": "headline_metric",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Annual culture volume",
+      "claim": "Annual culture volume = 2000 L/year.",
+      "provenanceRefs": [
+        "class_pack:bioreactor.class_pack",
+        "formula:working_volume_l * batches_per_year"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review the formula, input values and operating envelope before treating this metric as accepted."
+    },
+    {
+      "id": "brief_requirement:working_volume_l",
+      "kind": "brief_requirement",
+      "status": "brief_supplied",
+      "basis": "brief",
+      "scope": "Working volume",
+      "claim": "Working volume = 50 L.",
+      "provenanceRefs": [
+        "brief:input.brief"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process",
+        "actuation_kinematics",
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag",
+        "peristaltic_feed_pump",
+        "agitation_drive",
+        "temperature_control_loop"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm requirement value, tolerance and acceptance condition with the project owner."
+    }
+  ]
+}

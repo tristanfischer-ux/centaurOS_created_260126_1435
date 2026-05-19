@@ -1,0 +1,1034 @@
+{
+  "verdict": "allocation_ready",
+  "summary": {
+    "modules": 9,
+    "subModules": 27,
+    "componentWords": 108,
+    "readySubModules": 27,
+    "reviewSubModules": 0,
+    "blockedSubModules": 0,
+    "interfaceCarrierSubModules": 27,
+    "interfaceCarrierWithoutComponents": 0,
+    "requiredCriticalParts": 11,
+    "allocatedCriticalParts": 11,
+    "missingCriticalParts": 0,
+    "bomLines": 108,
+    "criticalBomLines": 11,
+    "duplicateComponentGroups": 0,
+    "duplicateCriticalComponentGroups": 0,
+    "allocationRatio": 1,
+    "criticalAllocationRatio": 1
+  },
+  "subModules": [
+    {
+      "id": "structure_containment:single_use_bag_chamber",
+      "moduleId": "structure_containment",
+      "moduleName": "Sterile Structure Containment",
+      "subModuleId": "single_use_bag_chamber",
+      "subModuleName": "Single-use bag chamber",
+      "purpose": "Carries the disposable culture bag and keeps ports accessible for sterile setup.",
+      "interfaces": [
+        "sterile_boundary",
+        "sterile_fluid_path",
+        "mechanical_mounts",
+        "service_access",
+        "pressure_relief"
+      ],
+      "componentWordIds": [
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label"
+      ],
+      "componentNames": [
+        "Single-use bioreactor bag",
+        "bag support tray",
+        "port clamp set",
+        "bag integrity test label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "single_use_bioreactor_bag"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:support_frame_load_path",
+      "moduleId": "structure_containment",
+      "moduleName": "Sterile Structure Containment",
+      "subModuleId": "support_frame_load_path",
+      "subModuleName": "Support frame and load path",
+      "purpose": "Carries fluid mass, agitation loads and service handling forces.",
+      "interfaces": [
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "stainless_support_frame",
+        "load_cell_mounting_bracket_set",
+        "levelling_foot_set",
+        "lifting_eye_kit"
+      ],
+      "componentNames": [
+        "stainless support frame",
+        "load cell mounting bracket set",
+        "levelling foot set",
+        "lifting eye kit"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:sterile_connector_panel",
+      "moduleId": "structure_containment",
+      "moduleName": "Sterile Structure Containment",
+      "subModuleId": "sterile_connector_panel",
+      "subModuleName": "Sterile connector panel",
+      "purpose": "Organises aseptic feed, harvest, sampling and gas connections.",
+      "interfaces": [
+        "sterile_boundary",
+        "sterile_fluid_path",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket"
+      ],
+      "componentNames": [
+        "Sterile tubing and connector set",
+        "aseptic sampling port",
+        "clamp rail",
+        "connector parking bracket"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "sterile_tubing_and_connector_set"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:agitation_drive_train",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Mixing And Agitation",
+      "subModuleId": "agitation_drive_train",
+      "subModuleName": "Agitation drive train",
+      "purpose": "Controls impeller or rocking motion for suspension culture.",
+      "interfaces": [
+        "mixing_drive",
+        "control_bus",
+        "sterile_boundary"
+      ],
+      "componentWordIds": [
+        "agitation_drive",
+        "magnetic_coupling_hub",
+        "drive_encoder",
+        "motor_mounting_plate"
+      ],
+      "componentNames": [
+        "Agitation drive",
+        "magnetic coupling hub",
+        "drive encoder",
+        "motor mounting plate"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "agitation_drive"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:mixing_impeller_interface",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Mixing And Agitation",
+      "subModuleId": "mixing_impeller_interface",
+      "subModuleName": "Mixing impeller interface",
+      "purpose": "Keeps the disposable impeller or rocker coupling aligned to the bag.",
+      "interfaces": [
+        "mixing_drive",
+        "sterile_boundary",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "single_use_impeller_coupling",
+        "impeller_guard_insert",
+        "rocker_angle_stop",
+        "mixing_validation_coupon"
+      ],
+      "componentNames": [
+        "single-use impeller coupling",
+        "impeller guard insert",
+        "rocker angle stop",
+        "mixing validation coupon"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:agitation_safety_feedback",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Mixing And Agitation",
+      "subModuleId": "agitation_safety_feedback",
+      "subModuleName": "Agitation safety feedback",
+      "purpose": "Detects stalled or excessive mixing conditions.",
+      "interfaces": [
+        "mixing_drive",
+        "sensor_bus",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "motor_current_sensor",
+        "overspeed_interlock_input",
+        "drive_fault_relay",
+        "emergency_drive_stop_contactor"
+      ],
+      "componentNames": [
+        "motor current sensor",
+        "overspeed interlock input",
+        "drive fault relay",
+        "emergency drive stop contactor"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:feed_pump_manifold",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Media Gas And Harvest Transport",
+      "subModuleId": "feed_pump_manifold",
+      "subModuleName": "Feed pump manifold",
+      "purpose": "Meters media, nutrient and base additions into the culture.",
+      "interfaces": [
+        "sterile_fluid_path",
+        "pump_control",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp"
+      ],
+      "componentNames": [
+        "Peristaltic feed pump",
+        "pump tubing cassette set",
+        "media bag hanger",
+        "feed line pinch clamp"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "peristaltic_feed_pump"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:harvest_sampling_path",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Media Gas And Harvest Transport",
+      "subModuleId": "harvest_sampling_path",
+      "subModuleName": "Harvest and sampling path",
+      "purpose": "Routes harvest and samples without opening the culture boundary.",
+      "interfaces": [
+        "sterile_fluid_path",
+        "service_access",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "harvest_transfer_tubing_set",
+        "single_use_sample_valve",
+        "waste_collection_bag",
+        "low_hold_up_connector"
+      ],
+      "componentNames": [
+        "harvest transfer tubing set",
+        "single-use sample valve",
+        "waste collection bag",
+        "low-hold-up connector"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:sparger_gas_mixing",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Media Gas And Harvest Transport",
+      "subModuleId": "sparger_gas_mixing",
+      "subModuleName": "Sparger gas mixing",
+      "purpose": "Meters air, oxygen, nitrogen and CO2 into the disposable sparger path.",
+      "interfaces": [
+        "gas_path",
+        "sterile_fluid_path",
+        "control_bus"
+      ],
+      "componentWordIds": [
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve"
+      ],
+      "componentNames": [
+        "Sparger and gas-mix manifold",
+        "mass-flow controller bank",
+        "sterile gas filter capsule",
+        "sparger check valve"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "sparger_and_gas_mix_manifold"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:temperature_control_loop",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Gas Exhaust Interface",
+      "subModuleId": "temperature_control_loop",
+      "subModuleName": "Temperature control loop",
+      "purpose": "Transfers heat into or out of the disposable culture vessel.",
+      "interfaces": [
+        "thermal_loop",
+        "control_bus",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "temperature_control_loop",
+        "heater_blanket",
+        "cooling_plate",
+        "thermal_interface_mat"
+      ],
+      "componentNames": [
+        "Temperature control loop",
+        "heater blanket",
+        "cooling plate",
+        "thermal interface mat"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "temperature_control_loop"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:exhaust_filter_train",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Gas Exhaust Interface",
+      "subModuleId": "exhaust_filter_train",
+      "subModuleName": "Exhaust filter train",
+      "purpose": "Maintains sterile exhaust and overpressure relief path.",
+      "interfaces": [
+        "exhaust_path",
+        "gas_path",
+        "sterile_boundary",
+        "pressure_relief"
+      ],
+      "componentWordIds": [
+        "exhaust_filter_and_pressure_relief_set",
+        "condensate_knock_out_bottle",
+        "exhaust_heater_sleeve",
+        "pressure_relief_indicator"
+      ],
+      "componentNames": [
+        "Exhaust filter and pressure relief set",
+        "condensate knock-out bottle",
+        "exhaust heater sleeve",
+        "pressure relief indicator"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "exhaust_filter_and_pressure_relief_set"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:ambient_enclosure_conditions",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Gas Exhaust Interface",
+      "subModuleId": "ambient_enclosure_conditions",
+      "subModuleName": "Ambient enclosure conditions",
+      "purpose": "Manages local clean-bench or enclosure support conditions.",
+      "interfaces": [
+        "service_access",
+        "sensor_bus",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "ambient_temperature_probe",
+        "clean_zone_status_beacon",
+        "splash_guard_panel",
+        "wipe_down_surface_kit"
+      ],
+      "componentNames": [
+        "ambient temperature probe",
+        "clean-zone status beacon",
+        "splash guard panel",
+        "wipe-down surface kit"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:do_ph_sensing",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Process Sensing Instrumentation",
+      "subModuleId": "do_ph_sensing",
+      "subModuleName": "DO and pH sensing",
+      "purpose": "Measures dissolved oxygen and pH through aseptic or single-use sensor paths.",
+      "interfaces": [
+        "sensor_bus",
+        "sterile_fluid_path"
+      ],
+      "componentWordIds": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor",
+        "sensor_patch_reader",
+        "sensor_calibration_record_card"
+      ],
+      "componentNames": [
+        "Dissolved oxygen optical sensor",
+        "Single-use pH sensor",
+        "sensor patch reader",
+        "sensor calibration record card"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:pressure_mass_temperature_sensing",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Process Sensing Instrumentation",
+      "subModuleId": "pressure_mass_temperature_sensing",
+      "subModuleName": "Pressure, mass and temperature sensing",
+      "purpose": "Tracks working volume, pressure and thermal state.",
+      "interfaces": [
+        "sensor_bus",
+        "thermal_loop",
+        "pressure_relief",
+        "mechanical_mounts"
+      ],
+      "componentWordIds": [
+        "load_cell_set",
+        "bag_pressure_transducer",
+        "culture_temperature_probe",
+        "foam_detection_probe"
+      ],
+      "componentNames": [
+        "Load cell set",
+        "bag pressure transducer",
+        "culture temperature probe",
+        "foam detection probe"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "load_cell_set"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:gas_flow_sensing",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Process Sensing Instrumentation",
+      "subModuleId": "gas_flow_sensing",
+      "subModuleName": "Gas flow sensing",
+      "purpose": "Verifies inlet gas delivery and exhaust path condition.",
+      "interfaces": [
+        "sensor_bus",
+        "gas_path",
+        "exhaust_path"
+      ],
+      "componentWordIds": [
+        "gas_flow_sensor_set",
+        "exhaust_pressure_sensor",
+        "oxygen_analyser_cell",
+        "co2_analyser_cell"
+      ],
+      "componentNames": [
+        "gas flow sensor set",
+        "exhaust pressure sensor",
+        "oxygen analyser cell",
+        "CO2 analyser cell"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:process_controller",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "process_controller",
+      "subModuleName": "Process controller",
+      "purpose": "Coordinates agitation, gas, pH, DO, temperature and pump loops.",
+      "interfaces": [
+        "control_bus",
+        "sensor_bus",
+        "pump_control",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware"
+      ],
+      "componentNames": [
+        "Bioreactor controller",
+        "I/O terminal slice set",
+        "control enclosure",
+        "recipe execution firmware"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "bioreactor_controller"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:batch_record_gateway",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "batch_record_gateway",
+      "subModuleName": "Batch record gateway",
+      "purpose": "Exports process history and audit data.",
+      "interfaces": [
+        "batch_record_network",
+        "service_port",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "batch_historian_module",
+        "audit_trail_storage",
+        "ethernet_switch",
+        "secure_time_source"
+      ],
+      "componentNames": [
+        "batch historian module",
+        "audit trail storage",
+        "ethernet switch",
+        "secure time source"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:operator_alarm_logic",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "operator_alarm_logic",
+      "subModuleName": "Operator and alarm logic",
+      "purpose": "Presents alarms and controlled operator actions.",
+      "interfaces": [
+        "alarm_bus",
+        "control_bus",
+        "service_port"
+      ],
+      "componentWordIds": [
+        "alarm_annunciator",
+        "operator_hmi_panel",
+        "role_access_key_switch",
+        "batch_acknowledge_button"
+      ],
+      "componentNames": [
+        "alarm annunciator",
+        "operator HMI panel",
+        "role access key switch",
+        "batch acknowledge button"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:control_power_panel",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "subModuleId": "control_power_panel",
+      "subModuleName": "Control power panel",
+      "purpose": "Distributes mains and DC control power to the bioreactor skid.",
+      "interfaces": [
+        "mains_supply",
+        "protective_earth",
+        "control_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "rcd_mains_isolator",
+        "24_v_dc_power_supply",
+        "terminal_block_rail",
+        "panel_earth_bar"
+      ],
+      "componentNames": [
+        "RCD mains isolator",
+        "24 V DC power supply",
+        "terminal block rail",
+        "panel earth bar"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:actuator_power_feeds",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "subModuleId": "actuator_power_feeds",
+      "subModuleName": "Actuator power feeds",
+      "purpose": "Feeds agitation, pumps and thermal actuators.",
+      "interfaces": [
+        "mains_supply",
+        "control_bus",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "pump_power_distribution_loom",
+        "agitation_drive_breaker",
+        "heater_output_relay",
+        "cable_gland_plate"
+      ],
+      "componentNames": [
+        "pump power distribution loom",
+        "agitation drive breaker",
+        "heater output relay",
+        "cable gland plate"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:backup_power_and_shutdown",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "subModuleId": "backup_power_and_shutdown",
+      "subModuleName": "Backup power and shutdown",
+      "purpose": "Keeps control alive long enough for safe process stop.",
+      "interfaces": [
+        "mains_supply",
+        "alarm_bus",
+        "control_bus"
+      ],
+      "componentWordIds": [
+        "ups_buffer_module",
+        "safe_shutdown_relay",
+        "power_fail_input_module",
+        "shutdown_status_lamp"
+      ],
+      "componentNames": [
+        "UPS buffer module",
+        "safe shutdown relay",
+        "power-fail input module",
+        "shutdown status lamp"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:sterile_pressure_safety",
+      "moduleId": "safety_protection",
+      "moduleName": "Aseptic And Pressure Safety",
+      "subModuleId": "sterile_pressure_safety",
+      "subModuleName": "Sterile pressure safety",
+      "purpose": "Prevents bag overpressure and sterile vent blockage.",
+      "interfaces": [
+        "sterile_boundary",
+        "pressure_relief",
+        "exhaust_path",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "single_use_pressure_relief_valve",
+        "vent_filter_integrity_tag",
+        "pressure_alarm_relay",
+        "bag_burst_shield"
+      ],
+      "componentNames": [
+        "single-use pressure relief valve",
+        "vent filter integrity tag",
+        "pressure alarm relay",
+        "bag burst shield"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:aseptic_setup_controls",
+      "moduleId": "safety_protection",
+      "moduleName": "Aseptic And Pressure Safety",
+      "subModuleId": "aseptic_setup_controls",
+      "subModuleName": "Aseptic setup controls",
+      "purpose": "Reduces setup contamination risk.",
+      "interfaces": [
+        "sterile_boundary",
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "sterile_connection_checklist_card",
+        "connector_tamper_seal_set",
+        "pre_use_integrity_test_kit",
+        "operator_gowning_placard"
+      ],
+      "componentNames": [
+        "sterile connection checklist card",
+        "connector tamper seal set",
+        "pre-use integrity test kit",
+        "operator gowning placard"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:operator_electrical_safety",
+      "moduleId": "safety_protection",
+      "moduleName": "Aseptic And Pressure Safety",
+      "subModuleId": "operator_electrical_safety",
+      "subModuleName": "Operator electrical safety",
+      "purpose": "Keeps wet-process electrical risks controlled.",
+      "interfaces": [
+        "protective_earth",
+        "mains_supply",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "emergency_stop_button",
+        "door_interlock_switch",
+        "leak_tray_float_switch",
+        "protective_earth_test_point"
+      ],
+      "componentNames": [
+        "emergency stop button",
+        "door interlock switch",
+        "leak tray float switch",
+        "protective earth test point"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:single_use_setup",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Setup Calibration And Service",
+      "subModuleId": "single_use_setup",
+      "subModuleName": "Single-use setup",
+      "purpose": "Guides bag installation and sterile connector management.",
+      "interfaces": [
+        "service_access",
+        "sterile_fluid_path",
+        "sterile_boundary"
+      ],
+      "componentWordIds": [
+        "bag_loading_fixture",
+        "tube_routing_template",
+        "connector_cap_organiser",
+        "setup_verification_barcode_sheet"
+      ],
+      "componentNames": [
+        "bag loading fixture",
+        "tube routing template",
+        "connector cap organiser",
+        "setup verification barcode sheet"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:sensor_calibration_access",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Setup Calibration And Service",
+      "subModuleId": "sensor_calibration_access",
+      "subModuleName": "Sensor calibration access",
+      "purpose": "Makes pre-batch sensor checks repeatable.",
+      "interfaces": [
+        "service_access",
+        "sensor_bus",
+        "sterile_fluid_path"
+      ],
+      "componentWordIds": [
+        "ph_calibration_buffer_holder",
+        "do_zero_span_adapter",
+        "calibration_data_entry_hmi_page",
+        "sensor_replacement_guide_label"
+      ],
+      "componentNames": [
+        "pH calibration buffer holder",
+        "DO zero span adapter",
+        "calibration data entry HMI page",
+        "sensor replacement guide label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:cleaning_turnaround",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Setup Calibration And Service",
+      "subModuleId": "cleaning_turnaround",
+      "subModuleName": "Cleaning and turnaround",
+      "purpose": "Supports non-product-contact cleaning and post-batch reset.",
+      "interfaces": [
+        "service_access",
+        "batch_record_network"
+      ],
+      "componentWordIds": [
+        "wipe_down_kit_holder",
+        "spill_tray_liner",
+        "spent_bag_removal_cart_interface",
+        "turnaround_checklist_card"
+      ],
+      "componentNames": [
+        "wipe-down kit holder",
+        "spill tray liner",
+        "spent bag removal cart interface",
+        "turnaround checklist card"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    }
+  ],
+  "criticalParts": [
+    {
+      "componentWordId": "single_use_bioreactor_bag",
+      "label": "Single-use bioreactor bag",
+      "allocated": true,
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "subModuleIds": [
+        "single_use_bag_chamber"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "agitation_drive",
+      "label": "Agitation drive",
+      "allocated": true,
+      "moduleIds": [
+        "actuation_kinematics"
+      ],
+      "subModuleIds": [
+        "agitation_drive_train"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "peristaltic_feed_pump",
+      "label": "Peristaltic feed pump",
+      "allocated": true,
+      "moduleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "subModuleIds": [
+        "feed_pump_manifold"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "sparger_and_gas_mix_manifold",
+      "label": "Sparger and gas-mix manifold",
+      "allocated": true,
+      "moduleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "subModuleIds": [
+        "sparger_gas_mixing"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "dissolved_oxygen_optical_sensor",
+      "label": "Dissolved oxygen optical sensor",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "do_ph_sensing"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "single_use_ph_sensor",
+      "label": "Single-use pH sensor",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "do_ph_sensing"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "temperature_control_loop",
+      "label": "Temperature control loop",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "temperature_control_loop"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "bioreactor_controller",
+      "label": "Bioreactor controller",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "process_controller"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "sterile_tubing_and_connector_set",
+      "label": "Sterile tubing and connector set",
+      "allocated": true,
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "subModuleIds": [
+        "sterile_connector_panel"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "exhaust_filter_and_pressure_relief_set",
+      "label": "Exhaust filter and pressure relief set",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "exhaust_filter_train"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "load_cell_set",
+      "label": "Load cell set",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "pressure_mass_temperature_sensing"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    }
+  ],
+  "duplicateGroups": [],
+  "blockers": [],
+  "nextActions": []
+}

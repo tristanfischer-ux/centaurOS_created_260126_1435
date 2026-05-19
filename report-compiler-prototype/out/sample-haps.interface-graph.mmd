@@ -1,0 +1,21 @@
+flowchart LR
+  structure_containment["Ultra-Light Wing Structure"]
+  energy_harvesting["Solar Energy Harvesting"]
+  energy_storage_source["Night-Cycle Energy Storage"]
+  power_distribution["Flight Power Distribution"]
+  actuation_kinematics["Propulsion And Control Surfaces"]
+  control_compute_communication["Autonomy Control Communication"]
+  sensing_instrumentation["Navigation And Airdata Sensing"]
+  payload_communication["Communications Payload"]
+  environmental_interface["Stratospheric Environmental Interface"]
+  safety_protection["Flight Safety And Recovery"]
+  maintenance_serviceability["Ground Handling Serviceability"]
+  energy_harvesting -->|"solar_dc_bus"| power_distribution
+  energy_storage_source -->|"battery_dc_bus"| power_distribution
+  power_distribution -->|"propulsion_power_bus"| actuation_kinematics
+  control_compute_communication -->|"flight_control_bus"| actuation_kinematics
+  sensing_instrumentation -->|"sensor_bus"| control_compute_communication
+  payload_communication -->|"payload_data_link"| control_compute_communication
+  environmental_interface -->|"thermal_path"| energy_storage_source
+  safety_protection -->|"telemetry_link"| control_compute_communication
+  classDef missing stroke:#a32626,stroke-width:3px,color:#a32626;

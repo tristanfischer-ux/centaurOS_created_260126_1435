@@ -1,0 +1,232 @@
+{
+  "summary": {
+    "modules": 9,
+    "readyModules": 2,
+    "sourcingBlockedModules": 7,
+    "attentionModules": 0,
+    "criticalUnpricedLines": 12,
+    "issueCount": 0
+  },
+  "modules": [
+    {
+      "moduleId": "structure_containment",
+      "moduleName": "Pressure Structure Containment",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "depth_rating_m"
+      ],
+      "sanityCheckIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "criticalUnpricedLines": [
+        "pressure_hull"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "energy_storage_source",
+      "moduleName": "Subsea Energy Storage",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "criticalUnpricedLines": [
+        "battery_pack"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "power_distribution",
+      "moduleName": "Subsea Power Distribution",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "criticalUnpricedLines": [
+        "wet_mate_connector_set"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Thruster Actuation Kinematics",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "criticalUnpricedLines": [
+        "thruster_set"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Compute Communication",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 7,
+      "requiredInterfaceEdges": 4,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "criticalUnpricedLines": [
+        "mission_computer",
+        "acoustic_modem"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Payload Sensing",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "dvl",
+        "inertial_navigation_unit",
+        "depth_and_pressure_sensor",
+        "forward_sonar_payload"
+      ],
+      "candidateUnpricedLines": 8,
+      "issueCodes": [],
+      "notes": [
+        "4 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "environmental_interface",
+      "moduleName": "Pressure Thermal Buoyancy Interface",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "depth_rating_m"
+      ],
+      "sanityCheckIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "safety_protection",
+      "moduleName": "Leak Abort And Recovery Safety",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "depth_rating_m"
+      ],
+      "sanityCheckIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "criticalUnpricedLines": [
+        "leak_detection_sensor",
+        "recovery_beacon"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Deck Recovery And Service",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    }
+  ]
+}

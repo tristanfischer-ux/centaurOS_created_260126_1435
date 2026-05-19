@@ -1,0 +1,75 @@
+{
+  "verdict": "architecture_generation_admitted",
+  "summary": {
+    "rows": 6,
+    "passRows": 6,
+    "reviewRows": 0,
+    "blockedRows": 0,
+    "passRatio": 1,
+    "productClass": "cgm",
+    "intakeVerdict": "brief_ready_for_architecture",
+    "clarificationVerdict": "no_clarification_needed",
+    "nextClarificationQuestion": null,
+    "scratchArchitectureSupported": true,
+    "architectureStageStatus": "passed",
+    "architectureSource": "scratch_universal_architecture",
+    "readyForBom": true,
+    "architectureCanBeUsedForReview": true,
+    "architectureCanProceedToBom": true,
+    "admittedSourcingEvidenceRows": 0,
+    "provenanceViolations": 0,
+    "nextAction": null
+  },
+  "rows": [
+    {
+      "area": "brief_intake_clearance",
+      "verdict": "pass",
+      "signal": "6/6 intake areas pass; class cgm (high); 3 quantified requirement(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Brief intake is strong enough to admit scratch architecture generation."
+    },
+    {
+      "area": "clarification_clearance",
+      "verdict": "pass",
+      "signal": "0 clarification question(s): 0 required, 0 recommended, 0 architecture-blocking.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "No brief clarification is needed before architecture generation."
+    },
+    {
+      "area": "class_grammar_clearance",
+      "verdict": "pass",
+      "signal": "Product class cgm; scratch universal grammar supported: yes.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Route this class through the scratch universal module grammar."
+    },
+    {
+      "area": "scratch_stage_clearance",
+      "verdict": "pass",
+      "signal": "Architecture stage passed; source scratch_universal_architecture; modules 10; submodules 30; components 120.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Architecture was produced by the scratch universal architecture stage."
+    },
+    {
+      "area": "architecture_readiness_boundary",
+      "verdict": "pass",
+      "signal": "Architecture ready for BoM: yes; blocking issues 0; required links 10/10.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Deterministic architecture readiness checks passed; sourcing work may begin only with explicit evidence."
+    },
+    {
+      "area": "bom_provenance_hold",
+      "verdict": "pass",
+      "signal": "0 admitted sourcing evidence row(s), 0 source-backed BoM claim(s), 0 provenance violation(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "BoM fields remain behind the explicit sourcing-evidence boundary."
+    }
+  ],
+  "blockers": [],
+  "nextActions": []
+}

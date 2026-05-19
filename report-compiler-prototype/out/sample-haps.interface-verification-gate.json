@@ -1,0 +1,339 @@
+{
+  "verdict": "interface_review_ready",
+  "summary": {
+    "rows": 8,
+    "acceptedRows": 0,
+    "reviewReadyRows": 8,
+    "pendingEvidenceRows": 0,
+    "deferredRows": 0,
+    "blockedRows": 0,
+    "presentContracts": 8,
+    "missingContracts": 0,
+    "carrierCompleteRows": 8,
+    "verificationActivityRows": 8,
+    "acceptedEvidenceRatio": 0,
+    "structuralPassRatio": 1
+  },
+  "rows": [
+    {
+      "id": "required:energy_harvesting:power_distribution:solar_dc_bus",
+      "interfaceId": "solar_dc_bus",
+      "fromModuleId": "energy_harvesting",
+      "fromModuleName": "Solar Energy Harvesting",
+      "toModuleId": "power_distribution",
+      "toModuleName": "Flight Power Distribution",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "solar_skin_array",
+        "mppt_conversion",
+        "solar_health_monitoring"
+      ],
+      "toCarrierSubModules": [
+        "solar_battery_power_management"
+      ],
+      "componentWordIds": [
+        "solar_cell_array",
+        "cell_interconnect_ribbon",
+        "transparent_encapsulation_film",
+        "solar_string_bypass_diode",
+        "mppt_power_tracker",
+        "solar_input_current_sensor",
+        "solar_voltage_tap_loom",
+        "mppt_heat_spreader",
+        "solar_string_monitor_board",
+        "uv_exposure_witness_coupon",
+        "wing_surface_temperature_sensor",
+        "solar_inspection_connector",
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set"
+      ],
+      "verificationActivityId": "interface_review:energy_harvesting:power_distribution:solar_dc_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:energy_storage_source:power_distribution:battery_dc_bus",
+      "interfaceId": "battery_dc_bus",
+      "fromModuleId": "energy_storage_source",
+      "fromModuleName": "Night-Cycle Energy Storage",
+      "toModuleId": "power_distribution",
+      "toModuleName": "Flight Power Distribution",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "stratospheric_battery_pack"
+      ],
+      "toCarrierSubModules": [
+        "solar_battery_power_management"
+      ],
+      "componentWordIds": [
+        "stratospheric_battery_pack",
+        "battery_management_board",
+        "lightweight_battery_enclosure",
+        "cell_heater_film",
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set"
+      ],
+      "verificationActivityId": "interface_review:energy_storage_source:power_distribution:battery_dc_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:power_distribution:actuation_kinematics:propulsion_power_bus",
+      "interfaceId": "propulsion_power_bus",
+      "fromModuleId": "power_distribution",
+      "fromModuleName": "Flight Power Distribution",
+      "toModuleId": "actuation_kinematics",
+      "toModuleName": "Propulsion And Control Surfaces",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "solar_battery_power_management"
+      ],
+      "toCarrierSubModules": [
+        "electric_propulsion_pods"
+      ],
+      "componentWordIds": [
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set",
+        "electric_propulsion_pod",
+        "high_altitude_propeller_set",
+        "motor_controller_module",
+        "propulsion_pod_fairing"
+      ],
+      "verificationActivityId": "interface_review:power_distribution:actuation_kinematics:propulsion_power_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:control_compute_communication:actuation_kinematics:flight_control_bus",
+      "interfaceId": "flight_control_bus",
+      "fromModuleId": "control_compute_communication",
+      "fromModuleName": "Autonomy Control Communication",
+      "toModuleId": "actuation_kinematics",
+      "toModuleName": "Propulsion And Control Surfaces",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "flight_control_computer",
+        "energy_aware_autonomy"
+      ],
+      "toCarrierSubModules": [
+        "electric_propulsion_pods",
+        "control_surface_actuation",
+        "station_keeping_trim"
+      ],
+      "componentWordIds": [
+        "flight_control_computer",
+        "autopilot_io_board",
+        "flight_software_image",
+        "watchdog_supervisor",
+        "solar_forecast_model",
+        "wind_field_route_planner",
+        "payload_duty_cycle_controller",
+        "return_corridor_manager",
+        "electric_propulsion_pod",
+        "high_altitude_propeller_set",
+        "motor_controller_module",
+        "propulsion_pod_fairing",
+        "low_temperature_servo_actuator",
+        "control_linkage_rod_set",
+        "surface_position_sensor",
+        "servo_heater_trace",
+        "trim_schedule_table",
+        "gust_load_estimator",
+        "airspeed_setpoint_manager",
+        "propulsion_calibration_record"
+      ],
+      "verificationActivityId": "interface_review:control_compute_communication:actuation_kinematics:flight_control_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "fromModuleId": "sensing_instrumentation",
+      "fromModuleName": "Navigation And Airdata Sensing",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Autonomy Control Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "navigation_suite",
+        "airdata_weather_sensors",
+        "structural_health_sensing"
+      ],
+      "toCarrierSubModules": [
+        "flight_control_computer"
+      ],
+      "componentWordIds": [
+        "gnss_ins_navigation_unit",
+        "barometric_altitude_sensor",
+        "sun_sensor_pair",
+        "precision_timebase_module",
+        "pitot_static_probe",
+        "outside_air_temperature_probe",
+        "wind_estimation_filter",
+        "humidity_frost_sensor",
+        "wing_strain_gauge_strip",
+        "spar_temperature_sensor",
+        "vibration_accelerometer",
+        "structural_health_recorder",
+        "flight_control_computer",
+        "autopilot_io_board",
+        "flight_software_image",
+        "watchdog_supervisor"
+      ],
+      "verificationActivityId": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:payload_communication:control_compute_communication:payload_data_link",
+      "interfaceId": "payload_data_link",
+      "fromModuleId": "payload_communication",
+      "fromModuleName": "Communications Payload",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Autonomy Control Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "payload_radio",
+        "antenna_aperture"
+      ],
+      "toCarrierSubModules": [
+        "ground_command_link",
+        "energy_aware_autonomy"
+      ],
+      "componentWordIds": [
+        "stratospheric_communications_payload",
+        "payload_modem_board",
+        "payload_rf_power_amplifier",
+        "payload_processor_module",
+        "payload_antenna_array",
+        "antenna_ground_plane_film",
+        "antenna_feed_harness",
+        "beam_pointing_calibration_target",
+        "ground_control_link",
+        "telemetry_transceiver",
+        "command_authentication_module",
+        "mission_log_recorder",
+        "solar_forecast_model",
+        "wind_field_route_planner",
+        "payload_duty_cycle_controller",
+        "return_corridor_manager"
+      ],
+      "verificationActivityId": "interface_review:payload_communication:control_compute_communication:payload_data_link",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:environmental_interface:energy_storage_source:thermal_path",
+      "interfaceId": "thermal_path",
+      "fromModuleId": "environmental_interface",
+      "fromModuleName": "Stratospheric Environmental Interface",
+      "toModuleId": "energy_storage_source",
+      "toModuleName": "Night-Cycle Energy Storage",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "thermal_protection",
+        "low_pressure_management"
+      ],
+      "toCarrierSubModules": [
+        "stratospheric_battery_pack",
+        "battery_thermal_zone"
+      ],
+      "componentWordIds": [
+        "thermal_insulation_blanket",
+        "multi_layer_insulation_patch",
+        "lightweight_thermal_strap",
+        "thermal_witness_label",
+        "low_pressure_vent_path",
+        "conformal_coating_set",
+        "high_altitude_creepage_spacer",
+        "desiccant_cartridge",
+        "stratospheric_battery_pack",
+        "battery_management_board",
+        "lightweight_battery_enclosure",
+        "cell_heater_film",
+        "battery_insulation_sleeve",
+        "phase_change_thermal_buffer",
+        "battery_temperature_sensor_harness",
+        "battery_vent_path"
+      ],
+      "verificationActivityId": "interface_review:environmental_interface:energy_storage_source:thermal_path",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:safety_protection:control_compute_communication:telemetry_link",
+      "interfaceId": "telemetry_link",
+      "fromModuleId": "safety_protection",
+      "fromModuleName": "Flight Safety And Recovery",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Autonomy Control Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "abort_recovery",
+        "airspace_safety"
+      ],
+      "toCarrierSubModules": [
+        "ground_command_link"
+      ],
+      "componentWordIds": [
+        "recovery_parachute_system",
+        "parachute_deployment_controller",
+        "recovery_beacon",
+        "safe_descent_mode_logic",
+        "geofence_database",
+        "lost_link_failsafe",
+        "flight_termination_relay",
+        "airspace_transponder_module",
+        "ground_control_link",
+        "telemetry_transceiver",
+        "command_authentication_module",
+        "mission_log_recorder"
+      ],
+      "verificationActivityId": "interface_review:safety_protection:control_compute_communication:telemetry_link",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Collect named interface-review evidence through verification intake."
+  ]
+}

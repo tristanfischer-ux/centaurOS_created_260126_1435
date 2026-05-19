@@ -1,0 +1,9 @@
+componentWordId,description,priority,supplierName,manufacturer,mpn,unitCostGbp,leadTimeWeeks,sourceGrade,evidence.ref,evidence.quote,retrievedAt
+growing_rack_structure,Growing rack structure,critical,,,,,,catalogue,,,
+led_grow_lights,LED grow lights,critical,,,,,,catalogue,,,
+air_circulation_fans,Air circulation fans,critical,,,,,,catalogue,,,
+co2_sensor_or_dosing,CO2 sensor or dosing,critical,,,,,,catalogue,,,
+reservoir_and_plumbing_set,Reservoir and plumbing set,critical,,,,,,catalogue,,,
+nutrient_pump,Nutrient pump,critical,,,,,,catalogue,,,
+environmental_controller,Environmental controller,critical,,,,,,catalogue,,,
+rcd_isolator_panel,RCD isolator panel,critical,,,,,,catalogue,,,

@@ -1,0 +1,80 @@
+{
+  "summary": {
+    "trustVerdict": "architecture_review_only",
+    "packages": 2,
+    "readyPackages": 2,
+    "waitingPackages": 0,
+    "closureRows": 10,
+    "trustBlockers": 229,
+    "nextPackage": "evidence_authenticity_review"
+  },
+  "packages": [
+    {
+      "id": "engineering_review",
+      "sequence": 3,
+      "title": "Resolve Engineering Review Questions",
+      "status": "ready",
+      "gateAreas": [],
+      "closureRows": 10,
+      "trustBlockers": 0,
+      "requiredInputs": [
+        "Accepted/corrected/rejected answers to review-pack questions.",
+        "Calculation and assumption decisions tied to reviewer evidence references."
+      ],
+      "sourceArtifacts": [
+        "*.engineering-review-pack.csv",
+        "*.engineering-assurance-matrix.csv",
+        "*.engineering-assumptions.csv",
+        "*.engineering-calculations.csv"
+      ],
+      "exitCriteria": [
+        "Requirement assurance rows have accepted or explicitly deferred engineering review evidence.",
+        "Generated architecture and calculation claims are accepted, corrected or rejected."
+      ],
+      "topBlockers": []
+    },
+    {
+      "id": "evidence_authenticity_review",
+      "sequence": 5,
+      "title": "Validate Evidence Authenticity",
+      "status": "ready",
+      "gateAreas": [
+        "evidence_authenticity"
+      ],
+      "closureRows": 0,
+      "trustBlockers": 229,
+      "requiredInputs": [
+        "Production supplier/catalogue URLs for BoM source records.",
+        "Named reviewer evidence references that are not protocol fixtures."
+      ],
+      "sourceArtifacts": [
+        "*.evidence-authenticity-gate.csv",
+        "*.sourcing-ledger.csv",
+        "*.verification-ledger.csv",
+        "*.claim-ledger.csv"
+      ],
+      "exitCriteria": [
+        "Evidence Authenticity Gate verdict is production_ready.",
+        "No protocol_fixture, unknown_reference or missing_metadata evidence rows remain."
+      ],
+      "topBlockers": [
+        "sourcing:1:lfp_prismatic_cells: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:2:cell_to_cell_busbar: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:3:cell_terminal_hardware_set: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:4:cell_insulation_pad: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:5:module_fuse: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:6:module_steel_frame: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:7:compression_plate: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:8:compression_tie_rod_set: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:9:module_top_cover: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:10:rack_label_plate: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:11:bms_slave_pcb: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:12:afe_monitor_ic: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:13:ntc_thermistor_harness: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:14:isolated_can_transceiver: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:15:conformal_coating: source evidence is a protocol fixture and proves mechanics only.",
+        "sourcing:16:dc_contactor_or_breaker: source evidence is a protocol fixture and proves mechanics only."
+      ]
+    }
+  ]
+}

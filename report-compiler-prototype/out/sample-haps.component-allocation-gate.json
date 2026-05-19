@@ -1,0 +1,1232 @@
+{
+  "verdict": "allocation_ready",
+  "summary": {
+    "modules": 11,
+    "subModules": 33,
+    "componentWords": 132,
+    "readySubModules": 33,
+    "reviewSubModules": 0,
+    "blockedSubModules": 0,
+    "interfaceCarrierSubModules": 33,
+    "interfaceCarrierWithoutComponents": 0,
+    "requiredCriticalParts": 12,
+    "allocatedCriticalParts": 12,
+    "missingCriticalParts": 0,
+    "bomLines": 132,
+    "criticalBomLines": 12,
+    "duplicateComponentGroups": 0,
+    "duplicateCriticalComponentGroups": 0,
+    "allocationRatio": 1,
+    "criticalAllocationRatio": 1
+  },
+  "subModules": [
+    {
+      "id": "structure_containment:wing_primary_structure",
+      "moduleId": "structure_containment",
+      "moduleName": "Ultra-Light Wing Structure",
+      "subModuleId": "wing_primary_structure",
+      "subModuleName": "Wing primary structure",
+      "purpose": "Provides the long-span lift structure and distributed payload mounting.",
+      "interfaces": [
+        "aero_load_path",
+        "solar_mount",
+        "propulsion_mounts"
+      ],
+      "componentWordIds": [
+        "high_aspect_ratio_wing_structure",
+        "carbon_spar_cap_set",
+        "foam_rib_set",
+        "wing_joiner_sleeve"
+      ],
+      "componentNames": [
+        "High-aspect-ratio wing structure",
+        "carbon spar cap set",
+        "foam rib set",
+        "wing joiner sleeve"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "high_aspect_ratio_wing_structure"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:tail_control_structure",
+      "moduleId": "structure_containment",
+      "moduleName": "Ultra-Light Wing Structure",
+      "subModuleId": "tail_control_structure",
+      "subModuleName": "Tail and control structure",
+      "purpose": "Provides static stability and trim surfaces.",
+      "interfaces": [
+        "aero_load_path",
+        "flight_control_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "tail_boom_assembly",
+        "elevator_surface",
+        "rudder_surface",
+        "control_hinge_set"
+      ],
+      "componentNames": [
+        "tail boom assembly",
+        "elevator surface",
+        "rudder surface",
+        "control hinge set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:payload_bay_structure",
+      "moduleId": "structure_containment",
+      "moduleName": "Ultra-Light Wing Structure",
+      "subModuleId": "payload_bay_structure",
+      "subModuleName": "Payload bay structure",
+      "purpose": "Supports payload, avionics and access panels while preserving aerodynamic form.",
+      "interfaces": [
+        "payload_mount",
+        "service_access",
+        "aero_load_path"
+      ],
+      "componentWordIds": [
+        "payload_bay_frame",
+        "avionics_tray",
+        "access_panel_latch_set",
+        "mass_balance_bracket"
+      ],
+      "componentNames": [
+        "payload bay frame",
+        "avionics tray",
+        "access panel latch set",
+        "mass balance bracket"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_harvesting:solar_skin_array",
+      "moduleId": "energy_harvesting",
+      "moduleName": "Solar Energy Harvesting",
+      "subModuleId": "solar_skin_array",
+      "subModuleName": "Solar skin array",
+      "purpose": "Distributes photovoltaic cells over wing surfaces.",
+      "interfaces": [
+        "solar_dc_bus",
+        "solar_mount",
+        "thermal_path"
+      ],
+      "componentWordIds": [
+        "solar_cell_array",
+        "cell_interconnect_ribbon",
+        "transparent_encapsulation_film",
+        "solar_string_bypass_diode"
+      ],
+      "componentNames": [
+        "Solar cell array",
+        "cell interconnect ribbon",
+        "transparent encapsulation film",
+        "solar string bypass diode"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "solar_cell_array"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_harvesting:mppt_conversion",
+      "moduleId": "energy_harvesting",
+      "moduleName": "Solar Energy Harvesting",
+      "subModuleId": "mppt_conversion",
+      "subModuleName": "MPPT conversion",
+      "purpose": "Tracks photovoltaic maximum power and feeds the flight DC bus.",
+      "interfaces": [
+        "solar_dc_bus",
+        "sensor_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "mppt_power_tracker",
+        "solar_input_current_sensor",
+        "solar_voltage_tap_loom",
+        "mppt_heat_spreader"
+      ],
+      "componentNames": [
+        "MPPT power tracker",
+        "solar input current sensor",
+        "solar voltage tap loom",
+        "MPPT heat spreader"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "mppt_power_tracker"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_harvesting:solar_health_monitoring",
+      "moduleId": "energy_harvesting",
+      "moduleName": "Solar Energy Harvesting",
+      "subModuleId": "solar_health_monitoring",
+      "subModuleName": "Solar health monitoring",
+      "purpose": "Detects string degradation and weathering across long endurance missions.",
+      "interfaces": [
+        "solar_dc_bus",
+        "sensor_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "solar_string_monitor_board",
+        "uv_exposure_witness_coupon",
+        "wing_surface_temperature_sensor",
+        "solar_inspection_connector"
+      ],
+      "componentNames": [
+        "solar string monitor board",
+        "UV exposure witness coupon",
+        "wing surface temperature sensor",
+        "solar inspection connector"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:stratospheric_battery_pack",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Night-Cycle Energy Storage",
+      "subModuleId": "stratospheric_battery_pack",
+      "subModuleName": "Stratospheric battery pack",
+      "purpose": "Stores night-cycle and transient propulsion energy.",
+      "interfaces": [
+        "battery_dc_bus",
+        "thermal_path",
+        "battery_monitor_bus"
+      ],
+      "componentWordIds": [
+        "stratospheric_battery_pack",
+        "battery_management_board",
+        "lightweight_battery_enclosure",
+        "cell_heater_film"
+      ],
+      "componentNames": [
+        "Stratospheric battery pack",
+        "battery management board",
+        "lightweight battery enclosure",
+        "cell heater film"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "stratospheric_battery_pack"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:battery_thermal_zone",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Night-Cycle Energy Storage",
+      "subModuleId": "battery_thermal_zone",
+      "subModuleName": "Battery thermal zone",
+      "purpose": "Protects battery capacity in low-pressure, cold stratospheric conditions.",
+      "interfaces": [
+        "thermal_path",
+        "battery_monitor_bus",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "battery_insulation_sleeve",
+        "phase_change_thermal_buffer",
+        "battery_temperature_sensor_harness",
+        "battery_vent_path"
+      ],
+      "componentNames": [
+        "battery insulation sleeve",
+        "phase-change thermal buffer",
+        "battery temperature sensor harness",
+        "battery vent path"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:energy_reserve_monitoring",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Night-Cycle Energy Storage",
+      "subModuleId": "energy_reserve_monitoring",
+      "subModuleName": "Energy reserve monitoring",
+      "purpose": "Tracks day/night balance and mission abort reserve.",
+      "interfaces": [
+        "battery_monitor_bus",
+        "sensor_bus",
+        "telemetry_link"
+      ],
+      "componentWordIds": [
+        "coulomb_counter_module",
+        "reserve_energy_estimator",
+        "battery_isolation_contactor",
+        "night_cycle_test_connector"
+      ],
+      "componentNames": [
+        "coulomb counter module",
+        "reserve energy estimator",
+        "battery isolation contactor",
+        "night-cycle test connector"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:solar_battery_power_management",
+      "moduleId": "power_distribution",
+      "moduleName": "Flight Power Distribution",
+      "subModuleId": "solar_battery_power_management",
+      "subModuleName": "Solar and battery power management",
+      "purpose": "Combines harvested and stored energy into mission load rails.",
+      "interfaces": [
+        "solar_dc_bus",
+        "battery_dc_bus",
+        "propulsion_power_bus",
+        "payload_power_bus"
+      ],
+      "componentWordIds": [
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set"
+      ],
+      "componentNames": [
+        "solar battery charge controller",
+        "main DC bus board",
+        "payload power switch",
+        "propulsion bus fuse set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:low_voltage_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Flight Power Distribution",
+      "subModuleId": "low_voltage_distribution",
+      "subModuleName": "Low-voltage distribution",
+      "purpose": "Feeds avionics, sensors, servos and communications loads.",
+      "interfaces": [
+        "low_voltage_rail",
+        "payload_power_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "avionics_dc_converter",
+        "servo_power_rail",
+        "communications_dc_converter",
+        "low_voltage_harness_loom"
+      ],
+      "componentNames": [
+        "avionics DC converter",
+        "servo power rail",
+        "communications DC converter",
+        "low-voltage harness loom"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:load_shed_protection",
+      "moduleId": "power_distribution",
+      "moduleName": "Flight Power Distribution",
+      "subModuleId": "load_shed_protection",
+      "subModuleName": "Load-shed protection",
+      "purpose": "Protects mission reserve during energy-negative conditions.",
+      "interfaces": [
+        "hardwired_trip",
+        "payload_power_bus",
+        "battery_monitor_bus"
+      ],
+      "componentWordIds": [
+        "load_shed_relay_set",
+        "brownout_supervisor",
+        "energy_priority_controller",
+        "fault_latch_indicator"
+      ],
+      "componentNames": [
+        "load shed relay set",
+        "brownout supervisor",
+        "energy priority controller",
+        "fault latch indicator"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:electric_propulsion_pods",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Control Surfaces",
+      "subModuleId": "electric_propulsion_pods",
+      "subModuleName": "Electric propulsion pods",
+      "purpose": "Provides distributed propulsive thrust along the wing.",
+      "interfaces": [
+        "propulsion_power_bus",
+        "flight_control_bus",
+        "propulsion_mounts"
+      ],
+      "componentWordIds": [
+        "electric_propulsion_pod",
+        "high_altitude_propeller_set",
+        "motor_controller_module",
+        "propulsion_pod_fairing"
+      ],
+      "componentNames": [
+        "Electric propulsion pod",
+        "high-altitude propeller set",
+        "motor controller module",
+        "propulsion pod fairing"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "electric_propulsion_pod"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:control_surface_actuation",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Control Surfaces",
+      "subModuleId": "control_surface_actuation",
+      "subModuleName": "Control surface actuation",
+      "purpose": "Moves trim surfaces with low power and reliable feedback.",
+      "interfaces": [
+        "flight_control_bus",
+        "aero_load_path",
+        "low_voltage_rail"
+      ],
+      "componentWordIds": [
+        "low_temperature_servo_actuator",
+        "control_linkage_rod_set",
+        "surface_position_sensor",
+        "servo_heater_trace"
+      ],
+      "componentNames": [
+        "low-temperature servo actuator",
+        "control linkage rod set",
+        "surface position sensor",
+        "servo heater trace"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:station_keeping_trim",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Control Surfaces",
+      "subModuleId": "station_keeping_trim",
+      "subModuleName": "Station-keeping trim",
+      "purpose": "Supports efficient loiter in variable stratospheric winds.",
+      "interfaces": [
+        "flight_control_bus",
+        "sensor_bus",
+        "aero_load_path"
+      ],
+      "componentWordIds": [
+        "trim_schedule_table",
+        "gust_load_estimator",
+        "airspeed_setpoint_manager",
+        "propulsion_calibration_record"
+      ],
+      "componentNames": [
+        "trim schedule table",
+        "gust load estimator",
+        "airspeed setpoint manager",
+        "propulsion calibration record"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:flight_control_computer",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Control Communication",
+      "subModuleId": "flight_control_computer",
+      "subModuleName": "Flight control computer",
+      "purpose": "Executes flight stabilisation, energy-aware routing and station keeping.",
+      "interfaces": [
+        "flight_control_bus",
+        "sensor_bus",
+        "battery_monitor_bus",
+        "hardwired_trip"
+      ],
+      "componentWordIds": [
+        "flight_control_computer",
+        "autopilot_io_board",
+        "flight_software_image",
+        "watchdog_supervisor"
+      ],
+      "componentNames": [
+        "Flight control computer",
+        "autopilot IO board",
+        "flight software image",
+        "watchdog supervisor"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "flight_control_computer"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:ground_command_link",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Control Communication",
+      "subModuleId": "ground_command_link",
+      "subModuleName": "Ground command link",
+      "purpose": "Maintains command, telemetry and mission supervision.",
+      "interfaces": [
+        "telemetry_link",
+        "payload_data_link",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "ground_control_link",
+        "telemetry_transceiver",
+        "command_authentication_module",
+        "mission_log_recorder"
+      ],
+      "componentNames": [
+        "Ground control link",
+        "telemetry transceiver",
+        "command authentication module",
+        "mission log recorder"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "ground_control_link"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:energy_aware_autonomy",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Control Communication",
+      "subModuleId": "energy_aware_autonomy",
+      "subModuleName": "Energy-aware autonomy",
+      "purpose": "Coordinates route, payload duty cycle and energy reserve.",
+      "interfaces": [
+        "battery_monitor_bus",
+        "payload_data_link",
+        "flight_control_bus"
+      ],
+      "componentWordIds": [
+        "solar_forecast_model",
+        "wind_field_route_planner",
+        "payload_duty_cycle_controller",
+        "return_corridor_manager"
+      ],
+      "componentNames": [
+        "solar forecast model",
+        "wind field route planner",
+        "payload duty-cycle controller",
+        "return corridor manager"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:navigation_suite",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Airdata Sensing",
+      "subModuleId": "navigation_suite",
+      "subModuleName": "Navigation suite",
+      "purpose": "Provides position, attitude and timing references.",
+      "interfaces": [
+        "sensor_bus",
+        "flight_control_bus",
+        "telemetry_link"
+      ],
+      "componentWordIds": [
+        "gnss_ins_navigation_unit",
+        "barometric_altitude_sensor",
+        "sun_sensor_pair",
+        "precision_timebase_module"
+      ],
+      "componentNames": [
+        "GNSS INS navigation unit",
+        "barometric altitude sensor",
+        "sun sensor pair",
+        "precision timebase module"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "gnss_ins_navigation_unit"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:airdata_weather_sensors",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Airdata Sensing",
+      "subModuleId": "airdata_weather_sensors",
+      "subModuleName": "Airdata and weather sensors",
+      "purpose": "Measures local atmosphere and flight condition.",
+      "interfaces": [
+        "sensor_bus",
+        "flight_control_bus"
+      ],
+      "componentWordIds": [
+        "pitot_static_probe",
+        "outside_air_temperature_probe",
+        "wind_estimation_filter",
+        "humidity_frost_sensor"
+      ],
+      "componentNames": [
+        "pitot static probe",
+        "outside air temperature probe",
+        "wind estimation filter",
+        "humidity frost sensor"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:structural_health_sensing",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Airdata Sensing",
+      "subModuleId": "structural_health_sensing",
+      "subModuleName": "Structural health sensing",
+      "purpose": "Tracks load and deformation over long-span flight.",
+      "interfaces": [
+        "sensor_bus",
+        "aero_load_path",
+        "telemetry_link"
+      ],
+      "componentWordIds": [
+        "wing_strain_gauge_strip",
+        "spar_temperature_sensor",
+        "vibration_accelerometer",
+        "structural_health_recorder"
+      ],
+      "componentNames": [
+        "wing strain gauge strip",
+        "spar temperature sensor",
+        "vibration accelerometer",
+        "structural health recorder"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "payload_communication:payload_radio",
+      "moduleId": "payload_communication",
+      "moduleName": "Communications Payload",
+      "subModuleId": "payload_radio",
+      "subModuleName": "Payload radio",
+      "purpose": "Carries communications relay payload electronics.",
+      "interfaces": [
+        "payload_data_link",
+        "payload_power_bus",
+        "thermal_path"
+      ],
+      "componentWordIds": [
+        "stratospheric_communications_payload",
+        "payload_modem_board",
+        "payload_rf_power_amplifier",
+        "payload_processor_module"
+      ],
+      "componentNames": [
+        "Stratospheric communications payload",
+        "payload modem board",
+        "payload RF power amplifier",
+        "payload processor module"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "stratospheric_communications_payload"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "payload_communication:antenna_aperture",
+      "moduleId": "payload_communication",
+      "moduleName": "Communications Payload",
+      "subModuleId": "antenna_aperture",
+      "subModuleName": "Antenna aperture",
+      "purpose": "Provides RF aperture and beam orientation support.",
+      "interfaces": [
+        "rf_aperture",
+        "payload_data_link",
+        "aero_load_path"
+      ],
+      "componentWordIds": [
+        "payload_antenna_array",
+        "antenna_ground_plane_film",
+        "antenna_feed_harness",
+        "beam_pointing_calibration_target"
+      ],
+      "componentNames": [
+        "Payload antenna array",
+        "antenna ground plane film",
+        "antenna feed harness",
+        "beam pointing calibration target"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "payload_antenna_array"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "payload_communication:payload_integration",
+      "moduleId": "payload_communication",
+      "moduleName": "Communications Payload",
+      "subModuleId": "payload_integration",
+      "subModuleName": "Payload integration",
+      "purpose": "Controls payload mounting, thermal coupling and service access.",
+      "interfaces": [
+        "payload_power_bus",
+        "thermal_path",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "payload_isolation_mount",
+        "payload_thermal_strap",
+        "payload_access_hatch",
+        "payload_configuration_tag"
+      ],
+      "componentNames": [
+        "payload isolation mount",
+        "payload thermal strap",
+        "payload access hatch",
+        "payload configuration tag"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:thermal_protection",
+      "moduleId": "environmental_interface",
+      "moduleName": "Stratospheric Environmental Interface",
+      "subModuleId": "thermal_protection",
+      "subModuleName": "Thermal protection",
+      "purpose": "Controls cold-soak and daytime heating across batteries, avionics and payload.",
+      "interfaces": [
+        "thermal_path",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "thermal_insulation_blanket",
+        "multi_layer_insulation_patch",
+        "lightweight_thermal_strap",
+        "thermal_witness_label"
+      ],
+      "componentNames": [
+        "Thermal insulation blanket",
+        "multi-layer insulation patch",
+        "lightweight thermal strap",
+        "thermal witness label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "thermal_insulation_blanket"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:uv_surface_protection",
+      "moduleId": "environmental_interface",
+      "moduleName": "Stratospheric Environmental Interface",
+      "subModuleId": "uv_surface_protection",
+      "subModuleName": "UV and surface protection",
+      "purpose": "Protects solar skin and airframe surface from UV, ozone and abrasion.",
+      "interfaces": [
+        "solar_mount",
+        "aero_load_path",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "uv_protective_film",
+        "leading_edge_erosion_tape",
+        "surface_contamination_wipe_kit",
+        "coating_inspection_marker"
+      ],
+      "componentNames": [
+        "UV protective film",
+        "leading edge erosion tape",
+        "surface contamination wipe kit",
+        "coating inspection marker"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:low_pressure_management",
+      "moduleId": "environmental_interface",
+      "moduleName": "Stratospheric Environmental Interface",
+      "subModuleId": "low_pressure_management",
+      "subModuleName": "Low-pressure electronics management",
+      "purpose": "Accounts for low pressure cooling and electrical spacing.",
+      "interfaces": [
+        "thermal_path",
+        "payload_power_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "low_pressure_vent_path",
+        "conformal_coating_set",
+        "high_altitude_creepage_spacer",
+        "desiccant_cartridge"
+      ],
+      "componentNames": [
+        "low-pressure vent path",
+        "conformal coating set",
+        "high-altitude creepage spacer",
+        "desiccant cartridge"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:abort_recovery",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Recovery",
+      "subModuleId": "abort_recovery",
+      "subModuleName": "Abort and recovery",
+      "purpose": "Provides controlled descent and recovery location after mission abort.",
+      "interfaces": [
+        "hardwired_trip",
+        "telemetry_link",
+        "flight_control_bus"
+      ],
+      "componentWordIds": [
+        "recovery_parachute_system",
+        "parachute_deployment_controller",
+        "recovery_beacon",
+        "safe_descent_mode_logic"
+      ],
+      "componentNames": [
+        "Recovery parachute system",
+        "parachute deployment controller",
+        "recovery beacon",
+        "safe descent mode logic"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "recovery_parachute_system"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:airspace_safety",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Recovery",
+      "subModuleId": "airspace_safety",
+      "subModuleName": "Airspace safety",
+      "purpose": "Maintains geofence, lost-link and flight termination policies.",
+      "interfaces": [
+        "flight_control_bus",
+        "telemetry_link",
+        "hardwired_trip"
+      ],
+      "componentWordIds": [
+        "geofence_database",
+        "lost_link_failsafe",
+        "flight_termination_relay",
+        "airspace_transponder_module"
+      ],
+      "componentNames": [
+        "geofence database",
+        "lost-link failsafe",
+        "flight termination relay",
+        "airspace transponder module"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:ground_handling_safety",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Recovery",
+      "subModuleId": "ground_handling_safety",
+      "subModuleName": "Ground handling safety",
+      "purpose": "Controls launch, recovery and battery handling hazards.",
+      "interfaces": [
+        "service_access",
+        "aero_load_path",
+        "battery_monitor_bus"
+      ],
+      "componentWordIds": [
+        "launch_arming_interlock",
+        "propulsion_safety_pin_set",
+        "battery_handling_placard",
+        "recovery_inspection_checklist"
+      ],
+      "componentNames": [
+        "launch arming interlock",
+        "propulsion safety pin set",
+        "battery handling placard",
+        "recovery inspection checklist"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:wing_assembly_service",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Ground Handling Serviceability",
+      "subModuleId": "wing_assembly_service",
+      "subModuleName": "Wing assembly service",
+      "purpose": "Makes distributed wing sections inspectable and assembled repeatably.",
+      "interfaces": [
+        "service_access",
+        "aero_load_path",
+        "solar_mount"
+      ],
+      "componentWordIds": [
+        "wing_assembly_jig",
+        "spar_pin_torque_tool",
+        "solar_skin_protection_mat",
+        "assembly_witness_mark_set"
+      ],
+      "componentNames": [
+        "wing assembly jig",
+        "spar pin torque tool",
+        "solar skin protection mat",
+        "assembly witness mark set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:launch_recovery_equipment",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Ground Handling Serviceability",
+      "subModuleId": "launch_recovery_equipment",
+      "subModuleName": "Launch and recovery equipment",
+      "purpose": "Supports low-speed launch and controlled recovery handling.",
+      "interfaces": [
+        "service_access",
+        "aero_load_path",
+        "telemetry_link"
+      ],
+      "componentWordIds": [
+        "launch_dolly_interface",
+        "wingtip_handling_fixture",
+        "recovery_cradle",
+        "ground_wind_limit_placard"
+      ],
+      "componentNames": [
+        "launch dolly interface",
+        "wingtip handling fixture",
+        "recovery cradle",
+        "ground wind limit placard"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:payload_checkout",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Ground Handling Serviceability",
+      "subModuleId": "payload_checkout",
+      "subModuleName": "Payload checkout",
+      "purpose": "Verifies communications payload and telemetry before launch.",
+      "interfaces": [
+        "service_access",
+        "payload_data_link",
+        "telemetry_link"
+      ],
+      "componentWordIds": [
+        "payload_checkout_cable",
+        "rf_load_test_adapter",
+        "telemetry_ground_terminal",
+        "preflight_log_card"
+      ],
+      "componentNames": [
+        "payload checkout cable",
+        "RF load test adapter",
+        "telemetry ground terminal",
+        "preflight log card"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    }
+  ],
+  "criticalParts": [
+    {
+      "componentWordId": "high_aspect_ratio_wing_structure",
+      "label": "High-aspect-ratio wing structure",
+      "allocated": true,
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "subModuleIds": [
+        "wing_primary_structure"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "solar_cell_array",
+      "label": "Solar cell array",
+      "allocated": true,
+      "moduleIds": [
+        "energy_harvesting"
+      ],
+      "subModuleIds": [
+        "solar_skin_array"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "mppt_power_tracker",
+      "label": "MPPT power tracker",
+      "allocated": true,
+      "moduleIds": [
+        "energy_harvesting"
+      ],
+      "subModuleIds": [
+        "mppt_conversion"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "stratospheric_battery_pack",
+      "label": "Stratospheric battery pack",
+      "allocated": true,
+      "moduleIds": [
+        "energy_storage_source"
+      ],
+      "subModuleIds": [
+        "stratospheric_battery_pack"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "electric_propulsion_pod",
+      "label": "Electric propulsion pod",
+      "allocated": true,
+      "moduleIds": [
+        "actuation_kinematics"
+      ],
+      "subModuleIds": [
+        "electric_propulsion_pods"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "flight_control_computer",
+      "label": "Flight control computer",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "flight_control_computer"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "gnss_ins_navigation_unit",
+      "label": "GNSS INS navigation unit",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "navigation_suite"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "stratospheric_communications_payload",
+      "label": "Stratospheric communications payload",
+      "allocated": true,
+      "moduleIds": [
+        "payload_communication"
+      ],
+      "subModuleIds": [
+        "payload_radio"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "payload_antenna_array",
+      "label": "Payload antenna array",
+      "allocated": true,
+      "moduleIds": [
+        "payload_communication"
+      ],
+      "subModuleIds": [
+        "antenna_aperture"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "thermal_insulation_blanket",
+      "label": "Thermal insulation blanket",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "thermal_protection"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "recovery_parachute_system",
+      "label": "Recovery parachute system",
+      "allocated": true,
+      "moduleIds": [
+        "safety_protection"
+      ],
+      "subModuleIds": [
+        "abort_recovery"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "ground_control_link",
+      "label": "Ground control link",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "ground_command_link"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    }
+  ],
+  "duplicateGroups": [],
+  "blockers": [],
+  "nextActions": []
+}

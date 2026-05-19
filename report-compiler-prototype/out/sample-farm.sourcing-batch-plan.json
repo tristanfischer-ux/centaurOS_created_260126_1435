@@ -1,0 +1,3580 @@
+{
+  "summary": {
+    "closureRows": 122,
+    "batches": 2,
+    "activeBatches": 1,
+    "waitingBatches": 0,
+    "deferredBatches": 1,
+    "activeRows": 8,
+    "waitingRows": 0,
+    "deferredRows": 114,
+    "procurementBlockingRows": 8,
+    "criticalSourceRows": 8,
+    "repairRows": 0,
+    "protocolReplacementRows": 0,
+    "identityRows": 0,
+    "candidateDeferredRows": 114,
+    "nextBatchId": "sourcing-batch:2:critical_source_collection",
+    "nextItemId": "critical_source_collection:1:environmental_controller",
+    "canUseForProcurement": false
+  },
+  "batches": [
+    {
+      "id": "sourcing-batch:2:critical_source_collection",
+      "sequence": 2,
+      "kind": "critical_source_collection",
+      "title": "Collect Critical Source Evidence",
+      "status": "active",
+      "rowCount": 8,
+      "readyRows": 8,
+      "blockedRows": 0,
+      "deferredRows": 0,
+      "procurementBlockingRows": 8,
+      "entryCriteria": [
+        "Architecture has identified critical BoM lines that are not source-backed."
+      ],
+      "exitCriteria": [
+        "Every critical line has admitted supplier/manufacturer/MPN/unit-cost evidence."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "critical_source_collection:1:environmental_controller",
+          "closureRowId": "bom-close:control_compute_communication_environmental_controller_environmental_controller",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "environmental_controller",
+          "description": "Environmental controller",
+          "searchTerms": [
+            "Environmental controller",
+            "Environmental controller manufacturer part number",
+            "Environmental controller catalogue price GBP",
+            "Environmental controller datasheet",
+            "Environmental controller horticulture hydroponic",
+            "Environmental controller food safe"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:2:air_circulation_fans",
+          "closureRowId": "bom-close:environmental_interface_canopy_air_mixing_air_circulation_fans",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "air_circulation_fans",
+          "description": "Air circulation fans",
+          "searchTerms": [
+            "Air circulation fans",
+            "Air circulation fans manufacturer part number",
+            "Air circulation fans catalogue price GBP",
+            "Air circulation fans datasheet",
+            "Air circulation fans horticulture hydroponic",
+            "Air circulation fans food safe"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:3:co2_sensor_or_dosing",
+          "closureRowId": "bom-close:environmental_interface_co2_enrichment_co2_sensor_or_dosing",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "co2_sensor_or_dosing",
+          "description": "CO2 sensor or dosing",
+          "searchTerms": [
+            "CO2 sensor or dosing",
+            "CO2 sensor or dosing manufacturer part number",
+            "CO2 sensor or dosing catalogue price GBP",
+            "CO2 sensor or dosing datasheet",
+            "CO2 sensor or dosing horticulture hydroponic",
+            "CO2 sensor or dosing food safe"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:4:led_grow_lights",
+          "closureRowId": "bom-close:environmental_interface_horticultural_lighting_led_grow_lights",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "led_grow_lights",
+          "description": "LED grow lights",
+          "searchTerms": [
+            "LED grow lights",
+            "LED grow lights manufacturer part number",
+            "LED grow lights catalogue price GBP",
+            "LED grow lights datasheet",
+            "LED grow lights horticulture hydroponic",
+            "LED grow lights food safe"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:5:nutrient_pump",
+          "closureRowId": "bom-close:mass_fluid_transport_process_fertigation_pumping_nutrient_pump",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "nutrient_pump",
+          "description": "Nutrient pump",
+          "searchTerms": [
+            "Nutrient pump",
+            "Nutrient pump manufacturer part number",
+            "Nutrient pump catalogue price GBP",
+            "Nutrient pump datasheet",
+            "Nutrient pump horticulture hydroponic",
+            "Nutrient pump food safe"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:6:reservoir_and_plumbing_set",
+          "closureRowId": "bom-close:mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "reservoir_and_plumbing_set",
+          "description": "Reservoir and plumbing set",
+          "searchTerms": [
+            "Reservoir and plumbing set",
+            "Reservoir and plumbing set manufacturer part number",
+            "Reservoir and plumbing set catalogue price GBP",
+            "Reservoir and plumbing set datasheet",
+            "Reservoir and plumbing set horticulture hydroponic",
+            "Reservoir and plumbing set food safe"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:7:rcd_isolator_panel",
+          "closureRowId": "bom-close:power_distribution_mains_panel_rcd_isolator_panel",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "rcd_isolator_panel",
+          "description": "RCD isolator panel",
+          "searchTerms": [
+            "RCD isolator panel",
+            "RCD isolator panel manufacturer part number",
+            "RCD isolator panel catalogue price GBP",
+            "RCD isolator panel datasheet",
+            "RCD isolator panel horticulture hydroponic",
+            "RCD isolator panel food safe"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:8:growing_rack_structure",
+          "closureRowId": "bom-close:structure_containment_growing_rack_stack_growing_rack_structure",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "growing_rack_structure",
+          "description": "Growing rack structure",
+          "searchTerms": [
+            "Growing rack structure",
+            "Growing rack structure manufacturer part number",
+            "Growing rack structure catalogue price GBP",
+            "Growing rack structure datasheet",
+            "Growing rack structure horticulture hydroponic",
+            "Growing rack structure food safe"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        }
+      ]
+    },
+    {
+      "id": "sourcing-batch:6:candidate_sourcing_deferred",
+      "sequence": 6,
+      "kind": "candidate_sourcing_deferred",
+      "title": "Defer Candidate-Only Sourcing",
+      "status": "deferred",
+      "rowCount": 114,
+      "readyRows": 0,
+      "blockedRows": 0,
+      "deferredRows": 114,
+      "procurementBlockingRows": 0,
+      "entryCriteria": [
+        "Candidate lines remain outside immediate procurement scope."
+      ],
+      "exitCriteria": [
+        "Candidate lines are either still explicitly deferred or promoted to critical sourcing scope."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "candidate_sourcing_deferred:1:analog_input_module",
+          "closureRowId": "bom-close:control_compute_communication_environmental_controller_analog_input_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "analog_input_module",
+          "description": "analog input module",
+          "searchTerms": [
+            "analog input module",
+            "analog input module manufacturer part number",
+            "analog input module catalogue price GBP",
+            "analog input module datasheet",
+            "analog input module horticulture hydroponic",
+            "analog input module food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:2:din_rail_plc",
+          "closureRowId": "bom-close:control_compute_communication_environmental_controller_din_rail_plc",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "din_rail_plc",
+          "description": "DIN-rail PLC",
+          "searchTerms": [
+            "DIN-rail PLC",
+            "DIN-rail PLC manufacturer part number",
+            "DIN-rail PLC catalogue price GBP",
+            "DIN-rail PLC datasheet",
+            "DIN-rail PLC horticulture hydroponic",
+            "DIN-rail PLC food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:3:real_time_clock_module",
+          "closureRowId": "bom-close:control_compute_communication_environmental_controller_real_time_clock_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "real_time_clock_module",
+          "description": "real-time clock module",
+          "searchTerms": [
+            "real-time clock module",
+            "real-time clock module manufacturer part number",
+            "real-time clock module catalogue price GBP",
+            "real-time clock module datasheet",
+            "real-time clock module horticulture hydroponic",
+            "real-time clock module food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:4:relay_output_module",
+          "closureRowId": "bom-close:control_compute_communication_environmental_controller_relay_output_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "relay_output_module",
+          "description": "relay output module",
+          "searchTerms": [
+            "relay output module",
+            "relay output module manufacturer part number",
+            "relay output module catalogue price GBP",
+            "relay output module datasheet",
+            "relay output module horticulture hydroponic",
+            "relay output module food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:5:alarm_historian",
+          "closureRowId": "bom-close:control_compute_communication_recipe_management_alarm_historian",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "alarm_historian",
+          "description": "alarm historian",
+          "searchTerms": [
+            "alarm historian",
+            "alarm historian manufacturer part number",
+            "alarm historian catalogue price GBP",
+            "alarm historian datasheet",
+            "alarm historian horticulture hydroponic",
+            "alarm historian food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:6:data_export_module",
+          "closureRowId": "bom-close:control_compute_communication_recipe_management_data_export_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "data_export_module",
+          "description": "data export module",
+          "searchTerms": [
+            "data export module",
+            "data export module manufacturer part number",
+            "data export module catalogue price GBP",
+            "data export module datasheet",
+            "data export module horticulture hydroponic",
+            "data export module food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:7:recipe_database",
+          "closureRowId": "bom-close:control_compute_communication_recipe_management_recipe_database",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "recipe_database",
+          "description": "recipe database",
+          "searchTerms": [
+            "recipe database",
+            "recipe database manufacturer part number",
+            "recipe database catalogue price GBP",
+            "recipe database datasheet",
+            "recipe database horticulture hydroponic",
+            "recipe database food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:8:set_point_scheduler",
+          "closureRowId": "bom-close:control_compute_communication_recipe_management_set_point_scheduler",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "set_point_scheduler",
+          "description": "set-point scheduler",
+          "searchTerms": [
+            "set-point scheduler",
+            "set-point scheduler manufacturer part number",
+            "set-point scheduler catalogue price GBP",
+            "set-point scheduler datasheet",
+            "set-point scheduler horticulture hydroponic",
+            "set-point scheduler food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:9:industrial_ethernet_switch",
+          "closureRowId": "bom-close:control_compute_communication_remote_monitoring_industrial_ethernet_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "industrial_ethernet_switch",
+          "description": "industrial Ethernet switch",
+          "searchTerms": [
+            "industrial Ethernet switch",
+            "industrial Ethernet switch manufacturer part number",
+            "industrial Ethernet switch catalogue price GBP",
+            "industrial Ethernet switch datasheet",
+            "industrial Ethernet switch horticulture hydroponic",
+            "industrial Ethernet switch food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:10:mqtt_telemetry_bridge",
+          "closureRowId": "bom-close:control_compute_communication_remote_monitoring_mqtt_telemetry_bridge",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "mqtt_telemetry_bridge",
+          "description": "MQTT telemetry bridge",
+          "searchTerms": [
+            "MQTT telemetry bridge",
+            "MQTT telemetry bridge manufacturer part number",
+            "MQTT telemetry bridge catalogue price GBP",
+            "MQTT telemetry bridge datasheet",
+            "MQTT telemetry bridge horticulture hydroponic",
+            "MQTT telemetry bridge food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:11:sms_alarm_modem",
+          "closureRowId": "bom-close:control_compute_communication_remote_monitoring_sms_alarm_modem",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sms_alarm_modem",
+          "description": "SMS alarm modem",
+          "searchTerms": [
+            "SMS alarm modem",
+            "SMS alarm modem manufacturer part number",
+            "SMS alarm modem catalogue price GBP",
+            "SMS alarm modem datasheet",
+            "SMS alarm modem horticulture hydroponic",
+            "SMS alarm modem food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:12:wi_fi_gateway",
+          "closureRowId": "bom-close:control_compute_communication_remote_monitoring_wi_fi_gateway",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "wi_fi_gateway",
+          "description": "Wi-Fi gateway",
+          "searchTerms": [
+            "Wi-Fi gateway",
+            "Wi-Fi gateway manufacturer part number",
+            "Wi-Fi gateway catalogue price GBP",
+            "Wi-Fi gateway datasheet",
+            "Wi-Fi gateway horticulture hydroponic",
+            "Wi-Fi gateway food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:13:airflow_baffle_plate",
+          "closureRowId": "bom-close:environmental_interface_canopy_air_mixing_airflow_baffle_plate",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "airflow_baffle_plate",
+          "description": "airflow baffle plate",
+          "searchTerms": [
+            "airflow baffle plate",
+            "airflow baffle plate manufacturer part number",
+            "airflow baffle plate catalogue price GBP",
+            "airflow baffle plate datasheet",
+            "airflow baffle plate horticulture hydroponic",
+            "airflow baffle plate food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:14:fan_guard_grille",
+          "closureRowId": "bom-close:environmental_interface_canopy_air_mixing_fan_guard_grille",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fan_guard_grille",
+          "description": "fan guard grille",
+          "searchTerms": [
+            "fan guard grille",
+            "fan guard grille manufacturer part number",
+            "fan guard grille catalogue price GBP",
+            "fan guard grille datasheet",
+            "fan guard grille horticulture hydroponic",
+            "fan guard grille food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:15:replaceable_intake_filter",
+          "closureRowId": "bom-close:environmental_interface_canopy_air_mixing_replaceable_intake_filter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "replaceable_intake_filter",
+          "description": "replaceable intake filter",
+          "searchTerms": [
+            "replaceable intake filter",
+            "replaceable intake filter manufacturer part number",
+            "replaceable intake filter catalogue price GBP",
+            "replaceable intake filter datasheet",
+            "replaceable intake filter horticulture hydroponic",
+            "replaceable intake filter food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:16:co2_distribution_tube",
+          "closureRowId": "bom-close:environmental_interface_co2_enrichment_co2_distribution_tube",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "co2_distribution_tube",
+          "description": "CO2 distribution tube",
+          "searchTerms": [
+            "CO2 distribution tube",
+            "CO2 distribution tube manufacturer part number",
+            "CO2 distribution tube catalogue price GBP",
+            "CO2 distribution tube datasheet",
+            "CO2 distribution tube horticulture hydroponic",
+            "CO2 distribution tube food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:17:co2_solenoid_valve",
+          "closureRowId": "bom-close:environmental_interface_co2_enrichment_co2_solenoid_valve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "co2_solenoid_valve",
+          "description": "CO2 solenoid valve",
+          "searchTerms": [
+            "CO2 solenoid valve",
+            "CO2 solenoid valve manufacturer part number",
+            "CO2 solenoid valve catalogue price GBP",
+            "CO2 solenoid valve datasheet",
+            "CO2 solenoid valve horticulture hydroponic",
+            "CO2 solenoid valve food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:18:gas_regulator",
+          "closureRowId": "bom-close:environmental_interface_co2_enrichment_gas_regulator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "gas_regulator",
+          "description": "gas regulator",
+          "searchTerms": [
+            "gas regulator",
+            "gas regulator manufacturer part number",
+            "gas regulator catalogue price GBP",
+            "gas regulator datasheet",
+            "gas regulator horticulture hydroponic",
+            "gas regulator food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:19:ndir_co2_sensor_head",
+          "closureRowId": "bom-close:environmental_interface_co2_enrichment_ndir_co2_sensor_head",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ndir_co2_sensor_head",
+          "description": "NDIR CO2 sensor head",
+          "searchTerms": [
+            "NDIR CO2 sensor head",
+            "NDIR CO2 sensor head manufacturer part number",
+            "NDIR CO2 sensor head catalogue price GBP",
+            "NDIR CO2 sensor head datasheet",
+            "NDIR CO2 sensor head horticulture hydroponic",
+            "NDIR CO2 sensor head food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:20:dimmable_led_driver",
+          "closureRowId": "bom-close:environmental_interface_horticultural_lighting_dimmable_led_driver",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "dimmable_led_driver",
+          "description": "dimmable LED driver",
+          "searchTerms": [
+            "dimmable LED driver",
+            "dimmable LED driver manufacturer part number",
+            "dimmable LED driver catalogue price GBP",
+            "dimmable LED driver datasheet",
+            "dimmable LED driver horticulture hydroponic",
+            "dimmable LED driver food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:21:glare_shield",
+          "closureRowId": "bom-close:environmental_interface_horticultural_lighting_glare_shield",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "glare_shield",
+          "description": "glare shield",
+          "searchTerms": [
+            "glare shield",
+            "glare shield manufacturer part number",
+            "glare shield catalogue price GBP",
+            "glare shield datasheet",
+            "glare shield horticulture hydroponic",
+            "glare shield food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:22:lighting_suspension_bracket",
+          "closureRowId": "bom-close:environmental_interface_horticultural_lighting_lighting_suspension_bracket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lighting_suspension_bracket",
+          "description": "lighting suspension bracket",
+          "searchTerms": [
+            "lighting suspension bracket",
+            "lighting suspension bracket manufacturer part number",
+            "lighting suspension bracket catalogue price GBP",
+            "lighting suspension bracket datasheet",
+            "lighting suspension bracket horticulture hydroponic",
+            "lighting suspension bracket food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:23:ppfd_calibration_target",
+          "closureRowId": "bom-close:environmental_interface_horticultural_lighting_ppfd_calibration_target",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ppfd_calibration_target",
+          "description": "PPFD calibration target",
+          "searchTerms": [
+            "PPFD calibration target",
+            "PPFD calibration target manufacturer part number",
+            "PPFD calibration target catalogue price GBP",
+            "PPFD calibration target datasheet",
+            "PPFD calibration target horticulture hydroponic",
+            "PPFD calibration target food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:24:condensate_pump",
+          "closureRowId": "bom-close:environmental_interface_humidity_temperature_control_condensate_pump",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "condensate_pump",
+          "description": "condensate pump",
+          "searchTerms": [
+            "condensate pump",
+            "condensate pump manufacturer part number",
+            "condensate pump catalogue price GBP",
+            "condensate pump datasheet",
+            "condensate pump horticulture hydroponic",
+            "condensate pump food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:25:dehumidifier_module",
+          "closureRowId": "bom-close:environmental_interface_humidity_temperature_control_dehumidifier_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "dehumidifier_module",
+          "description": "dehumidifier module",
+          "searchTerms": [
+            "dehumidifier module",
+            "dehumidifier module manufacturer part number",
+            "dehumidifier module catalogue price GBP",
+            "dehumidifier module datasheet",
+            "dehumidifier module horticulture hydroponic",
+            "dehumidifier module food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:26:heat_exchanger_coil",
+          "closureRowId": "bom-close:environmental_interface_humidity_temperature_control_heat_exchanger_coil",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "heat_exchanger_coil",
+          "description": "heat exchanger coil",
+          "searchTerms": [
+            "heat exchanger coil",
+            "heat exchanger coil manufacturer part number",
+            "heat exchanger coil catalogue price GBP",
+            "heat exchanger coil datasheet",
+            "heat exchanger coil horticulture hydroponic",
+            "heat exchanger coil food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:27:humidity_control_relay",
+          "closureRowId": "bom-close:environmental_interface_humidity_temperature_control_humidity_control_relay",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "humidity_control_relay",
+          "description": "humidity control relay",
+          "searchTerms": [
+            "humidity control relay",
+            "humidity control relay manufacturer part number",
+            "humidity control relay catalogue price GBP",
+            "humidity control relay datasheet",
+            "humidity control relay horticulture hydroponic",
+            "humidity control relay food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:28:supply_air_temperature_probe",
+          "closureRowId": "bom-close:environmental_interface_humidity_temperature_control_supply_air_temperature_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "supply_air_temperature_probe",
+          "description": "supply air temperature probe",
+          "searchTerms": [
+            "supply air temperature probe",
+            "supply air temperature probe manufacturer part number",
+            "supply air temperature probe catalogue price GBP",
+            "supply air temperature probe datasheet",
+            "supply air temperature probe horticulture hydroponic",
+            "supply air temperature probe food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:29:chemical_hazard_label_set",
+          "closureRowId": "bom-close:hmi_ergonomics_labelling_workflows_chemical_hazard_label_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "chemical_hazard_label_set",
+          "description": "chemical hazard label set",
+          "searchTerms": [
+            "chemical hazard label set",
+            "chemical hazard label set manufacturer part number",
+            "chemical hazard label set catalogue price GBP",
+            "chemical hazard label set datasheet",
+            "chemical hazard label set horticulture hydroponic",
+            "chemical hazard label set food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:30:cleaning_checklist_card",
+          "closureRowId": "bom-close:hmi_ergonomics_labelling_workflows_cleaning_checklist_card",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "cleaning_checklist_card",
+          "description": "cleaning checklist card",
+          "searchTerms": [
+            "cleaning checklist card",
+            "cleaning checklist card manufacturer part number",
+            "cleaning checklist card catalogue price GBP",
+            "cleaning checklist card datasheet",
+            "cleaning checklist card horticulture hydroponic",
+            "cleaning checklist card food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:31:crop_lot_label_holder",
+          "closureRowId": "bom-close:hmi_ergonomics_labelling_workflows_crop_lot_label_holder",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "crop_lot_label_holder",
+          "description": "crop lot label holder",
+          "searchTerms": [
+            "crop lot label holder",
+            "crop lot label holder manufacturer part number",
+            "crop lot label holder catalogue price GBP",
+            "crop lot label holder datasheet",
+            "crop lot label holder horticulture hydroponic",
+            "crop lot label holder food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:32:electrical_isolation_placard",
+          "closureRowId": "bom-close:hmi_ergonomics_labelling_workflows_electrical_isolation_placard",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "electrical_isolation_placard",
+          "description": "electrical isolation placard",
+          "searchTerms": [
+            "electrical isolation placard",
+            "electrical isolation placard manufacturer part number",
+            "electrical isolation placard catalogue price GBP",
+            "electrical isolation placard datasheet",
+            "electrical isolation placard horticulture hydroponic",
+            "electrical isolation placard food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:33:alarm_buzzer_beacon",
+          "closureRowId": "bom-close:hmi_ergonomics_local_hmi_alarm_buzzer_beacon",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "alarm_buzzer_beacon",
+          "description": "alarm buzzer beacon",
+          "searchTerms": [
+            "alarm buzzer beacon",
+            "alarm buzzer beacon manufacturer part number",
+            "alarm buzzer beacon catalogue price GBP",
+            "alarm buzzer beacon datasheet",
+            "alarm buzzer beacon horticulture hydroponic",
+            "alarm buzzer beacon food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:34:recipe_selector_control",
+          "closureRowId": "bom-close:hmi_ergonomics_local_hmi_recipe_selector_control",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "recipe_selector_control",
+          "description": "recipe selector control",
+          "searchTerms": [
+            "recipe selector control",
+            "recipe selector control manufacturer part number",
+            "recipe selector control catalogue price GBP",
+            "recipe selector control datasheet",
+            "recipe selector control horticulture hydroponic",
+            "recipe selector control food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:35:touchscreen_hmi",
+          "closureRowId": "bom-close:hmi_ergonomics_local_hmi_touchscreen_hmi",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "touchscreen_hmi",
+          "description": "touchscreen HMI",
+          "searchTerms": [
+            "touchscreen HMI",
+            "touchscreen HMI manufacturer part number",
+            "touchscreen HMI catalogue price GBP",
+            "touchscreen HMI datasheet",
+            "touchscreen HMI horticulture hydroponic",
+            "touchscreen HMI food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:36:usb_data_export_port",
+          "closureRowId": "bom-close:hmi_ergonomics_local_hmi_usb_data_export_port",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "usb_data_export_port",
+          "description": "USB data export port",
+          "searchTerms": [
+            "USB data export port",
+            "USB data export port manufacturer part number",
+            "USB data export port catalogue price GBP",
+            "USB data export port datasheet",
+            "USB data export port horticulture hydroponic",
+            "USB data export port food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:37:drying_fan_mode_switch",
+          "closureRowId": "bom-close:maintenance_serviceability_cleaning_access_drying_fan_mode_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "drying_fan_mode_switch",
+          "description": "drying fan mode switch",
+          "searchTerms": [
+            "drying fan mode switch",
+            "drying fan mode switch manufacturer part number",
+            "drying fan mode switch catalogue price GBP",
+            "drying fan mode switch datasheet",
+            "drying fan mode switch horticulture hydroponic",
+            "drying fan mode switch food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:38:quick_release_manifold_union",
+          "closureRowId": "bom-close:maintenance_serviceability_cleaning_access_quick_release_manifold_union",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "quick_release_manifold_union",
+          "description": "quick-release manifold union",
+          "searchTerms": [
+            "quick-release manifold union",
+            "quick-release manifold union manufacturer part number",
+            "quick-release manifold union catalogue price GBP",
+            "quick-release manifold union datasheet",
+            "quick-release manifold union horticulture hydroponic",
+            "quick-release manifold union food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:39:removable_sump_screen",
+          "closureRowId": "bom-close:maintenance_serviceability_cleaning_access_removable_sump_screen",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "removable_sump_screen",
+          "description": "removable sump screen",
+          "searchTerms": [
+            "removable sump screen",
+            "removable sump screen manufacturer part number",
+            "removable sump screen catalogue price GBP",
+            "removable sump screen datasheet",
+            "removable sump screen horticulture hydroponic",
+            "removable sump screen food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:40:washdown_hose_connection",
+          "closureRowId": "bom-close:maintenance_serviceability_cleaning_access_washdown_hose_connection",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "washdown_hose_connection",
+          "description": "washdown hose connection",
+          "searchTerms": [
+            "washdown hose connection",
+            "washdown hose connection manufacturer part number",
+            "washdown hose connection catalogue price GBP",
+            "washdown hose connection datasheet",
+            "washdown hose connection horticulture hydroponic",
+            "washdown hose connection food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:41:dosing_bottle_tray",
+          "closureRowId": "bom-close:maintenance_serviceability_consumable_service_dosing_bottle_tray",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "dosing_bottle_tray",
+          "description": "dosing bottle tray",
+          "searchTerms": [
+            "dosing bottle tray",
+            "dosing bottle tray manufacturer part number",
+            "dosing bottle tray catalogue price GBP",
+            "dosing bottle tray datasheet",
+            "dosing bottle tray horticulture hydroponic",
+            "dosing bottle tray food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:42:filter_service_hatch",
+          "closureRowId": "bom-close:maintenance_serviceability_consumable_service_filter_service_hatch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "filter_service_hatch",
+          "description": "filter service hatch",
+          "searchTerms": [
+            "filter service hatch",
+            "filter service hatch manufacturer part number",
+            "filter service hatch catalogue price GBP",
+            "filter service hatch datasheet",
+            "filter service hatch horticulture hydroponic",
+            "filter service hatch food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:43:probe_calibration_cup",
+          "closureRowId": "bom-close:maintenance_serviceability_consumable_service_probe_calibration_cup",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "probe_calibration_cup",
+          "description": "probe calibration cup",
+          "searchTerms": [
+            "probe calibration cup",
+            "probe calibration cup manufacturer part number",
+            "probe calibration cup catalogue price GBP",
+            "probe calibration cup datasheet",
+            "probe calibration cup horticulture hydroponic",
+            "probe calibration cup food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:44:spare_gasket_kit",
+          "closureRowId": "bom-close:maintenance_serviceability_consumable_service_spare_gasket_kit",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "spare_gasket_kit",
+          "description": "spare gasket kit",
+          "searchTerms": [
+            "spare gasket kit",
+            "spare gasket kit manufacturer part number",
+            "spare gasket kit catalogue price GBP",
+            "spare gasket kit datasheet",
+            "spare gasket kit horticulture hydroponic",
+            "spare gasket kit food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:45:harvest_work_ledge",
+          "closureRowId": "bom-close:maintenance_serviceability_harvest_access_harvest_work_ledge",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "harvest_work_ledge",
+          "description": "harvest work ledge",
+          "searchTerms": [
+            "harvest work ledge",
+            "harvest work ledge manufacturer part number",
+            "harvest work ledge catalogue price GBP",
+            "harvest work ledge datasheet",
+            "harvest work ledge horticulture hydroponic",
+            "harvest work ledge food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:46:removable_seedling_cassette",
+          "closureRowId": "bom-close:maintenance_serviceability_harvest_access_removable_seedling_cassette",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "removable_seedling_cassette",
+          "description": "removable seedling cassette",
+          "searchTerms": [
+            "removable seedling cassette",
+            "removable seedling cassette manufacturer part number",
+            "removable seedling cassette catalogue price GBP",
+            "removable seedling cassette datasheet",
+            "removable seedling cassette horticulture hydroponic",
+            "removable seedling cassette food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:47:shelf_stop_latch",
+          "closureRowId": "bom-close:maintenance_serviceability_harvest_access_shelf_stop_latch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "shelf_stop_latch",
+          "description": "shelf stop latch",
+          "searchTerms": [
+            "shelf stop latch",
+            "shelf stop latch manufacturer part number",
+            "shelf stop latch catalogue price GBP",
+            "shelf stop latch datasheet",
+            "shelf stop latch horticulture hydroponic",
+            "shelf stop latch food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:48:slide_out_tray_handle",
+          "closureRowId": "bom-close:maintenance_serviceability_harvest_access_slide_out_tray_handle",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "slide_out_tray_handle",
+          "description": "slide-out tray handle",
+          "searchTerms": [
+            "slide-out tray handle",
+            "slide-out tray handle manufacturer part number",
+            "slide-out tray handle catalogue price GBP",
+            "slide-out tray handle datasheet",
+            "slide-out tray handle horticulture hydroponic",
+            "slide-out tray handle food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:49:check_valve",
+          "closureRowId": "bom-close:mass_fluid_transport_process_fertigation_pumping_check_valve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "check_valve",
+          "description": "check valve",
+          "searchTerms": [
+            "check valve",
+            "check valve manufacturer part number",
+            "check valve catalogue price GBP",
+            "check valve datasheet",
+            "check valve horticulture hydroponic",
+            "check valve food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:50:flow_meter",
+          "closureRowId": "bom-close:mass_fluid_transport_process_fertigation_pumping_flow_meter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "flow_meter",
+          "description": "flow meter",
+          "searchTerms": [
+            "flow meter",
+            "flow meter manufacturer part number",
+            "flow meter catalogue price GBP",
+            "flow meter datasheet",
+            "flow meter horticulture hydroponic",
+            "flow meter food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:51:pump_isolation_valve",
+          "closureRowId": "bom-close:mass_fluid_transport_process_fertigation_pumping_pump_isolation_valve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pump_isolation_valve",
+          "description": "pump isolation valve",
+          "searchTerms": [
+            "pump isolation valve",
+            "pump isolation valve manufacturer part number",
+            "pump isolation valve catalogue price GBP",
+            "pump isolation valve datasheet",
+            "pump isolation valve horticulture hydroponic",
+            "pump isolation valve food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:52:pump_vibration_mount",
+          "closureRowId": "bom-close:mass_fluid_transport_process_fertigation_pumping_pump_vibration_mount",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pump_vibration_mount",
+          "description": "pump vibration mount",
+          "searchTerms": [
+            "pump vibration mount",
+            "pump vibration mount manufacturer part number",
+            "pump vibration mount catalogue price GBP",
+            "pump vibration mount datasheet",
+            "pump vibration mount horticulture hydroponic",
+            "pump vibration mount food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:53:drain_valve",
+          "closureRowId": "bom-close:mass_fluid_transport_process_filtration_sanitation_drain_valve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "drain_valve",
+          "description": "drain valve",
+          "searchTerms": [
+            "drain valve",
+            "drain valve manufacturer part number",
+            "drain valve catalogue price GBP",
+            "drain valve datasheet",
+            "drain valve horticulture hydroponic",
+            "drain valve food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:54:inline_mesh_filter",
+          "closureRowId": "bom-close:mass_fluid_transport_process_filtration_sanitation_inline_mesh_filter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "inline_mesh_filter",
+          "description": "inline mesh filter",
+          "searchTerms": [
+            "inline mesh filter",
+            "inline mesh filter manufacturer part number",
+            "inline mesh filter catalogue price GBP",
+            "inline mesh filter datasheet",
+            "inline mesh filter horticulture hydroponic",
+            "inline mesh filter food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:55:sample_port",
+          "closureRowId": "bom-close:mass_fluid_transport_process_filtration_sanitation_sample_port",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sample_port",
+          "description": "sample port",
+          "searchTerms": [
+            "sample port",
+            "sample port manufacturer part number",
+            "sample port catalogue price GBP",
+            "sample port datasheet",
+            "sample port horticulture hydroponic",
+            "sample port food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:56:uv_steriliser",
+          "closureRowId": "bom-close:mass_fluid_transport_process_filtration_sanitation_uv_steriliser",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "uv_steriliser",
+          "description": "UV steriliser",
+          "searchTerms": [
+            "UV steriliser",
+            "UV steriliser manufacturer part number",
+            "UV steriliser catalogue price GBP",
+            "UV steriliser datasheet",
+            "UV steriliser horticulture hydroponic",
+            "UV steriliser food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:57:anti_siphon_valve",
+          "closureRowId": "bom-close:mass_fluid_transport_process_nutrient_dosing_anti_siphon_valve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "anti_siphon_valve",
+          "description": "anti-siphon valve",
+          "searchTerms": [
+            "anti-siphon valve",
+            "anti-siphon valve manufacturer part number",
+            "anti-siphon valve catalogue price GBP",
+            "anti-siphon valve datasheet",
+            "anti-siphon valve horticulture hydroponic",
+            "anti-siphon valve food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:58:chemical_suction_lance",
+          "closureRowId": "bom-close:mass_fluid_transport_process_nutrient_dosing_chemical_suction_lance",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "chemical_suction_lance",
+          "description": "chemical suction lance",
+          "searchTerms": [
+            "chemical suction lance",
+            "chemical suction lance manufacturer part number",
+            "chemical suction lance catalogue price GBP",
+            "chemical suction lance datasheet",
+            "chemical suction lance horticulture hydroponic",
+            "chemical suction lance food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:59:mixing_eductor",
+          "closureRowId": "bom-close:mass_fluid_transport_process_nutrient_dosing_mixing_eductor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "mixing_eductor",
+          "description": "mixing eductor",
+          "searchTerms": [
+            "mixing eductor",
+            "mixing eductor manufacturer part number",
+            "mixing eductor catalogue price GBP",
+            "mixing eductor datasheet",
+            "mixing eductor horticulture hydroponic",
+            "mixing eductor food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:60:peristaltic_dosing_pump",
+          "closureRowId": "bom-close:mass_fluid_transport_process_nutrient_dosing_peristaltic_dosing_pump",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "peristaltic_dosing_pump",
+          "description": "peristaltic dosing pump",
+          "searchTerms": [
+            "peristaltic dosing pump",
+            "peristaltic dosing pump manufacturer part number",
+            "peristaltic dosing pump catalogue price GBP",
+            "peristaltic dosing pump datasheet",
+            "peristaltic dosing pump horticulture hydroponic",
+            "peristaltic dosing pump food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:61:ph_dosing_pump",
+          "closureRowId": "bom-close:mass_fluid_transport_process_nutrient_dosing_ph_dosing_pump",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ph_dosing_pump",
+          "description": "pH dosing pump",
+          "searchTerms": [
+            "pH dosing pump",
+            "pH dosing pump manufacturer part number",
+            "pH dosing pump catalogue price GBP",
+            "pH dosing pump datasheet",
+            "pH dosing pump horticulture hydroponic",
+            "pH dosing pump food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:62:bulkhead_fitting_set",
+          "closureRowId": "bom-close:mass_fluid_transport_process_reservoir_plumbing_bulkhead_fitting_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "bulkhead_fitting_set",
+          "description": "bulkhead fitting set",
+          "searchTerms": [
+            "bulkhead fitting set",
+            "bulkhead fitting set manufacturer part number",
+            "bulkhead fitting set catalogue price GBP",
+            "bulkhead fitting set datasheet",
+            "bulkhead fitting set horticulture hydroponic",
+            "bulkhead fitting set food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:63:opaque_nutrient_reservoir",
+          "closureRowId": "bom-close:mass_fluid_transport_process_reservoir_plumbing_opaque_nutrient_reservoir",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "opaque_nutrient_reservoir",
+          "description": "opaque nutrient reservoir",
+          "searchTerms": [
+            "opaque nutrient reservoir",
+            "opaque nutrient reservoir manufacturer part number",
+            "opaque nutrient reservoir catalogue price GBP",
+            "opaque nutrient reservoir datasheet",
+            "opaque nutrient reservoir horticulture hydroponic",
+            "opaque nutrient reservoir food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:64:pvc_u_manifold",
+          "closureRowId": "bom-close:mass_fluid_transport_process_reservoir_plumbing_pvc_u_manifold",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pvc_u_manifold",
+          "description": "PVC-U manifold",
+          "searchTerms": [
+            "PVC-U manifold",
+            "PVC-U manifold manufacturer part number",
+            "PVC-U manifold catalogue price GBP",
+            "PVC-U manifold datasheet",
+            "PVC-U manifold horticulture hydroponic",
+            "PVC-U manifold food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:65:return_drain_header",
+          "closureRowId": "bom-close:mass_fluid_transport_process_reservoir_plumbing_return_drain_header",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "return_drain_header",
+          "description": "return drain header",
+          "searchTerms": [
+            "return drain header",
+            "return drain header manufacturer part number",
+            "return drain header catalogue price GBP",
+            "return drain header datasheet",
+            "return drain header horticulture hydroponic",
+            "return drain header food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:66:driver_mounting_rail",
+          "closureRowId": "bom-close:power_distribution_lighting_power_driver_mounting_rail",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "driver_mounting_rail",
+          "description": "driver mounting rail",
+          "searchTerms": [
+            "driver mounting rail",
+            "driver mounting rail manufacturer part number",
+            "driver mounting rail catalogue price GBP",
+            "driver mounting rail datasheet",
+            "driver mounting rail horticulture hydroponic",
+            "driver mounting rail food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:67:fused_spur_module",
+          "closureRowId": "bom-close:power_distribution_lighting_power_fused_spur_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fused_spur_module",
+          "description": "fused spur module",
+          "searchTerms": [
+            "fused spur module",
+            "fused spur module manufacturer part number",
+            "fused spur module catalogue price GBP",
+            "fused spur module datasheet",
+            "fused spur module horticulture hydroponic",
+            "fused spur module food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:68:ip65_cable_gland_set",
+          "closureRowId": "bom-close:power_distribution_lighting_power_ip65_cable_gland_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ip65_cable_gland_set",
+          "description": "IP65 cable gland set",
+          "searchTerms": [
+            "IP65 cable gland set",
+            "IP65 cable gland set manufacturer part number",
+            "IP65 cable gland set catalogue price GBP",
+            "IP65 cable gland set datasheet",
+            "IP65 cable gland set horticulture hydroponic",
+            "IP65 cable gland set food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:69:lighting_bus_trunk",
+          "closureRowId": "bom-close:power_distribution_lighting_power_lighting_bus_trunk",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lighting_bus_trunk",
+          "description": "lighting bus trunk",
+          "searchTerms": [
+            "lighting bus trunk",
+            "lighting bus trunk manufacturer part number",
+            "lighting bus trunk catalogue price GBP",
+            "lighting bus trunk datasheet",
+            "lighting bus trunk horticulture hydroponic",
+            "lighting bus trunk food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:70:24_v_dc_power_supply",
+          "closureRowId": "bom-close:power_distribution_low_voltage_power_24_v_dc_power_supply",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "24_v_dc_power_supply",
+          "description": "24 V DC power supply",
+          "searchTerms": [
+            "24 V DC power supply",
+            "24 V DC power supply manufacturer part number",
+            "24 V DC power supply catalogue price GBP",
+            "24 V DC power supply datasheet",
+            "24 V DC power supply horticulture hydroponic",
+            "24 V DC power supply food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:71:control_cabinet_heater",
+          "closureRowId": "bom-close:power_distribution_low_voltage_power_control_cabinet_heater",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "control_cabinet_heater",
+          "description": "control cabinet heater",
+          "searchTerms": [
+            "control cabinet heater",
+            "control cabinet heater manufacturer part number",
+            "control cabinet heater catalogue price GBP",
+            "control cabinet heater datasheet",
+            "control cabinet heater horticulture hydroponic",
+            "control cabinet heater food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:72:dc_distribution_terminal",
+          "closureRowId": "bom-close:power_distribution_low_voltage_power_dc_distribution_terminal",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "dc_distribution_terminal",
+          "description": "DC distribution terminal",
+          "searchTerms": [
+            "DC distribution terminal",
+            "DC distribution terminal manufacturer part number",
+            "DC distribution terminal catalogue price GBP",
+            "DC distribution terminal datasheet",
+            "DC distribution terminal horticulture hydroponic",
+            "DC distribution terminal food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:73:ups_buffer_module",
+          "closureRowId": "bom-close:power_distribution_low_voltage_power_ups_buffer_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ups_buffer_module",
+          "description": "UPS buffer module",
+          "searchTerms": [
+            "UPS buffer module",
+            "UPS buffer module manufacturer part number",
+            "UPS buffer module catalogue price GBP",
+            "UPS buffer module datasheet",
+            "UPS buffer module horticulture hydroponic",
+            "UPS buffer module food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:74:lockable_main_isolator",
+          "closureRowId": "bom-close:power_distribution_mains_panel_lockable_main_isolator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lockable_main_isolator",
+          "description": "lockable main isolator",
+          "searchTerms": [
+            "lockable main isolator",
+            "lockable main isolator manufacturer part number",
+            "lockable main isolator catalogue price GBP",
+            "lockable main isolator datasheet",
+            "lockable main isolator horticulture hydroponic",
+            "lockable main isolator food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:75:protective_earth_bar",
+          "closureRowId": "bom-close:power_distribution_mains_panel_protective_earth_bar",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "protective_earth_bar",
+          "description": "protective earth bar",
+          "searchTerms": [
+            "protective earth bar",
+            "protective earth bar manufacturer part number",
+            "protective earth bar catalogue price GBP",
+            "protective earth bar datasheet",
+            "protective earth bar horticulture hydroponic",
+            "protective earth bar food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:76:rcbo_breaker_bank",
+          "closureRowId": "bom-close:power_distribution_mains_panel_rcbo_breaker_bank",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "rcbo_breaker_bank",
+          "description": "RCBO breaker bank",
+          "searchTerms": [
+            "RCBO breaker bank",
+            "RCBO breaker bank manufacturer part number",
+            "RCBO breaker bank catalogue price GBP",
+            "RCBO breaker bank datasheet",
+            "RCBO breaker bank horticulture hydroponic",
+            "RCBO breaker bank food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:77:surge_protection_device",
+          "closureRowId": "bom-close:power_distribution_mains_panel_surge_protection_device",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "surge_protection_device",
+          "description": "surge protection device",
+          "searchTerms": [
+            "surge protection device",
+            "surge protection device manufacturer part number",
+            "surge protection device catalogue price GBP",
+            "surge protection device datasheet",
+            "surge protection device horticulture hydroponic",
+            "surge protection device food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:78:cleaning_validation_swab_kit",
+          "closureRowId": "bom-close:safety_protection_food_contact_controls_cleaning_validation_swab_kit",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "cleaning_validation_swab_kit",
+          "description": "cleaning validation swab kit",
+          "searchTerms": [
+            "cleaning validation swab kit",
+            "cleaning validation swab kit manufacturer part number",
+            "cleaning validation swab kit catalogue price GBP",
+            "cleaning validation swab kit datasheet",
+            "cleaning validation swab kit horticulture hydroponic",
+            "cleaning validation swab kit food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:79:food_grade_tubing_set",
+          "closureRowId": "bom-close:safety_protection_food_contact_controls_food_grade_tubing_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "food_grade_tubing_set",
+          "description": "food-grade tubing set",
+          "searchTerms": [
+            "food-grade tubing set",
+            "food-grade tubing set manufacturer part number",
+            "food-grade tubing set catalogue price GBP",
+            "food-grade tubing set datasheet",
+            "food-grade tubing set horticulture hydroponic",
+            "food-grade tubing set food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:80:material_traceability_label",
+          "closureRowId": "bom-close:safety_protection_food_contact_controls_material_traceability_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "material_traceability_label",
+          "description": "material traceability label",
+          "searchTerms": [
+            "material traceability label",
+            "material traceability label manufacturer part number",
+            "material traceability label catalogue price GBP",
+            "material traceability label datasheet",
+            "material traceability label horticulture hydroponic",
+            "material traceability label food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:81:washdown_sop_placard",
+          "closureRowId": "bom-close:safety_protection_food_contact_controls_washdown_sop_placard",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "washdown_sop_placard",
+          "description": "washdown SOP placard",
+          "searchTerms": [
+            "washdown SOP placard",
+            "washdown SOP placard manufacturer part number",
+            "washdown SOP placard catalogue price GBP",
+            "washdown SOP placard datasheet",
+            "washdown SOP placard horticulture hydroponic",
+            "washdown SOP placard food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:82:bunded_base_tray",
+          "closureRowId": "bom-close:safety_protection_leak_containment_bunded_base_tray",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "bunded_base_tray",
+          "description": "bunded base tray",
+          "searchTerms": [
+            "bunded base tray",
+            "bunded base tray manufacturer part number",
+            "bunded base tray catalogue price GBP",
+            "bunded base tray datasheet",
+            "bunded base tray horticulture hydroponic",
+            "bunded base tray food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:83:floor_drain_adapter",
+          "closureRowId": "bom-close:safety_protection_leak_containment_floor_drain_adapter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "floor_drain_adapter",
+          "description": "floor drain adapter",
+          "searchTerms": [
+            "floor drain adapter",
+            "floor drain adapter manufacturer part number",
+            "floor drain adapter catalogue price GBP",
+            "floor drain adapter datasheet",
+            "floor drain adapter horticulture hydroponic",
+            "floor drain adapter food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:84:leak_detection_rope",
+          "closureRowId": "bom-close:safety_protection_leak_containment_leak_detection_rope",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "leak_detection_rope",
+          "description": "leak detection rope",
+          "searchTerms": [
+            "leak detection rope",
+            "leak detection rope manufacturer part number",
+            "leak detection rope catalogue price GBP",
+            "leak detection rope datasheet",
+            "leak detection rope horticulture hydroponic",
+            "leak detection rope food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:85:overflow_standpipe",
+          "closureRowId": "bom-close:safety_protection_leak_containment_overflow_standpipe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "overflow_standpipe",
+          "description": "overflow standpipe",
+          "searchTerms": [
+            "overflow standpipe",
+            "overflow standpipe manufacturer part number",
+            "overflow standpipe catalogue price GBP",
+            "overflow standpipe datasheet",
+            "overflow standpipe horticulture hydroponic",
+            "overflow standpipe food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:86:chemical_storage_latch",
+          "closureRowId": "bom-close:safety_protection_operator_interlocks_chemical_storage_latch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "chemical_storage_latch",
+          "description": "chemical storage latch",
+          "searchTerms": [
+            "chemical storage latch",
+            "chemical storage latch manufacturer part number",
+            "chemical storage latch catalogue price GBP",
+            "chemical storage latch datasheet",
+            "chemical storage latch horticulture hydroponic",
+            "chemical storage latch food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:87:door_interlock_switch",
+          "closureRowId": "bom-close:safety_protection_operator_interlocks_door_interlock_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "door_interlock_switch",
+          "description": "door interlock switch",
+          "searchTerms": [
+            "door interlock switch",
+            "door interlock switch manufacturer part number",
+            "door interlock switch catalogue price GBP",
+            "door interlock switch datasheet",
+            "door interlock switch horticulture hydroponic",
+            "door interlock switch food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:88:emergency_stop_button",
+          "closureRowId": "bom-close:safety_protection_operator_interlocks_emergency_stop_button",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "emergency_stop_button",
+          "description": "emergency stop button",
+          "searchTerms": [
+            "emergency stop button",
+            "emergency stop button manufacturer part number",
+            "emergency stop button catalogue price GBP",
+            "emergency stop button datasheet",
+            "emergency stop button horticulture hydroponic",
+            "emergency stop button food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:89:lighting_inhibit_relay",
+          "closureRowId": "bom-close:safety_protection_operator_interlocks_lighting_inhibit_relay",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lighting_inhibit_relay",
+          "description": "lighting inhibit relay",
+          "searchTerms": [
+            "lighting inhibit relay",
+            "lighting inhibit relay manufacturer part number",
+            "lighting inhibit relay catalogue price GBP",
+            "lighting inhibit relay datasheet",
+            "lighting inhibit relay horticulture hydroponic",
+            "lighting inhibit relay food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:90:differential_pressure_switch",
+          "closureRowId": "bom-close:sensing_instrumentation_climate_sensors_differential_pressure_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "differential_pressure_switch",
+          "description": "differential pressure switch",
+          "searchTerms": [
+            "differential pressure switch",
+            "differential pressure switch manufacturer part number",
+            "differential pressure switch catalogue price GBP",
+            "differential pressure switch datasheet",
+            "differential pressure switch horticulture hydroponic",
+            "differential pressure switch food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:91:leaf_temperature_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_climate_sensors_leaf_temperature_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "leaf_temperature_sensor",
+          "description": "leaf temperature sensor",
+          "searchTerms": [
+            "leaf temperature sensor",
+            "leaf temperature sensor manufacturer part number",
+            "leaf temperature sensor catalogue price GBP",
+            "leaf temperature sensor datasheet",
+            "leaf temperature sensor horticulture hydroponic",
+            "leaf temperature sensor food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:92:par_light_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_climate_sensors_par_light_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "par_light_sensor",
+          "description": "PAR light sensor",
+          "searchTerms": [
+            "PAR light sensor",
+            "PAR light sensor manufacturer part number",
+            "PAR light sensor catalogue price GBP",
+            "PAR light sensor datasheet",
+            "PAR light sensor horticulture hydroponic",
+            "PAR light sensor food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:93:temperature_humidity_probe",
+          "closureRowId": "bom-close:sensing_instrumentation_climate_sensors_temperature_humidity_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "temperature_humidity_probe",
+          "description": "temperature humidity probe",
+          "searchTerms": [
+            "temperature humidity probe",
+            "temperature humidity probe manufacturer part number",
+            "temperature humidity probe catalogue price GBP",
+            "temperature humidity probe datasheet",
+            "temperature humidity probe horticulture hydroponic",
+            "temperature humidity probe food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:94:calibration_colour_card",
+          "closureRowId": "bom-close:sensing_instrumentation_crop_observation_calibration_colour_card",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "calibration_colour_card",
+          "description": "calibration colour card",
+          "searchTerms": [
+            "calibration colour card",
+            "calibration colour card manufacturer part number",
+            "calibration colour card catalogue price GBP",
+            "calibration colour card datasheet",
+            "calibration colour card horticulture hydroponic",
+            "calibration colour card food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:95:camera_light_shield",
+          "closureRowId": "bom-close:sensing_instrumentation_crop_observation_camera_light_shield",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "camera_light_shield",
+          "description": "camera light shield",
+          "searchTerms": [
+            "camera light shield",
+            "camera light shield manufacturer part number",
+            "camera light shield catalogue price GBP",
+            "camera light shield datasheet",
+            "camera light shield horticulture hydroponic",
+            "camera light shield food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:96:rgb_crop_camera",
+          "closureRowId": "bom-close:sensing_instrumentation_crop_observation_rgb_crop_camera",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "rgb_crop_camera",
+          "description": "RGB crop camera",
+          "searchTerms": [
+            "RGB crop camera",
+            "RGB crop camera manufacturer part number",
+            "RGB crop camera catalogue price GBP",
+            "RGB crop camera datasheet",
+            "RGB crop camera horticulture hydroponic",
+            "RGB crop camera food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:97:time_lapse_controller",
+          "closureRowId": "bom-close:sensing_instrumentation_crop_observation_time_lapse_controller",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "time_lapse_controller",
+          "description": "time-lapse controller",
+          "searchTerms": [
+            "time-lapse controller",
+            "time-lapse controller manufacturer part number",
+            "time-lapse controller catalogue price GBP",
+            "time-lapse controller datasheet",
+            "time-lapse controller horticulture hydroponic",
+            "time-lapse controller food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:98:ec_probe",
+          "closureRowId": "bom-close:sensing_instrumentation_nutrient_sensors_ec_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ec_probe",
+          "description": "EC probe",
+          "searchTerms": [
+            "EC probe",
+            "EC probe manufacturer part number",
+            "EC probe catalogue price GBP",
+            "EC probe datasheet",
+            "EC probe horticulture hydroponic",
+            "EC probe food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:99:ph_probe",
+          "closureRowId": "bom-close:sensing_instrumentation_nutrient_sensors_ph_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ph_probe",
+          "description": "pH probe",
+          "searchTerms": [
+            "pH probe",
+            "pH probe manufacturer part number",
+            "pH probe catalogue price GBP",
+            "pH probe datasheet",
+            "pH probe horticulture hydroponic",
+            "pH probe food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:100:reservoir_level_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_nutrient_sensors_reservoir_level_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "reservoir_level_sensor",
+          "description": "reservoir level sensor",
+          "searchTerms": [
+            "reservoir level sensor",
+            "reservoir level sensor manufacturer part number",
+            "reservoir level sensor catalogue price GBP",
+            "reservoir level sensor datasheet",
+            "reservoir level sensor horticulture hydroponic",
+            "reservoir level sensor food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:101:solution_temperature_probe",
+          "closureRowId": "bom-close:sensing_instrumentation_nutrient_sensors_solution_temperature_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "solution_temperature_probe",
+          "description": "solution temperature probe",
+          "searchTerms": [
+            "solution temperature probe",
+            "solution temperature probe manufacturer part number",
+            "solution temperature probe catalogue price GBP",
+            "solution temperature probe datasheet",
+            "solution temperature probe horticulture hydroponic",
+            "solution temperature probe food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:102:food_safe_grow_tray",
+          "closureRowId": "bom-close:structure_containment_crop_tray_carriers_food_safe_grow_tray",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "food_safe_grow_tray",
+          "description": "food-safe grow tray",
+          "searchTerms": [
+            "food-safe grow tray",
+            "food-safe grow tray manufacturer part number",
+            "food-safe grow tray catalogue price GBP",
+            "food-safe grow tray datasheet",
+            "food-safe grow tray horticulture hydroponic",
+            "food-safe grow tray food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:103:nft_channel_insert",
+          "closureRowId": "bom-close:structure_containment_crop_tray_carriers_nft_channel_insert",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "nft_channel_insert",
+          "description": "NFT channel insert",
+          "searchTerms": [
+            "NFT channel insert",
+            "NFT channel insert manufacturer part number",
+            "NFT channel insert catalogue price GBP",
+            "NFT channel insert datasheet",
+            "NFT channel insert horticulture hydroponic",
+            "NFT channel insert food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:104:root_zone_cover",
+          "closureRowId": "bom-close:structure_containment_crop_tray_carriers_root_zone_cover",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "root_zone_cover",
+          "description": "root-zone cover",
+          "searchTerms": [
+            "root-zone cover",
+            "root-zone cover manufacturer part number",
+            "root-zone cover catalogue price GBP",
+            "root-zone cover datasheet",
+            "root-zone cover horticulture hydroponic",
+            "root-zone cover food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:105:seedling_raft",
+          "closureRowId": "bom-close:structure_containment_crop_tray_carriers_seedling_raft",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "seedling_raft",
+          "description": "seedling raft",
+          "searchTerms": [
+            "seedling raft",
+            "seedling raft manufacturer part number",
+            "seedling raft catalogue price GBP",
+            "seedling raft datasheet",
+            "seedling raft horticulture hydroponic",
+            "seedling raft food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:106:tray_drain_fitting",
+          "closureRowId": "bom-close:structure_containment_crop_tray_carriers_tray_drain_fitting",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "tray_drain_fitting",
+          "description": "tray drain fitting",
+          "searchTerms": [
+            "tray drain fitting",
+            "tray drain fitting manufacturer part number",
+            "tray drain fitting catalogue price GBP",
+            "tray drain fitting datasheet",
+            "tray drain fitting horticulture hydroponic",
+            "tray drain fitting food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:107:clear_inspection_door",
+          "closureRowId": "bom-close:structure_containment_enclosure_panels_clear_inspection_door",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "clear_inspection_door",
+          "description": "clear inspection door",
+          "searchTerms": [
+            "clear inspection door",
+            "clear inspection door manufacturer part number",
+            "clear inspection door catalogue price GBP",
+            "clear inspection door datasheet",
+            "clear inspection door horticulture hydroponic",
+            "clear inspection door food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:108:condensate_drip_channel",
+          "closureRowId": "bom-close:structure_containment_enclosure_panels_condensate_drip_channel",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "condensate_drip_channel",
+          "description": "condensate drip channel",
+          "searchTerms": [
+            "condensate drip channel",
+            "condensate drip channel manufacturer part number",
+            "condensate drip channel catalogue price GBP",
+            "condensate drip channel datasheet",
+            "condensate drip channel horticulture hydroponic",
+            "condensate drip channel food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:109:epdm_door_gasket",
+          "closureRowId": "bom-close:structure_containment_enclosure_panels_epdm_door_gasket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "epdm_door_gasket",
+          "description": "EPDM door gasket",
+          "searchTerms": [
+            "EPDM door gasket",
+            "EPDM door gasket manufacturer part number",
+            "EPDM door gasket catalogue price GBP",
+            "EPDM door gasket datasheet",
+            "EPDM door gasket horticulture hydroponic",
+            "EPDM door gasket food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:110:washdown_side_panel",
+          "closureRowId": "bom-close:structure_containment_enclosure_panels_washdown_side_panel",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "washdown_side_panel",
+          "description": "washdown side panel",
+          "searchTerms": [
+            "washdown side panel",
+            "washdown side panel manufacturer part number",
+            "washdown side panel catalogue price GBP",
+            "washdown side panel datasheet",
+            "washdown side panel horticulture hydroponic",
+            "washdown side panel food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:111:adjustable_levelling_foot",
+          "closureRowId": "bom-close:structure_containment_growing_rack_stack_adjustable_levelling_foot",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "adjustable_levelling_foot",
+          "description": "adjustable levelling foot",
+          "searchTerms": [
+            "adjustable levelling foot",
+            "adjustable levelling foot manufacturer part number",
+            "adjustable levelling foot catalogue price GBP",
+            "adjustable levelling foot datasheet",
+            "adjustable levelling foot horticulture hydroponic",
+            "adjustable levelling foot food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:112:aluminium_extrusion_upright",
+          "closureRowId": "bom-close:structure_containment_growing_rack_stack_aluminium_extrusion_upright",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "aluminium_extrusion_upright",
+          "description": "aluminium extrusion upright",
+          "searchTerms": [
+            "aluminium extrusion upright",
+            "aluminium extrusion upright manufacturer part number",
+            "aluminium extrusion upright catalogue price GBP",
+            "aluminium extrusion upright datasheet",
+            "aluminium extrusion upright horticulture hydroponic",
+            "aluminium extrusion upright food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:113:cross_brace_set",
+          "closureRowId": "bom-close:structure_containment_growing_rack_stack_cross_brace_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "cross_brace_set",
+          "description": "cross brace set",
+          "searchTerms": [
+            "cross brace set",
+            "cross brace set manufacturer part number",
+            "cross brace set catalogue price GBP",
+            "cross brace set datasheet",
+            "cross brace set horticulture hydroponic",
+            "cross brace set food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:114:tray_slide_rail",
+          "closureRowId": "bom-close:structure_containment_growing_rack_stack_tray_slide_rail",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "tray_slide_rail",
+          "description": "tray slide rail",
+          "searchTerms": [
+            "tray slide rail",
+            "tray slide rail manufacturer part number",
+            "tray slide rail catalogue price GBP",
+            "tray slide rail datasheet",
+            "tray slide rail horticulture hydroponic",
+            "tray slide rail food safe"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        }
+      ]
+    }
+  ]
+}

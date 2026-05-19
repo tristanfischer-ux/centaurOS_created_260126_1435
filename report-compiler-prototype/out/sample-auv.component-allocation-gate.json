@@ -1,0 +1,1040 @@
+{
+  "verdict": "allocation_ready",
+  "summary": {
+    "modules": 9,
+    "subModules": 27,
+    "componentWords": 108,
+    "readySubModules": 27,
+    "reviewSubModules": 0,
+    "blockedSubModules": 0,
+    "interfaceCarrierSubModules": 27,
+    "interfaceCarrierWithoutComponents": 0,
+    "requiredCriticalParts": 12,
+    "allocatedCriticalParts": 12,
+    "missingCriticalParts": 0,
+    "bomLines": 108,
+    "criticalBomLines": 12,
+    "duplicateComponentGroups": 0,
+    "duplicateCriticalComponentGroups": 0,
+    "allocationRatio": 1,
+    "criticalAllocationRatio": 1
+  },
+  "subModules": [
+    {
+      "id": "structure_containment:pressure_hull_shell",
+      "moduleId": "structure_containment",
+      "moduleName": "Pressure Structure Containment",
+      "subModuleId": "pressure_hull_shell",
+      "subModuleName": "Pressure hull shell",
+      "purpose": "Forms the dry pressure boundary and endcap sealing envelope.",
+      "interfaces": [
+        "pressure_boundary",
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port"
+      ],
+      "componentNames": [
+        "Pressure hull",
+        "endcap clamp ring",
+        "double O-ring gland set",
+        "hull proof-test port"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "pressure_hull"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:internal_mounting_frame",
+      "moduleId": "structure_containment",
+      "moduleName": "Pressure Structure Containment",
+      "subModuleId": "internal_mounting_frame",
+      "subModuleName": "Internal mounting frame",
+      "purpose": "Locates dry electronics, batteries and payload interface hardware.",
+      "interfaces": [
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "electronics_tray_rail",
+        "battery_cradle_frame",
+        "payload_mounting_rail",
+        "trim_weight_pocket"
+      ],
+      "componentNames": [
+        "electronics tray rail",
+        "battery cradle frame",
+        "payload mounting rail",
+        "trim weight pocket"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:hydrodynamic_fairing",
+      "moduleId": "structure_containment",
+      "moduleName": "Pressure Structure Containment",
+      "subModuleId": "hydrodynamic_fairing",
+      "subModuleName": "Hydrodynamic fairing",
+      "purpose": "Reduces drag and protects external appendages during survey runs.",
+      "interfaces": [
+        "hydrodynamic_shell",
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "nose_fairing",
+        "tail_cone_fairing",
+        "stabilising_fin_set",
+        "access_hatch_latch_set"
+      ],
+      "componentNames": [
+        "nose fairing",
+        "tail cone fairing",
+        "stabilising fin set",
+        "access hatch latch set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:subsea_battery_pack",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Subsea Energy Storage",
+      "subModuleId": "subsea_battery_pack",
+      "subModuleName": "Subsea battery pack",
+      "purpose": "Supplies mission energy with reserve margin and pressure-rated containment.",
+      "interfaces": [
+        "dc_power_bus",
+        "battery_monitor_bus",
+        "thermal_path"
+      ],
+      "componentWordIds": [
+        "battery_pack",
+        "battery_management_board",
+        "pack_isolation_fuse",
+        "pressure_rated_battery_enclosure"
+      ],
+      "componentNames": [
+        "Battery pack",
+        "battery management board",
+        "pack isolation fuse",
+        "pressure-rated battery enclosure"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "battery_pack"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:charging_interface",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Subsea Energy Storage",
+      "subModuleId": "charging_interface",
+      "subModuleName": "Charging interface",
+      "purpose": "Enables deck charging and state verification without compromising the pressure boundary.",
+      "interfaces": [
+        "service_access",
+        "dc_power_bus",
+        "battery_monitor_bus"
+      ],
+      "componentWordIds": [
+        "charge_interlock_plug",
+        "shore_charger_adapter",
+        "state_of_charge_display_puck",
+        "battery_vent_inspection_plug"
+      ],
+      "componentNames": [
+        "charge interlock plug",
+        "shore charger adapter",
+        "state-of-charge display puck",
+        "battery vent inspection plug"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:energy_monitoring",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Subsea Energy Storage",
+      "subModuleId": "energy_monitoring",
+      "subModuleName": "Energy monitoring",
+      "purpose": "Tracks reserve energy and supports abort decisions.",
+      "interfaces": [
+        "battery_monitor_bus",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "coulomb_counter_module",
+        "pack_temperature_sensor_strip",
+        "energy_reserve_indicator",
+        "battery_telemetry_isolator"
+      ],
+      "componentNames": [
+        "coulomb counter module",
+        "pack temperature sensor strip",
+        "energy reserve indicator",
+        "battery telemetry isolator"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:dc_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Subsea Power Distribution",
+      "subModuleId": "dc_distribution",
+      "subModuleName": "DC distribution",
+      "purpose": "Switches and protects the main battery bus before branch loads.",
+      "interfaces": [
+        "dc_power_bus",
+        "thruster_power_bus",
+        "payload_power_bus"
+      ],
+      "componentWordIds": [
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor"
+      ],
+      "componentNames": [
+        "fused DC distribution board",
+        "Wet-mate connector set",
+        "main power enable relay",
+        "bus voltage monitor"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "wet_mate_connector_set"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:low_voltage_rails",
+      "moduleId": "power_distribution",
+      "moduleName": "Subsea Power Distribution",
+      "subModuleId": "low_voltage_rails",
+      "subModuleName": "Low-voltage rails",
+      "purpose": "Creates stable avionics and payload supply rails.",
+      "interfaces": [
+        "low_voltage_rail",
+        "payload_power_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "24_v_dc_converter",
+        "12_v_payload_converter",
+        "5_v_avionics_converter",
+        "emi_power_filter"
+      ],
+      "componentNames": [
+        "24 V DC converter",
+        "12 V payload converter",
+        "5 V avionics converter",
+        "EMI power filter"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:isolation_grounding",
+      "moduleId": "power_distribution",
+      "moduleName": "Subsea Power Distribution",
+      "subModuleId": "isolation_grounding",
+      "subModuleName": "Isolation and grounding",
+      "purpose": "Controls leakage, bonding and service isolation paths in a flooded environment.",
+      "interfaces": [
+        "dc_power_bus",
+        "alarm_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "ground_fault_monitor",
+        "chassis_bonding_strap",
+        "service_isolation_key",
+        "fault_annunciator_module"
+      ],
+      "componentNames": [
+        "ground fault monitor",
+        "chassis bonding strap",
+        "service isolation key",
+        "fault annunciator module"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:thruster_array",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Thruster Actuation Kinematics",
+      "subModuleId": "thruster_array",
+      "subModuleName": "Thruster array",
+      "purpose": "Provides vectored propulsion channels for survey and manoeuvre control.",
+      "interfaces": [
+        "thruster_power_bus",
+        "thrust_command_bus",
+        "mechanical_mounts"
+      ],
+      "componentWordIds": [
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness"
+      ],
+      "componentNames": [
+        "Thruster set",
+        "thruster nozzle guard",
+        "thruster mounting bracket",
+        "motor phase harness"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "thruster_set"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:drive_electronics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Thruster Actuation Kinematics",
+      "subModuleId": "drive_electronics",
+      "subModuleName": "Drive electronics",
+      "purpose": "Converts command inputs into motor phase drive while reporting current and faults.",
+      "interfaces": [
+        "thruster_power_bus",
+        "thrust_command_bus",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table"
+      ],
+      "componentNames": [
+        "thruster motor controller stack",
+        "current sensor channel set",
+        "controller heat spreader",
+        "thrust calibration table"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:trim_surfaces",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Thruster Actuation Kinematics",
+      "subModuleId": "trim_surfaces",
+      "subModuleName": "Trim and stability surfaces",
+      "purpose": "Improves passive stability and reduces control effort.",
+      "interfaces": [
+        "hydrodynamic_shell",
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "adjustable_trim_fin",
+        "ballast_trim_block",
+        "roll_trim_screw_set",
+        "tow_tank_trim_mark"
+      ],
+      "componentNames": [
+        "adjustable trim fin",
+        "ballast trim block",
+        "roll trim screw set",
+        "tow-tank trim mark"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:mission_computer_stack",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Compute Communication",
+      "subModuleId": "mission_computer_stack",
+      "subModuleName": "Mission computer stack",
+      "purpose": "Executes mission state machine, vehicle control and payload logging.",
+      "interfaces": [
+        "navigation_sensor_bus",
+        "payload_data_bus",
+        "thrust_command_bus",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder"
+      ],
+      "componentNames": [
+        "Mission computer",
+        "real-time control board",
+        "watchdog supervisor module",
+        "mission data recorder"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "mission_computer"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:acoustic_communications",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Compute Communication",
+      "subModuleId": "acoustic_communications",
+      "subModuleName": "Acoustic communications",
+      "purpose": "Provides low-bandwidth underwater command, health and recovery messaging.",
+      "interfaces": [
+        "acoustic_link",
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "acoustic_modem",
+        "acoustic_transducer_mount",
+        "acoustic_isolation_pad",
+        "surface_command_protocol_adapter"
+      ],
+      "componentNames": [
+        "Acoustic modem",
+        "acoustic transducer mount",
+        "acoustic isolation pad",
+        "surface command protocol adapter"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "acoustic_modem"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:software_health_management",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Compute Communication",
+      "subModuleId": "software_health_management",
+      "subModuleName": "Software health management",
+      "purpose": "Defines safe modes, reserve-energy logic and post-mission evidence.",
+      "interfaces": [
+        "alarm_bus",
+        "battery_monitor_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "failsafe_state_machine",
+        "time_sync_module",
+        "configuration_backup_storage",
+        "debug_service_port"
+      ],
+      "componentNames": [
+        "failsafe state machine",
+        "time sync module",
+        "configuration backup storage",
+        "debug service port"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:navigation_sensor_suite",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Payload Sensing",
+      "subModuleId": "navigation_sensor_suite",
+      "subModuleName": "Navigation sensor suite",
+      "purpose": "Combines bottom-track velocity, inertial attitude and surface fixes.",
+      "interfaces": [
+        "navigation_sensor_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "dvl",
+        "inertial_navigation_unit",
+        "magnetic_compass_module",
+        "gnss_surface_receiver"
+      ],
+      "componentNames": [
+        "DVL",
+        "Inertial navigation unit",
+        "magnetic compass module",
+        "GNSS surface receiver"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "dvl",
+        "inertial_navigation_unit"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:depth_environment_sensors",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Payload Sensing",
+      "subModuleId": "depth_environment_sensors",
+      "subModuleName": "Depth and environment sensors",
+      "purpose": "Measures depth, water conditions and pressure-boundary state.",
+      "interfaces": [
+        "navigation_sensor_bus",
+        "pressure_boundary",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "depth_and_pressure_sensor",
+        "water_temperature_probe",
+        "conductivity_sensor",
+        "internal_humidity_sensor"
+      ],
+      "componentNames": [
+        "Depth and pressure sensor",
+        "water temperature probe",
+        "conductivity sensor",
+        "internal humidity sensor"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "depth_and_pressure_sensor"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:payload_sensor_bay",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Payload Sensing",
+      "subModuleId": "payload_sensor_bay",
+      "subModuleName": "Payload sensor bay",
+      "purpose": "Carries inspection payloads and synchronises payload data with navigation state.",
+      "interfaces": [
+        "payload_data_bus",
+        "navigation_sensor_bus",
+        "pressure_boundary"
+      ],
+      "componentWordIds": [
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module"
+      ],
+      "componentNames": [
+        "Forward sonar payload",
+        "camera viewport window",
+        "payload sync trigger",
+        "payload data link module"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "forward_sonar_payload"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:pressure_boundary_management",
+      "moduleId": "environmental_interface",
+      "moduleName": "Pressure Thermal Buoyancy Interface",
+      "subModuleId": "pressure_boundary_management",
+      "subModuleName": "Pressure boundary management",
+      "purpose": "Handles penetrators, pressure compensation and pressure-test interfaces.",
+      "interfaces": [
+        "pressure_boundary",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "cable_penetrator_seal",
+        "pressure_compensation_bladder",
+        "oil_fill_service_port",
+        "pressure_equalisation_valve"
+      ],
+      "componentNames": [
+        "cable penetrator seal",
+        "pressure compensation bladder",
+        "oil-fill service port",
+        "pressure equalisation valve"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:thermal_path",
+      "moduleId": "environmental_interface",
+      "moduleName": "Pressure Thermal Buoyancy Interface",
+      "subModuleId": "thermal_path",
+      "subModuleName": "Thermal path",
+      "purpose": "Conducts electronics and battery heat into the hull and surrounding seawater.",
+      "interfaces": [
+        "thermal_path",
+        "pressure_boundary",
+        "mechanical_mounts"
+      ],
+      "componentWordIds": [
+        "electronics_thermal_bridge",
+        "hull_heat_spreader_plate",
+        "battery_thermal_pad",
+        "thruster_heat_sink_collar"
+      ],
+      "componentNames": [
+        "electronics thermal bridge",
+        "hull heat spreader plate",
+        "battery thermal pad",
+        "thruster heat sink collar"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:buoyancy_trim",
+      "moduleId": "environmental_interface",
+      "moduleName": "Pressure Thermal Buoyancy Interface",
+      "subModuleId": "buoyancy_trim",
+      "subModuleName": "Buoyancy and trim",
+      "purpose": "Sets neutral buoyancy, trim and recoverable mass distribution.",
+      "interfaces": [
+        "buoyancy_trim",
+        "hydrodynamic_shell",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "syntactic_foam_block_set",
+        "ballast_rail",
+        "buoyancy_calibration_tag",
+        "field_trim_worksheet"
+      ],
+      "componentNames": [
+        "syntactic foam block set",
+        "ballast rail",
+        "buoyancy calibration tag",
+        "field trim worksheet"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:leak_detection",
+      "moduleId": "safety_protection",
+      "moduleName": "Leak Abort And Recovery Safety",
+      "subModuleId": "leak_detection",
+      "subModuleName": "Leak detection",
+      "purpose": "Detects internal water ingress before catastrophic electronics damage.",
+      "interfaces": [
+        "leak_alarm_bus",
+        "alarm_bus",
+        "pressure_boundary"
+      ],
+      "componentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad"
+      ],
+      "componentNames": [
+        "Leak detection sensor",
+        "bilge moisture strip",
+        "leak alarm relay",
+        "absorbent witness pad"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "leak_detection_sensor"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:abort_recovery",
+      "moduleId": "safety_protection",
+      "moduleName": "Leak Abort And Recovery Safety",
+      "subModuleId": "abort_recovery",
+      "subModuleName": "Abort and recovery",
+      "purpose": "Supports vehicle location and recovery after fault or mission completion.",
+      "interfaces": [
+        "alarm_bus",
+        "service_access",
+        "acoustic_link"
+      ],
+      "componentWordIds": [
+        "recovery_beacon",
+        "drop_weight_release",
+        "emergency_strobe",
+        "surface_flag_float"
+      ],
+      "componentNames": [
+        "Recovery beacon",
+        "drop-weight release",
+        "emergency strobe",
+        "surface flag float"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "recovery_beacon"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:pressure_fail_safe",
+      "moduleId": "safety_protection",
+      "moduleName": "Leak Abort And Recovery Safety",
+      "subModuleId": "pressure_fail_safe",
+      "subModuleName": "Pressure fail-safe",
+      "purpose": "Prevents over-depth operation and isolates hazardous energy under fault.",
+      "interfaces": [
+        "pressure_boundary",
+        "dc_power_bus",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug"
+      ],
+      "componentNames": [
+        "over-depth abort switch",
+        "watchdog kill relay",
+        "battery isolation contactor",
+        "pressure relief service plug"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:deck_recovery",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Deck Recovery And Service",
+      "subModuleId": "deck_recovery",
+      "subModuleName": "Deck recovery",
+      "purpose": "Provides safe handling points for launch and retrieval operations.",
+      "interfaces": [
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "lifting_bridle",
+        "deck_recovery_handle",
+        "launch_cradle_interface",
+        "tow_point_fitting"
+      ],
+      "componentNames": [
+        "lifting bridle",
+        "deck recovery handle",
+        "launch cradle interface",
+        "tow point fitting"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:service_access",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Deck Recovery And Service",
+      "subModuleId": "service_access",
+      "subModuleName": "Service access",
+      "purpose": "Enables repeatable checks for seals, charging and diagnostics.",
+      "interfaces": [
+        "service_access",
+        "pressure_boundary",
+        "dc_power_bus"
+      ],
+      "componentWordIds": [
+        "o_ring_grease_kit",
+        "vacuum_leak_test_port",
+        "diagnostic_connector",
+        "service_checklist_card"
+      ],
+      "componentNames": [
+        "O-ring grease kit",
+        "vacuum leak test port",
+        "diagnostic connector",
+        "service checklist card"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:field_transport",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Deck Recovery And Service",
+      "subModuleId": "field_transport",
+      "subModuleName": "Field transport",
+      "purpose": "Protects the vehicle and records environmental exposure between missions.",
+      "interfaces": [
+        "service_access",
+        "hydrodynamic_shell"
+      ],
+      "componentWordIds": [
+        "transport_cradle",
+        "protective_nose_cover",
+        "desiccant_cartridge",
+        "maintenance_log_tag"
+      ],
+      "componentNames": [
+        "transport cradle",
+        "protective nose cover",
+        "desiccant cartridge",
+        "maintenance log tag"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    }
+  ],
+  "criticalParts": [
+    {
+      "componentWordId": "pressure_hull",
+      "label": "Pressure hull",
+      "allocated": true,
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "subModuleIds": [
+        "pressure_hull_shell"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "thruster_set",
+      "label": "Thruster set",
+      "allocated": true,
+      "moduleIds": [
+        "actuation_kinematics"
+      ],
+      "subModuleIds": [
+        "thruster_array"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "dvl",
+      "label": "DVL",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "navigation_sensor_suite"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "battery_pack",
+      "label": "Battery pack",
+      "allocated": true,
+      "moduleIds": [
+        "energy_storage_source"
+      ],
+      "subModuleIds": [
+        "subsea_battery_pack"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "acoustic_modem",
+      "label": "Acoustic modem",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "acoustic_communications"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "inertial_navigation_unit",
+      "label": "Inertial navigation unit",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "navigation_sensor_suite"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "depth_and_pressure_sensor",
+      "label": "Depth and pressure sensor",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "depth_environment_sensors"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "leak_detection_sensor",
+      "label": "Leak detection sensor",
+      "allocated": true,
+      "moduleIds": [
+        "safety_protection"
+      ],
+      "subModuleIds": [
+        "leak_detection"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "mission_computer",
+      "label": "Mission computer",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "mission_computer_stack"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "forward_sonar_payload",
+      "label": "Forward sonar payload",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "payload_sensor_bay"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "recovery_beacon",
+      "label": "Recovery beacon",
+      "allocated": true,
+      "moduleIds": [
+        "safety_protection"
+      ],
+      "subModuleIds": [
+        "abort_recovery"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "wet_mate_connector_set",
+      "label": "Wet-mate connector set",
+      "allocated": true,
+      "moduleIds": [
+        "power_distribution"
+      ],
+      "subModuleIds": [
+        "dc_distribution"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    }
+  ],
+  "duplicateGroups": [],
+  "blockers": [],
+  "nextActions": []
+}

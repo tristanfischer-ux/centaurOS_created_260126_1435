@@ -1,0 +1,19 @@
+flowchart LR
+  structure_containment["Pressure Structure Containment"]
+  energy_storage_source["Subsea Energy Storage"]
+  power_distribution["Subsea Power Distribution"]
+  actuation_kinematics["Thruster Actuation Kinematics"]
+  control_compute_communication["Autonomy Compute Communication"]
+  sensing_instrumentation["Navigation And Payload Sensing"]
+  environmental_interface["Pressure Thermal Buoyancy Interface"]
+  safety_protection["Leak Abort And Recovery Safety"]
+  maintenance_serviceability["Deck Recovery And Service"]
+  energy_storage_source -->|"dc_power_bus"| power_distribution
+  power_distribution -->|"thruster_power_bus"| actuation_kinematics
+  control_compute_communication -->|"thrust_command_bus"| actuation_kinematics
+  sensing_instrumentation -->|"navigation_sensor_bus"| control_compute_communication
+  sensing_instrumentation -->|"payload_data_bus"| control_compute_communication
+  environmental_interface -->|"pressure_boundary"| structure_containment
+  safety_protection -->|"alarm_bus"| control_compute_communication
+  safety_protection -->|"pressure_boundary"| structure_containment
+  classDef missing stroke:#a32626,stroke-width:3px,color:#a32626;

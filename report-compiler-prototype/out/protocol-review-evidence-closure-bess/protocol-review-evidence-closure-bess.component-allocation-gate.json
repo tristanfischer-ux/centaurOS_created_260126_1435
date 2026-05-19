@@ -1,0 +1,1558 @@
+{
+  "verdict": "allocation_ready",
+  "summary": {
+    "modules": 11,
+    "subModules": 46,
+    "componentWords": 204,
+    "readySubModules": 46,
+    "reviewSubModules": 0,
+    "blockedSubModules": 0,
+    "interfaceCarrierSubModules": 46,
+    "interfaceCarrierWithoutComponents": 0,
+    "requiredCriticalParts": 6,
+    "allocatedCriticalParts": 6,
+    "missingCriticalParts": 0,
+    "bomLines": 204,
+    "criticalBomLines": 6,
+    "duplicateComponentGroups": 0,
+    "duplicateCriticalComponentGroups": 0,
+    "allocationRatio": 1,
+    "criticalAllocationRatio": 1
+  },
+  "subModules": [
+    {
+      "id": "energy_storage_source:cell_string",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "subModuleId": "cell_string",
+      "subModuleName": "Cell string",
+      "purpose": "Electrochemical storage path assembled from series/parallel LFP cells.",
+      "interfaces": [
+        "dc_bus",
+        "thermal_loop",
+        "bms_tap_harness"
+      ],
+      "componentWordIds": [
+        "lfp_prismatic_cells",
+        "cell_to_cell_busbar",
+        "cell_terminal_hardware_set",
+        "cell_insulation_pad",
+        "module_fuse"
+      ],
+      "componentNames": [
+        "LFP prismatic cells",
+        "cell-to-cell busbar",
+        "cell terminal hardware set",
+        "cell insulation pad",
+        "module fuse"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "lfp_prismatic_cells"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:rack_structure",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "subModuleId": "rack_structure",
+      "subModuleName": "Rack structure",
+      "purpose": "Constrains cell modules during transport, vibration and cycling expansion.",
+      "interfaces": [
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "module_steel_frame",
+        "compression_plate",
+        "compression_tie_rod_set",
+        "module_top_cover",
+        "rack_label_plate"
+      ],
+      "componentNames": [
+        "module steel frame",
+        "compression plate",
+        "compression tie rod set",
+        "module top cover",
+        "rack label plate"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:bms_slave",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "subModuleId": "bms_slave",
+      "subModuleName": "BMS slave board",
+      "purpose": "Measures cell voltage and temperature at rack level.",
+      "interfaces": [
+        "bms_network",
+        "sensor_harness"
+      ],
+      "componentWordIds": [
+        "bms_slave_pcb",
+        "afe_monitor_ic",
+        "ntc_thermistor_harness",
+        "isolated_can_transceiver",
+        "conformal_coating"
+      ],
+      "componentNames": [
+        "BMS slave PCB",
+        "AFE monitor IC",
+        "NTC thermistor harness",
+        "isolated CAN transceiver",
+        "conformal coating"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:dc_string_output",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "subModuleId": "dc_string_output",
+      "subModuleName": "DC string output",
+      "purpose": "Combines rack outputs into a protected high-voltage DC path.",
+      "interfaces": [
+        "dc_bus",
+        "hardwired_trip"
+      ],
+      "componentWordIds": [
+        "dc_contactor_or_breaker",
+        "precharge_resistor",
+        "hv_fuse_holder",
+        "pack_current_sensor",
+        "service_disconnect"
+      ],
+      "componentNames": [
+        "DC contactor or breaker",
+        "precharge resistor",
+        "HV fuse holder",
+        "pack current sensor",
+        "service disconnect"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "dc_contactor_or_breaker"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:module_interconnect_harness",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "subModuleId": "module_interconnect_harness",
+      "subModuleName": "Module interconnect harness",
+      "purpose": "Routes low-voltage sensing, communications and temperature signals across rack assemblies.",
+      "interfaces": [
+        "bms_tap_harness",
+        "sensor_harness",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "cell_voltage_sense_loom",
+        "rack_can_drop_cable",
+        "harness_strain_relief_rail",
+        "low_smoke_cable_sleeve"
+      ],
+      "componentNames": [
+        "cell voltage sense loom",
+        "rack CAN drop cable",
+        "harness strain relief rail",
+        "low-smoke cable sleeve"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:rack_thermal_interface",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "subModuleId": "rack_thermal_interface",
+      "subModuleName": "Rack thermal interface",
+      "purpose": "Couples cell modules to the container thermal loop while preserving service replacement access.",
+      "interfaces": [
+        "thermal_loop",
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "rack_cold_plate_manifold",
+        "thermally_conductive_gap_pad",
+        "coolant_quick_connector_pair",
+        "rack_drip_tray",
+        "leak_detection_rope"
+      ],
+      "componentNames": [
+        "rack cold plate manifold",
+        "thermally conductive gap pad",
+        "coolant quick connector pair",
+        "rack drip tray",
+        "leak detection rope"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_conversion_transduction:pcs_inverter",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion System",
+      "subModuleId": "pcs_inverter",
+      "subModuleName": "PCS inverter bridge",
+      "purpose": "Performs bidirectional DC/AC conversion.",
+      "interfaces": [
+        "dc_bus",
+        "ac_bus",
+        "modbus_tcp"
+      ],
+      "componentWordIds": [
+        "pcs_inverter",
+        "igbt_power_module",
+        "dc_link_capacitor_bank",
+        "gate_driver_board",
+        "inverter_control_board",
+        "liquid_cooled_heatsink"
+      ],
+      "componentNames": [
+        "PCS inverter",
+        "IGBT power module",
+        "DC link capacitor bank",
+        "gate driver board",
+        "inverter control board",
+        "liquid-cooled heatsink"
+      ],
+      "componentCount": 6,
+      "criticalComponentWordIds": [
+        "pcs_inverter"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_conversion_transduction:transformer_stage",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion System",
+      "subModuleId": "transformer_stage",
+      "subModuleName": "Transformer stage",
+      "purpose": "Adapts PCS output voltage to site connection voltage.",
+      "interfaces": [
+        "ac_bus",
+        "thermal_path"
+      ],
+      "componentWordIds": [
+        "cast_resin_transformer",
+        "hv_winding",
+        "lv_winding",
+        "temperature_probe",
+        "anti_vibration_mount"
+      ],
+      "componentNames": [
+        "cast resin transformer",
+        "HV winding",
+        "LV winding",
+        "temperature probe",
+        "anti-vibration mount"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_conversion_transduction:grid_filter",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion System",
+      "subModuleId": "grid_filter",
+      "subModuleName": "Grid filter",
+      "purpose": "Controls harmonics and conducted emissions.",
+      "interfaces": [
+        "ac_bus",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "grid_filter_choke",
+        "ac_filter_capacitor",
+        "emi_filter_assembly",
+        "protective_earth_bar"
+      ],
+      "componentNames": [
+        "grid filter choke",
+        "AC filter capacitor",
+        "EMI filter assembly",
+        "protective earth bar"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_conversion_transduction:grid_protection_relay",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion System",
+      "subModuleId": "grid_protection_relay",
+      "subModuleName": "Grid protection relay",
+      "purpose": "Supervises grid voltage, frequency and trip settings at the point of connection.",
+      "interfaces": [
+        "ac_bus",
+        "modbus_tcp",
+        "hardwired_trip",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "grid_protection_relay",
+        "voltage_sensing_fuse_set",
+        "relay_test_block",
+        "trip_circuit_monitor",
+        "g99_settings_label"
+      ],
+      "componentNames": [
+        "grid protection relay",
+        "voltage sensing fuse set",
+        "relay test block",
+        "trip circuit monitor",
+        "G99 settings label"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:container_shell",
+      "moduleId": "structure_containment",
+      "moduleName": "Container Structure And Fit-Out",
+      "subModuleId": "container_shell",
+      "subModuleName": "ISO container shell",
+      "purpose": "Forms the weather-tight transportable enclosure.",
+      "interfaces": [
+        "lifting_points",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "corten_steel_side_panel",
+        "corner_casting",
+        "marine_plywood_floor",
+        "roof_panel"
+      ],
+      "componentNames": [
+        "corten steel side panel",
+        "corner casting",
+        "marine plywood floor",
+        "roof panel"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:internal_partitions",
+      "moduleId": "structure_containment",
+      "moduleName": "Container Structure And Fit-Out",
+      "subModuleId": "internal_partitions",
+      "subModuleName": "Internal partitions",
+      "purpose": "Separates battery, PCS, controls and service zones.",
+      "interfaces": [
+        "fire_boundary",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "steel_stud_frame",
+        "fire_rated_board",
+        "mineral_wool_insulation",
+        "intumescent_sealant"
+      ],
+      "componentNames": [
+        "steel stud frame",
+        "fire-rated board",
+        "mineral wool insulation",
+        "intumescent sealant"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:rack_mounting",
+      "moduleId": "structure_containment",
+      "moduleName": "Container Structure And Fit-Out",
+      "subModuleId": "rack_mounting",
+      "subModuleName": "Rack mounting rails",
+      "purpose": "Anchors battery racks against transport and seismic loads.",
+      "interfaces": [
+        "mechanical_mounts"
+      ],
+      "componentWordIds": [
+        "floor_reinforcement_plate",
+        "rack_mounting_rail",
+        "vibration_isolator",
+        "anchor_bolt_set"
+      ],
+      "componentNames": [
+        "floor reinforcement plate",
+        "rack mounting rail",
+        "vibration isolator",
+        "anchor bolt set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:cable_penetration_sealing",
+      "moduleId": "structure_containment",
+      "moduleName": "Container Structure And Fit-Out",
+      "subModuleId": "cable_penetration_sealing",
+      "subModuleName": "Cable penetration sealing",
+      "purpose": "Seals power, control and auxiliary cable entries through container fire and weather boundaries.",
+      "interfaces": [
+        "fire_boundary",
+        "service_access",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "gland_plate_assembly",
+        "firestop_collar_set",
+        "emc_cable_gland",
+        "rain_drip_shield",
+        "penetration_schedule_label"
+      ],
+      "componentNames": [
+        "gland plate assembly",
+        "firestop collar set",
+        "EMC cable gland",
+        "rain drip shield",
+        "penetration schedule label"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:electrical_measurement",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing And Instrumentation",
+      "subModuleId": "electrical_measurement",
+      "subModuleName": "Electrical measurement",
+      "purpose": "Measures voltage, current and insulation state.",
+      "interfaces": [
+        "sensor_bus",
+        "dc_bus"
+      ],
+      "componentWordIds": [
+        "dc_voltage_transducer",
+        "hall_current_sensor",
+        "insulation_monitoring_device",
+        "auxiliary_metering_transducer"
+      ],
+      "componentNames": [
+        "DC voltage transducer",
+        "Hall current sensor",
+        "insulation monitoring device",
+        "auxiliary metering transducer"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:environmental_sensors",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing And Instrumentation",
+      "subModuleId": "environmental_sensors",
+      "subModuleName": "Environmental sensors",
+      "purpose": "Measures container air conditions and gas hazards.",
+      "interfaces": [
+        "sensor_bus",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "temperature_humidity_sensor",
+        "hydrogen_detector",
+        "smoke_aspirating_detector",
+        "door_position_switch"
+      ],
+      "componentNames": [
+        "temperature humidity sensor",
+        "hydrogen detector",
+        "smoke aspirating detector",
+        "door position switch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:thermal_sensors",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing And Instrumentation",
+      "subModuleId": "thermal_sensors",
+      "subModuleName": "Thermal sensors",
+      "purpose": "Tracks coolant and heat exchanger temperatures.",
+      "interfaces": [
+        "sensor_bus",
+        "thermal_loop"
+      ],
+      "componentWordIds": [
+        "coolant_inlet_thermistor",
+        "coolant_outlet_thermistor",
+        "flow_meter",
+        "pressure_transducer"
+      ],
+      "componentNames": [
+        "coolant inlet thermistor",
+        "coolant outlet thermistor",
+        "flow meter",
+        "pressure transducer"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:event_recording",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing And Instrumentation",
+      "subModuleId": "event_recording",
+      "subModuleName": "Event recording",
+      "purpose": "Captures timestamped trips, alarms and measurements for engineering review.",
+      "interfaces": [
+        "sensor_bus",
+        "alarm_bus",
+        "site_scada"
+      ],
+      "componentWordIds": [
+        "fault_recorder_module",
+        "event_timestamp_logger",
+        "digital_input_card",
+        "local_historian_buffer",
+        "calibration_certificate_holder"
+      ],
+      "componentNames": [
+        "fault recorder module",
+        "event timestamp logger",
+        "digital input card",
+        "local historian buffer",
+        "calibration certificate holder"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:bms_master",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute And Communication",
+      "subModuleId": "bms_master",
+      "subModuleName": "BMS master controller",
+      "purpose": "Supervises pack state and protective limits.",
+      "interfaces": [
+        "bms_network",
+        "hardwired_trip"
+      ],
+      "componentWordIds": [
+        "bms_master_controller",
+        "isolation_interface",
+        "contactor_driver_output",
+        "soc_estimation_firmware"
+      ],
+      "componentNames": [
+        "BMS master controller",
+        "isolation interface",
+        "contactor driver output",
+        "SOC estimation firmware"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "bms_master_controller"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:ems_controller",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute And Communication",
+      "subModuleId": "ems_controller",
+      "subModuleName": "EMS controller",
+      "purpose": "Dispatches power and monitors system state.",
+      "interfaces": [
+        "modbus_tcp",
+        "site_scada"
+      ],
+      "componentWordIds": [
+        "industrial_controller",
+        "i_o_expansion_module",
+        "network_switch",
+        "cellular_router"
+      ],
+      "componentNames": [
+        "industrial controller",
+        "I/O expansion module",
+        "network switch",
+        "cellular router"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:communications_gateway",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute And Communication",
+      "subModuleId": "communications_gateway",
+      "subModuleName": "Communications gateway",
+      "purpose": "Bridges local controls to site and remote systems.",
+      "interfaces": [
+        "site_scada",
+        "modbus_tcp"
+      ],
+      "componentWordIds": [
+        "modbus_tcp_gateway",
+        "scada_protocol_adapter",
+        "time_synchronisation_module",
+        "cybersecurity_firewall"
+      ],
+      "componentNames": [
+        "Modbus TCP gateway",
+        "SCADA protocol adapter",
+        "time synchronisation module",
+        "cybersecurity firewall"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:cybersecurity_monitoring",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute And Communication",
+      "subModuleId": "cybersecurity_monitoring",
+      "subModuleName": "Cybersecurity monitoring",
+      "purpose": "Manages secure access, logging and recovery data for remote operation.",
+      "interfaces": [
+        "site_scada",
+        "modbus_tcp",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "vpn_access_appliance",
+        "syslog_collector",
+        "account_key_switch",
+        "firmware_escrow_tag",
+        "configuration_backup_module"
+      ],
+      "componentNames": [
+        "VPN access appliance",
+        "syslog collector",
+        "account key switch",
+        "firmware escrow tag",
+        "configuration backup module"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:fire_suppression",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection And Interlocks",
+      "subModuleId": "fire_suppression",
+      "subModuleName": "Fire suppression system",
+      "purpose": "Detects and suppresses incipient battery-container fire.",
+      "interfaces": [
+        "alarm_bus",
+        "fire_boundary"
+      ],
+      "componentWordIds": [
+        "fire_detection_suppression",
+        "clean_agent_cylinder",
+        "release_solenoid",
+        "nozzle_pipework",
+        "pressure_switch"
+      ],
+      "componentNames": [
+        "Fire detection/suppression",
+        "clean-agent cylinder",
+        "release solenoid",
+        "nozzle pipework",
+        "pressure switch"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "fire_detection_suppression"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:emergency_stop",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection And Interlocks",
+      "subModuleId": "emergency_stop",
+      "subModuleName": "Emergency stop chain",
+      "purpose": "Trips high-energy paths through hardwired safety logic.",
+      "interfaces": [
+        "hardwired_trip",
+        "dc_bus",
+        "ac_bus"
+      ],
+      "componentWordIds": [
+        "e_stop_mushroom_button",
+        "safety_relay",
+        "dc_shunt_trip_output",
+        "ac_breaker_trip_coil"
+      ],
+      "componentNames": [
+        "E-stop mushroom button",
+        "safety relay",
+        "DC shunt trip output",
+        "AC breaker trip coil"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:surge_fault_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection And Interlocks",
+      "subModuleId": "surge_fault_protection",
+      "subModuleName": "Surge and fault protection",
+      "purpose": "Limits transient and overcurrent damage.",
+      "interfaces": [
+        "dc_bus",
+        "ac_bus",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "dc_surge_protection_device",
+        "ac_surge_protection_device",
+        "arc_flash_label_set",
+        "protective_earth_bonding_kit"
+      ],
+      "componentNames": [
+        "DC surge protection device",
+        "AC surge protection device",
+        "arc flash label set",
+        "protective earth bonding kit"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:deflagration_venting",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection And Interlocks",
+      "subModuleId": "deflagration_venting",
+      "subModuleName": "Deflagration venting",
+      "purpose": "Provides a controlled pressure relief path if battery off-gas ignition occurs.",
+      "interfaces": [
+        "fire_boundary",
+        "alarm_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "pressure_relief_vent_panel",
+        "vent_microswitch",
+        "flame_arrestor_mesh",
+        "vent_weather_hood",
+        "post_event_inspection_tag"
+      ],
+      "componentNames": [
+        "pressure relief vent panel",
+        "vent microswitch",
+        "flame arrestor mesh",
+        "vent weather hood",
+        "post-event inspection tag"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:hvac_unit",
+      "moduleId": "environmental_interface",
+      "moduleName": "Environmental Interface",
+      "subModuleId": "hvac_unit",
+      "subModuleName": "HVAC unit",
+      "purpose": "Controls air temperature and humidity inside compartments.",
+      "interfaces": [
+        "electrical_power",
+        "thermal_loop",
+        "thermal_path",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "container_hvac_unit",
+        "air_filter_element",
+        "condensate_drain_kit",
+        "hvac_controller"
+      ],
+      "componentNames": [
+        "container HVAC unit",
+        "air filter element",
+        "condensate drain kit",
+        "HVAC controller"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:ventilation_path",
+      "moduleId": "environmental_interface",
+      "moduleName": "Environmental Interface",
+      "subModuleId": "ventilation_path",
+      "subModuleName": "Ventilation path",
+      "purpose": "Directs airflow around PCS, controls and service areas.",
+      "interfaces": [
+        "thermal_loop",
+        "thermal_path",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "intake_louvre",
+        "exhaust_louvre",
+        "ec_fan_assembly",
+        "airflow_baffle"
+      ],
+      "componentNames": [
+        "intake louvre",
+        "exhaust louvre",
+        "EC fan assembly",
+        "airflow baffle"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:thermal_insulation",
+      "moduleId": "environmental_interface",
+      "moduleName": "Environmental Interface",
+      "subModuleId": "thermal_insulation",
+      "subModuleName": "Thermal insulation",
+      "purpose": "Reduces ambient heat transfer into the container.",
+      "interfaces": [
+        "fire_boundary",
+        "thermal_path"
+      ],
+      "componentWordIds": [
+        "insulation_panel",
+        "vapour_barrier_film",
+        "thermal_break_strip",
+        "seal_gasket_set"
+      ],
+      "componentNames": [
+        "insulation panel",
+        "vapour barrier film",
+        "thermal break strip",
+        "seal gasket set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:heat_rejection_coil",
+      "moduleId": "environmental_interface",
+      "moduleName": "Environmental Interface",
+      "subModuleId": "heat_rejection_coil",
+      "subModuleName": "Heat rejection coil",
+      "purpose": "Rejects battery and PCS heat from the coolant loop to outdoor air.",
+      "interfaces": [
+        "thermal_loop",
+        "thermal_path",
+        "electrical_power",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "dry_cooler_coil",
+        "ec_condenser_fan",
+        "fan_contactor",
+        "coil_guard_grille",
+        "drain_safe_condensate_pan"
+      ],
+      "componentNames": [
+        "dry cooler coil",
+        "EC condenser fan",
+        "fan contactor",
+        "coil guard grille",
+        "drain-safe condensate pan"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:dc_busbars",
+      "moduleId": "power_distribution",
+      "moduleName": "DC And AC Power Distribution",
+      "subModuleId": "dc_busbars",
+      "subModuleName": "Main DC busbars",
+      "purpose": "Carries pack current from racks to PCS.",
+      "interfaces": [
+        "dc_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "copper_dc_busbar",
+        "busbar_support_insulator",
+        "busbar_shroud",
+        "torque_witness_marker"
+      ],
+      "componentNames": [
+        "copper DC busbar",
+        "busbar support insulator",
+        "busbar shroud",
+        "torque witness marker"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:ac_switchgear",
+      "moduleId": "power_distribution",
+      "moduleName": "DC And AC Power Distribution",
+      "subModuleId": "ac_switchgear",
+      "subModuleName": "AC switchgear",
+      "purpose": "Connects PCS output to site AC connection.",
+      "interfaces": [
+        "ac_bus",
+        "protective_earth",
+        "hardwired_trip"
+      ],
+      "componentWordIds": [
+        "moulded_case_circuit_breaker",
+        "ac_contactor",
+        "metering_ct_set",
+        "terminal_block_assembly"
+      ],
+      "componentNames": [
+        "moulded-case circuit breaker",
+        "AC contactor",
+        "metering CT set",
+        "terminal block assembly"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:auxiliary_power",
+      "moduleId": "power_distribution",
+      "moduleName": "DC And AC Power Distribution",
+      "subModuleId": "auxiliary_power",
+      "subModuleName": "Auxiliary power distribution",
+      "purpose": "Supplies controls, HVAC, pumps and service loads.",
+      "interfaces": [
+        "electrical_power",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "auxiliary_transformer",
+        "24_v_dc_power_supply",
+        "miniature_circuit_breaker_bank",
+        "ups_module"
+      ],
+      "componentNames": [
+        "auxiliary transformer",
+        "24 V DC power supply",
+        "miniature circuit breaker bank",
+        "UPS module"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:earthing_lightning",
+      "moduleId": "power_distribution",
+      "moduleName": "DC And AC Power Distribution",
+      "subModuleId": "earthing_lightning",
+      "subModuleName": "Earthing and lightning protection",
+      "purpose": "Bonds exposed metalwork and surge devices to a verifiable protective-earth network.",
+      "interfaces": [
+        "protective_earth",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "main_earth_bar",
+        "earth_stud_array",
+        "lightning_surge_counter",
+        "equipotential_bonding_strap",
+        "earth_continuity_test_point"
+      ],
+      "componentNames": [
+        "main earth bar",
+        "earth stud array",
+        "lightning surge counter",
+        "equipotential bonding strap",
+        "earth continuity test point"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:access_doors",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Serviceability",
+      "subModuleId": "access_doors",
+      "subModuleName": "Access doors and hardware",
+      "purpose": "Provides controlled entry to service zones.",
+      "interfaces": [
+        "service_access"
+      ],
+      "componentWordIds": [
+        "lockable_access_door",
+        "door_seal_gasket",
+        "panic_release_latch",
+        "door_stay_arm"
+      ],
+      "componentNames": [
+        "lockable access door",
+        "door seal gasket",
+        "panic release latch",
+        "door stay arm"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:service_lighting",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Serviceability",
+      "subModuleId": "service_lighting",
+      "subModuleName": "Service lighting",
+      "purpose": "Illuminates work zones during inspection.",
+      "interfaces": [
+        "electrical_power",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "led_service_luminaire",
+        "emergency_light_fitting",
+        "maintenance_receptacle",
+        "lighting_switchgear"
+      ],
+      "componentNames": [
+        "LED service luminaire",
+        "emergency light fitting",
+        "maintenance receptacle",
+        "lighting switchgear"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:lifting_handling",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Serviceability",
+      "subModuleId": "lifting_handling",
+      "subModuleName": "Lifting and handling points",
+      "purpose": "Supports transport, installation and module replacement.",
+      "interfaces": [
+        "lifting_points",
+        "mechanical_mounts"
+      ],
+      "componentWordIds": [
+        "certified_lifting_lug",
+        "forklift_pocket_reinforcement",
+        "removable_rack_guide",
+        "service_trolley_interface"
+      ],
+      "componentNames": [
+        "certified lifting lug",
+        "forklift pocket reinforcement",
+        "removable rack guide",
+        "service trolley interface"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:commissioning_ports",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Serviceability",
+      "subModuleId": "commissioning_ports",
+      "subModuleName": "Commissioning ports",
+      "purpose": "Provides controlled access points for electrical, coolant and controller commissioning checks.",
+      "interfaces": [
+        "service_access",
+        "sensor_bus",
+        "dc_bus"
+      ],
+      "componentWordIds": [
+        "insulated_test_socket",
+        "coolant_sampling_port",
+        "laptop_service_port",
+        "lockout_hasp_rail",
+        "commissioning_torque_log_plate"
+      ],
+      "componentNames": [
+        "insulated test socket",
+        "coolant sampling port",
+        "laptop service port",
+        "lockout hasp rail",
+        "commissioning torque log plate"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:pump_station",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Coolant Circulation Process",
+      "subModuleId": "pump_station",
+      "subModuleName": "Coolant pump station",
+      "purpose": "Circulates coolant through rack cold plates.",
+      "interfaces": [
+        "thermal_loop",
+        "electrical_power",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "thermal_management_loop",
+        "coolant_circulation_pump",
+        "pump_vfd",
+        "check_valve",
+        "isolation_valve"
+      ],
+      "componentNames": [
+        "Thermal management loop",
+        "coolant circulation pump",
+        "pump VFD",
+        "check valve",
+        "isolation valve"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "thermal_management_loop"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:filtration_treatment",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Coolant Circulation Process",
+      "subModuleId": "filtration_treatment",
+      "subModuleName": "Filtration and treatment",
+      "purpose": "Maintains coolant cleanliness and chemistry.",
+      "interfaces": [
+        "thermal_loop",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "coolant_filter_housing",
+        "replaceable_filter_cartridge",
+        "glycol_concentration_sensor",
+        "fill_and_drain_manifold"
+      ],
+      "componentNames": [
+        "coolant filter housing",
+        "replaceable filter cartridge",
+        "glycol concentration sensor",
+        "fill and drain manifold"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:expansion_air_removal",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Coolant Circulation Process",
+      "subModuleId": "expansion_air_removal",
+      "subModuleName": "Expansion and air removal",
+      "purpose": "Accommodates fluid expansion and removes trapped air.",
+      "interfaces": [
+        "thermal_loop",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "expansion_vessel",
+        "automatic_air_vent",
+        "pressure_relief_valve",
+        "low_pressure_switch"
+      ],
+      "componentNames": [
+        "expansion vessel",
+        "automatic air vent",
+        "pressure relief valve",
+        "low pressure switch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:heat_exchanger_manifold",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Coolant Circulation Process",
+      "subModuleId": "heat_exchanger_manifold",
+      "subModuleName": "Heat exchanger manifold",
+      "purpose": "Transfers rack heat into the outdoor heat rejection path while preserving service bypass options.",
+      "interfaces": [
+        "thermal_loop",
+        "service_access",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "plate_heat_exchanger",
+        "temperature_balancing_valve",
+        "purge_valve_set",
+        "service_bypass_loop",
+        "insulated_hose_set"
+      ],
+      "componentNames": [
+        "plate heat exchanger",
+        "temperature balancing valve",
+        "purge valve set",
+        "service bypass loop",
+        "insulated hose set"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:local_hmi",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Operator HMI And Labelling",
+      "subModuleId": "local_hmi",
+      "subModuleName": "Local HMI panel",
+      "purpose": "Provides local status, alarms and manual controls.",
+      "interfaces": [
+        "site_scada",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "industrial_touchscreen",
+        "panel_pc",
+        "key_switch",
+        "alarm_buzzer_beacon"
+      ],
+      "componentNames": [
+        "industrial touchscreen",
+        "panel PC",
+        "key switch",
+        "alarm buzzer beacon"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:external_labelling",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Operator HMI And Labelling",
+      "subModuleId": "external_labelling",
+      "subModuleName": "External labelling",
+      "purpose": "Communicates hazards and service instructions.",
+      "interfaces": [
+        "service_access"
+      ],
+      "componentWordIds": [
+        "high_voltage_warning_label",
+        "arc_flash_boundary_label",
+        "fire_suppression_instruction_placard",
+        "asset_qr_label"
+      ],
+      "componentNames": [
+        "high voltage warning label",
+        "arc flash boundary label",
+        "fire suppression instruction placard",
+        "asset QR label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:operator_workflow",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Operator HMI And Labelling",
+      "subModuleId": "operator_workflow",
+      "subModuleName": "Operator workflow aids",
+      "purpose": "Supports safe inspection and reset actions.",
+      "interfaces": [
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "laminated_isolation_checklist",
+        "inspection_log_holder",
+        "status_stack_light",
+        "manual_reset_station"
+      ],
+      "componentNames": [
+        "laminated isolation checklist",
+        "inspection log holder",
+        "status stack light",
+        "manual reset station"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:remote_notification",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Operator HMI And Labelling",
+      "subModuleId": "remote_notification",
+      "subModuleName": "Remote notification interface",
+      "purpose": "Routes actionable alarms to the site operator while preventing unsafe remote reset.",
+      "interfaces": [
+        "site_scada",
+        "alarm_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "operator_notification_relay",
+        "sms_alarm_output_module",
+        "alarm_acknowledgement_button",
+        "escalation_contact_label",
+        "remote_reset_inhibit_relay"
+      ],
+      "componentNames": [
+        "operator notification relay",
+        "SMS alarm output module",
+        "alarm acknowledgement button",
+        "escalation contact label",
+        "remote reset inhibit relay"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    }
+  ],
+  "criticalParts": [
+    {
+      "componentWordId": "lfp_prismatic_cells",
+      "label": "LFP prismatic cells",
+      "allocated": true,
+      "moduleIds": [
+        "energy_storage_source"
+      ],
+      "subModuleIds": [
+        "cell_string"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "bms_master_controller",
+      "label": "BMS master controller",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "bms_master"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "pcs_inverter",
+      "label": "PCS inverter",
+      "allocated": true,
+      "moduleIds": [
+        "energy_conversion_transduction"
+      ],
+      "subModuleIds": [
+        "pcs_inverter"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "thermal_management_loop",
+      "label": "Thermal management loop",
+      "allocated": true,
+      "moduleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "subModuleIds": [
+        "pump_station"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "fire_detection_suppression",
+      "label": "Fire detection/suppression",
+      "allocated": true,
+      "moduleIds": [
+        "safety_protection"
+      ],
+      "subModuleIds": [
+        "fire_suppression"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "dc_contactor_or_breaker",
+      "label": "DC contactor or breaker",
+      "allocated": true,
+      "moduleIds": [
+        "energy_storage_source"
+      ],
+      "subModuleIds": [
+        "dc_string_output"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    }
+  ],
+  "duplicateGroups": [],
+  "blockers": [],
+  "nextActions": []
+}

@@ -1,0 +1,594 @@
+{
+  "summary": {
+    "rows": 37,
+    "briefSupported": 3,
+    "modelPresent": 10,
+    "reviewRequired": 10,
+    "sourceRequired": 14,
+    "blocked": 0,
+    "architectureBlockers": 0,
+    "bomBlockers": 14
+  },
+  "rows": [
+    {
+      "linkedRequirements": [
+        "wear_days"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:wear_days",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Wear duration",
+      "assumption": "Wear duration = 14 days is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "reading_interval_minutes"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:reading_interval_minutes",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Reading interval",
+      "assumption": "Reading interval = 5 minutes is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "mard_percent"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:mard_percent",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "MARD target",
+      "assumption": "MARD target = 9 % is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "metric:headline_output",
+      "category": "derived_metric",
+      "status": "review_required",
+      "scope": "Sensor wear duration",
+      "assumption": "Sensor wear duration uses wear_days with medium confidence.",
+      "basis": "class_pack:cgm.class_pack; formula:wear_days",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:capex_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated CAPEX",
+      "assumption": "Estimated CAPEX uses an implicit model with low confidence.",
+      "basis": "formula:capex=sum(bom.totalCostGbp); class_pack:cgm.class_pack",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:opex_annual_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated annual OPEX",
+      "assumption": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "basis": "formula:opex=capex*0.04",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [
+        "wear_days"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:cgm_wear_duration",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Wear Duration",
+      "assumption": "Wear Duration currently evaluates as pass against 7 to 15 days for common disposable CGM patch wear; longer wear needs adhesive, biocompatibility and sensor-drift evidence.",
+      "basis": "brief:input.brief; model:engineering_sanity.cgm; model:engineering_sanity.cgm",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "reading_interval_minutes"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:cgm_reading_interval",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Reading Interval",
+      "assumption": "Reading Interval currently evaluates as pass against 1 to 15 minute reading intervals for wearable trend monitoring before battery and radio duty-cycle evidence.",
+      "basis": "brief:input.brief; model:engineering_sanity.cgm; model:engineering_sanity.cgm",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "mard_percent"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:cgm_accuracy_target",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "MARD Accuracy Target",
+      "assumption": "MARD Accuracy Target currently evaluates as pass against <=10% MARD target before clinical validation; 10-15% needs strong use-case constraints, >15% is weak for dosing-adjacent use.",
+      "basis": "brief:input.brief; model:engineering_sanity.cgm; model:engineering_sanity.cgm",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:cgm_biofluid_signal_closure",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Biofluid/Signal Closure",
+      "assumption": "Biofluid/Signal Closure currently evaluates as pass against interstitial fluid path, electrode signal, sensor signal bus and calibration data bus present.",
+      "basis": "model:engineering_sanity.cgm; model:engineering_sanity.cgm",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "wear_days",
+        "reading_interval_minutes"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:cgm_patch_power_comms_safety",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Patch/Power/Comms/Safety Closure",
+      "assumption": "Patch/Power/Comms/Safety Closure currently evaluates as pass against adhesive skin boundary, sterile boundary, BLE link, low-power rail, alarm bus and disposable applicator present.",
+      "basis": "model:engineering_sanity.cgm; model:engineering_sanity.cgm",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "interstitial_fluid_path"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "skin_patient_interface -> sensing_instrumentation",
+      "assumption": "interstitial_fluid_path is named on both endpoint modules in the generated architecture.",
+      "basis": "Sensor chemistry must access interstitial fluid through a declared patient interface.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "insertion_path"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:actuation_kinematics:skin_patient_interface:insertion_path",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "actuation_kinematics -> skin_patient_interface",
+      "assumption": "insertion_path is named on both endpoint modules in the generated architecture.",
+      "basis": "Applicator insertion path must align with the adhesive patch and skin boundary.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "sensor_signal_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:sensing_instrumentation:control_compute_communication:sensor_signal_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "assumption": "sensor_signal_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Analog sensing output must feed the processing and telemetry stack.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "calibration_data_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:sensing_instrumentation:control_compute_communication:calibration_data_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "assumption": "calibration_data_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Factory calibration and drift state must be visible to the reader algorithm.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "cell_power_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:energy_storage_source:power_distribution:cell_power_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "energy_storage_source -> power_distribution",
+      "assumption": "cell_power_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Battery output must feed protected low-power rails.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "analog_power_rail"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:power_distribution:sensing_instrumentation:analog_power_rail",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "power_distribution -> sensing_instrumentation",
+      "assumption": "analog_power_rail is named on both endpoint modules in the generated architecture.",
+      "basis": "Electrochemical analog front-end needs a low-noise supply path.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "low_power_rail"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:power_distribution:control_compute_communication:low_power_rail",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "power_distribution -> control_compute_communication",
+      "assumption": "low_power_rail is named on both endpoint modules in the generated architecture.",
+      "basis": "MCU and BLE telemetry need duty-cycled digital power.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "temperature_compensation_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:environmental_interface:control_compute_communication:temperature_compensation_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "environmental_interface -> control_compute_communication",
+      "assumption": "temperature_compensation_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Body-temperature context must feed the glucose compensation algorithm.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "alarm_state_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:safety_protection:alarm_state_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> safety_protection",
+      "assumption": "alarm_state_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Patient alarm and stale-data states must route through safety logic.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "sterile_boundary"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:maintenance_serviceability:skin_patient_interface:sterile_boundary",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "maintenance_serviceability -> skin_patient_interface",
+      "assumption": "sterile_boundary is named on both endpoint modules in the generated architecture.",
+      "basis": "Sterile packaging evidence must connect to the patient-contact boundary.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "adhesive_skin_patch"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:skin_patient_interface_adhesive_patch_stack_adhesive_skin_patch",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Adhesive skin patch",
+      "assumption": "Adhesive skin patch is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "glucose_sensing_filament"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_glucose_filament_stack_glucose_sensing_filament",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Glucose sensing filament",
+      "assumption": "Glucose sensing filament is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "enzyme_reagent_membrane"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_glucose_filament_stack_enzyme_reagent_membrane",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Enzyme reagent membrane",
+      "assumption": "Enzyme reagent membrane is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "reference_electrode"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_glucose_filament_stack_reference_electrode",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Reference electrode",
+      "assumption": "Reference electrode is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "disposable_applicator"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:actuation_kinematics_disposable_applicator_disposable_applicator",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Disposable applicator",
+      "assumption": "Disposable applicator is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "protective_transmitter_housing"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:structure_containment_transmitter_housing_protective_transmitter_housing",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Protective transmitter housing",
+      "assumption": "Protective transmitter housing is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "thin_film_battery"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_storage_source_battery_cell_thin_film_battery",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Thin-film battery",
+      "assumption": "Thin-film battery is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "low_power_microcontroller"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_mcu_firmware_low_power_microcontroller",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Low-power microcontroller",
+      "assumption": "Low-power microcontroller is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "ble_radio_module"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_ble_telemetry_ble_radio_module",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "BLE radio module",
+      "assumption": "BLE radio module is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "temperature_sensor"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_temperature_compensation_temperature_sensor",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Temperature sensor",
+      "assumption": "Temperature sensor is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "sterile_barrier_pouch"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:maintenance_serviceability_sterile_packaging_sterile_barrier_pouch",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Sterile barrier pouch",
+      "assumption": "Sterile barrier pouch is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "udi_label_set"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:maintenance_serviceability_lot_traceability_udi_label_set",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "UDI label set",
+      "assumption": "UDI label set is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.cgm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:ISO-10993",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "ISO-10993",
+      "assumption": "Biological evaluation of patient-contacting materials is relevant to this product class in Global / medical device.",
+      "basis": "class_pack:cgm.class_pack",
+      "evidenceRequired": "Skin-contact material, adhesive and wear-duration biocompatibility evidence."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:ISO-14971",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "ISO-14971",
+      "assumption": "Medical-device risk management is relevant to this product class in Global / medical device.",
+      "basis": "class_pack:cgm.class_pack",
+      "evidenceRequired": "Hazard analysis, risk controls and residual-risk acceptability."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:IEC-62304",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "IEC-62304",
+      "assumption": "Medical-device software lifecycle is relevant to this product class in Global / medical device.",
+      "basis": "class_pack:cgm.class_pack",
+      "evidenceRequired": "Software architecture, risk class, verification and release evidence."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:IEC-60601-1",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "IEC-60601-1",
+      "assumption": "Medical electrical equipment safety reference is relevant to this product class in Global / medical device.",
+      "basis": "class_pack:cgm.class_pack",
+      "evidenceRequired": "Electrical safety, leakage, power source and abnormal-operation evidence tailored to wearable use."
+    }
+  ]
+}

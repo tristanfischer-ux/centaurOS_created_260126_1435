@@ -1,0 +1,13 @@
+componentWordId,description,priority,supplierName,manufacturer,mpn,unitCostGbp,leadTimeWeeks,sourceGrade,evidence.ref,evidence.quote,retrievedAt
+1u_rack_chassis,1U rack chassis,critical,,,,,,catalogue,,,
+ai_accelerator_module,AI accelerator module,critical,,,,,,catalogue,,,
+cpu_module,CPU module,critical,,,,,,catalogue,,,
+ecc_memory,ECC memory,critical,,,,,,catalogue,,,
+system_motherboard,System motherboard,critical,,,,,,catalogue,,,
+high_speed_nic,High-speed NIC,critical,,,,,,catalogue,,,
+nvme_ssd,NVMe SSD,critical,,,,,,catalogue,,,
+bmc_management_controller,BMC management controller,critical,,,,,,catalogue,,,
+redundant_power_supply,Redundant power supply,critical,,,,,,catalogue,,,
+fan_wall_assembly,Fan wall assembly,critical,,,,,,catalogue,,,
+heatsink_cold_plate,Heatsink cold plate,critical,,,,,,catalogue,,,
+tpm_security_module,TPM security module,critical,,,,,,catalogue,,,

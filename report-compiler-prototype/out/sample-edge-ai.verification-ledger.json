@@ -1,0 +1,409 @@
+{
+  "summary": {
+    "activities": 39,
+    "evidenceEligibleActivities": 31,
+    "sourceEvidenceActivities": 8,
+    "accepted": 0,
+    "rejected": 0,
+    "deferred": 0,
+    "pending": 31,
+    "blockedWithoutEvidence": 0,
+    "reviewCoverageRatio": 0,
+    "acceptanceRatio": 0,
+    "ignoredRecords": 0,
+    "supersededRecords": 0
+  },
+  "ignoredRecords": [],
+  "rows": [
+    {
+      "activityId": "design_review:structure_containment",
+      "activity": "Review Rack Structure Containment architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "structure_containment",
+      "moduleName": "Rack Structure Containment",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:structure_containment",
+      "activity": "Verify Rack Structure Containment requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "structure_containment",
+      "moduleName": "Rack Structure Containment",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:structure_containment",
+      "activity": "Collect source-backed evidence for Rack Structure Containment critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "structure_containment",
+      "moduleName": "Rack Structure Containment",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:compute_acceleration",
+      "activity": "Review Compute Acceleration architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "compute_acceleration",
+      "moduleName": "Compute Acceleration",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:compute_acceleration",
+      "activity": "Verify Compute Acceleration requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "compute_acceleration",
+      "moduleName": "Compute Acceleration",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:compute_acceleration",
+      "activity": "Collect source-backed evidence for Compute Acceleration critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "compute_acceleration",
+      "moduleName": "Compute Acceleration",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:network_io",
+      "activity": "Review Network IO architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "network_io",
+      "moduleName": "Network IO",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:network_io",
+      "activity": "Collect source-backed evidence for Network IO critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "network_io",
+      "moduleName": "Network IO",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:data_storage",
+      "activity": "Review Data Storage architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "data_storage",
+      "moduleName": "Data Storage",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:data_storage",
+      "activity": "Collect source-backed evidence for Data Storage critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "data_storage",
+      "moduleName": "Data Storage",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:control_compute_communication",
+      "activity": "Review Control Compute Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:control_compute_communication",
+      "activity": "Verify Control Compute Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:control_compute_communication",
+      "activity": "Collect source-backed evidence for Control Compute Communication critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:power_distribution",
+      "activity": "Review Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:power_distribution",
+      "activity": "Verify Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:power_distribution",
+      "activity": "Collect source-backed evidence for Power Distribution critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:environmental_interface",
+      "activity": "Review Thermal Airflow Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Airflow Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:environmental_interface",
+      "activity": "Verify Thermal Airflow Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Airflow Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:environmental_interface",
+      "activity": "Collect source-backed evidence for Thermal Airflow Interface critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Airflow Interface",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:sensing_instrumentation",
+      "activity": "Review Telemetry Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Telemetry Instrumentation",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:safety_protection",
+      "activity": "Review Security And Safety Protection architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection",
+      "moduleName": "Security And Safety Protection",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:safety_protection",
+      "activity": "Verify Security And Safety Protection requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection",
+      "moduleName": "Security And Safety Protection",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:safety_protection",
+      "activity": "Collect source-backed evidence for Security And Safety Protection critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "safety_protection",
+      "moduleName": "Security And Safety Protection",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:maintenance_serviceability",
+      "activity": "Review Field Maintenance Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance Serviceability",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:maintenance_serviceability",
+      "activity": "Verify Field Maintenance Serviceability requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance Serviceability",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:control_compute_communication:compute_acceleration:pcie_fabric",
+      "activity": "Verify pcie_fabric interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication:compute_acceleration",
+      "moduleName": "Control Compute Communication -> Compute Acceleration",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:power_distribution:compute_acceleration:gpu_power_bus",
+      "activity": "Verify gpu_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution:compute_acceleration",
+      "moduleName": "Power Distribution -> Compute Acceleration",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:network_io:control_compute_communication:inference_network",
+      "activity": "Verify inference_network interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "network_io:control_compute_communication",
+      "moduleName": "Network IO -> Control Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:data_storage:control_compute_communication:storage_bus",
+      "activity": "Verify storage_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "data_storage:control_compute_communication",
+      "moduleName": "Data Storage -> Control Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:environmental_interface:compute_acceleration:thermal_path",
+      "activity": "Verify thermal_path interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface:compute_acceleration",
+      "moduleName": "Thermal Airflow Interface -> Compute Acceleration",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Telemetry Instrumentation -> Control Compute Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:safety_protection:power_distribution:hardwired_trip",
+      "activity": "Verify hardwired_trip interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection:power_distribution",
+      "moduleName": "Security And Safety Protection -> Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:structure_containment:environmental_interface:airflow_path",
+      "activity": "Verify airflow_path interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "structure_containment:environmental_interface",
+      "moduleName": "Rack Structure Containment -> Thermal Airflow Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:IEC-62368-1",
+      "activity": "Plan evidence for IEC-62368-1",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:CE-EMC",
+      "activity": "Plan evidence for CE-EMC",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:SECURE-BOOT-REVIEW",
+      "activity": "Plan evidence for SECURE-BOOT-REVIEW",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:1",
+      "activity": "Review risk control for Accelerator thermal throttling or shutdown under rack inlet conditions",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:2",
+      "activity": "Review risk control for Insecure firmware or management interface compromise",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:3",
+      "activity": "Review risk control for Inference outage from PSU, fan or SSD failure",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    }
+  ]
+}

@@ -1,0 +1,1101 @@
+{
+  "summary": {
+    "rows": 64,
+    "blockers": 18,
+    "majors": 46,
+    "minors": 0,
+    "architectureBlockingRows": 0,
+    "bomBlockingRows": 15,
+    "publishBlockingRows": 64,
+    "sourcingIntakeRows": 15,
+    "verificationIntakeRows": 37,
+    "engineeringReviewRows": 11,
+    "architectureRevisionRows": 0
+  },
+  "rows": [
+    {
+      "id": "readiness:1",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "bom score 1 is below 8.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "score_repair",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:2",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "12 critical BoM line(s) lack source-backed cost evidence.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:3",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "8 verification activity/activities remain blocked.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:4",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "0/35 non-sourcing verification activity/activities have accepted reviewer evidence.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "calculation:cgm_total_wear_readings",
+      "kind": "calculation_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "CGM total wear readings",
+      "issue": "4032 readings over the stated wear period.",
+      "requiredEvidence": "Confirm memory, telemetry retries, battery capacity, sensor drift and calibration strategy.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "wear_days",
+        "reading_interval_minutes"
+      ],
+      "source": "engineering_calculation_ledger"
+    },
+    {
+      "id": "assumption:metric:headline_output",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Sensor wear duration",
+      "issue": "Sensor wear duration uses wear_days with medium confidence.",
+      "requiredEvidence": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:metric:capex_gbp",
+      "kind": "assumption_review",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Estimated CAPEX",
+      "issue": "Estimated CAPEX uses an implicit model with low confidence.",
+      "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:metric:opex_annual_gbp",
+      "kind": "assumption_review",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Estimated annual OPEX",
+      "issue": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:cgm_wear_duration",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Wear Duration",
+      "issue": "Wear Duration currently evaluates as pass against 7 to 15 days for common disposable CGM patch wear; longer wear needs adhesive, biocompatibility and sensor-drift evidence.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "wear_days"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:cgm_reading_interval",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Reading Interval",
+      "issue": "Reading Interval currently evaluates as pass against 1 to 15 minute reading intervals for wearable trend monitoring before battery and radio duty-cycle evidence.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "reading_interval_minutes"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:cgm_accuracy_target",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "MARD Accuracy Target",
+      "issue": "MARD Accuracy Target currently evaluates as pass against <=10% MARD target before clinical validation; 10-15% needs strong use-case constraints, >15% is weak for dosing-adjacent use.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "mard_percent"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:cgm_biofluid_signal_closure",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Biofluid/Signal Closure",
+      "issue": "Biofluid/Signal Closure currently evaluates as pass against interstitial fluid path, electrode signal, sensor signal bus and calibration data bus present.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:cgm_patch_power_comms_safety",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Patch/Power/Comms/Safety Closure",
+      "issue": "Patch/Power/Comms/Safety Closure currently evaluates as pass against adhesive skin boundary, sterile boundary, BLE link, low-power rail, alarm bus and disposable applicator present.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "wear_days",
+        "reading_interval_minutes"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:ISO-10993",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "ISO-10993",
+      "issue": "Biological evaluation of patient-contacting materials is relevant to this product class in Global / medical device.",
+      "requiredEvidence": "Skin-contact material, adhesive and wear-duration biocompatibility evidence.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:ISO-14971",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "ISO-14971",
+      "issue": "Medical-device risk management is relevant to this product class in Global / medical device.",
+      "requiredEvidence": "Hazard analysis, risk controls and residual-risk acceptability.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:IEC-62304",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "IEC-62304",
+      "issue": "Medical-device software lifecycle is relevant to this product class in Global / medical device.",
+      "requiredEvidence": "Software architecture, risk class, verification and release evidence.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:IEC-60601-1",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "IEC-60601-1",
+      "issue": "Medical electrical equipment safety reference is relevant to this product class in Global / medical device.",
+      "requiredEvidence": "Electrical safety, leakage, power source and abnormal-operation evidence tailored to wearable use.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "sourcing:adhesive_skin_patch",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Adhesive skin patch",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "adhesive_skin_patch"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:glucose_sensing_filament",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Glucose sensing filament",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "glucose_sensing_filament"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:enzyme_reagent_membrane",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Enzyme reagent membrane",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "enzyme_reagent_membrane"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:reference_electrode",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Reference electrode",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "reference_electrode"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:disposable_applicator",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Disposable applicator",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "disposable_applicator"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:protective_transmitter_housing",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Protective transmitter housing",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "protective_transmitter_housing"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:thin_film_battery",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Thin-film battery",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "thin_film_battery"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:low_power_microcontroller",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Low-power microcontroller",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "low_power_microcontroller"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:ble_radio_module",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "BLE radio module",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "ble_radio_module"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:temperature_sensor",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Temperature sensor",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "temperature_sensor"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:sterile_barrier_pouch",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Sterile barrier pouch",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "sterile_barrier_pouch"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:udi_label_set",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "UDI label set",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "udi_label_set"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "verification:design_review:skin_patient_interface",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Skin Patient Interface",
+      "issue": "Review Skin Patient Interface architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:skin_patient_interface"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:skin_patient_interface",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Skin Patient Interface",
+      "issue": "Verify Skin Patient Interface requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:skin_patient_interface"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:sensing_instrumentation",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Glucose Sensing Instrumentation",
+      "issue": "Review Glucose Sensing Instrumentation architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:sensing_instrumentation"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:sensing_instrumentation",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Glucose Sensing Instrumentation",
+      "issue": "Verify Glucose Sensing Instrumentation requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:sensing_instrumentation"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:actuation_kinematics",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Applicator Insertion Mechanism",
+      "issue": "Review Applicator Insertion Mechanism architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:actuation_kinematics"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:structure_containment",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Transmitter Housing Structure",
+      "issue": "Review Transmitter Housing Structure architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:structure_containment"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:energy_storage_source",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Wearable Energy Source",
+      "issue": "Review Wearable Energy Source architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:energy_storage_source"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:energy_storage_source",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Wearable Energy Source",
+      "issue": "Verify Wearable Energy Source requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:energy_storage_source"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:power_distribution",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Low-Power Distribution",
+      "issue": "Review Low-Power Distribution architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:power_distribution"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:power_distribution",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Low-Power Distribution",
+      "issue": "Verify Low-Power Distribution requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:power_distribution"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:control_compute_communication",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Control Compute Communication",
+      "issue": "Review Control Compute Communication architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:control_compute_communication"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:control_compute_communication",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Control Compute Communication",
+      "issue": "Verify Control Compute Communication requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:control_compute_communication"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:environmental_interface",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Wear Environment Compensation",
+      "issue": "Review Wear Environment Compensation architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:environmental_interface"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:environmental_interface",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Wear Environment Compensation",
+      "issue": "Verify Wear Environment Compensation requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:environmental_interface"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:safety_protection",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Patient Safety Protection",
+      "issue": "Review Patient Safety Protection architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:safety_protection"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:safety_protection",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Patient Safety Protection",
+      "issue": "Verify Patient Safety Protection requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:safety_protection"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:maintenance_serviceability",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Packaging Traceability Serviceability",
+      "issue": "Review Packaging Traceability Serviceability architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:maintenance_serviceability"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Skin Patient Interface -> Glucose Sensing Instrumentation",
+      "issue": "Verify interstitial_fluid_path interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:actuation_kinematics:skin_patient_interface:insertion_path",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Applicator Insertion Mechanism -> Skin Patient Interface",
+      "issue": "Verify insertion_path interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:actuation_kinematics:skin_patient_interface:insertion_path"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:sensing_instrumentation:control_compute_communication:sensor_signal_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Glucose Sensing Instrumentation -> Control Compute Communication",
+      "issue": "Verify sensor_signal_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:sensing_instrumentation:control_compute_communication:sensor_signal_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:sensing_instrumentation:control_compute_communication:calibration_data_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Glucose Sensing Instrumentation -> Control Compute Communication",
+      "issue": "Verify calibration_data_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:sensing_instrumentation:control_compute_communication:calibration_data_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:energy_storage_source:power_distribution:cell_power_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Wearable Energy Source -> Low-Power Distribution",
+      "issue": "Verify cell_power_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:energy_storage_source:power_distribution:cell_power_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:power_distribution:sensing_instrumentation:analog_power_rail",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Low-Power Distribution -> Glucose Sensing Instrumentation",
+      "issue": "Verify analog_power_rail interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:power_distribution:sensing_instrumentation:analog_power_rail"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:power_distribution:control_compute_communication:low_power_rail",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Low-Power Distribution -> Control Compute Communication",
+      "issue": "Verify low_power_rail interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:power_distribution:control_compute_communication:low_power_rail"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:environmental_interface:control_compute_communication:temperature_compensation_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Wear Environment Compensation -> Control Compute Communication",
+      "issue": "Verify temperature_compensation_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:environmental_interface:control_compute_communication:temperature_compensation_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:control_compute_communication:safety_protection:alarm_state_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Control Compute Communication -> Patient Safety Protection",
+      "issue": "Verify alarm_state_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:control_compute_communication:safety_protection:alarm_state_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:maintenance_serviceability:skin_patient_interface:sterile_boundary",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Packaging Traceability Serviceability -> Skin Patient Interface",
+      "issue": "Verify sterile_boundary interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:maintenance_serviceability:skin_patient_interface:sterile_boundary"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:ISO-10993",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for ISO-10993",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:ISO-10993"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:ISO-14971",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for ISO-14971",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:ISO-14971"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:IEC-62304",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for IEC-62304",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:IEC-62304"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:IEC-60601-1",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for IEC-60601-1",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:IEC-60601-1"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:1",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Incorrect glucose reading drives unsafe therapy decision",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:1"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:2",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Skin irritation or adhesive injury during extended wear",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:2"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:3",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Applicator needle or filament insertion injury",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:3"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:4",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Telemetry or battery failure hides a clinically relevant trend",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:4"
+      ],
+      "source": "verification_evidence_ledger"
+    }
+  ]
+}

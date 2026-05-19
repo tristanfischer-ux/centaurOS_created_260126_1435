@@ -1,0 +1,114 @@
+{
+  "dossierId": "audit-csv-roundtrip-initial",
+  "productClass": "energy_storage",
+  "criticalOnly": true,
+  "instructions": [
+    "Fill only from supplier, manufacturer, distributor, quote, catalogue or datasheet evidence.",
+    "Do not use benchmark averages, LLM estimates, class-pack defaults or unsourced model output.",
+    "The intake record is only admitted when every required field validates and componentWordId matches a candidate BoM line."
+  ],
+  "drafts": [
+    {
+      "componentWordId": "lfp_prismatic_cells",
+      "description": "LFP prismatic cells",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "dc_contactor_or_breaker",
+      "description": "DC contactor or breaker",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "pcs_inverter",
+      "description": "PCS inverter",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "bms_master_controller",
+      "description": "BMS master controller",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "fire_detection_suppression",
+      "description": "Fire detection/suppression",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "thermal_management_loop",
+      "description": "Thermal management loop",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    }
+  ]
+}

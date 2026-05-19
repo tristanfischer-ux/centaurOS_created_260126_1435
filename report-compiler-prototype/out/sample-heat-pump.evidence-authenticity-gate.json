@@ -1,0 +1,20 @@
+{
+  "verdict": "no_evidence",
+  "summary": {
+    "rows": 0,
+    "sourcingRows": 0,
+    "verificationRows": 0,
+    "productionReadyRows": 0,
+    "protocolFixtureRows": 0,
+    "reviewRequiredRows": 0,
+    "missingMetadataRows": 0,
+    "externalUrlRows": 0,
+    "internalReferenceRows": 0,
+    "localFileRows": 0,
+    "unknownReferenceRows": 0,
+    "passRatio": 0
+  },
+  "rows": [],
+  "promotionBlockers": [],
+  "nextActions": []
+}

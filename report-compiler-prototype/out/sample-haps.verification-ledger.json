@@ -1,0 +1,459 @@
+{
+  "summary": {
+    "activities": 44,
+    "evidenceEligibleActivities": 35,
+    "sourceEvidenceActivities": 9,
+    "accepted": 0,
+    "rejected": 0,
+    "deferred": 0,
+    "pending": 35,
+    "blockedWithoutEvidence": 0,
+    "reviewCoverageRatio": 0,
+    "acceptanceRatio": 0,
+    "ignoredRecords": 0,
+    "supersededRecords": 0
+  },
+  "ignoredRecords": [],
+  "rows": [
+    {
+      "activityId": "design_review:structure_containment",
+      "activity": "Review Ultra-Light Wing Structure architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "structure_containment",
+      "moduleName": "Ultra-Light Wing Structure",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:structure_containment",
+      "activity": "Verify Ultra-Light Wing Structure requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "structure_containment",
+      "moduleName": "Ultra-Light Wing Structure",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:structure_containment",
+      "activity": "Collect source-backed evidence for Ultra-Light Wing Structure critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "structure_containment",
+      "moduleName": "Ultra-Light Wing Structure",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:energy_harvesting",
+      "activity": "Review Solar Energy Harvesting architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_harvesting",
+      "moduleName": "Solar Energy Harvesting",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:energy_harvesting",
+      "activity": "Verify Solar Energy Harvesting requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_harvesting",
+      "moduleName": "Solar Energy Harvesting",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:energy_harvesting",
+      "activity": "Collect source-backed evidence for Solar Energy Harvesting critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "energy_harvesting",
+      "moduleName": "Solar Energy Harvesting",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:energy_storage_source",
+      "activity": "Review Night-Cycle Energy Storage architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Night-Cycle Energy Storage",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:energy_storage_source",
+      "activity": "Verify Night-Cycle Energy Storage requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Night-Cycle Energy Storage",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:energy_storage_source",
+      "activity": "Collect source-backed evidence for Night-Cycle Energy Storage critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Night-Cycle Energy Storage",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:power_distribution",
+      "activity": "Review Flight Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution",
+      "moduleName": "Flight Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:power_distribution",
+      "activity": "Verify Flight Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution",
+      "moduleName": "Flight Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "design_review:actuation_kinematics",
+      "activity": "Review Propulsion And Control Surfaces architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Control Surfaces",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:actuation_kinematics",
+      "activity": "Verify Propulsion And Control Surfaces requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Control Surfaces",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:actuation_kinematics",
+      "activity": "Collect source-backed evidence for Propulsion And Control Surfaces critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Control Surfaces",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:control_compute_communication",
+      "activity": "Review Autonomy Control Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Control Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:control_compute_communication",
+      "activity": "Verify Autonomy Control Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Control Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:control_compute_communication",
+      "activity": "Collect source-backed evidence for Autonomy Control Communication critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Control Communication",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:sensing_instrumentation",
+      "activity": "Review Navigation And Airdata Sensing architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Airdata Sensing",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:sensing_instrumentation",
+      "activity": "Verify Navigation And Airdata Sensing requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Airdata Sensing",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:sensing_instrumentation",
+      "activity": "Collect source-backed evidence for Navigation And Airdata Sensing critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Airdata Sensing",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:payload_communication",
+      "activity": "Review Communications Payload architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "payload_communication",
+      "moduleName": "Communications Payload",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:payload_communication",
+      "activity": "Collect source-backed evidence for Communications Payload critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "payload_communication",
+      "moduleName": "Communications Payload",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:environmental_interface",
+      "activity": "Review Stratospheric Environmental Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface",
+      "moduleName": "Stratospheric Environmental Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:environmental_interface",
+      "activity": "Verify Stratospheric Environmental Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface",
+      "moduleName": "Stratospheric Environmental Interface",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:environmental_interface",
+      "activity": "Collect source-backed evidence for Stratospheric Environmental Interface critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "environmental_interface",
+      "moduleName": "Stratospheric Environmental Interface",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:safety_protection",
+      "activity": "Review Flight Safety And Recovery architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Recovery",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:safety_protection",
+      "activity": "Verify Flight Safety And Recovery requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Recovery",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "source_evidence:safety_protection",
+      "activity": "Collect source-backed evidence for Flight Safety And Recovery critical components",
+      "evidenceKind": "source_evidence",
+      "plannedStatus": "blocked",
+      "ledgerStatus": "source_evidence_required",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Recovery",
+      "residualAction": "Use sourcing intake for supplier, manufacturer, MPN, cost and lead-time evidence."
+    },
+    {
+      "activityId": "design_review:maintenance_serviceability",
+      "activity": "Review Ground Handling Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Ground Handling Serviceability",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "calculation:maintenance_serviceability",
+      "activity": "Verify Ground Handling Serviceability requirement calculations",
+      "evidenceKind": "calculation",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Ground Handling Serviceability",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:energy_harvesting:power_distribution:solar_dc_bus",
+      "activity": "Verify solar_dc_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_harvesting:power_distribution",
+      "moduleName": "Solar Energy Harvesting -> Flight Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:energy_storage_source:power_distribution:battery_dc_bus",
+      "activity": "Verify battery_dc_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "energy_storage_source:power_distribution",
+      "moduleName": "Night-Cycle Energy Storage -> Flight Power Distribution",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:power_distribution:actuation_kinematics:propulsion_power_bus",
+      "activity": "Verify propulsion_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "power_distribution:actuation_kinematics",
+      "moduleName": "Flight Power Distribution -> Propulsion And Control Surfaces",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:control_compute_communication:actuation_kinematics:flight_control_bus",
+      "activity": "Verify flight_control_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "control_compute_communication:actuation_kinematics",
+      "moduleName": "Autonomy Control Communication -> Propulsion And Control Surfaces",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Navigation And Airdata Sensing -> Autonomy Control Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:payload_communication:control_compute_communication:payload_data_link",
+      "activity": "Verify payload_data_link interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "payload_communication:control_compute_communication",
+      "moduleName": "Communications Payload -> Autonomy Control Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:environmental_interface:energy_storage_source:thermal_path",
+      "activity": "Verify thermal_path interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "environmental_interface:energy_storage_source",
+      "moduleName": "Stratospheric Environmental Interface -> Night-Cycle Energy Storage",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "interface_review:safety_protection:control_compute_communication:telemetry_link",
+      "activity": "Verify telemetry_link interface contract",
+      "evidenceKind": "interface_review",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "moduleId": "safety_protection:control_compute_communication",
+      "moduleName": "Flight Safety And Recovery -> Autonomy Control Communication",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:CAA-UAS-OPS",
+      "activity": "Plan evidence for CAA-UAS-OPS",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:DO-160-ENV",
+      "activity": "Plan evidence for DO-160-ENV",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "compliance_review:SOLAR-ENERGY-BALANCE-REVIEW",
+      "activity": "Plan evidence for SOLAR-ENERGY-BALANCE-REVIEW",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:1",
+      "activity": "Review risk control for Energy-negative overnight operation",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:2",
+      "activity": "Review risk control for Wing structural failure in gust or launch handling",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    },
+    {
+      "activityId": "risk_review:3",
+      "activity": "Review risk control for Lost command link or uncontrolled descent",
+      "evidenceKind": "compliance_review",
+      "plannedStatus": "open",
+      "ledgerStatus": "pending",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "residualAction": "Collect reviewer evidence through the verification intake template."
+    }
+  ]
+}

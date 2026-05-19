@@ -1,0 +1,78 @@
+{
+  "summary": {
+    "bomLines": 120,
+    "distinctComponentWordIds": 117,
+    "duplicateComponentGroups": 3,
+    "duplicateAllocatedLines": 6,
+    "duplicateCriticalComponentGroups": 3,
+    "canonicalReviewRequired": true
+  },
+  "groups": [
+    {
+      "componentWordId": "insulation_monitoring_device",
+      "descriptions": [
+        "Insulation monitoring device"
+      ],
+      "lineIds": [
+        "sensing_instrumentation_insulation_fault_detection_insulation_monitoring_device",
+        "safety_protection_dc_fault_protection_insulation_monitoring_device"
+      ],
+      "criticalLineIds": [
+        "sensing_instrumentation_insulation_fault_detection_insulation_monitoring_device",
+        "safety_protection_dc_fault_protection_insulation_monitoring_device"
+      ],
+      "quantityByUnit": [
+        {
+          "unit": "candidate",
+          "quantity": 2
+        }
+      ],
+      "lineCount": 2,
+      "recommendation": "Resolve whether these allocations are one shared physical item or separate install locations before sourcing, costing or deduplicating."
+    },
+    {
+      "componentWordId": "iso_15118_plc_modem",
+      "descriptions": [
+        "ISO 15118 PLC modem"
+      ],
+      "lineIds": [
+        "charging_connector_interface_vehicle_communication_frontend_iso_15118_plc_modem",
+        "control_compute_communication_protocol_stack_iso_15118_plc_modem"
+      ],
+      "criticalLineIds": [
+        "charging_connector_interface_vehicle_communication_frontend_iso_15118_plc_modem",
+        "control_compute_communication_protocol_stack_iso_15118_plc_modem"
+      ],
+      "quantityByUnit": [
+        {
+          "unit": "candidate",
+          "quantity": 2
+        }
+      ],
+      "lineCount": 2,
+      "recommendation": "Resolve whether these allocations are one shared physical item or separate install locations before sourcing, costing or deduplicating."
+    },
+    {
+      "componentWordId": "mid_energy_meter",
+      "descriptions": [
+        "MID energy meter"
+      ],
+      "lineIds": [
+        "power_distribution_billing_metering_branch_mid_energy_meter",
+        "sensing_instrumentation_energy_metering_mid_energy_meter"
+      ],
+      "criticalLineIds": [
+        "power_distribution_billing_metering_branch_mid_energy_meter",
+        "sensing_instrumentation_energy_metering_mid_energy_meter"
+      ],
+      "quantityByUnit": [
+        {
+          "unit": "candidate",
+          "quantity": 2
+        }
+      ],
+      "lineCount": 2,
+      "recommendation": "Resolve whether these allocations are one shared physical item or separate install locations before sourcing, costing or deduplicating."
+    }
+  ]
+}

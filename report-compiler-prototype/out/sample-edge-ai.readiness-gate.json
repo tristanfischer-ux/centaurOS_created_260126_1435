@@ -1,0 +1,121 @@
+{
+  "targetSectionScore": 8,
+  "verdict": "architecture_review_ready",
+  "summary": {
+    "sections": 6,
+    "sectionsAtOrAboveTarget": 5,
+    "sectionsBelowTarget": 1,
+    "meanScore": 7.67,
+    "architectureReadyForBom": true,
+    "verificationBlockedActivities": 8,
+    "verificationOpenActivities": 6,
+    "verificationEvidenceEligibleActivities": 31,
+    "verificationAcceptedActivities": 0,
+    "verificationRejectedActivities": 0,
+    "verificationDeferredActivities": 0,
+    "verificationPendingActivities": 31,
+    "verificationUnacceptedActivities": 31,
+    "verificationReviewCoverageRatio": 0,
+    "verificationAcceptanceRatio": 0,
+    "sourcingAdmissionStatus": "not_started",
+    "unpricedCriticalLines": 12,
+    "blockerIssues": 12,
+    "majorIssues": 1,
+    "minorIssues": 0
+  },
+  "sections": [
+    {
+      "section": "executive_summary",
+      "score": 9,
+      "targetScore": 8,
+      "passesTarget": true,
+      "issueCount": 0,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "actions": [
+        "No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending."
+      ]
+    },
+    {
+      "section": "brief_requirements",
+      "score": 9,
+      "targetScore": 8,
+      "passesTarget": true,
+      "issueCount": 0,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "actions": [
+        "No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending."
+      ]
+    },
+    {
+      "section": "design_modules",
+      "score": 9,
+      "targetScore": 8,
+      "passesTarget": true,
+      "issueCount": 0,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "actions": [
+        "No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending."
+      ]
+    },
+    {
+      "section": "bom",
+      "score": 1,
+      "targetScore": 8,
+      "passesTarget": false,
+      "issueCount": 13,
+      "blockerCount": 12,
+      "majorCount": 1,
+      "minorCount": 0,
+      "actions": [
+        "Admit source-backed evidence for every critical BoM line through sourcing intake.",
+        "Increase priced-line coverage with admissible supplier evidence, not estimates."
+      ]
+    },
+    {
+      "section": "feasibility_notes",
+      "score": 9,
+      "targetScore": 8,
+      "passesTarget": true,
+      "issueCount": 0,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "actions": [
+        "No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending."
+      ]
+    },
+    {
+      "section": "sources_references",
+      "score": 9,
+      "targetScore": 8,
+      "passesTarget": true,
+      "issueCount": 0,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "actions": [
+        "No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending."
+      ]
+    }
+  ],
+  "promotionBlockers": [
+    "bom score 1 is below 8.",
+    "12 critical BoM line(s) lack source-backed cost evidence.",
+    "8 verification activity/activities remain blocked.",
+    "0/31 non-sourcing verification activity/activities have accepted reviewer evidence."
+  ],
+  "nextActions": [
+    "Admit source-backed evidence for every critical BoM line through sourcing intake.",
+    "Increase priced-line coverage with admissible supplier evidence, not estimates.",
+    "Collect engineering-review evidence for pending verification activities.",
+    "Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable.",
+    "Clear blocked verification activities or explicitly defer them with reviewer evidence.",
+    "Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines."
+  ]
+}

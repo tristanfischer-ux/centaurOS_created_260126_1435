@@ -1,0 +1,78 @@
+{
+  "verdict": "architecture_generation_review_required",
+  "summary": {
+    "rows": 6,
+    "passRows": 4,
+    "reviewRows": 2,
+    "blockedRows": 0,
+    "passRatio": 0.67,
+    "productClass": "bioreactor",
+    "intakeVerdict": "brief_intake_review_required",
+    "clarificationVerdict": "clarification_recommended",
+    "nextClarificationQuestion": "target_metrics:1",
+    "scratchArchitectureSupported": true,
+    "architectureStageStatus": "passed",
+    "architectureSource": "scratch_universal_architecture",
+    "readyForBom": true,
+    "architectureCanBeUsedForReview": true,
+    "architectureCanProceedToBom": false,
+    "admittedSourcingEvidenceRows": 0,
+    "provenanceViolations": 0,
+    "nextAction": "Treat generated architecture as review-only until recommended clarification questions are answered."
+  },
+  "rows": [
+    {
+      "area": "brief_intake_clearance",
+      "verdict": "review",
+      "signal": "5/6 intake areas pass; class bioreactor (high); 1 quantified requirement(s).",
+      "passRatio": 0.83,
+      "blockers": [],
+      "requiredAction": "Treat generated architecture as review-only until recommended clarification questions are answered."
+    },
+    {
+      "area": "clarification_clearance",
+      "verdict": "review",
+      "signal": "4 clarification question(s): 0 required, 3 recommended, 0 architecture-blocking.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Keep the architecture labelled as review-only until recommended brief clarifications are answered."
+    },
+    {
+      "area": "class_grammar_clearance",
+      "verdict": "pass",
+      "signal": "Product class bioreactor; scratch universal grammar supported: yes.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Route this class through the scratch universal module grammar."
+    },
+    {
+      "area": "scratch_stage_clearance",
+      "verdict": "pass",
+      "signal": "Architecture stage passed; source scratch_universal_architecture; modules 9; submodules 27; components 108.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Architecture was produced by the scratch universal architecture stage."
+    },
+    {
+      "area": "architecture_readiness_boundary",
+      "verdict": "pass",
+      "signal": "Architecture ready for BoM: yes; blocking issues 0; required links 6/6.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Deterministic architecture readiness checks passed; sourcing work may begin only with explicit evidence."
+    },
+    {
+      "area": "bom_provenance_hold",
+      "verdict": "pass",
+      "signal": "0 admitted sourcing evidence row(s), 0 source-backed BoM claim(s), 0 provenance violation(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "BoM fields remain behind the explicit sourcing-evidence boundary."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Treat generated architecture as review-only until recommended clarification questions are answered.",
+    "Keep the architecture labelled as review-only until recommended brief clarifications are answered."
+  ]
+}

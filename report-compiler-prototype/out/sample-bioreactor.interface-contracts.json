@@ -1,0 +1,616 @@
+{
+  "summary": {
+    "requiredContracts": 6,
+    "presentContracts": 6,
+    "missingContracts": 0,
+    "sharedInterfaces": 15,
+    "localOnlyInterfaces": 2
+  },
+  "requiredContracts": [
+    {
+      "id": "required:structure_containment:mass_fluid_transport_process:sterile_fluid_path",
+      "interfaceId": "sterile_fluid_path",
+      "status": "present",
+      "from": {
+        "moduleId": "structure_containment",
+        "moduleName": "Sterile Structure Containment",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "single_use_bag_chamber",
+            "subModuleName": "Single-use bag chamber",
+            "componentWordIds": [
+              "single_use_bioreactor_bag",
+              "bag_support_tray",
+              "port_clamp_set",
+              "bag_integrity_test_label"
+            ]
+          },
+          {
+            "subModuleId": "sterile_connector_panel",
+            "subModuleName": "Sterile connector panel",
+            "componentWordIds": [
+              "sterile_tubing_and_connector_set",
+              "aseptic_sampling_port",
+              "clamp_rail",
+              "connector_parking_bracket"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "mass_fluid_transport_process",
+        "moduleName": "Media Gas And Harvest Transport",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "feed_pump_manifold",
+            "subModuleName": "Feed pump manifold",
+            "componentWordIds": [
+              "peristaltic_feed_pump",
+              "pump_tubing_cassette_set",
+              "media_bag_hanger",
+              "feed_line_pinch_clamp"
+            ]
+          },
+          {
+            "subModuleId": "harvest_sampling_path",
+            "subModuleName": "Harvest and sampling path",
+            "componentWordIds": [
+              "harvest_transfer_tubing_set",
+              "single_use_sample_valve",
+              "waste_collection_bag",
+              "low_hold_up_connector"
+            ]
+          },
+          {
+            "subModuleId": "sparger_gas_mixing",
+            "subModuleName": "Sparger gas mixing",
+            "componentWordIds": [
+              "sparger_and_gas_mix_manifold",
+              "mass_flow_controller_bank",
+              "sterile_gas_filter_capsule",
+              "sparger_check_valve"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "The sterile bag must connect to feed, harvest and sampling fluid paths.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:actuation_kinematics:structure_containment:sterile_boundary",
+      "interfaceId": "sterile_boundary",
+      "status": "present",
+      "from": {
+        "moduleId": "actuation_kinematics",
+        "moduleName": "Mixing And Agitation",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "agitation_drive_train",
+            "subModuleName": "Agitation drive train",
+            "componentWordIds": [
+              "agitation_drive",
+              "magnetic_coupling_hub",
+              "drive_encoder",
+              "motor_mounting_plate"
+            ]
+          },
+          {
+            "subModuleId": "mixing_impeller_interface",
+            "subModuleName": "Mixing impeller interface",
+            "componentWordIds": [
+              "single_use_impeller_coupling",
+              "impeller_guard_insert",
+              "rocker_angle_stop",
+              "mixing_validation_coupon"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "structure_containment",
+        "moduleName": "Sterile Structure Containment",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "single_use_bag_chamber",
+            "subModuleName": "Single-use bag chamber",
+            "componentWordIds": [
+              "single_use_bioreactor_bag",
+              "bag_support_tray",
+              "port_clamp_set",
+              "bag_integrity_test_label"
+            ]
+          },
+          {
+            "subModuleId": "sterile_connector_panel",
+            "subModuleName": "Sterile connector panel",
+            "componentWordIds": [
+              "sterile_tubing_and_connector_set",
+              "aseptic_sampling_port",
+              "clamp_rail",
+              "connector_parking_bracket"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Mixing drive must couple into the disposable culture boundary without breaking sterility.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:mass_fluid_transport_process:environmental_interface:gas_path",
+      "interfaceId": "gas_path",
+      "status": "present",
+      "from": {
+        "moduleId": "mass_fluid_transport_process",
+        "moduleName": "Media Gas And Harvest Transport",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "sparger_gas_mixing",
+            "subModuleName": "Sparger gas mixing",
+            "componentWordIds": [
+              "sparger_and_gas_mix_manifold",
+              "mass_flow_controller_bank",
+              "sterile_gas_filter_capsule",
+              "sparger_check_valve"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "environmental_interface",
+        "moduleName": "Thermal Gas Exhaust Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "exhaust_filter_train",
+            "subModuleName": "Exhaust filter train",
+            "componentWordIds": [
+              "exhaust_filter_and_pressure_relief_set",
+              "condensate_knock_out_bottle",
+              "exhaust_heater_sleeve",
+              "pressure_relief_indicator"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Sparging and exhaust conditioning must share a declared gas path.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Process Sensing Instrumentation",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "do_ph_sensing",
+            "subModuleName": "DO and pH sensing",
+            "componentWordIds": [
+              "dissolved_oxygen_optical_sensor",
+              "single_use_ph_sensor",
+              "sensor_patch_reader",
+              "sensor_calibration_record_card"
+            ]
+          },
+          {
+            "subModuleId": "pressure_mass_temperature_sensing",
+            "subModuleName": "Pressure, mass and temperature sensing",
+            "componentWordIds": [
+              "load_cell_set",
+              "bag_pressure_transducer",
+              "culture_temperature_probe",
+              "foam_detection_probe"
+            ]
+          },
+          {
+            "subModuleId": "gas_flow_sensing",
+            "subModuleName": "Gas flow sensing",
+            "componentWordIds": [
+              "gas_flow_sensor_set",
+              "exhaust_pressure_sensor",
+              "oxygen_analyser_cell",
+              "co2_analyser_cell"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "process_controller",
+            "subModuleName": "Process controller",
+            "componentWordIds": [
+              "bioreactor_controller",
+              "i_o_terminal_slice_set",
+              "control_enclosure",
+              "recipe_execution_firmware"
+            ]
+          },
+          {
+            "subModuleId": "batch_record_gateway",
+            "subModuleName": "Batch record gateway",
+            "componentWordIds": [
+              "batch_historian_module",
+              "audit_trail_storage",
+              "ethernet_switch",
+              "secure_time_source"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "DO, pH, mass and temperature measurements must feed process control.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:control_compute_communication:mass_fluid_transport_process:pump_control",
+      "interfaceId": "pump_control",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "process_controller",
+            "subModuleName": "Process controller",
+            "componentWordIds": [
+              "bioreactor_controller",
+              "i_o_terminal_slice_set",
+              "control_enclosure",
+              "recipe_execution_firmware"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "mass_fluid_transport_process",
+        "moduleName": "Media Gas And Harvest Transport",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "feed_pump_manifold",
+            "subModuleName": "Feed pump manifold",
+            "componentWordIds": [
+              "peristaltic_feed_pump",
+              "pump_tubing_cassette_set",
+              "media_bag_hanger",
+              "feed_line_pinch_clamp"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Controller must command feed, harvest and gas-flow actuators.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:safety_protection:structure_containment:pressure_relief",
+      "interfaceId": "pressure_relief",
+      "status": "present",
+      "from": {
+        "moduleId": "safety_protection",
+        "moduleName": "Aseptic And Pressure Safety",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "sterile_pressure_safety",
+            "subModuleName": "Sterile pressure safety",
+            "componentWordIds": [
+              "single_use_pressure_relief_valve",
+              "vent_filter_integrity_tag",
+              "pressure_alarm_relay",
+              "bag_burst_shield"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "structure_containment",
+        "moduleName": "Sterile Structure Containment",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "single_use_bag_chamber",
+            "subModuleName": "Single-use bag chamber",
+            "componentWordIds": [
+              "single_use_bioreactor_bag",
+              "bag_support_tray",
+              "port_clamp_set",
+              "bag_integrity_test_label"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Disposable culture containment must connect to pressure relief and sterile exhaust protection.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    }
+  ],
+  "sharedInterfaces": [
+    {
+      "interfaceId": "mixing_drive",
+      "status": "local_only",
+      "moduleIds": [
+        "actuation_kinematics"
+      ],
+      "moduleNames": [
+        "Mixing And Agitation"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "service_port",
+      "status": "local_only",
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Control Compute Communication"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "alarm_bus",
+      "status": "shared",
+      "moduleIds": [
+        "actuation_kinematics",
+        "environmental_interface",
+        "control_compute_communication",
+        "power_distribution",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Mixing And Agitation",
+        "Thermal Gas Exhaust Interface",
+        "Control Compute Communication",
+        "Power Distribution",
+        "Aseptic And Pressure Safety"
+      ],
+      "carrierSubModuleCount": 7
+    },
+    {
+      "interfaceId": "batch_record_network",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Control Compute Communication",
+        "Setup Calibration And Service"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "control_bus",
+      "status": "shared",
+      "moduleIds": [
+        "actuation_kinematics",
+        "mass_fluid_transport_process",
+        "environmental_interface",
+        "control_compute_communication",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Mixing And Agitation",
+        "Media Gas And Harvest Transport",
+        "Thermal Gas Exhaust Interface",
+        "Control Compute Communication",
+        "Power Distribution"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "exhaust_path",
+      "status": "shared",
+      "moduleIds": [
+        "environmental_interface",
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Thermal Gas Exhaust Interface",
+        "Process Sensing Instrumentation",
+        "Aseptic And Pressure Safety"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "gas_path",
+      "status": "shared",
+      "moduleIds": [
+        "mass_fluid_transport_process",
+        "environmental_interface",
+        "sensing_instrumentation"
+      ],
+      "moduleNames": [
+        "Media Gas And Harvest Transport",
+        "Thermal Gas Exhaust Interface",
+        "Process Sensing Instrumentation"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "mains_supply",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Power Distribution",
+        "Aseptic And Pressure Safety"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "mechanical_mounts",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "sensing_instrumentation"
+      ],
+      "moduleNames": [
+        "Sterile Structure Containment",
+        "Process Sensing Instrumentation"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "pressure_relief",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Sterile Structure Containment",
+        "Thermal Gas Exhaust Interface",
+        "Process Sensing Instrumentation",
+        "Aseptic And Pressure Safety"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "protective_earth",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Power Distribution",
+        "Aseptic And Pressure Safety"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "pump_control",
+      "status": "shared",
+      "moduleIds": [
+        "mass_fluid_transport_process",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Media Gas And Harvest Transport",
+        "Control Compute Communication"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "sensor_bus",
+      "status": "shared",
+      "moduleIds": [
+        "actuation_kinematics",
+        "mass_fluid_transport_process",
+        "environmental_interface",
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Mixing And Agitation",
+        "Media Gas And Harvest Transport",
+        "Thermal Gas Exhaust Interface",
+        "Process Sensing Instrumentation",
+        "Control Compute Communication",
+        "Setup Calibration And Service"
+      ],
+      "carrierSubModuleCount": 11
+    },
+    {
+      "interfaceId": "service_access",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "actuation_kinematics",
+        "mass_fluid_transport_process",
+        "environmental_interface",
+        "power_distribution",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Sterile Structure Containment",
+        "Mixing And Agitation",
+        "Media Gas And Harvest Transport",
+        "Thermal Gas Exhaust Interface",
+        "Power Distribution",
+        "Aseptic And Pressure Safety",
+        "Setup Calibration And Service"
+      ],
+      "carrierSubModuleCount": 12
+    },
+    {
+      "interfaceId": "sterile_boundary",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "actuation_kinematics",
+        "environmental_interface",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Sterile Structure Containment",
+        "Mixing And Agitation",
+        "Thermal Gas Exhaust Interface",
+        "Aseptic And Pressure Safety",
+        "Setup Calibration And Service"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "sterile_fluid_path",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process",
+        "sensing_instrumentation",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Sterile Structure Containment",
+        "Media Gas And Harvest Transport",
+        "Process Sensing Instrumentation",
+        "Setup Calibration And Service"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "thermal_loop",
+      "status": "shared",
+      "moduleIds": [
+        "environmental_interface",
+        "sensing_instrumentation"
+      ],
+      "moduleNames": [
+        "Thermal Gas Exhaust Interface",
+        "Process Sensing Instrumentation"
+      ],
+      "carrierSubModuleCount": 2
+    }
+  ]
+}

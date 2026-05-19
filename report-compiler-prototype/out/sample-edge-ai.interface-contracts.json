@@ -1,0 +1,793 @@
+{
+  "summary": {
+    "requiredContracts": 8,
+    "presentContracts": 8,
+    "missingContracts": 0,
+    "sharedInterfaces": 16,
+    "localOnlyInterfaces": 2
+  },
+  "requiredContracts": [
+    {
+      "id": "required:control_compute_communication:compute_acceleration:pcie_fabric",
+      "interfaceId": "pcie_fabric",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "host_control",
+            "subModuleName": "Host control",
+            "componentWordIds": [
+              "bmc_management_controller",
+              "management_ethernet_phy",
+              "bios_firmware_image",
+              "platform_configuration_eeprom"
+            ]
+          },
+          {
+            "subModuleId": "runtime_orchestration",
+            "subModuleName": "Runtime orchestration",
+            "componentWordIds": [
+              "inference_runtime_image",
+              "accelerator_driver_bundle",
+              "watchdog_service",
+              "configuration_manifest"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "compute_acceleration",
+        "moduleName": "Compute Acceleration",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "accelerator_module",
+            "subModuleName": "Accelerator module",
+            "componentWordIds": [
+              "ai_accelerator_module",
+              "accelerator_carrier_board",
+              "pcie_edge_connector",
+              "accelerator_retention_latch"
+            ]
+          },
+          {
+            "subModuleId": "cpu_memory_complex",
+            "subModuleName": "CPU and memory complex",
+            "componentWordIds": [
+              "cpu_module",
+              "ecc_memory",
+              "system_motherboard",
+              "boot_flash_device"
+            ]
+          },
+          {
+            "subModuleId": "signal_power_integrity",
+            "subModuleName": "Signal and power integrity",
+            "componentWordIds": [
+              "high_current_vrm_module",
+              "pcie_retimer_set",
+              "clock_distribution_device",
+              "power_integrity_capacitor_bank"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Host control must enumerate and command the accelerator over a declared PCIe fabric.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:power_distribution:compute_acceleration:gpu_power_bus",
+      "interfaceId": "gpu_power_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "power_distribution",
+        "moduleName": "Power Distribution",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "dc_rail_distribution",
+            "subModuleName": "DC rail distribution",
+            "componentWordIds": [
+              "12_v_busbar",
+              "accelerator_power_harness",
+              "hot_swap_controller",
+              "fan_power_distribution_loom"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "compute_acceleration",
+        "moduleName": "Compute Acceleration",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "accelerator_module",
+            "subModuleName": "Accelerator module",
+            "componentWordIds": [
+              "ai_accelerator_module",
+              "accelerator_carrier_board",
+              "pcie_edge_connector",
+              "accelerator_retention_latch"
+            ]
+          },
+          {
+            "subModuleId": "signal_power_integrity",
+            "subModuleName": "Signal and power integrity",
+            "componentWordIds": [
+              "high_current_vrm_module",
+              "pcie_retimer_set",
+              "clock_distribution_device",
+              "power_integrity_capacitor_bank"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Accelerator power must be isolated from lower-power appliance rails.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:network_io:control_compute_communication:inference_network",
+      "interfaceId": "inference_network",
+      "status": "present",
+      "from": {
+        "moduleId": "network_io",
+        "moduleName": "Network IO",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "high_speed_network",
+            "subModuleName": "High-speed network",
+            "componentWordIds": [
+              "high_speed_nic",
+              "optical_transceiver_cage",
+              "nic_heatsink",
+              "network_link_led_board"
+            ]
+          },
+          {
+            "subModuleId": "timing_ingest",
+            "subModuleName": "Timing and ingest",
+            "componentWordIds": [
+              "ptp_timing_module",
+              "gpio_trigger_input",
+              "data_ingest_connector",
+              "network_bypass_relay"
+            ]
+          },
+          {
+            "subModuleId": "io_isolation_routing",
+            "subModuleName": "IO isolation and routing",
+            "componentWordIds": [
+              "emi_gasket_strip",
+              "shielded_io_bracket",
+              "cable_strain_relief_comb",
+              "service_loop_tie_set"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "runtime_orchestration",
+            "subModuleName": "Runtime orchestration",
+            "componentWordIds": [
+              "inference_runtime_image",
+              "accelerator_driver_bundle",
+              "watchdog_service",
+              "configuration_manifest"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Inference traffic must reach host software and runtime orchestration.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:data_storage:control_compute_communication:storage_bus",
+      "interfaceId": "storage_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "data_storage",
+        "moduleName": "Data Storage",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "nvme_storage",
+            "subModuleName": "NVMe storage",
+            "componentWordIds": [
+              "nvme_ssd",
+              "m_2_carrier_tray",
+              "drive_thermal_pad",
+              "drive_retention_screw_set"
+            ]
+          },
+          {
+            "subModuleId": "model_cache",
+            "subModuleName": "Model cache and recovery",
+            "componentWordIds": [
+              "model_cache_partition",
+              "storage_health_monitor",
+              "secure_erase_controller",
+              "firmware_recovery_image"
+            ]
+          },
+          {
+            "subModuleId": "log_buffer",
+            "subModuleName": "Log and evidence buffer",
+            "componentWordIds": [
+              "event_log_partition",
+              "write_endurance_counter",
+              "crash_dump_region",
+              "log_export_port"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "host_control",
+            "subModuleName": "Host control",
+            "componentWordIds": [
+              "bmc_management_controller",
+              "management_ethernet_phy",
+              "bios_firmware_image",
+              "platform_configuration_eeprom"
+            ]
+          },
+          {
+            "subModuleId": "runtime_orchestration",
+            "subModuleName": "Runtime orchestration",
+            "componentWordIds": [
+              "inference_runtime_image",
+              "accelerator_driver_bundle",
+              "watchdog_service",
+              "configuration_manifest"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Model cache and logs must be visible to host software.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:environmental_interface:compute_acceleration:thermal_path",
+      "interfaceId": "thermal_path",
+      "status": "present",
+      "from": {
+        "moduleId": "environmental_interface",
+        "moduleName": "Thermal Airflow Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "heat_transfer",
+            "subModuleName": "Heat transfer path",
+            "componentWordIds": [
+              "heatsink_cold_plate",
+              "thermal_interface_material_set",
+              "heatpipe_assembly",
+              "rear_exhaust_duct"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "compute_acceleration",
+        "moduleName": "Compute Acceleration",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "accelerator_module",
+            "subModuleName": "Accelerator module",
+            "componentWordIds": [
+              "ai_accelerator_module",
+              "accelerator_carrier_board",
+              "pcie_edge_connector",
+              "accelerator_retention_latch"
+            ]
+          },
+          {
+            "subModuleId": "signal_power_integrity",
+            "subModuleName": "Signal and power integrity",
+            "componentWordIds": [
+              "high_current_vrm_module",
+              "pcie_retimer_set",
+              "clock_distribution_device",
+              "power_integrity_capacitor_bank"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Accelerator and CPU heat must couple into the cooling path.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Telemetry Instrumentation",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "thermal_sensors",
+            "subModuleName": "Thermal sensors",
+            "componentWordIds": [
+              "inlet_temperature_sensor",
+              "accelerator_hotspot_sensor",
+              "exhaust_temperature_sensor",
+              "board_humidity_sensor"
+            ]
+          },
+          {
+            "subModuleId": "power_fan_telemetry",
+            "subModuleName": "Power and fan telemetry",
+            "componentWordIds": [
+              "psu_pmbus_monitor",
+              "rail_current_monitor",
+              "fan_tachometer_hub",
+              "chassis_intrusion_switch"
+            ]
+          },
+          {
+            "subModuleId": "front_panel_status",
+            "subModuleName": "Front panel status",
+            "componentWordIds": [
+              "front_status_led_board",
+              "uid_button",
+              "alarm_buzzer",
+              "lcd_status_panel"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "host_control",
+            "subModuleName": "Host control",
+            "componentWordIds": [
+              "bmc_management_controller",
+              "management_ethernet_phy",
+              "bios_firmware_image",
+              "platform_configuration_eeprom"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Thermal and power telemetry must feed management control.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:safety_protection:power_distribution:hardwired_trip",
+      "interfaceId": "hardwired_trip",
+      "status": "present",
+      "from": {
+        "moduleId": "safety_protection",
+        "moduleName": "Security And Safety Protection",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "thermal_shutdown",
+            "subModuleName": "Thermal shutdown",
+            "componentWordIds": [
+              "thermal_trip_relay",
+              "overtemperature_latch",
+              "fan_failure_interlock",
+              "hardwired_shutdown_line"
+            ]
+          },
+          {
+            "subModuleId": "electrical_safety",
+            "subModuleName": "Electrical safety",
+            "componentWordIds": [
+              "protective_earth_stud",
+              "insulation_barrier_sheet",
+              "finger_safe_psu_cover",
+              "warning_label_set"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "power_distribution",
+        "moduleName": "Power Distribution",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "hold_up_protection",
+            "subModuleName": "Hold-up and protection",
+            "componentWordIds": [
+              "hold_up_capacitor_module",
+              "brownout_detector",
+              "current_shunt_module",
+              "efuse_channel_set"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Thermal and electrical safety faults must force power shutdown.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:structure_containment:environmental_interface:airflow_path",
+      "interfaceId": "airflow_path",
+      "status": "present",
+      "from": {
+        "moduleId": "structure_containment",
+        "moduleName": "Rack Structure Containment",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "rack_chassis",
+            "subModuleName": "Rack chassis",
+            "componentWordIds": [
+              "1u_rack_chassis",
+              "slide_rail_kit",
+              "internal_divider_panel",
+              "front_bezel_assembly"
+            ]
+          },
+          {
+            "subModuleId": "accelerator_mounting",
+            "subModuleName": "Accelerator mounting",
+            "componentWordIds": [
+              "accelerator_retention_bracket",
+              "pcie_riser_support",
+              "card_stiffener_rail",
+              "gpu_airflow_baffle"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "environmental_interface",
+        "moduleName": "Thermal Airflow Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "forced_air_cooling",
+            "subModuleName": "Forced-air cooling",
+            "componentWordIds": [
+              "fan_wall_assembly",
+              "pwm_fan_controller",
+              "airflow_straightener",
+              "replaceable_dust_filter"
+            ]
+          },
+          {
+            "subModuleId": "heat_transfer",
+            "subModuleName": "Heat transfer path",
+            "componentWordIds": [
+              "heatsink_cold_plate",
+              "thermal_interface_material_set",
+              "heatpipe_assembly",
+              "rear_exhaust_duct"
+            ]
+          },
+          {
+            "subModuleId": "inlet_outlet_management",
+            "subModuleName": "Inlet and outlet management",
+            "componentWordIds": [
+              "front_inlet_grille",
+              "rear_exhaust_grille",
+              "air_seal_foam_kit",
+              "rack_pressure_map_label"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "The rack chassis must preserve the front-to-back airflow path used by cooling.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    }
+  ],
+  "sharedInterfaces": [
+    {
+      "interfaceId": "ac_input_bus",
+      "status": "local_only",
+      "moduleIds": [
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Power Distribution"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "memory_bus",
+      "status": "local_only",
+      "moduleIds": [
+        "compute_acceleration"
+      ],
+      "moduleNames": [
+        "Compute Acceleration"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "airflow_path",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Rack Structure Containment",
+        "Thermal Airflow Interface",
+        "Field Maintenance Serviceability"
+      ],
+      "carrierSubModuleCount": 6
+    },
+    {
+      "interfaceId": "fan_control_bus",
+      "status": "shared",
+      "moduleIds": [
+        "environmental_interface",
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Thermal Airflow Interface",
+        "Telemetry Instrumentation",
+        "Security And Safety Protection"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "gpu_power_bus",
+      "status": "shared",
+      "moduleIds": [
+        "compute_acceleration",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Compute Acceleration",
+        "Power Distribution"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "hardwired_trip",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Power Distribution",
+        "Security And Safety Protection"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "inference_network",
+      "status": "shared",
+      "moduleIds": [
+        "network_io",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Network IO",
+        "Control Compute Communication"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "low_voltage_rail",
+      "status": "shared",
+      "moduleIds": [
+        "compute_acceleration",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Compute Acceleration",
+        "Power Distribution"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "management_network",
+      "status": "shared",
+      "moduleIds": [
+        "network_io",
+        "data_storage",
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Network IO",
+        "Data Storage",
+        "Control Compute Communication",
+        "Telemetry Instrumentation",
+        "Security And Safety Protection",
+        "Field Maintenance Serviceability"
+      ],
+      "carrierSubModuleCount": 9
+    },
+    {
+      "interfaceId": "pcie_fabric",
+      "status": "shared",
+      "moduleIds": [
+        "compute_acceleration",
+        "network_io",
+        "data_storage",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Compute Acceleration",
+        "Network IO",
+        "Data Storage",
+        "Control Compute Communication"
+      ],
+      "carrierSubModuleCount": 7
+    },
+    {
+      "interfaceId": "protective_earth",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "network_io",
+        "power_distribution",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Rack Structure Containment",
+        "Network IO",
+        "Power Distribution",
+        "Security And Safety Protection"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "rack_mount",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Rack Structure Containment",
+        "Field Maintenance Serviceability"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "secure_boot_chain",
+      "status": "shared",
+      "moduleIds": [
+        "data_storage",
+        "control_compute_communication",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Data Storage",
+        "Control Compute Communication",
+        "Security And Safety Protection",
+        "Field Maintenance Serviceability"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "sensor_bus",
+      "status": "shared",
+      "moduleIds": [
+        "compute_acceleration",
+        "control_compute_communication",
+        "power_distribution",
+        "environmental_interface",
+        "sensing_instrumentation"
+      ],
+      "moduleNames": [
+        "Compute Acceleration",
+        "Control Compute Communication",
+        "Power Distribution",
+        "Thermal Airflow Interface",
+        "Telemetry Instrumentation"
+      ],
+      "carrierSubModuleCount": 9
+    },
+    {
+      "interfaceId": "service_access",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "network_io",
+        "data_storage",
+        "control_compute_communication",
+        "power_distribution",
+        "environmental_interface",
+        "sensing_instrumentation",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Rack Structure Containment",
+        "Network IO",
+        "Data Storage",
+        "Control Compute Communication",
+        "Power Distribution",
+        "Thermal Airflow Interface",
+        "Telemetry Instrumentation",
+        "Security And Safety Protection",
+        "Field Maintenance Serviceability"
+      ],
+      "carrierSubModuleCount": 18
+    },
+    {
+      "interfaceId": "storage_bus",
+      "status": "shared",
+      "moduleIds": [
+        "data_storage",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Data Storage",
+        "Control Compute Communication"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "thermal_alarm_bus",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Control Compute Communication",
+        "Telemetry Instrumentation",
+        "Security And Safety Protection"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "thermal_path",
+      "status": "shared",
+      "moduleIds": [
+        "compute_acceleration",
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Compute Acceleration",
+        "Thermal Airflow Interface"
+      ],
+      "carrierSubModuleCount": 3
+    }
+  ]
+}

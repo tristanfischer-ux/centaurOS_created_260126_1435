@@ -210,9 +210,48 @@ function renderSingleModifier(modifier: ModifyingCharacter): string {
  *    {kind:'form',     value:'prismatic'}]
  *     → 'qty ×3920, cap 280 Ah, prismatic'
  */
+/**
+ * Modifier kinds suppressed from every rendered prose path. Tristan directive
+ * 2026-05-15, two tiers:
+ *
+ *   PERMANENT (never render, regardless of BoM state):
+ *     - lead_time, supplier — fabricator-specific; always need a human conversation
+ *       with a contract manufacturer. The engine cannot generate trustworthy lead
+ *       times under any condition.
+ *
+ *   TEMPORARY (suppressed until BoM table + assumptions ledger exist, then on):
+ *     - unit_cost_estimate_gbp, unit_cost_estimate_eur, unit_cost_estimate_usd,
+ *       unit_cost, cost, price — financial metrics need to be BoM-grounded with
+ *       an assumptions ledger before they can render.
+ *
+ * Modifier values stay in the data for downstream non-rendered consumption;
+ * every render-time consumer filters them out via `filterRenderableModifiers`.
+ */
+const PERMANENTLY_SUPPRESSED_KINDS: ReadonlySet<string> = new Set([
+  'lead_time',
+  'supplier',
+])
+const TEMPORARILY_SUPPRESSED_KINDS: ReadonlySet<string> = new Set([
+  'unit_cost_estimate_gbp',
+  'unit_cost_estimate_eur',
+  'unit_cost_estimate_usd',
+  'unit_cost',
+  'cost',
+  'price',
+])
+const SUPPRESSED_MODIFIER_KINDS: ReadonlySet<string> = new Set([
+  ...PERMANENTLY_SUPPRESSED_KINDS,
+  ...TEMPORARILY_SUPPRESSED_KINDS,
+])
+
+export function filterRenderableModifiers<T extends { kind: string }>(modifiers: ReadonlyArray<T>): T[] {
+  return (modifiers ?? []).filter(m => !SUPPRESSED_MODIFIER_KINDS.has(String(m?.kind ?? '').toLowerCase()))
+}
+
 export function modifierStripInline(modifiers: ReadonlyArray<ModifyingCharacter>): string {
-  if (!modifiers || modifiers.length === 0) return ''
-  return modifiers.map(renderSingleModifier).join(', ')
+  const renderable = filterRenderableModifiers(modifiers ?? [])
+  if (renderable.length === 0) return ''
+  return renderable.map(renderSingleModifier).join(', ')
 }
 
 // ---------------------------------------------------------------------------
@@ -249,7 +288,7 @@ function renderWordClause(word: WordSpec): string {
  */
 function renderWordRadClause(word: WordSpec): string {
   const charId = word.content_character?.character_id || word.id
-  const modTokens = (word.modifier_characters ?? []).map(m =>
+  const modTokens = filterRenderableModifiers(word.modifier_characters ?? []).map(m =>
     m.unit ? `${m.value}${m.unit}` : m.value,
   )
   return [charId, ...modTokens].join(` ${GRAMMAR_OPERATORS.WITHIN_WORD} `)
@@ -302,6 +341,263 @@ export function generateSubmoduleSentence(
 
   const sentence = `The ${subject} ${verb} ${wordPart}${topology}`
   return ensureTerminalPunctuation(sentence)
+}
+
+// ---------------------------------------------------------------------------
+// generateSubmoduleParagraph — rich multi-sentence sub-module prose
+// ---------------------------------------------------------------------------
+
+/**
+ * Modifier kinds we recognise and weave into natural English. Anything not in
+ * this list falls through to a `kind value` inline strip at the end.
+ */
+const MODIFIER_KIND_GROUPS = {
+  identity: ['manufacturer', 'part_number', 'supplier'],
+  quantity: ['quantity'],
+  physical: ['material', 'dimensions', 'dimension', 'mass', 'mass_kg', 'form', 'colour', 'color', 'volume', 'capacity'],
+  performance: ['rating_primary', 'rating_secondary', 'rating', 'voltage', 'current', 'power', 'flow_rate', 'efficiency', 'operating_temp_range', 'temp_range', 'pressure', 'frequency'],
+  compliance: ['regulatory', 'ip_rating', 'certification', 'standard'],
+  procurement: ['lead_time', 'unit_cost_estimate_gbp', 'unit_cost_estimate_eur', 'unit_cost'],
+} as const
+
+function pickModifier(mods: ReadonlyArray<ModifyingCharacter>, kinds: ReadonlyArray<string>): ModifyingCharacter | undefined {
+  for (const k of kinds) {
+    const found = mods.find(m => m.kind === k)
+    if (found) return found
+  }
+  return undefined
+}
+
+function pickAll(mods: ReadonlyArray<ModifyingCharacter>, kinds: ReadonlyArray<string>): ModifyingCharacter[] {
+  return mods.filter(m => kinds.includes(m.kind))
+}
+
+function modValue(m: ModifyingCharacter | undefined): string {
+  if (!m) return ''
+  const v = String(m.value ?? '').trim()
+  if (!v) return ''
+  return m.unit ? `${v} ${m.unit}` : v
+}
+
+/**
+ * Render ONE word as a natural-English sentence (or sentence fragment) weaving
+ * in every modifier with appropriate prepositions. Output is 1-2 sentences,
+ * roughly 20-40 words depending on modifier density.
+ *
+ * Example output (with manufacturer + part_number + material + dimensions + regulatory + cost):
+ *   "A Fluidmaster ½-inch WRAS-approved float valve (part FM-400, in moulded PE)
+ *    measures 88 mm overall and is sourced at approximately £6.80 per unit
+ *    with a 5-day lead time."
+ */
+function renderWordProse(word: WordSpec): string {
+  const charName = word.content_character?.name_human
+    || humaniseId(word.content_character?.character_id ?? word.id ?? 'component')
+  const mods = word.modifier_characters ?? []
+
+  const manufacturer = pickModifier(mods, MODIFIER_KIND_GROUPS.identity.filter(k => k === 'manufacturer'))
+  const partNumber = pickModifier(mods, ['part_number'])
+  const supplier = pickModifier(mods, ['supplier'])
+  const quantity = pickModifier(mods, MODIFIER_KIND_GROUPS.quantity)
+  const material = pickModifier(mods, ['material'])
+  const dimensions = pickModifier(mods, ['dimensions', 'dimension'])
+  const mass = pickModifier(mods, ['mass', 'mass_kg'])
+  const form = pickModifier(mods, ['form'])
+  const capacity = pickModifier(mods, ['capacity', 'volume'])
+  const ratingPrimary = pickModifier(mods, ['rating_primary', 'rating'])
+  const ratingSecondary = pickModifier(mods, ['rating_secondary'])
+  const voltage = pickModifier(mods, ['voltage'])
+  const current = pickModifier(mods, ['current'])
+  const power = pickModifier(mods, ['power'])
+  const flow = pickModifier(mods, ['flow_rate'])
+  const efficiency = pickModifier(mods, ['efficiency'])
+  const tempRange = pickModifier(mods, ['operating_temp_range', 'temp_range'])
+  const pressure = pickModifier(mods, ['pressure'])
+  const frequency = pickModifier(mods, ['frequency'])
+  const regulatory = pickAll(mods, ['regulatory', 'certification', 'standard'])
+  const ipRating = pickModifier(mods, ['ip_rating'])
+  // Financial modifiers (lead_time, unit_cost) — read but SUPPRESSED in rendered
+  // prose until the BoM table + assumptions ledger exist (Tristan directive
+  // 2026-05-15: financial metrics absent until they are BoM-grounded). The
+  // modifier values are kept in the data registry for downstream use; this
+  // call-site picks them up only when SUPPRESS_FINANCIALS_IN_PROSE flips false.
+  const SUPPRESS_FINANCIALS_IN_PROSE = true
+  const leadTime = SUPPRESS_FINANCIALS_IN_PROSE ? null : pickModifier(mods, ['lead_time'])
+  const cost = SUPPRESS_FINANCIALS_IN_PROSE ? null : pickModifier(mods, ['unit_cost_estimate_gbp', 'unit_cost'])
+
+  // Build the opening NP — "A Fluidmaster ½-inch WRAS-approved float valve"
+  const openParts: string[] = ['A']
+  if (manufacturer) openParts.push(modValue(manufacturer))
+  if (dimensions && !manufacturer) openParts.push(modValue(dimensions))
+  if (form) openParts.push(modValue(form))
+  openParts.push(charName.toLowerCase())
+  let opener = openParts.join(' ')
+  // Parenthetical: part number + material + dimensions (when not opener)
+  const paren: string[] = []
+  if (partNumber) paren.push(`part ${modValue(partNumber)}`)
+  if (material) paren.push(`in ${modValue(material)}`)
+  if (dimensions && manufacturer) paren.push(`${modValue(dimensions)}`)
+  if (mass) paren.push(`${modValue(mass)}`)
+  if (capacity) paren.push(`${modValue(capacity)} capacity`)
+  if (paren.length) opener += ` (${paren.join(', ')})`
+  if (quantity) {
+    // Strip leading × glyph from modValue (modifier values for kind:'quantity'
+    // arrive as "×4716"), parse the count, format with thousands separator, and
+    // drop the indefinite article "A " from the opener when plural — otherwise
+    // the prose reads "4,716× A name" which mis-parses. Fixes the "x4716 x A name"
+    // pattern documented in drawer_forgeos_gotchas_227e3c8fd74fcd32: original line
+    // emitted "×N × A name", which render-minimal-pdf.tsx:115 (.replace(/×/g, 'x'))
+    // then collapsed to ASCII "xN x A name" — pervasive and unreadable.
+    const rawQ = modValue(quantity).replace(/^×\s*/, '').trim()
+    const qNum = parseInt(rawQ.replace(/[^\d]/g, ''), 10)
+    if (Number.isFinite(qNum) && qNum > 1) {
+      const formatted = qNum.toLocaleString('en-GB')
+      const openerNoArticle = opener.replace(/^A\s+/, '')
+      opener = `${formatted}× ${openerNoArticle}`
+    }
+    // For quantity == 1 (or unparseable), leave the singular "A {name}" alone.
+  }
+
+  // Performance clause — combine ratings, voltage, current, power, etc.
+  const perfBits: string[] = []
+  if (ratingPrimary) perfBits.push(`rated ${modValue(ratingPrimary)}`)
+  if (ratingSecondary) perfBits.push(`secondary rating ${modValue(ratingSecondary)}`)
+  if (voltage) perfBits.push(`${modValue(voltage)} nominal`)
+  if (current) perfBits.push(`${modValue(current)} continuous current`)
+  if (power) perfBits.push(`${modValue(power)} power`)
+  if (flow) perfBits.push(`${modValue(flow)} flow`)
+  if (pressure) perfBits.push(`${modValue(pressure)} working pressure`)
+  if (frequency) perfBits.push(`${modValue(frequency)}`)
+  if (efficiency) perfBits.push(`${modValue(efficiency)} efficiency`)
+  if (tempRange) perfBits.push(`operating over ${modValue(tempRange)}`)
+  const perfClause = perfBits.length ? `, ${perfBits.join(', ')}` : ''
+
+  // Compliance clause
+  const certs: string[] = []
+  if (regulatory.length) certs.push(...regulatory.map(modValue).filter(Boolean))
+  if (ipRating) certs.push(modValue(ipRating))
+  const complianceClause = certs.length ? `, certified to ${certs.join(' and ')}` : ''
+
+  // Procurement clause. Strip any leading currency symbol/code the LLM may have
+  // emitted (e.g. "£450", "GBP 450") so we never double-prefix as "££450".
+  const procBits: string[] = []
+  if (supplier) procBits.push(`sourced via ${modValue(supplier)}`)
+  if (leadTime) procBits.push(`${modValue(leadTime)} lead time`)
+  if (cost) {
+    const raw = modValue(cost)
+    const numericOnly = raw.replace(/^\s*(?:£|\$|€|GBP|USD|EUR)\s*/i, '').trim()
+    procBits.push(`approximately £${numericOnly} per unit`)
+  }
+  const procClause = procBits.length ? ` Procurement: ${procBits.join('; ')}.` : ''
+
+  // Fallthrough: anything we didn't pick up
+  const recognised = new Set<string>([
+    ...MODIFIER_KIND_GROUPS.identity,
+    ...MODIFIER_KIND_GROUPS.quantity,
+    ...MODIFIER_KIND_GROUPS.physical,
+    ...MODIFIER_KIND_GROUPS.performance,
+    ...MODIFIER_KIND_GROUPS.compliance,
+    ...MODIFIER_KIND_GROUPS.procurement,
+  ])
+  const leftovers = mods.filter(m => !recognised.has(m.kind))
+  const leftoverClause = leftovers.length
+    ? ` (additional: ${leftovers.map(m => `${humaniseId(m.kind)}: ${modValue(m)}`).join('; ')})`
+    : ''
+
+  return ensureTerminalPunctuation(`${opener}${perfClause}${complianceClause}${leftoverClause}${procClause}`.trim())
+}
+
+/**
+ * Generate a multi-sentence English paragraph for ONE sub-module, weaving every
+ * word + every modifier into natural prose. Target length: ~150-200 words for
+ * a sub-module with 5-7 words each carrying 5-10 modifiers. This is the
+ * "rich" path consumed by the §4.5 renderer.
+ *
+ * Bug history (2026-05-15): the previous gate `llmProse.length >= 200` was
+ * length-only and silently dropped words from the BoM-grade output. A 220-char
+ * single-sentence LLM emission "looks substantial" but only names 4 of 5
+ * words. iter-47 dropped suppression_control_panel, vent_sealant, e_stop_enclosure,
+ * detector_dust_cover, and 4/5 of thermal_runaway_detection. Because the BoM
+ * is aggregated from the words[] (not prose), the visible prose mismatched
+ * the BoM data. Fix: WORD-COVERAGE check — use LLM prose only when EVERY
+ * word.name_human or content_character.name_human appears in it.
+ */
+function llmProseCoversAllWords(llmProse: string, words: ReadonlyArray<WordSpec>): boolean {
+  if (!llmProse) return false
+  const lower = llmProse.toLowerCase()
+  for (const w of words) {
+    const candidates = [
+      w.content_character?.name_human,
+      w.name_human,
+      humaniseId(w.content_character?.character_id ?? w.id ?? ''),
+    ].filter((s): s is string => !!s && s.length > 0)
+    const present = candidates.some(c => lower.includes(c.toLowerCase()))
+    if (!present) return false
+  }
+  return true
+}
+
+/**
+ * Walk every sub-module and pre-apply the deterministic prose fallback to any
+ * sub-module whose LLM-emitted english_sentence drops words from words[].
+ *
+ * Universal fix (2026-05-15): the sub_module_prose_covers_words gate was
+ * firing on 36/51 VF sub-modules and similar shapes on BESS/heatpump, because
+ * the LLM english_sentence often picks 3-of-5 components for prose flow.
+ * Phase 2 repair has to ask the LLM to rewrite the sentence — slow, expensive,
+ * and not always successful.
+ *
+ * Generate the deterministic prose once at the end of Phase 1 (already covers
+ * every word by construction via renderWordProse). The data the gate sees is
+ * self-consistent; gate goes silent; renderer doesn't have to choose at render
+ * time. Net effect on quality: tiny — deterministic prose was already the
+ * render-time fallback. Net effect on Phase 2 repair count: large.
+ */
+export function ensureSubmoduleProseCoversWords(modules: ReadonlyArray<ModuleSpec>): {
+  sub_modules_rewritten: number
+  total_sub_modules: number
+} {
+  let rewritten = 0
+  let total = 0
+  for (const m of modules ?? []) {
+    for (const sm of ((m as any).sub_modules ?? [])) {
+      total++
+      const words = sm.words ?? []
+      if (words.length === 0) continue
+      const current = (sm.english_sentence ?? '').trim()
+      if (current && llmProseCoversAllWords(current, words)) continue
+      sm.english_sentence = generateSubmoduleParagraph(sm)
+      rewritten++
+    }
+  }
+  return { sub_modules_rewritten: rewritten, total_sub_modules: total }
+}
+
+export function generateSubmoduleParagraph(subModule: SubModuleSpec): string {
+  const llmProse = (subModule.english_sentence ?? '').trim()
+  const words = subModule.words ?? []
+  // Use LLM prose only when it names every word. Length alone is insufficient.
+  if (llmProse.length >= 150 && llmProseCoversAllWords(llmProse, words)) {
+    return ensureTerminalPunctuation(llmProse)
+  }
+
+  const subject = subModule.name_human || humaniseId(subModule.id)
+  const verb = (subModule.role_verb && subModule.role_verb.trim()) || 'comprises'
+  const topology = (subModule.topology_clause ?? '').trim()
+
+  if (words.length === 0) {
+    return ensureTerminalPunctuation(`The ${subject} ${verb} no specified components`)
+  }
+
+  // Opener: name + role
+  const opener = `The ${subject} ${verb} ${words.length} component${words.length === 1 ? '' : 's'}.`
+
+  // Per-word prose
+  const wordSentences = words.map(renderWordProse)
+
+  // Topology closer
+  const closer = topology ? ` ${ensureTerminalPunctuation(topology)}` : ''
+
+  return [opener, ...wordSentences, closer].filter(Boolean).join(' ').trim()
 }
 
 // ---------------------------------------------------------------------------
@@ -529,6 +825,13 @@ export interface SubModuleSentencePair {
   sub_module_id: string
   sentence_en: string
   sentence_rad: string
+  /**
+   * Phase-A addition (2026-05-15): rich 150-200 word prose paragraph for the
+   * §4.5 renderer, weaving every word + every modifier_character into natural
+   * English. The deterministic builder is in `generateSubmoduleParagraph()`;
+   * LLM-emitted `english_sentence` is preferred when substantial.
+   */
+  paragraph_en: string
 }
 
 /**
@@ -584,10 +887,12 @@ export function buildNaturalLanguageLayer(
     for (const sub of moduleSpec.sub_modules ?? []) {
       const en = generateSubmoduleSentence(sub, { style: 'verbose' })
       const rad = generateSubmoduleRadSentence(sub)
+      const paragraph = generateSubmoduleParagraph(sub)
       subSentences.push({
         sub_module_id: sub.id,
         sentence_en: en,
         sentence_rad: rad,
+        paragraph_en: paragraph,
       })
       enSubSentences.push(en)
     }

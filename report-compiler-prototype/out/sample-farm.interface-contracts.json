@@ -1,0 +1,405 @@
+{
+  "summary": {
+    "requiredContracts": 3,
+    "presentContracts": 3,
+    "missingContracts": 0,
+    "sharedInterfaces": 12,
+    "localOnlyInterfaces": 1
+  },
+  "requiredContracts": [
+    {
+      "id": "required:control_compute_communication:environmental_interface:actuator_bus",
+      "interfaceId": "actuator_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Recipe Control And Communications",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "environmental_controller",
+            "subModuleName": "Environmental controller",
+            "componentWordIds": [
+              "environmental_controller",
+              "din_rail_plc",
+              "analog_input_module",
+              "relay_output_module",
+              "real_time_clock_module"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "environmental_interface",
+        "moduleName": "Light Climate And Gas Environment",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "canopy_air_mixing",
+            "subModuleName": "Canopy air mixing",
+            "componentWordIds": [
+              "air_circulation_fans",
+              "fan_guard_grille",
+              "airflow_baffle_plate",
+              "replaceable_intake_filter"
+            ]
+          },
+          {
+            "subModuleId": "humidity_temperature_control",
+            "subModuleName": "Humidity and temperature control",
+            "componentWordIds": [
+              "dehumidifier_module",
+              "heat_exchanger_coil",
+              "condensate_pump",
+              "supply_air_temperature_probe",
+              "humidity_control_relay"
+            ]
+          },
+          {
+            "subModuleId": "co2_enrichment",
+            "subModuleName": "CO2 enrichment",
+            "componentWordIds": [
+              "co2_sensor_or_dosing",
+              "ndir_co2_sensor_head",
+              "co2_solenoid_valve",
+              "gas_regulator",
+              "co2_distribution_tube"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Farm controller must command lighting, CO2 dosing and airflow.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:control_compute_communication:mass_fluid_transport_process:actuator_bus",
+      "interfaceId": "actuator_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Recipe Control And Communications",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "environmental_controller",
+            "subModuleName": "Environmental controller",
+            "componentWordIds": [
+              "environmental_controller",
+              "din_rail_plc",
+              "analog_input_module",
+              "relay_output_module",
+              "real_time_clock_module"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "mass_fluid_transport_process",
+        "moduleName": "Nutrient And Water Transport Process",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "fertigation_pumping",
+            "subModuleName": "Fertigation pumping",
+            "componentWordIds": [
+              "nutrient_pump",
+              "pump_isolation_valve",
+              "check_valve",
+              "flow_meter",
+              "pump_vibration_mount"
+            ]
+          },
+          {
+            "subModuleId": "nutrient_dosing",
+            "subModuleName": "Nutrient dosing",
+            "componentWordIds": [
+              "peristaltic_dosing_pump",
+              "ph_dosing_pump",
+              "chemical_suction_lance",
+              "anti_siphon_valve",
+              "mixing_eductor"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Farm controller must command fertigation pumps and nutrient circulation.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:environmental_interface:mass_fluid_transport_process:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "environmental_interface",
+        "moduleName": "Light Climate And Gas Environment",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "humidity_temperature_control",
+            "subModuleName": "Humidity and temperature control",
+            "componentWordIds": [
+              "dehumidifier_module",
+              "heat_exchanger_coil",
+              "condensate_pump",
+              "supply_air_temperature_probe",
+              "humidity_control_relay"
+            ]
+          },
+          {
+            "subModuleId": "co2_enrichment",
+            "subModuleName": "CO2 enrichment",
+            "componentWordIds": [
+              "co2_sensor_or_dosing",
+              "ndir_co2_sensor_head",
+              "co2_solenoid_valve",
+              "gas_regulator",
+              "co2_distribution_tube"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "mass_fluid_transport_process",
+        "moduleName": "Nutrient And Water Transport Process",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "fertigation_pumping",
+            "subModuleName": "Fertigation pumping",
+            "componentWordIds": [
+              "nutrient_pump",
+              "pump_isolation_valve",
+              "check_valve",
+              "flow_meter",
+              "pump_vibration_mount"
+            ]
+          },
+          {
+            "subModuleId": "nutrient_dosing",
+            "subModuleName": "Nutrient dosing",
+            "componentWordIds": [
+              "peristaltic_dosing_pump",
+              "ph_dosing_pump",
+              "chemical_suction_lance",
+              "anti_siphon_valve",
+              "mixing_eductor"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Climate and fertigation state must be observable by the same control layer.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    }
+  ],
+  "sharedInterfaces": [
+    {
+      "interfaceId": "protective_earth",
+      "status": "local_only",
+      "moduleIds": [
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Wet-Zone Power Distribution"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "actuator_bus",
+      "status": "shared",
+      "moduleIds": [
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "control_compute_communication",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Light Climate And Gas Environment",
+        "Nutrient And Water Transport Process",
+        "Recipe Control And Communications",
+        "Wet-Zone Power Distribution"
+      ],
+      "carrierSubModuleCount": 7
+    },
+    {
+      "interfaceId": "airflow",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "sensing_instrumentation"
+      ],
+      "moduleNames": [
+        "Growing Structure And Containment",
+        "Light Climate And Gas Environment",
+        "Crop And Process Instrumentation"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "alarm_bus",
+      "status": "shared",
+      "moduleIds": [
+        "safety_protection",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Food-Safe Safety And Protection",
+        "Operator HMI And Labelling"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "lighting_control",
+      "status": "shared",
+      "moduleIds": [
+        "environmental_interface",
+        "control_compute_communication",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Light Climate And Gas Environment",
+        "Recipe Control And Communications",
+        "Wet-Zone Power Distribution"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "mains_supply",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "power_distribution",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Growing Structure And Containment",
+        "Light Climate And Gas Environment",
+        "Wet-Zone Power Distribution",
+        "Food-Safe Safety And Protection"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "nutrient_loop",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process",
+        "sensing_instrumentation",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Growing Structure And Containment",
+        "Nutrient And Water Transport Process",
+        "Crop And Process Instrumentation",
+        "Harvest Cleaning And Serviceability"
+      ],
+      "carrierSubModuleCount": 7
+    },
+    {
+      "interfaceId": "operator_network",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Recipe Control And Communications",
+        "Operator HMI And Labelling"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "sensor_bus",
+      "status": "shared",
+      "moduleIds": [
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Light Climate And Gas Environment",
+        "Nutrient And Water Transport Process",
+        "Crop And Process Instrumentation",
+        "Recipe Control And Communications",
+        "Wet-Zone Power Distribution"
+      ],
+      "carrierSubModuleCount": 9
+    },
+    {
+      "interfaceId": "service_access",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "power_distribution",
+        "safety_protection",
+        "maintenance_serviceability",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Growing Structure And Containment",
+        "Light Climate And Gas Environment",
+        "Nutrient And Water Transport Process",
+        "Wet-Zone Power Distribution",
+        "Food-Safe Safety And Protection",
+        "Harvest Cleaning And Serviceability",
+        "Operator HMI And Labelling"
+      ],
+      "carrierSubModuleCount": 12
+    },
+    {
+      "interfaceId": "tray_support",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Growing Structure And Containment",
+        "Harvest Cleaning And Serviceability"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "video_link",
+      "status": "shared",
+      "moduleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Crop And Process Instrumentation",
+        "Recipe Control And Communications"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "washdown_boundary",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Growing Structure And Containment",
+        "Nutrient And Water Transport Process",
+        "Food-Safe Safety And Protection",
+        "Harvest Cleaning And Serviceability"
+      ],
+      "carrierSubModuleCount": 4
+    }
+  ]
+}

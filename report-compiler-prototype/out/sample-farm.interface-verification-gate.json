@@ -1,0 +1,154 @@
+{
+  "verdict": "interface_review_ready",
+  "summary": {
+    "rows": 3,
+    "acceptedRows": 0,
+    "reviewReadyRows": 3,
+    "pendingEvidenceRows": 0,
+    "deferredRows": 0,
+    "blockedRows": 0,
+    "presentContracts": 3,
+    "missingContracts": 0,
+    "carrierCompleteRows": 3,
+    "verificationActivityRows": 3,
+    "acceptedEvidenceRatio": 0,
+    "structuralPassRatio": 1
+  },
+  "rows": [
+    {
+      "id": "required:control_compute_communication:environmental_interface:actuator_bus",
+      "interfaceId": "actuator_bus",
+      "fromModuleId": "control_compute_communication",
+      "fromModuleName": "Recipe Control And Communications",
+      "toModuleId": "environmental_interface",
+      "toModuleName": "Light Climate And Gas Environment",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "environmental_controller"
+      ],
+      "toCarrierSubModules": [
+        "canopy_air_mixing",
+        "humidity_temperature_control",
+        "co2_enrichment"
+      ],
+      "componentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module",
+        "air_circulation_fans",
+        "fan_guard_grille",
+        "airflow_baffle_plate",
+        "replaceable_intake_filter",
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay",
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube"
+      ],
+      "verificationActivityId": "interface_review:control_compute_communication:environmental_interface:actuator_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:control_compute_communication:mass_fluid_transport_process:actuator_bus",
+      "interfaceId": "actuator_bus",
+      "fromModuleId": "control_compute_communication",
+      "fromModuleName": "Recipe Control And Communications",
+      "toModuleId": "mass_fluid_transport_process",
+      "toModuleName": "Nutrient And Water Transport Process",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "environmental_controller"
+      ],
+      "toCarrierSubModules": [
+        "fertigation_pumping",
+        "nutrient_dosing"
+      ],
+      "componentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module",
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount",
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor"
+      ],
+      "verificationActivityId": "interface_review:control_compute_communication:mass_fluid_transport_process:actuator_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:environmental_interface:mass_fluid_transport_process:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "fromModuleId": "environmental_interface",
+      "fromModuleName": "Light Climate And Gas Environment",
+      "toModuleId": "mass_fluid_transport_process",
+      "toModuleName": "Nutrient And Water Transport Process",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "humidity_temperature_control",
+        "co2_enrichment"
+      ],
+      "toCarrierSubModules": [
+        "fertigation_pumping",
+        "nutrient_dosing"
+      ],
+      "componentWordIds": [
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay",
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube",
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount",
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor"
+      ],
+      "verificationActivityId": "interface_review:environmental_interface:mass_fluid_transport_process:sensor_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Collect named interface-review evidence through verification intake."
+  ]
+}

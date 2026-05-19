@@ -1,0 +1,98 @@
+{
+  "summary": {
+    "rows": 1,
+    "accepted": 0,
+    "readyForReview": 0,
+    "needsReview": 1,
+    "blocked": 0,
+    "unlinked": 0,
+    "rowsWithCalculations": 1,
+    "rowsWithReviewQuestions": 1,
+    "rowsWithAcceptedVerification": 0
+  },
+  "rows": [
+    {
+      "requirementId": "duration_minutes",
+      "label": "Duration",
+      "value": "40 minutes",
+      "architectureCoverage": "covered",
+      "architectureModuleIds": [
+        "energy_storage_source",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "architectureModuleNames": [
+        "Flight Energy Storage",
+        "Propulsion And Flight Actuation",
+        "Flight Control Compute And Communications"
+      ],
+      "subModuleIds": [
+        "flight_battery_pack",
+        "motor_sets",
+        "flight_controller_stack"
+      ],
+      "componentWordIds": [
+        "flight_battery_pack",
+        "brushless_motors",
+        "flight_controller"
+      ],
+      "calculationIds": [
+        "drone_endurance_hours",
+        "drone_reserve_time_minutes"
+      ],
+      "calculationStatuses": [
+        "within_envelope",
+        "needs_review"
+      ],
+      "reviewQuestionIds": [
+        "assumption_resolution:component:actuation_kinematics_esc_stack_esc",
+        "assumption_resolution:component:actuation_kinematics_motor_sets_brushless_motors",
+        "assumption_resolution:component:actuation_kinematics_propeller_sets_propeller_set",
+        "assumption_resolution:component:control_compute_communication_flight_controller_stack_flight_controller",
+        "assumption_resolution:component:control_compute_communication_radio_navigation_link_radio_and_gnss_link",
+        "assumption_resolution:component:energy_storage_source_flight_battery_pack_flight_battery_pack",
+        "assumption_resolution:sanity:drone_control_power_chain",
+        "assumption_resolution:sanity:drone_endurance_target",
+        "assumption_resolution:sanity:drone_propulsion_quads",
+        "calculation_envelope:drone_reserve_time_minutes",
+        "calculation_envelope:drone_endurance_hours",
+        "interface_contract:control_compute_communication:actuation_kinematics:motor_drive",
+        "interface_contract:control_compute_communication:sensing_instrumentation:sensor_bus",
+        "interface_contract:energy_storage_source:actuation_kinematics:power_bus",
+        "module_allocation:actuation_kinematics",
+        "module_allocation:control_compute_communication",
+        "module_allocation:energy_storage_source",
+        "submodule_allocation:actuation_kinematics:esc_stack",
+        "submodule_allocation:actuation_kinematics:motor_sets",
+        "submodule_allocation:actuation_kinematics:propeller_sets",
+        "submodule_allocation:control_compute_communication:flight_controller_stack",
+        "submodule_allocation:control_compute_communication:radio_navigation_link",
+        "submodule_allocation:control_compute_communication:video_downlink",
+        "submodule_allocation:energy_storage_source:charging_interface",
+        "submodule_allocation:energy_storage_source:flight_battery_pack",
+        "submodule_allocation:energy_storage_source:power_monitoring"
+      ],
+      "reviewStatus": "needs_review",
+      "verificationActivityIds": [
+        "design_review:energy_storage_source",
+        "calculation:energy_storage_source",
+        "design_review:actuation_kinematics",
+        "calculation:actuation_kinematics",
+        "design_review:control_compute_communication",
+        "calculation:control_compute_communication"
+      ],
+      "verificationStatuses": [
+        "pending",
+        "pending",
+        "pending",
+        "pending",
+        "pending",
+        "pending"
+      ],
+      "acceptedVerificationActivityIds": [],
+      "overallStatus": "needs_review",
+      "blockers": [],
+      "nextAction": "Complete engineering review questions, calculations or deferred verification evidence."
+    }
+  ]
+}

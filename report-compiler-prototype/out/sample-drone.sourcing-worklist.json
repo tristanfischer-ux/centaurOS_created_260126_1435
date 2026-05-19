@@ -1,0 +1,887 @@
+{
+  "status": "not_started",
+  "criticalUnpriced": [
+    {
+      "componentWordId": "carbon_airframe",
+      "description": "Carbon airframe",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "critical",
+      "reason": "Required class-critical line must be sourced before BoM can pass."
+    },
+    {
+      "componentWordId": "flight_battery_pack",
+      "description": "Flight battery pack",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "critical",
+      "reason": "Required class-critical line must be sourced before BoM can pass."
+    },
+    {
+      "componentWordId": "brushless_motors",
+      "description": "Brushless motors",
+      "quantity": 4,
+      "unit": "each",
+      "priority": "critical",
+      "reason": "Required class-critical line must be sourced before BoM can pass."
+    },
+    {
+      "componentWordId": "esc",
+      "description": "ESC",
+      "quantity": 4,
+      "unit": "each",
+      "priority": "critical",
+      "reason": "Required class-critical line must be sourced before BoM can pass."
+    },
+    {
+      "componentWordId": "propeller_set",
+      "description": "Propeller set",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "critical",
+      "reason": "Required class-critical line must be sourced before BoM can pass."
+    },
+    {
+      "componentWordId": "flight_controller",
+      "description": "Flight controller",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "critical",
+      "reason": "Required class-critical line must be sourced before BoM can pass."
+    },
+    {
+      "componentWordId": "radio_and_gnss_link",
+      "description": "Radio and GNSS link",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "critical",
+      "reason": "Required class-critical line must be sourced before BoM can pass."
+    },
+    {
+      "componentWordId": "4k_camera_payload",
+      "description": "4K camera payload",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "critical",
+      "reason": "Required class-critical line must be sourced before BoM can pass."
+    }
+  ],
+  "candidateUnpriced": [
+    {
+      "componentWordId": "carbon_fibre_arm_tube",
+      "description": "carbon fibre arm tube",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "centre_plate_pair",
+      "description": "centre plate pair",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "arm_folding_hinge",
+      "description": "arm folding hinge",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "landing_gear_strut",
+      "description": "landing gear strut",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "camera_gimbal_mount_plate",
+      "description": "camera gimbal mount plate",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "rubber_vibration_damper",
+      "description": "rubber vibration damper",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "payload_quick_release_latch",
+      "description": "payload quick-release latch",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "payload_cg_adjustment_rail",
+      "description": "payload CG adjustment rail",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "battery_tray",
+      "description": "battery tray",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "battery_retention_strap",
+      "description": "battery retention strap",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "anti_slip_battery_pad",
+      "description": "anti-slip battery pad",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "pack_latch_sensor",
+      "description": "pack latch sensor",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "high_discharge_cell_group",
+      "description": "high-discharge cell group",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "battery_management_pcb",
+      "description": "battery management PCB",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "xt90_anti_spark_connector",
+      "description": "XT90 anti-spark connector",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "pack_temperature_sensor",
+      "description": "pack temperature sensor",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "power_module_shunt",
+      "description": "power module shunt",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "voltage_divider_board",
+      "description": "voltage divider board",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "low_voltage_alarm_output",
+      "description": "low-voltage alarm output",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "battery_telemetry_connector",
+      "description": "battery telemetry connector",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "balance_charge_harness",
+      "description": "balance charge harness",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "charging_cradle",
+      "description": "charging cradle",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "pack_id_label",
+      "description": "pack ID label",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "transport_storage_case_insert",
+      "description": "transport storage case insert",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "motor_mounting_screw_set",
+      "description": "motor mounting screw set",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "motor_phase_lead_set",
+      "description": "motor phase lead set",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "motor_bearing_shield",
+      "description": "motor bearing shield",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "esc_cooling_plate",
+      "description": "ESC cooling plate",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "pwm_signal_harness",
+      "description": "PWM signal harness",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "current_telemetry_line",
+      "description": "current telemetry line",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "esc_conformal_coating",
+      "description": "ESC conformal coating",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "propeller_hub_adapter",
+      "description": "propeller hub adapter",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "propeller_lock_nut",
+      "description": "propeller lock nut",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "spare_propeller_pouch",
+      "description": "spare propeller pouch",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "imu_vibration_isolation_mount",
+      "description": "IMU vibration isolation mount",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "barometer_foam_cover",
+      "description": "barometer foam cover",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "sd_card_flight_logger",
+      "description": "SD card flight logger",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "failsafe_firmware_profile",
+      "description": "failsafe firmware profile",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "gnss_antenna_mast",
+      "description": "GNSS antenna mast",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "rc_receiver",
+      "description": "RC receiver",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "telemetry_radio_module",
+      "description": "telemetry radio module",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "antenna_diversity_mount",
+      "description": "antenna diversity mount",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "low_latency_video_transmitter",
+      "description": "low-latency video transmitter",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "video_antenna_pair",
+      "description": "video antenna pair",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "hdmi_micro_cable",
+      "description": "HDMI micro cable",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "video_power_filter",
+      "description": "video power filter",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "three_axis_gimbal",
+      "description": "three-axis gimbal",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "camera_control_cable",
+      "description": "camera control cable",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "lens_protection_hood",
+      "description": "lens protection hood",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "microsd_media_card",
+      "description": "microSD media card",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "magnetometer_module",
+      "description": "magnetometer module",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "rangefinder_altimeter",
+      "description": "rangefinder altimeter",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "optical_flow_sensor",
+      "description": "optical flow sensor",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "airspeed_estimate_port",
+      "description": "airspeed estimate port",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "vibration_monitor_pad",
+      "description": "vibration monitor pad",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "payload_presence_switch",
+      "description": "payload presence switch",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "avionics_temperature_probe",
+      "description": "avionics temperature probe",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "landing_contact_switch",
+      "description": "landing contact switch",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "power_distribution_pcb",
+      "description": "power distribution PCB",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "copper_bus_plane",
+      "description": "copper bus plane",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "main_fuse_link",
+      "description": "main fuse link",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "anti_spark_loop_key",
+      "description": "anti-spark loop key",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "5_v_bec_regulator",
+      "description": "5 V BEC regulator",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "12_v_payload_regulator",
+      "description": "12 V payload regulator",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "lc_noise_filter",
+      "description": "LC noise filter",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "rail_status_led",
+      "description": "rail status LED",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "silicone_power_lead_set",
+      "description": "silicone power lead set",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "jst_signal_harness",
+      "description": "JST signal harness",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "braided_cable_sleeve",
+      "description": "braided cable sleeve",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "strain_relief_clip_set",
+      "description": "strain relief clip set",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "arming_switch",
+      "description": "arming switch",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "status_buzzer",
+      "description": "status buzzer",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "motor_inhibit_logic",
+      "description": "motor inhibit logic",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "preflight_checklist_tag",
+      "description": "preflight checklist tag",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "return_to_home_failsafe",
+      "description": "return-to-home failsafe",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "geofence_configuration",
+      "description": "geofence configuration",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "low_battery_landing_logic",
+      "description": "low battery landing logic",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "flight_termination_setting",
+      "description": "flight termination setting",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "fire_resistant_battery_pouch",
+      "description": "fire-resistant battery pouch",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "pack_swelling_gauge",
+      "description": "pack swelling gauge",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "charge_log_sheet",
+      "description": "charge log sheet",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "thermal_warning_label",
+      "description": "thermal warning label",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "spare_arm_clamp",
+      "description": "spare arm clamp",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "motor_alignment_gauge",
+      "description": "motor alignment gauge",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "propeller_torque_tool",
+      "description": "propeller torque tool",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "field_fastener_kit",
+      "description": "field fastener kit",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "crack_inspection_marker",
+      "description": "crack inspection marker",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "fastener_witness_paint",
+      "description": "fastener witness paint",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "battery_cycle_counter_label",
+      "description": "battery cycle counter label",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "payload_latch_witness_mark",
+      "description": "payload latch witness mark",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "foam_transport_case",
+      "description": "foam transport case",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "propeller_guard_sleeve",
+      "description": "propeller guard sleeve",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "gimbal_transport_lock",
+      "description": "gimbal transport lock",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "desiccant_storage_pouch",
+      "description": "desiccant storage pouch",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "handheld_transmitter",
+      "description": "handheld transmitter",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "ground_station_tablet",
+      "description": "ground-station tablet",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "sun_hood",
+      "description": "sun hood",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "controller_neck_strap",
+      "description": "controller neck strap",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "aircraft_id_label",
+      "description": "aircraft ID label",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "propeller_rotation_label",
+      "description": "propeller rotation label",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "payload_mass_placard",
+      "description": "payload mass placard",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    },
+    {
+      "componentWordId": "preflight_checklist_card",
+      "description": "preflight checklist card",
+      "quantity": 1,
+      "unit": "candidate",
+      "priority": "candidate",
+      "reason": "Architecture candidate line can be sourced after critical lines."
+    }
+  ]
+}

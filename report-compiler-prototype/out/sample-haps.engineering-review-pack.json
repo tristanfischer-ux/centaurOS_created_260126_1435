@@ -1,0 +1,3129 @@
+{
+  "summary": {
+    "rows": 86,
+    "accepted": 0,
+    "readyForReview": 53,
+    "needsReview": 33,
+    "blocked": 0,
+    "moduleQuestions": 11,
+    "subModuleQuestions": 33,
+    "interfaceQuestions": 8,
+    "calculationQuestions": 3,
+    "assumptionQuestions": 31
+  },
+  "questions": [
+    {
+      "id": "assumption_resolution:compliance:CAA-UAS-OPS",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "CAA-UAS-OPS",
+      "reviewerQuestion": "Can the CAA-UAS-OPS assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Airspace concept of operations, detect-and-avoid assumptions, command link and recovery evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:DO-160-ENV",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "DO-160-ENV",
+      "reviewerQuestion": "Can the DO-160-ENV assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Temperature, vibration, electrical power and EMC environmental evidence tailored to stratospheric operation.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:SOLAR-ENERGY-BALANCE-REVIEW",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "SOLAR-ENERGY-BALANCE-REVIEW",
+      "reviewerQuestion": "Can the SOLAR-ENERGY-BALANCE-REVIEW assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Solar collection, battery night-cycle, propulsion load and station-keeping wind model evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:actuation_kinematics_electric_propulsion_pods_electric_propulsion_pod",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Electric propulsion pod",
+      "reviewerQuestion": "Can the Electric propulsion pod assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "electric_propulsion_pod"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_flight_control_computer_flight_control_computer",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Flight control computer",
+      "reviewerQuestion": "Can the Flight control computer assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "flight_control_computer"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_ground_command_link_ground_control_link",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Ground control link",
+      "reviewerQuestion": "Can the Ground control link assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "ground_control_link"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_harvesting_mppt_conversion_mppt_power_tracker",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "MPPT power tracker",
+      "reviewerQuestion": "Can the MPPT power tracker assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_harvesting"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "mppt_power_tracker"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_harvesting_solar_skin_array_solar_cell_array",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Solar cell array",
+      "reviewerQuestion": "Can the Solar cell array assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_harvesting"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "solar_cell_array"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_storage_source_stratospheric_battery_pack_stratospheric_battery_pack",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Stratospheric battery pack",
+      "reviewerQuestion": "Can the Stratospheric battery pack assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "stratospheric_battery_pack"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_thermal_protection_thermal_insulation_blanket",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Thermal insulation blanket",
+      "reviewerQuestion": "Can the Thermal insulation blanket assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "thermal_insulation_blanket"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:payload_communication_antenna_aperture_payload_antenna_array",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Payload antenna array",
+      "reviewerQuestion": "Can the Payload antenna array assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "payload_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "payload_antenna_array"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:payload_communication_payload_radio_stratospheric_communications_payload",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Stratospheric communications payload",
+      "reviewerQuestion": "Can the Stratospheric communications payload assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "payload_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "stratospheric_communications_payload"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:safety_protection_abort_recovery_recovery_parachute_system",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Recovery parachute system",
+      "reviewerQuestion": "Can the Recovery parachute system assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "recovery_parachute_system"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_navigation_suite_gnss_ins_navigation_unit",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "GNSS INS navigation unit",
+      "reviewerQuestion": "Can the GNSS INS navigation unit assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "gnss_ins_navigation_unit"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:structure_containment_wing_primary_structure_high_aspect_ratio_wing_structure",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "High-aspect-ratio wing structure",
+      "reviewerQuestion": "Can the High-aspect-ratio wing structure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "high_aspect_ratio_wing_structure"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:actuation_kinematics:flight_control_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> actuation_kinematics",
+      "reviewerQuestion": "Can the control_compute_communication -> actuation_kinematics assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "flight_control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:energy_harvesting:power_distribution:solar_dc_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "energy_harvesting -> power_distribution",
+      "reviewerQuestion": "Can the energy_harvesting -> power_distribution assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "solar_dc_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:energy_storage_source:power_distribution:battery_dc_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "energy_storage_source -> power_distribution",
+      "reviewerQuestion": "Can the energy_storage_source -> power_distribution assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "battery_dc_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:environmental_interface:energy_storage_source:thermal_path",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "environmental_interface -> energy_storage_source",
+      "reviewerQuestion": "Can the environmental_interface -> energy_storage_source assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:payload_communication:control_compute_communication:payload_data_link",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "payload_communication -> control_compute_communication",
+      "reviewerQuestion": "Can the payload_communication -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "payload_data_link"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:power_distribution:actuation_kinematics:propulsion_power_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "power_distribution -> actuation_kinematics",
+      "reviewerQuestion": "Can the power_distribution -> actuation_kinematics assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "propulsion_power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:safety_protection:control_compute_communication:telemetry_link",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "safety_protection -> control_compute_communication",
+      "reviewerQuestion": "Can the safety_protection -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "telemetry_link"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "reviewerQuestion": "Can the sensing_instrumentation -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:capex_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated CAPEX",
+      "reviewerQuestion": "Can the Estimated CAPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:headline_output",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Station-keeping endurance",
+      "reviewerQuestion": "Can the Station-keeping endurance assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:opex_annual_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated annual OPEX",
+      "reviewerQuestion": "Can the Estimated annual OPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:haps_altitude_band",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Stratospheric Altitude Band",
+      "reviewerQuestion": "Can the Stratospheric Altitude Band assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface",
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:haps_endurance_target",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Station-Keeping Endurance",
+      "reviewerQuestion": "Can the Station-Keeping Endurance assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_harvesting",
+        "energy_storage_source",
+        "power_distribution",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:haps_energy_flight_closure",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Solar/Energy/Flight Closure",
+      "reviewerQuestion": "Can the Solar/Energy/Flight Closure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "energy_harvesting",
+        "actuation_kinematics",
+        "maintenance_serviceability",
+        "energy_storage_source",
+        "power_distribution",
+        "control_compute_communication",
+        "environmental_interface",
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "wingspan_m",
+        "endurance_days",
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:haps_payload_comms_safety",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Payload/Telemetry/Safety Closure",
+      "reviewerQuestion": "Can the Payload/Telemetry/Safety Closure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface",
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:haps_wingspan_envelope",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Wing Span Envelope",
+      "reviewerQuestion": "Can the Wing Span Envelope assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "energy_harvesting",
+        "actuation_kinematics",
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "wingspan_m"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:haps_endurance_hours",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "HAPS endurance hours",
+      "reviewerQuestion": "Does the HAPS endurance hours calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm solar resource, battery reserve, wind field, degradation, payload power and recovery plan.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "energy_harvesting",
+        "energy_storage_source",
+        "power_distribution",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "haps_endurance_hours"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:haps_wingspan_to_altitude_ratio",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "HAPS wingspan-to-altitude marker",
+      "reviewerQuestion": "Does the HAPS wingspan-to-altitude marker calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm wing area, mass budget, airfoil, aeroelastic margin, launch loads and transport constraints.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "energy_harvesting",
+        "actuation_kinematics",
+        "maintenance_serviceability",
+        "environmental_interface",
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "wingspan_m",
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "haps_wingspan_to_altitude_ratio"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:haps_altitude_ft",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "HAPS altitude conversion",
+      "reviewerQuestion": "Does the HAPS altitude conversion calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm operating altitude, airspace permissions, atmospheric density, thermal envelope and wind model.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface",
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "haps_altitude_ft"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_contract:control_compute_communication:actuation_kinematics:flight_control_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Autonomy Control Communication -> Propulsion And Control Surfaces via flight_control_bus",
+      "reviewerQuestion": "Is the flight_control_bus interface between Autonomy Control Communication and Propulsion And Control Surfaces correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "flight_control_computer",
+        "energy_aware_autonomy",
+        "electric_propulsion_pods",
+        "control_surface_actuation",
+        "station_keeping_trim"
+      ],
+      "linkedComponentWordIds": [
+        "flight_control_computer",
+        "autopilot_io_board",
+        "flight_software_image",
+        "watchdog_supervisor",
+        "solar_forecast_model",
+        "wind_field_route_planner",
+        "payload_duty_cycle_controller",
+        "return_corridor_manager",
+        "electric_propulsion_pod",
+        "high_altitude_propeller_set",
+        "motor_controller_module",
+        "propulsion_pod_fairing",
+        "low_temperature_servo_actuator",
+        "control_linkage_rod_set",
+        "surface_position_sensor",
+        "servo_heater_trace",
+        "trim_schedule_table",
+        "gust_load_estimator",
+        "airspeed_setpoint_manager",
+        "propulsion_calibration_record"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "flight_control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:energy_harvesting:power_distribution:solar_dc_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Solar Energy Harvesting -> Flight Power Distribution via solar_dc_bus",
+      "reviewerQuestion": "Is the solar_dc_bus interface between Solar Energy Harvesting and Flight Power Distribution correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "energy_harvesting",
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "solar_skin_array",
+        "mppt_conversion",
+        "solar_health_monitoring",
+        "solar_battery_power_management"
+      ],
+      "linkedComponentWordIds": [
+        "solar_cell_array",
+        "cell_interconnect_ribbon",
+        "transparent_encapsulation_film",
+        "solar_string_bypass_diode",
+        "mppt_power_tracker",
+        "solar_input_current_sensor",
+        "solar_voltage_tap_loom",
+        "mppt_heat_spreader",
+        "solar_string_monitor_board",
+        "uv_exposure_witness_coupon",
+        "wing_surface_temperature_sensor",
+        "solar_inspection_connector",
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "solar_dc_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:energy_storage_source:power_distribution:battery_dc_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Night-Cycle Energy Storage -> Flight Power Distribution via battery_dc_bus",
+      "reviewerQuestion": "Is the battery_dc_bus interface between Night-Cycle Energy Storage and Flight Power Distribution correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "stratospheric_battery_pack",
+        "solar_battery_power_management"
+      ],
+      "linkedComponentWordIds": [
+        "stratospheric_battery_pack",
+        "battery_management_board",
+        "lightweight_battery_enclosure",
+        "cell_heater_film",
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "battery_dc_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:environmental_interface:energy_storage_source:thermal_path",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Stratospheric Environmental Interface -> Night-Cycle Energy Storage via thermal_path",
+      "reviewerQuestion": "Is the thermal_path interface between Stratospheric Environmental Interface and Night-Cycle Energy Storage correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface",
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_protection",
+        "low_pressure_management",
+        "stratospheric_battery_pack",
+        "battery_thermal_zone"
+      ],
+      "linkedComponentWordIds": [
+        "thermal_insulation_blanket",
+        "multi_layer_insulation_patch",
+        "lightweight_thermal_strap",
+        "thermal_witness_label",
+        "low_pressure_vent_path",
+        "conformal_coating_set",
+        "high_altitude_creepage_spacer",
+        "desiccant_cartridge",
+        "stratospheric_battery_pack",
+        "battery_management_board",
+        "lightweight_battery_enclosure",
+        "cell_heater_film",
+        "battery_insulation_sleeve",
+        "phase_change_thermal_buffer",
+        "battery_temperature_sensor_harness",
+        "battery_vent_path"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:payload_communication:control_compute_communication:payload_data_link",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Communications Payload -> Autonomy Control Communication via payload_data_link",
+      "reviewerQuestion": "Is the payload_data_link interface between Communications Payload and Autonomy Control Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "payload_communication",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "payload_radio",
+        "antenna_aperture",
+        "ground_command_link",
+        "energy_aware_autonomy"
+      ],
+      "linkedComponentWordIds": [
+        "stratospheric_communications_payload",
+        "payload_modem_board",
+        "payload_rf_power_amplifier",
+        "payload_processor_module",
+        "payload_antenna_array",
+        "antenna_ground_plane_film",
+        "antenna_feed_harness",
+        "beam_pointing_calibration_target",
+        "ground_control_link",
+        "telemetry_transceiver",
+        "command_authentication_module",
+        "mission_log_recorder",
+        "solar_forecast_model",
+        "wind_field_route_planner",
+        "payload_duty_cycle_controller",
+        "return_corridor_manager"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "payload_data_link"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:power_distribution:actuation_kinematics:propulsion_power_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Power Distribution -> Propulsion And Control Surfaces via propulsion_power_bus",
+      "reviewerQuestion": "Is the propulsion_power_bus interface between Flight Power Distribution and Propulsion And Control Surfaces correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "solar_battery_power_management",
+        "electric_propulsion_pods"
+      ],
+      "linkedComponentWordIds": [
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set",
+        "electric_propulsion_pod",
+        "high_altitude_propeller_set",
+        "motor_controller_module",
+        "propulsion_pod_fairing"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "propulsion_power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:safety_protection:control_compute_communication:telemetry_link",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Safety And Recovery -> Autonomy Control Communication via telemetry_link",
+      "reviewerQuestion": "Is the telemetry_link interface between Flight Safety And Recovery and Autonomy Control Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "safety_protection",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "abort_recovery",
+        "airspace_safety",
+        "ground_command_link"
+      ],
+      "linkedComponentWordIds": [
+        "recovery_parachute_system",
+        "parachute_deployment_controller",
+        "recovery_beacon",
+        "safe_descent_mode_logic",
+        "geofence_database",
+        "lost_link_failsafe",
+        "flight_termination_relay",
+        "airspace_transponder_module",
+        "ground_control_link",
+        "telemetry_transceiver",
+        "command_authentication_module",
+        "mission_log_recorder"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "telemetry_link"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Airdata Sensing -> Autonomy Control Communication via sensor_bus",
+      "reviewerQuestion": "Is the sensor_bus interface between Navigation And Airdata Sensing and Autonomy Control Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "navigation_suite",
+        "airdata_weather_sensors",
+        "structural_health_sensing",
+        "flight_control_computer"
+      ],
+      "linkedComponentWordIds": [
+        "gnss_ins_navigation_unit",
+        "barometric_altitude_sensor",
+        "sun_sensor_pair",
+        "precision_timebase_module",
+        "pitot_static_probe",
+        "outside_air_temperature_probe",
+        "wind_estimation_filter",
+        "humidity_frost_sensor",
+        "wing_strain_gauge_strip",
+        "spar_temperature_sensor",
+        "vibration_accelerometer",
+        "structural_health_recorder",
+        "flight_control_computer",
+        "autopilot_io_board",
+        "flight_software_image",
+        "watchdog_supervisor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "module_allocation:actuation_kinematics",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Propulsion And Control Surfaces",
+      "reviewerQuestion": "Does Propulsion And Control Surfaces have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "electric_propulsion_pods",
+        "control_surface_actuation",
+        "station_keeping_trim"
+      ],
+      "linkedComponentWordIds": [
+        "electric_propulsion_pod",
+        "high_altitude_propeller_set",
+        "motor_controller_module",
+        "propulsion_pod_fairing",
+        "low_temperature_servo_actuator",
+        "control_linkage_rod_set",
+        "surface_position_sensor",
+        "servo_heater_trace",
+        "trim_schedule_table",
+        "gust_load_estimator",
+        "airspeed_setpoint_manager",
+        "propulsion_calibration_record"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "propulsion_power_bus",
+        "flight_control_bus",
+        "propulsion_mounts",
+        "aero_load_path",
+        "low_voltage_rail",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Autonomy Control Communication",
+      "reviewerQuestion": "Does Autonomy Control Communication have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "flight_control_computer",
+        "ground_command_link",
+        "energy_aware_autonomy"
+      ],
+      "linkedComponentWordIds": [
+        "flight_control_computer",
+        "autopilot_io_board",
+        "flight_software_image",
+        "watchdog_supervisor",
+        "ground_control_link",
+        "telemetry_transceiver",
+        "command_authentication_module",
+        "mission_log_recorder",
+        "solar_forecast_model",
+        "wind_field_route_planner",
+        "payload_duty_cycle_controller",
+        "return_corridor_manager"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days",
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "flight_control_bus",
+        "sensor_bus",
+        "telemetry_link",
+        "battery_monitor_bus",
+        "payload_data_link",
+        "hardwired_trip",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure",
+        "haps_altitude_band",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:energy_harvesting",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Solar Energy Harvesting",
+      "reviewerQuestion": "Does Solar Energy Harvesting have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "energy_harvesting"
+      ],
+      "linkedSubModuleIds": [
+        "solar_skin_array",
+        "mppt_conversion",
+        "solar_health_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "solar_cell_array",
+        "cell_interconnect_ribbon",
+        "transparent_encapsulation_film",
+        "solar_string_bypass_diode",
+        "mppt_power_tracker",
+        "solar_input_current_sensor",
+        "solar_voltage_tap_loom",
+        "mppt_heat_spreader",
+        "solar_string_monitor_board",
+        "uv_exposure_witness_coupon",
+        "wing_surface_temperature_sensor",
+        "solar_inspection_connector"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "solar_dc_bus",
+        "solar_mount",
+        "sensor_bus",
+        "thermal_path",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:energy_storage_source",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Night-Cycle Energy Storage",
+      "reviewerQuestion": "Does Night-Cycle Energy Storage have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "stratospheric_battery_pack",
+        "battery_thermal_zone",
+        "energy_reserve_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "stratospheric_battery_pack",
+        "battery_management_board",
+        "lightweight_battery_enclosure",
+        "cell_heater_film",
+        "battery_insulation_sleeve",
+        "phase_change_thermal_buffer",
+        "battery_temperature_sensor_harness",
+        "battery_vent_path",
+        "coulomb_counter_module",
+        "reserve_energy_estimator",
+        "battery_isolation_contactor",
+        "night_cycle_test_connector"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "battery_dc_bus",
+        "thermal_path",
+        "battery_monitor_bus",
+        "service_access",
+        "sensor_bus",
+        "telemetry_link"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Stratospheric Environmental Interface",
+      "reviewerQuestion": "Does Stratospheric Environmental Interface have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_protection",
+        "uv_surface_protection",
+        "low_pressure_management"
+      ],
+      "linkedComponentWordIds": [
+        "thermal_insulation_blanket",
+        "multi_layer_insulation_patch",
+        "lightweight_thermal_strap",
+        "thermal_witness_label",
+        "uv_protective_film",
+        "leading_edge_erosion_tape",
+        "surface_contamination_wipe_kit",
+        "coating_inspection_marker",
+        "low_pressure_vent_path",
+        "conformal_coating_set",
+        "high_altitude_creepage_spacer",
+        "desiccant_cartridge"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "thermal_path",
+        "solar_mount",
+        "service_access",
+        "rf_aperture",
+        "aero_load_path",
+        "payload_power_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Ground Handling Serviceability",
+      "reviewerQuestion": "Does Ground Handling Serviceability have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "wing_assembly_service",
+        "launch_recovery_equipment",
+        "payload_checkout"
+      ],
+      "linkedComponentWordIds": [
+        "wing_assembly_jig",
+        "spar_pin_torque_tool",
+        "solar_skin_protection_mat",
+        "assembly_witness_mark_set",
+        "launch_dolly_interface",
+        "wingtip_handling_fixture",
+        "recovery_cradle",
+        "ground_wind_limit_placard",
+        "payload_checkout_cable",
+        "rf_load_test_adapter",
+        "telemetry_ground_terminal",
+        "preflight_log_card"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "aero_load_path",
+        "telemetry_link",
+        "solar_mount",
+        "payload_data_link"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:payload_communication",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Communications Payload",
+      "reviewerQuestion": "Does Communications Payload have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "payload_communication"
+      ],
+      "linkedSubModuleIds": [
+        "payload_radio",
+        "antenna_aperture",
+        "payload_integration"
+      ],
+      "linkedComponentWordIds": [
+        "stratospheric_communications_payload",
+        "payload_modem_board",
+        "payload_rf_power_amplifier",
+        "payload_processor_module",
+        "payload_antenna_array",
+        "antenna_ground_plane_film",
+        "antenna_feed_harness",
+        "beam_pointing_calibration_target",
+        "payload_isolation_mount",
+        "payload_thermal_strap",
+        "payload_access_hatch",
+        "payload_configuration_tag"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "payload_data_link",
+        "payload_power_bus",
+        "rf_aperture",
+        "thermal_path",
+        "service_access",
+        "aero_load_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Power Distribution",
+      "reviewerQuestion": "Does Flight Power Distribution have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "solar_battery_power_management",
+        "low_voltage_distribution",
+        "load_shed_protection"
+      ],
+      "linkedComponentWordIds": [
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set",
+        "avionics_dc_converter",
+        "servo_power_rail",
+        "communications_dc_converter",
+        "low_voltage_harness_loom",
+        "load_shed_relay_set",
+        "brownout_supervisor",
+        "energy_priority_controller",
+        "fault_latch_indicator"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "solar_dc_bus",
+        "battery_dc_bus",
+        "propulsion_power_bus",
+        "payload_power_bus",
+        "low_voltage_rail",
+        "hardwired_trip",
+        "service_access",
+        "battery_monitor_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Safety And Recovery",
+      "reviewerQuestion": "Does Flight Safety And Recovery have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "abort_recovery",
+        "airspace_safety",
+        "ground_handling_safety"
+      ],
+      "linkedComponentWordIds": [
+        "recovery_parachute_system",
+        "parachute_deployment_controller",
+        "recovery_beacon",
+        "safe_descent_mode_logic",
+        "geofence_database",
+        "lost_link_failsafe",
+        "flight_termination_relay",
+        "airspace_transponder_module",
+        "launch_arming_interlock",
+        "propulsion_safety_pin_set",
+        "battery_handling_placard",
+        "recovery_inspection_checklist"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "hardwired_trip",
+        "telemetry_link",
+        "flight_control_bus",
+        "service_access",
+        "aero_load_path",
+        "battery_monitor_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Airdata Sensing",
+      "reviewerQuestion": "Does Navigation And Airdata Sensing have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "navigation_suite",
+        "airdata_weather_sensors",
+        "structural_health_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "gnss_ins_navigation_unit",
+        "barometric_altitude_sensor",
+        "sun_sensor_pair",
+        "precision_timebase_module",
+        "pitot_static_probe",
+        "outside_air_temperature_probe",
+        "wind_estimation_filter",
+        "humidity_frost_sensor",
+        "wing_strain_gauge_strip",
+        "spar_temperature_sensor",
+        "vibration_accelerometer",
+        "structural_health_recorder"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "flight_control_bus",
+        "aero_load_path",
+        "telemetry_link"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Ultra-Light Wing Structure",
+      "reviewerQuestion": "Does Ultra-Light Wing Structure have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "wing_primary_structure",
+        "tail_control_structure",
+        "payload_bay_structure"
+      ],
+      "linkedComponentWordIds": [
+        "high_aspect_ratio_wing_structure",
+        "carbon_spar_cap_set",
+        "foam_rib_set",
+        "wing_joiner_sleeve",
+        "tail_boom_assembly",
+        "elevator_surface",
+        "rudder_surface",
+        "control_hinge_set",
+        "payload_bay_frame",
+        "avionics_tray",
+        "access_panel_latch_set",
+        "mass_balance_bracket"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m"
+      ],
+      "linkedInterfaceIds": [
+        "aero_load_path",
+        "solar_mount",
+        "propulsion_mounts",
+        "service_access",
+        "payload_mount",
+        "flight_control_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:control_surface_actuation",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Propulsion And Control Surfaces / Control surface actuation",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Control surface actuation make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "control_surface_actuation"
+      ],
+      "linkedComponentWordIds": [
+        "low_temperature_servo_actuator",
+        "control_linkage_rod_set",
+        "surface_position_sensor",
+        "servo_heater_trace"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "flight_control_bus",
+        "aero_load_path",
+        "low_voltage_rail"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:electric_propulsion_pods",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Propulsion And Control Surfaces / Electric propulsion pods",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Electric propulsion pods make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "electric_propulsion_pods"
+      ],
+      "linkedComponentWordIds": [
+        "electric_propulsion_pod",
+        "high_altitude_propeller_set",
+        "motor_controller_module",
+        "propulsion_pod_fairing"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "propulsion_power_bus",
+        "flight_control_bus",
+        "propulsion_mounts"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:station_keeping_trim",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Propulsion And Control Surfaces / Station-keeping trim",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Station-keeping trim make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "station_keeping_trim"
+      ],
+      "linkedComponentWordIds": [
+        "trim_schedule_table",
+        "gust_load_estimator",
+        "airspeed_setpoint_manager",
+        "propulsion_calibration_record"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "flight_control_bus",
+        "sensor_bus",
+        "aero_load_path"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:energy_aware_autonomy",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Autonomy Control Communication / Energy-aware autonomy",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Energy-aware autonomy make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "energy_aware_autonomy"
+      ],
+      "linkedComponentWordIds": [
+        "solar_forecast_model",
+        "wind_field_route_planner",
+        "payload_duty_cycle_controller",
+        "return_corridor_manager"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days",
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "battery_monitor_bus",
+        "payload_data_link",
+        "flight_control_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure",
+        "haps_altitude_band",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:flight_control_computer",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Autonomy Control Communication / Flight control computer",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Flight control computer make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "flight_control_computer"
+      ],
+      "linkedComponentWordIds": [
+        "flight_control_computer",
+        "autopilot_io_board",
+        "flight_software_image",
+        "watchdog_supervisor"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days",
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "flight_control_bus",
+        "sensor_bus",
+        "battery_monitor_bus",
+        "hardwired_trip"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure",
+        "haps_altitude_band",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:ground_command_link",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Autonomy Control Communication / Ground command link",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Ground command link make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "ground_command_link"
+      ],
+      "linkedComponentWordIds": [
+        "ground_control_link",
+        "telemetry_transceiver",
+        "command_authentication_module",
+        "mission_log_recorder"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days",
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "telemetry_link",
+        "payload_data_link",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure",
+        "haps_altitude_band",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_harvesting:mppt_conversion",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Solar Energy Harvesting / MPPT conversion",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to MPPT conversion make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_harvesting"
+      ],
+      "linkedSubModuleIds": [
+        "mppt_conversion"
+      ],
+      "linkedComponentWordIds": [
+        "mppt_power_tracker",
+        "solar_input_current_sensor",
+        "solar_voltage_tap_loom",
+        "mppt_heat_spreader"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "solar_dc_bus",
+        "sensor_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_harvesting:solar_health_monitoring",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Solar Energy Harvesting / Solar health monitoring",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Solar health monitoring make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_harvesting"
+      ],
+      "linkedSubModuleIds": [
+        "solar_health_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "solar_string_monitor_board",
+        "uv_exposure_witness_coupon",
+        "wing_surface_temperature_sensor",
+        "solar_inspection_connector"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "solar_dc_bus",
+        "sensor_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_harvesting:solar_skin_array",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Solar Energy Harvesting / Solar skin array",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Solar skin array make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_harvesting"
+      ],
+      "linkedSubModuleIds": [
+        "solar_skin_array"
+      ],
+      "linkedComponentWordIds": [
+        "solar_cell_array",
+        "cell_interconnect_ribbon",
+        "transparent_encapsulation_film",
+        "solar_string_bypass_diode"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "solar_dc_bus",
+        "solar_mount",
+        "thermal_path"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:battery_thermal_zone",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Night-Cycle Energy Storage / Battery thermal zone",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Battery thermal zone make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "battery_thermal_zone"
+      ],
+      "linkedComponentWordIds": [
+        "battery_insulation_sleeve",
+        "phase_change_thermal_buffer",
+        "battery_temperature_sensor_harness",
+        "battery_vent_path"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "thermal_path",
+        "battery_monitor_bus",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:energy_reserve_monitoring",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Night-Cycle Energy Storage / Energy reserve monitoring",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Energy reserve monitoring make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "energy_reserve_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "coulomb_counter_module",
+        "reserve_energy_estimator",
+        "battery_isolation_contactor",
+        "night_cycle_test_connector"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "battery_monitor_bus",
+        "sensor_bus",
+        "telemetry_link"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:stratospheric_battery_pack",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Night-Cycle Energy Storage / Stratospheric battery pack",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Stratospheric battery pack make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "stratospheric_battery_pack"
+      ],
+      "linkedComponentWordIds": [
+        "stratospheric_battery_pack",
+        "battery_management_board",
+        "lightweight_battery_enclosure",
+        "cell_heater_film"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "battery_dc_bus",
+        "thermal_path",
+        "battery_monitor_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:low_pressure_management",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Stratospheric Environmental Interface / Low-pressure electronics management",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Low-pressure electronics management make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "low_pressure_management"
+      ],
+      "linkedComponentWordIds": [
+        "low_pressure_vent_path",
+        "conformal_coating_set",
+        "high_altitude_creepage_spacer",
+        "desiccant_cartridge"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "thermal_path",
+        "payload_power_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:thermal_protection",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Stratospheric Environmental Interface / Thermal protection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Thermal protection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_protection"
+      ],
+      "linkedComponentWordIds": [
+        "thermal_insulation_blanket",
+        "multi_layer_insulation_patch",
+        "lightweight_thermal_strap",
+        "thermal_witness_label"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "thermal_path",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:uv_surface_protection",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Stratospheric Environmental Interface / UV and surface protection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to UV and surface protection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "uv_surface_protection"
+      ],
+      "linkedComponentWordIds": [
+        "uv_protective_film",
+        "leading_edge_erosion_tape",
+        "surface_contamination_wipe_kit",
+        "coating_inspection_marker"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "solar_mount",
+        "aero_load_path",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:launch_recovery_equipment",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Ground Handling Serviceability / Launch and recovery equipment",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Launch and recovery equipment make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "launch_recovery_equipment"
+      ],
+      "linkedComponentWordIds": [
+        "launch_dolly_interface",
+        "wingtip_handling_fixture",
+        "recovery_cradle",
+        "ground_wind_limit_placard"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "aero_load_path",
+        "telemetry_link"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:payload_checkout",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Ground Handling Serviceability / Payload checkout",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Payload checkout make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "payload_checkout"
+      ],
+      "linkedComponentWordIds": [
+        "payload_checkout_cable",
+        "rf_load_test_adapter",
+        "telemetry_ground_terminal",
+        "preflight_log_card"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "payload_data_link",
+        "telemetry_link"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:wing_assembly_service",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Ground Handling Serviceability / Wing assembly service",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Wing assembly service make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "wing_assembly_service"
+      ],
+      "linkedComponentWordIds": [
+        "wing_assembly_jig",
+        "spar_pin_torque_tool",
+        "solar_skin_protection_mat",
+        "assembly_witness_mark_set"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "aero_load_path",
+        "solar_mount"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:payload_communication:antenna_aperture",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Communications Payload / Antenna aperture",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Antenna aperture make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "payload_communication"
+      ],
+      "linkedSubModuleIds": [
+        "antenna_aperture"
+      ],
+      "linkedComponentWordIds": [
+        "payload_antenna_array",
+        "antenna_ground_plane_film",
+        "antenna_feed_harness",
+        "beam_pointing_calibration_target"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "rf_aperture",
+        "payload_data_link",
+        "aero_load_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:payload_communication:payload_integration",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Communications Payload / Payload integration",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Payload integration make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "payload_communication"
+      ],
+      "linkedSubModuleIds": [
+        "payload_integration"
+      ],
+      "linkedComponentWordIds": [
+        "payload_isolation_mount",
+        "payload_thermal_strap",
+        "payload_access_hatch",
+        "payload_configuration_tag"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "payload_power_bus",
+        "thermal_path",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:payload_communication:payload_radio",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Communications Payload / Payload radio",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Payload radio make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "payload_communication"
+      ],
+      "linkedSubModuleIds": [
+        "payload_radio"
+      ],
+      "linkedComponentWordIds": [
+        "stratospheric_communications_payload",
+        "payload_modem_board",
+        "payload_rf_power_amplifier",
+        "payload_processor_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "payload_data_link",
+        "payload_power_bus",
+        "thermal_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:load_shed_protection",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Power Distribution / Load-shed protection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Load-shed protection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "load_shed_protection"
+      ],
+      "linkedComponentWordIds": [
+        "load_shed_relay_set",
+        "brownout_supervisor",
+        "energy_priority_controller",
+        "fault_latch_indicator"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "hardwired_trip",
+        "payload_power_bus",
+        "battery_monitor_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:low_voltage_distribution",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Power Distribution / Low-voltage distribution",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Low-voltage distribution make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "low_voltage_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "avionics_dc_converter",
+        "servo_power_rail",
+        "communications_dc_converter",
+        "low_voltage_harness_loom"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "low_voltage_rail",
+        "payload_power_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:solar_battery_power_management",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Power Distribution / Solar and battery power management",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Solar and battery power management make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "solar_battery_power_management"
+      ],
+      "linkedComponentWordIds": [
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set"
+      ],
+      "linkedRequirementIds": [
+        "endurance_days"
+      ],
+      "linkedInterfaceIds": [
+        "solar_dc_bus",
+        "battery_dc_bus",
+        "propulsion_power_bus",
+        "payload_power_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:abort_recovery",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Safety And Recovery / Abort and recovery",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Abort and recovery make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "abort_recovery"
+      ],
+      "linkedComponentWordIds": [
+        "recovery_parachute_system",
+        "parachute_deployment_controller",
+        "recovery_beacon",
+        "safe_descent_mode_logic"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "hardwired_trip",
+        "telemetry_link",
+        "flight_control_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:airspace_safety",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Safety And Recovery / Airspace safety",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Airspace safety make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "airspace_safety"
+      ],
+      "linkedComponentWordIds": [
+        "geofence_database",
+        "lost_link_failsafe",
+        "flight_termination_relay",
+        "airspace_transponder_module"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "flight_control_bus",
+        "telemetry_link",
+        "hardwired_trip"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:ground_handling_safety",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Safety And Recovery / Ground handling safety",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Ground handling safety make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "ground_handling_safety"
+      ],
+      "linkedComponentWordIds": [
+        "launch_arming_interlock",
+        "propulsion_safety_pin_set",
+        "battery_handling_placard",
+        "recovery_inspection_checklist"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "aero_load_path",
+        "battery_monitor_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:airdata_weather_sensors",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Airdata Sensing / Airdata and weather sensors",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Airdata and weather sensors make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "airdata_weather_sensors"
+      ],
+      "linkedComponentWordIds": [
+        "pitot_static_probe",
+        "outside_air_temperature_probe",
+        "wind_estimation_filter",
+        "humidity_frost_sensor"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "flight_control_bus"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:navigation_suite",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Airdata Sensing / Navigation suite",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Navigation suite make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "navigation_suite"
+      ],
+      "linkedComponentWordIds": [
+        "gnss_ins_navigation_unit",
+        "barometric_altitude_sensor",
+        "sun_sensor_pair",
+        "precision_timebase_module"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "flight_control_bus",
+        "telemetry_link"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:structural_health_sensing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Airdata Sensing / Structural health sensing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Structural health sensing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "structural_health_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "wing_strain_gauge_strip",
+        "spar_temperature_sensor",
+        "vibration_accelerometer",
+        "structural_health_recorder"
+      ],
+      "linkedRequirementIds": [
+        "altitude_km"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "aero_load_path",
+        "telemetry_link"
+      ],
+      "linkedCalculationIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:payload_bay_structure",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Ultra-Light Wing Structure / Payload bay structure",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Payload bay structure make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "payload_bay_structure"
+      ],
+      "linkedComponentWordIds": [
+        "payload_bay_frame",
+        "avionics_tray",
+        "access_panel_latch_set",
+        "mass_balance_bracket"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m"
+      ],
+      "linkedInterfaceIds": [
+        "payload_mount",
+        "service_access",
+        "aero_load_path"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:tail_control_structure",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Ultra-Light Wing Structure / Tail and control structure",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Tail and control structure make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "tail_control_structure"
+      ],
+      "linkedComponentWordIds": [
+        "tail_boom_assembly",
+        "elevator_surface",
+        "rudder_surface",
+        "control_hinge_set"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m"
+      ],
+      "linkedInterfaceIds": [
+        "aero_load_path",
+        "flight_control_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:wing_primary_structure",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Ultra-Light Wing Structure / Wing primary structure",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Wing primary structure make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "wing_primary_structure"
+      ],
+      "linkedComponentWordIds": [
+        "high_aspect_ratio_wing_structure",
+        "carbon_spar_cap_set",
+        "foam_rib_set",
+        "wing_joiner_sleeve"
+      ],
+      "linkedRequirementIds": [
+        "wingspan_m"
+      ],
+      "linkedInterfaceIds": [
+        "aero_load_path",
+        "solar_mount",
+        "propulsion_mounts"
+      ],
+      "linkedCalculationIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "blockers": []
+    }
+  ]
+}

@@ -1,0 +1,1892 @@
+{
+  "summary": {
+    "rows": 47,
+    "sourcingRows": 15,
+    "verificationRows": 32,
+    "readyRows": 44,
+    "blockedRows": 0,
+    "bomBlockingRows": 15,
+    "publishBlockingRows": 47,
+    "nextRowId": "acquire:4:assumption:metric:capex_gbp"
+  },
+  "rows": [
+    {
+      "id": "acquire:1:readiness:2",
+      "sequence": 1,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "open",
+      "subjectId": "readiness:2",
+      "scope": "Report readiness gate",
+      "issue": "12 critical BoM line(s) lack source-backed cost evidence.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:2:readiness:3",
+      "sequence": 2,
+      "kind": "verification",
+      "priority": "blocker",
+      "status": "open",
+      "subjectId": "readiness:3",
+      "scope": "Report readiness gate",
+      "issue": "7 verification activity/activities remain blocked.",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:3:readiness:4",
+      "sequence": 3,
+      "kind": "verification",
+      "priority": "blocker",
+      "status": "open",
+      "subjectId": "readiness:4",
+      "scope": "Report readiness gate",
+      "issue": "0/30 non-sourcing verification activity/activities have accepted reviewer evidence.",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:4:assumption:metric:capex_gbp",
+      "sequence": 4,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "assumption:metric:capex_gbp",
+      "scope": "Estimated CAPEX",
+      "issue": "Estimated CAPEX uses an implicit model with low confidence.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:5:assumption:metric:opex_annual_gbp",
+      "sequence": 5,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "assumption:metric:opex_annual_gbp",
+      "scope": "Estimated annual OPEX",
+      "issue": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:6:sourcing:pressure_hull",
+      "sequence": 6,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "pressure_hull",
+      "scope": "Pressure hull",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:7:sourcing:battery_pack",
+      "sequence": 7,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "battery_pack",
+      "scope": "Battery pack",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:8:sourcing:wet_mate_connector_set",
+      "sequence": 8,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "wet_mate_connector_set",
+      "scope": "Wet-mate connector set",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:9:sourcing:thruster_set",
+      "sequence": 9,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "thruster_set",
+      "scope": "Thruster set",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:10:sourcing:mission_computer",
+      "sequence": 10,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "mission_computer",
+      "scope": "Mission computer",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:11:sourcing:acoustic_modem",
+      "sequence": 11,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "acoustic_modem",
+      "scope": "Acoustic modem",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:12:sourcing:dvl",
+      "sequence": 12,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "dvl",
+      "scope": "DVL",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:13:sourcing:inertial_navigation_unit",
+      "sequence": 13,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "inertial_navigation_unit",
+      "scope": "Inertial navigation unit",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:14:sourcing:depth_and_pressure_sensor",
+      "sequence": 14,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "depth_and_pressure_sensor",
+      "scope": "Depth and pressure sensor",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:15:sourcing:forward_sonar_payload",
+      "sequence": 15,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "forward_sonar_payload",
+      "scope": "Forward sonar payload",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:16:sourcing:leak_detection_sensor",
+      "sequence": 16,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "leak_detection_sensor",
+      "scope": "Leak detection sensor",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:17:sourcing:recovery_beacon",
+      "sequence": 17,
+      "kind": "sourcing",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "subjectId": "recovery_beacon",
+      "scope": "Recovery beacon",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "acquisitionTarget": "supplier_catalogue_or_quote",
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "disallowedEvidence": [
+        "LLM-estimated cost",
+        "benchmark average without supplier evidence",
+        "class-pack default",
+        "test-fixture:// source"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM ledger carries supplier/manufacturer/MPN/cost only from admitted evidence.",
+        "BoM provenance manifest shows source_backed for claimed fields."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:18:verification:design_review:structure_containment",
+      "sequence": 18,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "design_review:structure_containment",
+      "scope": "Pressure Structure Containment",
+      "issue": "Review Pressure Structure Containment architecture allocation",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:19:verification:calculation:structure_containment",
+      "sequence": 19,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "calculation:structure_containment",
+      "scope": "Pressure Structure Containment",
+      "issue": "Verify Pressure Structure Containment requirement calculations",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:20:verification:design_review:energy_storage_source",
+      "sequence": 20,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "design_review:energy_storage_source",
+      "scope": "Subsea Energy Storage",
+      "issue": "Review Subsea Energy Storage architecture allocation",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:21:verification:calculation:energy_storage_source",
+      "sequence": 21,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "calculation:energy_storage_source",
+      "scope": "Subsea Energy Storage",
+      "issue": "Verify Subsea Energy Storage requirement calculations",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:22:verification:design_review:power_distribution",
+      "sequence": 22,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "design_review:power_distribution",
+      "scope": "Subsea Power Distribution",
+      "issue": "Review Subsea Power Distribution architecture allocation",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:23:verification:calculation:power_distribution",
+      "sequence": 23,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "calculation:power_distribution",
+      "scope": "Subsea Power Distribution",
+      "issue": "Verify Subsea Power Distribution requirement calculations",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:24:verification:design_review:actuation_kinematics",
+      "sequence": 24,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "design_review:actuation_kinematics",
+      "scope": "Thruster Actuation Kinematics",
+      "issue": "Review Thruster Actuation Kinematics architecture allocation",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:25:verification:calculation:actuation_kinematics",
+      "sequence": 25,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "calculation:actuation_kinematics",
+      "scope": "Thruster Actuation Kinematics",
+      "issue": "Verify Thruster Actuation Kinematics requirement calculations",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:26:verification:design_review:control_compute_communication",
+      "sequence": 26,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "design_review:control_compute_communication",
+      "scope": "Autonomy Compute Communication",
+      "issue": "Review Autonomy Compute Communication architecture allocation",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:27:verification:calculation:control_compute_communication",
+      "sequence": 27,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "calculation:control_compute_communication",
+      "scope": "Autonomy Compute Communication",
+      "issue": "Verify Autonomy Compute Communication requirement calculations",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:28:verification:design_review:sensing_instrumentation",
+      "sequence": 28,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "design_review:sensing_instrumentation",
+      "scope": "Navigation And Payload Sensing",
+      "issue": "Review Navigation And Payload Sensing architecture allocation",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:29:verification:design_review:environmental_interface",
+      "sequence": 29,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "design_review:environmental_interface",
+      "scope": "Pressure Thermal Buoyancy Interface",
+      "issue": "Review Pressure Thermal Buoyancy Interface architecture allocation",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:30:verification:calculation:environmental_interface",
+      "sequence": 30,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "calculation:environmental_interface",
+      "scope": "Pressure Thermal Buoyancy Interface",
+      "issue": "Verify Pressure Thermal Buoyancy Interface requirement calculations",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:31:verification:design_review:safety_protection",
+      "sequence": 31,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "design_review:safety_protection",
+      "scope": "Leak Abort And Recovery Safety",
+      "issue": "Review Leak Abort And Recovery Safety architecture allocation",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:32:verification:calculation:safety_protection",
+      "sequence": 32,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "calculation:safety_protection",
+      "scope": "Leak Abort And Recovery Safety",
+      "issue": "Verify Leak Abort And Recovery Safety requirement calculations",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:33:verification:design_review:maintenance_serviceability",
+      "sequence": 33,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "design_review:maintenance_serviceability",
+      "scope": "Deck Recovery And Service",
+      "issue": "Review Deck Recovery And Service architecture allocation",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:34:verification:interface_review:energy_storage_source:power_distribution:dc_power_bus",
+      "sequence": 34,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "interface_review:energy_storage_source:power_distribution:dc_power_bus",
+      "scope": "Subsea Energy Storage -> Subsea Power Distribution",
+      "issue": "Verify dc_power_bus interface contract",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:35:verification:interface_review:power_distribution:actuation_kinematics:thruster_power_bus",
+      "sequence": 35,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "interface_review:power_distribution:actuation_kinematics:thruster_power_bus",
+      "scope": "Subsea Power Distribution -> Thruster Actuation Kinematics",
+      "issue": "Verify thruster_power_bus interface contract",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:36:verification:interface_review:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "sequence": 36,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "interface_review:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "scope": "Autonomy Compute Communication -> Thruster Actuation Kinematics",
+      "issue": "Verify thrust_command_bus interface contract",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:37:verification:interface_review:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "sequence": 37,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "interface_review:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "scope": "Navigation And Payload Sensing -> Autonomy Compute Communication",
+      "issue": "Verify navigation_sensor_bus interface contract",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:38:verification:interface_review:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "sequence": 38,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "interface_review:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "scope": "Navigation And Payload Sensing -> Autonomy Compute Communication",
+      "issue": "Verify payload_data_bus interface contract",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:39:verification:interface_review:environmental_interface:structure_containment:pressure_boundary",
+      "sequence": 39,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "interface_review:environmental_interface:structure_containment:pressure_boundary",
+      "scope": "Pressure Thermal Buoyancy Interface -> Pressure Structure Containment",
+      "issue": "Verify pressure_boundary interface contract",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:40:verification:interface_review:safety_protection:control_compute_communication:alarm_bus",
+      "sequence": 40,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "interface_review:safety_protection:control_compute_communication:alarm_bus",
+      "scope": "Leak Abort And Recovery Safety -> Autonomy Compute Communication",
+      "issue": "Verify alarm_bus interface contract",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:41:verification:interface_review:safety_protection:structure_containment:pressure_boundary",
+      "sequence": 41,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "interface_review:safety_protection:structure_containment:pressure_boundary",
+      "scope": "Leak Abort And Recovery Safety -> Pressure Structure Containment",
+      "issue": "Verify pressure_boundary interface contract",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:42:verification:compliance_review:PRESSURE-BOUNDARY-REVIEW",
+      "sequence": 42,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "compliance_review:PRESSURE-BOUNDARY-REVIEW",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for PRESSURE-BOUNDARY-REVIEW",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:43:verification:compliance_review:SUBSEA-LEAK-ABORT-REVIEW",
+      "sequence": 43,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "compliance_review:SUBSEA-LEAK-ABORT-REVIEW",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for SUBSEA-LEAK-ABORT-REVIEW",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:44:verification:compliance_review:EMC-MARINE-COMMS-REVIEW",
+      "sequence": 44,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "compliance_review:EMC-MARINE-COMMS-REVIEW",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for EMC-MARINE-COMMS-REVIEW",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:45:verification:risk_review:1",
+      "sequence": 45,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "risk_review:1",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Pressure hull or seal failure at depth",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:46:verification:risk_review:2",
+      "sequence": 46,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "risk_review:2",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Loss of navigation or communications underwater",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    },
+    {
+      "id": "acquire:47:verification:risk_review:3",
+      "sequence": 47,
+      "kind": "verification",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "subjectId": "risk_review:3",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Unable to recover vehicle after abort",
+      "acquisitionTarget": "named_engineering_review",
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "disallowedEvidence": [
+        "anonymous reviewer",
+        "unchecked model assertion",
+        "test-fixture:// review",
+        "source-evidence claims that belong in sourcing intake"
+      ],
+      "intakeArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "acceptanceCriteria": [
+        "Verification intake accepts the row.",
+        "Verification ledger status is accepted, rejected or deferred with named evidence.",
+        "Reviewer evidence can be traced back to the relevant architecture or calculation activity."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true
+    }
+  ]
+}

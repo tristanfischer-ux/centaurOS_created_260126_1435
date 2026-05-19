@@ -1,0 +1,320 @@
+{
+  "includeSourceEvidence": false,
+  "instructions": [
+    "Use this intake for engineering design-review, calculation, interface-review and compliance evidence only.",
+    "Do not admit BoM supplier, manufacturer, MPN, unit-cost or lead-time claims through this intake; use the sourcing intake instead.",
+    "Every admitted record must name the reviewer, verdict, evidence reference, evidence note and review timestamp."
+  ],
+  "drafts": [
+    {
+      "activityId": "design_review:skin_patient_interface",
+      "activity": "Review Skin Patient Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:skin_patient_interface",
+      "activity": "Verify Skin Patient Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:sensing_instrumentation",
+      "activity": "Review Glucose Sensing Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:sensing_instrumentation",
+      "activity": "Verify Glucose Sensing Instrumentation requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:actuation_kinematics",
+      "activity": "Review Applicator Insertion Mechanism architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:structure_containment",
+      "activity": "Review Transmitter Housing Structure architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:energy_storage_source",
+      "activity": "Review Wearable Energy Source architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:energy_storage_source",
+      "activity": "Verify Wearable Energy Source requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:power_distribution",
+      "activity": "Review Low-Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:power_distribution",
+      "activity": "Verify Low-Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:control_compute_communication",
+      "activity": "Review Control Compute Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:control_compute_communication",
+      "activity": "Verify Control Compute Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:environmental_interface",
+      "activity": "Review Wear Environment Compensation architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:environmental_interface",
+      "activity": "Verify Wear Environment Compensation requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:safety_protection",
+      "activity": "Review Patient Safety Protection architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:safety_protection",
+      "activity": "Verify Patient Safety Protection requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:maintenance_serviceability",
+      "activity": "Review Packaging Traceability Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+      "activity": "Verify interstitial_fluid_path interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:actuation_kinematics:skin_patient_interface:insertion_path",
+      "activity": "Verify insertion_path interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:sensing_instrumentation:control_compute_communication:sensor_signal_bus",
+      "activity": "Verify sensor_signal_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:sensing_instrumentation:control_compute_communication:calibration_data_bus",
+      "activity": "Verify calibration_data_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:energy_storage_source:power_distribution:cell_power_bus",
+      "activity": "Verify cell_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:power_distribution:sensing_instrumentation:analog_power_rail",
+      "activity": "Verify analog_power_rail interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:power_distribution:control_compute_communication:low_power_rail",
+      "activity": "Verify low_power_rail interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:environmental_interface:control_compute_communication:temperature_compensation_bus",
+      "activity": "Verify temperature_compensation_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:control_compute_communication:safety_protection:alarm_state_bus",
+      "activity": "Verify alarm_state_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:maintenance_serviceability:skin_patient_interface:sterile_boundary",
+      "activity": "Verify sterile_boundary interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:ISO-10993",
+      "activity": "Plan evidence for ISO-10993",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:ISO-14971",
+      "activity": "Plan evidence for ISO-14971",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:IEC-62304",
+      "activity": "Plan evidence for IEC-62304",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:IEC-60601-1",
+      "activity": "Plan evidence for IEC-60601-1",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    }
+  ]
+}

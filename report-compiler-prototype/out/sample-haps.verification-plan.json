@@ -1,0 +1,1393 @@
+{
+  "summary": {
+    "activities": 44,
+    "readyForReview": 29,
+    "open": 6,
+    "blocked": 9,
+    "designReviewActivities": 11,
+    "calculationActivities": 10,
+    "interfaceReviewActivities": 8,
+    "sourceEvidenceActivities": 9,
+    "complianceReviewActivities": 6
+  },
+  "activities": [
+    {
+      "id": "design_review:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Ultra-Light Wing Structure",
+      "activity": "Review Ultra-Light Wing Structure architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wingspan_m"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "interfaceIds": [
+        "aero_load_path",
+        "solar_mount",
+        "propulsion_mounts",
+        "service_access",
+        "payload_mount",
+        "flight_control_bus"
+      ],
+      "componentWordIds": [
+        "high_aspect_ratio_wing_structure",
+        "carbon_spar_cap_set",
+        "foam_rib_set",
+        "wing_joiner_sleeve",
+        "tail_boom_assembly",
+        "elevator_surface",
+        "rudder_surface",
+        "control_hinge_set",
+        "payload_bay_frame",
+        "avionics_tray",
+        "access_panel_latch_set",
+        "mass_balance_bracket"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Ultra-Light Wing Structure",
+      "activity": "Verify Ultra-Light Wing Structure requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wingspan_m"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Ultra-Light Wing Structure",
+      "activity": "Collect source-backed evidence for Ultra-Light Wing Structure critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "wingspan_m"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "high_aspect_ratio_wing_structure"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "high_aspect_ratio_wing_structure"
+      ]
+    },
+    {
+      "id": "design_review:energy_harvesting",
+      "moduleId": "energy_harvesting",
+      "moduleName": "Solar Energy Harvesting",
+      "activity": "Review Solar Energy Harvesting architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "interfaceIds": [
+        "solar_dc_bus",
+        "solar_mount",
+        "sensor_bus",
+        "thermal_path",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "solar_cell_array",
+        "cell_interconnect_ribbon",
+        "transparent_encapsulation_film",
+        "solar_string_bypass_diode",
+        "mppt_power_tracker",
+        "solar_input_current_sensor",
+        "solar_voltage_tap_loom",
+        "mppt_heat_spreader",
+        "solar_string_monitor_board",
+        "uv_exposure_witness_coupon",
+        "wing_surface_temperature_sensor",
+        "solar_inspection_connector"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:energy_harvesting",
+      "moduleId": "energy_harvesting",
+      "moduleName": "Solar Energy Harvesting",
+      "activity": "Verify Solar Energy Harvesting requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:energy_harvesting",
+      "moduleId": "energy_harvesting",
+      "moduleName": "Solar Energy Harvesting",
+      "activity": "Collect source-backed evidence for Solar Energy Harvesting critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "solar_cell_array",
+        "mppt_power_tracker"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "solar_cell_array",
+        "mppt_power_tracker"
+      ]
+    },
+    {
+      "id": "design_review:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Night-Cycle Energy Storage",
+      "activity": "Review Night-Cycle Energy Storage architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "interfaceIds": [
+        "battery_dc_bus",
+        "thermal_path",
+        "battery_monitor_bus",
+        "service_access",
+        "sensor_bus",
+        "telemetry_link"
+      ],
+      "componentWordIds": [
+        "stratospheric_battery_pack",
+        "battery_management_board",
+        "lightweight_battery_enclosure",
+        "cell_heater_film",
+        "battery_insulation_sleeve",
+        "phase_change_thermal_buffer",
+        "battery_temperature_sensor_harness",
+        "battery_vent_path",
+        "coulomb_counter_module",
+        "reserve_energy_estimator",
+        "battery_isolation_contactor",
+        "night_cycle_test_connector"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Night-Cycle Energy Storage",
+      "activity": "Verify Night-Cycle Energy Storage requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Night-Cycle Energy Storage",
+      "activity": "Collect source-backed evidence for Night-Cycle Energy Storage critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "endurance_days"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "stratospheric_battery_pack"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "stratospheric_battery_pack"
+      ]
+    },
+    {
+      "id": "design_review:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Flight Power Distribution",
+      "activity": "Review Flight Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "interfaceIds": [
+        "solar_dc_bus",
+        "battery_dc_bus",
+        "propulsion_power_bus",
+        "payload_power_bus",
+        "low_voltage_rail",
+        "hardwired_trip",
+        "service_access",
+        "battery_monitor_bus"
+      ],
+      "componentWordIds": [
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set",
+        "avionics_dc_converter",
+        "servo_power_rail",
+        "communications_dc_converter",
+        "low_voltage_harness_loom",
+        "load_shed_relay_set",
+        "brownout_supervisor",
+        "energy_priority_controller",
+        "fault_latch_indicator"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Flight Power Distribution",
+      "activity": "Verify Flight Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Control Surfaces",
+      "activity": "Review Propulsion And Control Surfaces architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "interfaceIds": [
+        "propulsion_power_bus",
+        "flight_control_bus",
+        "propulsion_mounts",
+        "aero_load_path",
+        "low_voltage_rail",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "electric_propulsion_pod",
+        "high_altitude_propeller_set",
+        "motor_controller_module",
+        "propulsion_pod_fairing",
+        "low_temperature_servo_actuator",
+        "control_linkage_rod_set",
+        "surface_position_sensor",
+        "servo_heater_trace",
+        "trim_schedule_table",
+        "gust_load_estimator",
+        "airspeed_setpoint_manager",
+        "propulsion_calibration_record"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Control Surfaces",
+      "activity": "Verify Propulsion And Control Surfaces requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Control Surfaces",
+      "activity": "Collect source-backed evidence for Propulsion And Control Surfaces critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "electric_propulsion_pod"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "electric_propulsion_pod"
+      ]
+    },
+    {
+      "id": "design_review:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Control Communication",
+      "activity": "Review Autonomy Control Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_days",
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure",
+        "haps_altitude_band",
+        "haps_payload_comms_safety"
+      ],
+      "interfaceIds": [
+        "flight_control_bus",
+        "sensor_bus",
+        "telemetry_link",
+        "battery_monitor_bus",
+        "payload_data_link",
+        "hardwired_trip",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "flight_control_computer",
+        "autopilot_io_board",
+        "flight_software_image",
+        "watchdog_supervisor",
+        "ground_control_link",
+        "telemetry_transceiver",
+        "command_authentication_module",
+        "mission_log_recorder",
+        "solar_forecast_model",
+        "wind_field_route_planner",
+        "payload_duty_cycle_controller",
+        "return_corridor_manager"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Control Communication",
+      "activity": "Verify Autonomy Control Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_days",
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure",
+        "haps_altitude_band",
+        "haps_payload_comms_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Control Communication",
+      "activity": "Collect source-backed evidence for Autonomy Control Communication critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "endurance_days",
+        "altitude_km"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "flight_control_computer",
+        "ground_control_link"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "flight_control_computer",
+        "ground_control_link"
+      ]
+    },
+    {
+      "id": "design_review:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Airdata Sensing",
+      "activity": "Review Navigation And Airdata Sensing architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "interfaceIds": [
+        "sensor_bus",
+        "flight_control_bus",
+        "aero_load_path",
+        "telemetry_link"
+      ],
+      "componentWordIds": [
+        "gnss_ins_navigation_unit",
+        "barometric_altitude_sensor",
+        "sun_sensor_pair",
+        "precision_timebase_module",
+        "pitot_static_probe",
+        "outside_air_temperature_probe",
+        "wind_estimation_filter",
+        "humidity_frost_sensor",
+        "wing_strain_gauge_strip",
+        "spar_temperature_sensor",
+        "vibration_accelerometer",
+        "structural_health_recorder"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Airdata Sensing",
+      "activity": "Verify Navigation And Airdata Sensing requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Airdata Sensing",
+      "activity": "Collect source-backed evidence for Navigation And Airdata Sensing critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "gnss_ins_navigation_unit"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "gnss_ins_navigation_unit"
+      ]
+    },
+    {
+      "id": "design_review:payload_communication",
+      "moduleId": "payload_communication",
+      "moduleName": "Communications Payload",
+      "activity": "Review Communications Payload architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "payload_data_link",
+        "payload_power_bus",
+        "rf_aperture",
+        "thermal_path",
+        "service_access",
+        "aero_load_path"
+      ],
+      "componentWordIds": [
+        "stratospheric_communications_payload",
+        "payload_modem_board",
+        "payload_rf_power_amplifier",
+        "payload_processor_module",
+        "payload_antenna_array",
+        "antenna_ground_plane_film",
+        "antenna_feed_harness",
+        "beam_pointing_calibration_target",
+        "payload_isolation_mount",
+        "payload_thermal_strap",
+        "payload_access_hatch",
+        "payload_configuration_tag"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:payload_communication",
+      "moduleId": "payload_communication",
+      "moduleName": "Communications Payload",
+      "activity": "Collect source-backed evidence for Communications Payload critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "stratospheric_communications_payload",
+        "payload_antenna_array"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "stratospheric_communications_payload",
+        "payload_antenna_array"
+      ]
+    },
+    {
+      "id": "design_review:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Stratospheric Environmental Interface",
+      "activity": "Review Stratospheric Environmental Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "interfaceIds": [
+        "thermal_path",
+        "solar_mount",
+        "service_access",
+        "rf_aperture",
+        "aero_load_path",
+        "payload_power_bus"
+      ],
+      "componentWordIds": [
+        "thermal_insulation_blanket",
+        "multi_layer_insulation_patch",
+        "lightweight_thermal_strap",
+        "thermal_witness_label",
+        "uv_protective_film",
+        "leading_edge_erosion_tape",
+        "surface_contamination_wipe_kit",
+        "coating_inspection_marker",
+        "low_pressure_vent_path",
+        "conformal_coating_set",
+        "high_altitude_creepage_spacer",
+        "desiccant_cartridge"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Stratospheric Environmental Interface",
+      "activity": "Verify Stratospheric Environmental Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Stratospheric Environmental Interface",
+      "activity": "Collect source-backed evidence for Stratospheric Environmental Interface critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "thermal_insulation_blanket"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "thermal_insulation_blanket"
+      ]
+    },
+    {
+      "id": "design_review:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Recovery",
+      "activity": "Review Flight Safety And Recovery architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "interfaceIds": [
+        "hardwired_trip",
+        "telemetry_link",
+        "flight_control_bus",
+        "service_access",
+        "aero_load_path",
+        "battery_monitor_bus"
+      ],
+      "componentWordIds": [
+        "recovery_parachute_system",
+        "parachute_deployment_controller",
+        "recovery_beacon",
+        "safe_descent_mode_logic",
+        "geofence_database",
+        "lost_link_failsafe",
+        "flight_termination_relay",
+        "airspace_transponder_module",
+        "launch_arming_interlock",
+        "propulsion_safety_pin_set",
+        "battery_handling_placard",
+        "recovery_inspection_checklist"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Recovery",
+      "activity": "Verify Flight Safety And Recovery requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Recovery",
+      "activity": "Collect source-backed evidence for Flight Safety And Recovery critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "recovery_parachute_system"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "recovery_parachute_system"
+      ]
+    },
+    {
+      "id": "design_review:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Ground Handling Serviceability",
+      "activity": "Review Ground Handling Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wingspan_m"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "interfaceIds": [
+        "service_access",
+        "aero_load_path",
+        "telemetry_link",
+        "solar_mount",
+        "payload_data_link"
+      ],
+      "componentWordIds": [
+        "wing_assembly_jig",
+        "spar_pin_torque_tool",
+        "solar_skin_protection_mat",
+        "assembly_witness_mark_set",
+        "launch_dolly_interface",
+        "wingtip_handling_fixture",
+        "recovery_cradle",
+        "ground_wind_limit_placard",
+        "payload_checkout_cable",
+        "rf_load_test_adapter",
+        "telemetry_ground_terminal",
+        "preflight_log_card"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Ground Handling Serviceability",
+      "activity": "Verify Ground Handling Serviceability requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wingspan_m"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:energy_harvesting:power_distribution:solar_dc_bus",
+      "moduleId": "energy_harvesting:power_distribution",
+      "moduleName": "Solar Energy Harvesting -> Flight Power Distribution",
+      "activity": "Verify solar_dc_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "solar_dc_bus"
+      ],
+      "componentWordIds": [
+        "solar_cell_array",
+        "cell_interconnect_ribbon",
+        "transparent_encapsulation_film",
+        "solar_string_bypass_diode",
+        "mppt_power_tracker",
+        "solar_input_current_sensor",
+        "solar_voltage_tap_loom",
+        "mppt_heat_spreader",
+        "solar_string_monitor_board",
+        "uv_exposure_witness_coupon",
+        "wing_surface_temperature_sensor",
+        "solar_inspection_connector",
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set"
+      ],
+      "rationale": "Solar array output must feed power management over a declared DC bus.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:energy_storage_source:power_distribution:battery_dc_bus",
+      "moduleId": "energy_storage_source:power_distribution",
+      "moduleName": "Night-Cycle Energy Storage -> Flight Power Distribution",
+      "activity": "Verify battery_dc_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "battery_dc_bus"
+      ],
+      "componentWordIds": [
+        "stratospheric_battery_pack",
+        "battery_management_board",
+        "lightweight_battery_enclosure",
+        "cell_heater_film",
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set"
+      ],
+      "rationale": "Night-cycle battery energy must connect into load distribution.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:power_distribution:actuation_kinematics:propulsion_power_bus",
+      "moduleId": "power_distribution:actuation_kinematics",
+      "moduleName": "Flight Power Distribution -> Propulsion And Control Surfaces",
+      "activity": "Verify propulsion_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "propulsion_power_bus"
+      ],
+      "componentWordIds": [
+        "solar_battery_charge_controller",
+        "main_dc_bus_board",
+        "payload_power_switch",
+        "propulsion_bus_fuse_set",
+        "electric_propulsion_pod",
+        "high_altitude_propeller_set",
+        "motor_controller_module",
+        "propulsion_pod_fairing"
+      ],
+      "rationale": "Propulsion loads must receive protected high-current power.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:control_compute_communication:actuation_kinematics:flight_control_bus",
+      "moduleId": "control_compute_communication:actuation_kinematics",
+      "moduleName": "Autonomy Control Communication -> Propulsion And Control Surfaces",
+      "activity": "Verify flight_control_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "flight_control_bus"
+      ],
+      "componentWordIds": [
+        "flight_control_computer",
+        "autopilot_io_board",
+        "flight_software_image",
+        "watchdog_supervisor",
+        "solar_forecast_model",
+        "wind_field_route_planner",
+        "payload_duty_cycle_controller",
+        "return_corridor_manager",
+        "electric_propulsion_pod",
+        "high_altitude_propeller_set",
+        "motor_controller_module",
+        "propulsion_pod_fairing",
+        "low_temperature_servo_actuator",
+        "control_linkage_rod_set",
+        "surface_position_sensor",
+        "servo_heater_trace",
+        "trim_schedule_table",
+        "gust_load_estimator",
+        "airspeed_setpoint_manager",
+        "propulsion_calibration_record"
+      ],
+      "rationale": "Flight controller must command propulsion and trim actuators.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Navigation And Airdata Sensing -> Autonomy Control Communication",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "gnss_ins_navigation_unit",
+        "barometric_altitude_sensor",
+        "sun_sensor_pair",
+        "precision_timebase_module",
+        "pitot_static_probe",
+        "outside_air_temperature_probe",
+        "wind_estimation_filter",
+        "humidity_frost_sensor",
+        "wing_strain_gauge_strip",
+        "spar_temperature_sensor",
+        "vibration_accelerometer",
+        "structural_health_recorder",
+        "flight_control_computer",
+        "autopilot_io_board",
+        "flight_software_image",
+        "watchdog_supervisor"
+      ],
+      "rationale": "Navigation, airdata and structural state must feed autonomy decisions.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:payload_communication:control_compute_communication:payload_data_link",
+      "moduleId": "payload_communication:control_compute_communication",
+      "moduleName": "Communications Payload -> Autonomy Control Communication",
+      "activity": "Verify payload_data_link interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "payload_data_link"
+      ],
+      "componentWordIds": [
+        "stratospheric_communications_payload",
+        "payload_modem_board",
+        "payload_rf_power_amplifier",
+        "payload_processor_module",
+        "payload_antenna_array",
+        "antenna_ground_plane_film",
+        "antenna_feed_harness",
+        "beam_pointing_calibration_target",
+        "ground_control_link",
+        "telemetry_transceiver",
+        "command_authentication_module",
+        "mission_log_recorder",
+        "solar_forecast_model",
+        "wind_field_route_planner",
+        "payload_duty_cycle_controller",
+        "return_corridor_manager"
+      ],
+      "rationale": "Payload state must be visible to vehicle autonomy and telemetry.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:environmental_interface:energy_storage_source:thermal_path",
+      "moduleId": "environmental_interface:energy_storage_source",
+      "moduleName": "Stratospheric Environmental Interface -> Night-Cycle Energy Storage",
+      "activity": "Verify thermal_path interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "thermal_path"
+      ],
+      "componentWordIds": [
+        "thermal_insulation_blanket",
+        "multi_layer_insulation_patch",
+        "lightweight_thermal_strap",
+        "thermal_witness_label",
+        "low_pressure_vent_path",
+        "conformal_coating_set",
+        "high_altitude_creepage_spacer",
+        "desiccant_cartridge",
+        "stratospheric_battery_pack",
+        "battery_management_board",
+        "lightweight_battery_enclosure",
+        "cell_heater_film",
+        "battery_insulation_sleeve",
+        "phase_change_thermal_buffer",
+        "battery_temperature_sensor_harness",
+        "battery_vent_path"
+      ],
+      "rationale": "Battery survival and night-cycle capacity depend on a declared thermal path.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:safety_protection:control_compute_communication:telemetry_link",
+      "moduleId": "safety_protection:control_compute_communication",
+      "moduleName": "Flight Safety And Recovery -> Autonomy Control Communication",
+      "activity": "Verify telemetry_link interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "telemetry_link"
+      ],
+      "componentWordIds": [
+        "recovery_parachute_system",
+        "parachute_deployment_controller",
+        "recovery_beacon",
+        "safe_descent_mode_logic",
+        "geofence_database",
+        "lost_link_failsafe",
+        "flight_termination_relay",
+        "airspace_transponder_module",
+        "ground_control_link",
+        "telemetry_transceiver",
+        "command_authentication_module",
+        "mission_log_recorder"
+      ],
+      "rationale": "Abort, descent and recovery state must remain visible to ground operators.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "compliance_review:CAA-UAS-OPS",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for CAA-UAS-OPS",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "High-altitude unmanned aircraft operational safety case",
+      "acceptanceCriteria": [
+        "Airspace concept of operations, detect-and-avoid assumptions, command link and recovery evidence."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:DO-160-ENV",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for DO-160-ENV",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Airborne equipment environmental conditions",
+      "acceptanceCriteria": [
+        "Temperature, vibration, electrical power and EMC environmental evidence tailored to stratospheric operation."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:SOLAR-ENERGY-BALANCE-REVIEW",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for SOLAR-ENERGY-BALANCE-REVIEW",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Solar day/night energy balance review",
+      "acceptanceCriteria": [
+        "Solar collection, battery night-cycle, propulsion load and station-keeping wind model evidence."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:1",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Energy-negative overnight operation",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 200; mitigation: Solar/battery energy balance, night-cycle reserve and wind-aware station-keeping plan.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:2",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Wing structural failure in gust or launch handling",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 135; mitigation: Aeroelastic analysis, ground load test and launch/recovery handling limits.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:3",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Lost command link or uncontrolled descent",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 120; mitigation: Redundant telemetry, autonomous return/loiter logic, geofence and recovery parachute.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    }
+  ]
+}

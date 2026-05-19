@@ -1,0 +1,1253 @@
+{
+  "summary": {
+    "activities": 39,
+    "readyForReview": 27,
+    "open": 4,
+    "blocked": 8,
+    "designReviewActivities": 10,
+    "calculationActivities": 7,
+    "interfaceReviewActivities": 10,
+    "sourceEvidenceActivities": 8,
+    "complianceReviewActivities": 4
+  },
+  "activities": [
+    {
+      "id": "design_review:skin_patient_interface",
+      "moduleId": "skin_patient_interface",
+      "moduleName": "Skin Patient Interface",
+      "activity": "Review Skin Patient Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wear_days"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "interfaceIds": [
+        "adhesive_skin_boundary",
+        "interstitial_fluid_path",
+        "sterile_boundary",
+        "insertion_path",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "adhesive_skin_patch",
+        "hydrocolloid_edge_seal",
+        "breathable_backing_film",
+        "pull_tab_liner",
+        "skin_contact_gasket",
+        "filament_entry_seal",
+        "antimicrobial_contact_pad",
+        "insertion_site_spacing_ring",
+        "flex_relief_bridge",
+        "sweat_channel_texture",
+        "patch_stretch_zone",
+        "removal_aid_tab"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:skin_patient_interface",
+      "moduleId": "skin_patient_interface",
+      "moduleName": "Skin Patient Interface",
+      "activity": "Verify Skin Patient Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wear_days"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:skin_patient_interface",
+      "moduleId": "skin_patient_interface",
+      "moduleName": "Skin Patient Interface",
+      "activity": "Collect source-backed evidence for Skin Patient Interface critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "wear_days"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "adhesive_skin_patch"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "adhesive_skin_patch"
+      ]
+    },
+    {
+      "id": "design_review:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Glucose Sensing Instrumentation",
+      "activity": "Review Glucose Sensing Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "interfaceIds": [
+        "interstitial_fluid_path",
+        "electrode_signal_path",
+        "sensor_signal_bus",
+        "calibration_data_bus",
+        "analog_power_rail",
+        "temperature_compensation_bus"
+      ],
+      "componentWordIds": [
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode",
+        "diffusion_limiting_membrane",
+        "potentiostat_afe",
+        "low_leakage_input_guard",
+        "electrode_flex_tail",
+        "sensor_bias_resistor_network",
+        "calibration_data_eeprom",
+        "drift_estimator_firmware_table",
+        "factory_calibration_code",
+        "signal_integrity_test_pad"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Glucose Sensing Instrumentation",
+      "activity": "Verify Glucose Sensing Instrumentation requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Glucose Sensing Instrumentation",
+      "activity": "Collect source-backed evidence for Glucose Sensing Instrumentation critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode"
+      ]
+    },
+    {
+      "id": "design_review:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Applicator Insertion Mechanism",
+      "activity": "Review Applicator Insertion Mechanism architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "insertion_path",
+        "sterile_boundary",
+        "user_trigger",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "disposable_applicator",
+        "spring_insertion_driver",
+        "trigger_button",
+        "safety_cap",
+        "introducer_needle",
+        "filament_deployment_shuttle",
+        "depth_stop_collar",
+        "retraction_latch",
+        "needle_shield",
+        "post_use_lock_tab",
+        "applicator_status_window",
+        "trigger_interlock_spring"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Applicator Insertion Mechanism",
+      "activity": "Collect source-backed evidence for Applicator Insertion Mechanism critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "disposable_applicator"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "disposable_applicator"
+      ]
+    },
+    {
+      "id": "design_review:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Transmitter Housing Structure",
+      "activity": "Review Transmitter Housing Structure architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "electronics_mount",
+        "ingress_boundary",
+        "adhesive_skin_boundary",
+        "service_access",
+        "insertion_path"
+      ],
+      "componentWordIds": [
+        "protective_transmitter_housing",
+        "ultrasonic_weld_seam",
+        "electronics_carrier_tray",
+        "ingress_gasket",
+        "flexible_patch_frame",
+        "sensor_port_boss",
+        "transmitter_latch_rail",
+        "strain_relief_web",
+        "hydrophobic_vent_membrane",
+        "ip_ingress_seal",
+        "splash_shield_lip",
+        "housing_serial_marking"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Transmitter Housing Structure",
+      "activity": "Collect source-backed evidence for Transmitter Housing Structure critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "protective_transmitter_housing"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "protective_transmitter_housing"
+      ]
+    },
+    {
+      "id": "design_review:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Wearable Energy Source",
+      "activity": "Review Wearable Energy Source architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wear_days"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "interfaceIds": [
+        "cell_power_bus",
+        "service_access",
+        "lot_traceability"
+      ],
+      "componentWordIds": [
+        "thin_film_battery",
+        "battery_weld_tab",
+        "battery_pouch_insulator",
+        "state_of_charge_witness_pad",
+        "brownout_hold_up_capacitor",
+        "battery_cut_off_tab",
+        "shelf_life_isolation_film",
+        "activation_pull_strip",
+        "battery_vent_clearance",
+        "reverse_polarity_fuse",
+        "pack_temperature_dot",
+        "battery_lot_barcode"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Wearable Energy Source",
+      "activity": "Verify Wearable Energy Source requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wear_days"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Wearable Energy Source",
+      "activity": "Collect source-backed evidence for Wearable Energy Source critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "wear_days"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "thin_film_battery"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "thin_film_battery"
+      ]
+    },
+    {
+      "id": "design_review:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Low-Power Distribution",
+      "activity": "Review Low-Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "reading_interval_minutes"
+      ],
+      "sanityCheckIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety"
+      ],
+      "interfaceIds": [
+        "cell_power_bus",
+        "low_power_rail",
+        "analog_power_rail",
+        "hardwired_trip",
+        "sensor_signal_bus"
+      ],
+      "componentWordIds": [
+        "nanoamp_power_switch",
+        "digital_buck_regulator",
+        "rail_measurement_divider",
+        "wake_timer_oscillator",
+        "sensor_excitation_mux",
+        "analog_power_filter",
+        "electrode_guard_driver",
+        "afe_wake_timer",
+        "hardwired_reset_supervisor",
+        "overcurrent_limiter",
+        "load_gate_transistor",
+        "fault_latch"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Low-Power Distribution",
+      "activity": "Verify Low-Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "reading_interval_minutes"
+      ],
+      "sanityCheckIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "activity": "Review Control Compute Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "interfaceIds": [
+        "sensor_signal_bus",
+        "calibration_data_bus",
+        "ble_link",
+        "alarm_state_bus",
+        "low_power_rail",
+        "temperature_compensation_bus"
+      ],
+      "componentWordIds": [
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock",
+        "ble_radio_module",
+        "printed_antenna",
+        "pairing_button_pad",
+        "encrypted_session_counter",
+        "glucose_trend_buffer_flash",
+        "event_log_memory",
+        "calibration_data_bus_bridge",
+        "clock_drift_compensator"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "activity": "Verify Control Compute Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "activity": "Collect source-backed evidence for Control Compute Communication critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "low_power_microcontroller",
+        "ble_radio_module"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "low_power_microcontroller",
+        "ble_radio_module"
+      ]
+    },
+    {
+      "id": "design_review:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Wear Environment Compensation",
+      "activity": "Review Wear Environment Compensation architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wear_days",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target",
+        "cgm_biofluid_signal_closure"
+      ],
+      "interfaceIds": [
+        "temperature_compensation_bus",
+        "ingress_boundary",
+        "adhesive_skin_boundary",
+        "sensor_signal_bus"
+      ],
+      "componentWordIds": [
+        "temperature_sensor",
+        "thermal_model_table",
+        "skin_temperature_flex_tail",
+        "cold_start_delay_flag",
+        "sweat_barrier_film",
+        "condensation_drain_groove",
+        "humidity_indicator_dot",
+        "ingress_exposure_witness",
+        "motion_artefact_filter_table",
+        "patch_pressure_relief_slot",
+        "compression_warning_marker",
+        "activity_context_accelerometer"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Wear Environment Compensation",
+      "activity": "Verify Wear Environment Compensation requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wear_days",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target",
+        "cgm_biofluid_signal_closure"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Wear Environment Compensation",
+      "activity": "Collect source-backed evidence for Wear Environment Compensation critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "wear_days",
+        "mard_percent"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "temperature_sensor"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "temperature_sensor"
+      ]
+    },
+    {
+      "id": "design_review:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Patient Safety Protection",
+      "activity": "Review Patient Safety Protection architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wear_days"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "interfaceIds": [
+        "alarm_state_bus",
+        "sterile_boundary",
+        "adhesive_skin_boundary",
+        "hardwired_trip",
+        "service_access",
+        "sensor_signal_bus"
+      ],
+      "componentWordIds": [
+        "hypoglycaemia_alarm_state",
+        "hyperglycaemia_alarm_state",
+        "sensor_fault_classifier",
+        "stale_data_lockout",
+        "biocompatibility_material_record",
+        "adhesive_irritation_limit_tag",
+        "latex_free_label",
+        "skin_contact_change_log",
+        "sterile_boundary_indicator",
+        "sharps_injury_warning_label",
+        "applicator_disposal_instruction",
+        "tamper_evident_seal"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Patient Safety Protection",
+      "activity": "Verify Patient Safety Protection requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "wear_days"
+      ],
+      "sanityCheckIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Packaging Traceability Serviceability",
+      "activity": "Review Packaging Traceability Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sterile_boundary",
+        "lot_traceability",
+        "service_access",
+        "ble_link"
+      ],
+      "componentWordIds": [
+        "sterile_barrier_pouch",
+        "desiccant_sachet",
+        "pouch_seal_indicator",
+        "expiry_date_label",
+        "udi_label_set",
+        "ifu_leaflet",
+        "lot_traceability_barcode",
+        "release_inspection_stamp",
+        "phone_pairing_qr_card",
+        "applicator_instruction_card",
+        "sensor_warm_up_timer_label",
+        "adhesive_removal_wipe"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Packaging Traceability Serviceability",
+      "activity": "Collect source-backed evidence for Packaging Traceability Serviceability critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "sterile_barrier_pouch",
+        "udi_label_set"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "sterile_barrier_pouch",
+        "udi_label_set"
+      ]
+    },
+    {
+      "id": "interface_review:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+      "moduleId": "skin_patient_interface:sensing_instrumentation",
+      "moduleName": "Skin Patient Interface -> Glucose Sensing Instrumentation",
+      "activity": "Verify interstitial_fluid_path interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "interstitial_fluid_path"
+      ],
+      "componentWordIds": [
+        "adhesive_skin_patch",
+        "hydrocolloid_edge_seal",
+        "breathable_backing_film",
+        "pull_tab_liner",
+        "skin_contact_gasket",
+        "filament_entry_seal",
+        "antimicrobial_contact_pad",
+        "insertion_site_spacing_ring",
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode",
+        "diffusion_limiting_membrane"
+      ],
+      "rationale": "Sensor chemistry must access interstitial fluid through a declared patient interface.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:actuation_kinematics:skin_patient_interface:insertion_path",
+      "moduleId": "actuation_kinematics:skin_patient_interface",
+      "moduleName": "Applicator Insertion Mechanism -> Skin Patient Interface",
+      "activity": "Verify insertion_path interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "insertion_path"
+      ],
+      "componentWordIds": [
+        "disposable_applicator",
+        "spring_insertion_driver",
+        "trigger_button",
+        "safety_cap",
+        "introducer_needle",
+        "filament_deployment_shuttle",
+        "depth_stop_collar",
+        "retraction_latch",
+        "skin_contact_gasket",
+        "filament_entry_seal",
+        "antimicrobial_contact_pad",
+        "insertion_site_spacing_ring"
+      ],
+      "rationale": "Applicator insertion path must align with the adhesive patch and skin boundary.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:sensing_instrumentation:control_compute_communication:sensor_signal_bus",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Glucose Sensing Instrumentation -> Control Compute Communication",
+      "activity": "Verify sensor_signal_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_signal_bus"
+      ],
+      "componentWordIds": [
+        "potentiostat_afe",
+        "low_leakage_input_guard",
+        "electrode_flex_tail",
+        "sensor_bias_resistor_network",
+        "calibration_data_eeprom",
+        "drift_estimator_firmware_table",
+        "factory_calibration_code",
+        "signal_integrity_test_pad",
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock",
+        "glucose_trend_buffer_flash",
+        "event_log_memory",
+        "calibration_data_bus_bridge",
+        "clock_drift_compensator"
+      ],
+      "rationale": "Analog sensing output must feed the processing and telemetry stack.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:sensing_instrumentation:control_compute_communication:calibration_data_bus",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Glucose Sensing Instrumentation -> Control Compute Communication",
+      "activity": "Verify calibration_data_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "calibration_data_bus"
+      ],
+      "componentWordIds": [
+        "calibration_data_eeprom",
+        "drift_estimator_firmware_table",
+        "factory_calibration_code",
+        "signal_integrity_test_pad",
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock",
+        "glucose_trend_buffer_flash",
+        "event_log_memory",
+        "calibration_data_bus_bridge",
+        "clock_drift_compensator"
+      ],
+      "rationale": "Factory calibration and drift state must be visible to the reader algorithm.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:energy_storage_source:power_distribution:cell_power_bus",
+      "moduleId": "energy_storage_source:power_distribution",
+      "moduleName": "Wearable Energy Source -> Low-Power Distribution",
+      "activity": "Verify cell_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "cell_power_bus"
+      ],
+      "componentWordIds": [
+        "thin_film_battery",
+        "battery_weld_tab",
+        "battery_pouch_insulator",
+        "state_of_charge_witness_pad",
+        "brownout_hold_up_capacitor",
+        "battery_cut_off_tab",
+        "shelf_life_isolation_film",
+        "activation_pull_strip",
+        "battery_vent_clearance",
+        "reverse_polarity_fuse",
+        "pack_temperature_dot",
+        "battery_lot_barcode",
+        "nanoamp_power_switch",
+        "digital_buck_regulator",
+        "rail_measurement_divider",
+        "wake_timer_oscillator",
+        "sensor_excitation_mux",
+        "analog_power_filter",
+        "electrode_guard_driver",
+        "afe_wake_timer"
+      ],
+      "rationale": "Battery output must feed protected low-power rails.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:power_distribution:sensing_instrumentation:analog_power_rail",
+      "moduleId": "power_distribution:sensing_instrumentation",
+      "moduleName": "Low-Power Distribution -> Glucose Sensing Instrumentation",
+      "activity": "Verify analog_power_rail interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "analog_power_rail"
+      ],
+      "componentWordIds": [
+        "sensor_excitation_mux",
+        "analog_power_filter",
+        "electrode_guard_driver",
+        "afe_wake_timer",
+        "hardwired_reset_supervisor",
+        "overcurrent_limiter",
+        "load_gate_transistor",
+        "fault_latch",
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode",
+        "diffusion_limiting_membrane",
+        "potentiostat_afe",
+        "low_leakage_input_guard",
+        "electrode_flex_tail",
+        "sensor_bias_resistor_network"
+      ],
+      "rationale": "Electrochemical analog front-end needs a low-noise supply path.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:power_distribution:control_compute_communication:low_power_rail",
+      "moduleId": "power_distribution:control_compute_communication",
+      "moduleName": "Low-Power Distribution -> Control Compute Communication",
+      "activity": "Verify low_power_rail interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "low_power_rail"
+      ],
+      "componentWordIds": [
+        "nanoamp_power_switch",
+        "digital_buck_regulator",
+        "rail_measurement_divider",
+        "wake_timer_oscillator",
+        "hardwired_reset_supervisor",
+        "overcurrent_limiter",
+        "load_gate_transistor",
+        "fault_latch",
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock",
+        "ble_radio_module",
+        "printed_antenna",
+        "pairing_button_pad",
+        "encrypted_session_counter"
+      ],
+      "rationale": "MCU and BLE telemetry need duty-cycled digital power.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:environmental_interface:control_compute_communication:temperature_compensation_bus",
+      "moduleId": "environmental_interface:control_compute_communication",
+      "moduleName": "Wear Environment Compensation -> Control Compute Communication",
+      "activity": "Verify temperature_compensation_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "temperature_compensation_bus"
+      ],
+      "componentWordIds": [
+        "temperature_sensor",
+        "thermal_model_table",
+        "skin_temperature_flex_tail",
+        "cold_start_delay_flag",
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock"
+      ],
+      "rationale": "Body-temperature context must feed the glucose compensation algorithm.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:control_compute_communication:safety_protection:alarm_state_bus",
+      "moduleId": "control_compute_communication:safety_protection",
+      "moduleName": "Control Compute Communication -> Patient Safety Protection",
+      "activity": "Verify alarm_state_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "alarm_state_bus"
+      ],
+      "componentWordIds": [
+        "ble_radio_module",
+        "printed_antenna",
+        "pairing_button_pad",
+        "encrypted_session_counter",
+        "glucose_trend_buffer_flash",
+        "event_log_memory",
+        "calibration_data_bus_bridge",
+        "clock_drift_compensator",
+        "hypoglycaemia_alarm_state",
+        "hyperglycaemia_alarm_state",
+        "sensor_fault_classifier",
+        "stale_data_lockout"
+      ],
+      "rationale": "Patient alarm and stale-data states must route through safety logic.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:maintenance_serviceability:skin_patient_interface:sterile_boundary",
+      "moduleId": "maintenance_serviceability:skin_patient_interface",
+      "moduleName": "Packaging Traceability Serviceability -> Skin Patient Interface",
+      "activity": "Verify sterile_boundary interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sterile_boundary"
+      ],
+      "componentWordIds": [
+        "sterile_barrier_pouch",
+        "desiccant_sachet",
+        "pouch_seal_indicator",
+        "expiry_date_label",
+        "adhesive_skin_patch",
+        "hydrocolloid_edge_seal",
+        "breathable_backing_film",
+        "pull_tab_liner",
+        "skin_contact_gasket",
+        "filament_entry_seal",
+        "antimicrobial_contact_pad",
+        "insertion_site_spacing_ring"
+      ],
+      "rationale": "Sterile packaging evidence must connect to the patient-contact boundary.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "compliance_review:ISO-10993",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for ISO-10993",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Biological evaluation of patient-contacting materials",
+      "acceptanceCriteria": [
+        "Skin-contact material, adhesive and wear-duration biocompatibility evidence."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:ISO-14971",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for ISO-14971",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Medical-device risk management",
+      "acceptanceCriteria": [
+        "Hazard analysis, risk controls and residual-risk acceptability."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:IEC-62304",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for IEC-62304",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Medical-device software lifecycle",
+      "acceptanceCriteria": [
+        "Software architecture, risk class, verification and release evidence."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:IEC-60601-1",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for IEC-60601-1",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Medical electrical equipment safety reference",
+      "acceptanceCriteria": [
+        "Electrical safety, leakage, power source and abnormal-operation evidence tailored to wearable use."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    }
+  ]
+}

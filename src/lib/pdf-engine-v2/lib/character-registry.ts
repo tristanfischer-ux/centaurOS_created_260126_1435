@@ -219,6 +219,60 @@ export async function getCharactersFromRegistry(
 }
 
 /**
+ * Phase C (2026-05-15): fetch top-N registry rows for a given product class,
+ * ordered by source_grade strength (verified > priced > canonical > plausible >
+ * unverified) and confidence_score. Used by serial-design-chain-v2 to pre-seed
+ * reviewer prompts with known components for the target product class so
+ * reviewers prefer matching existing parts over inventing new ones.
+ *
+ * Empty registry for a class → empty array (graceful degradation: reviewers
+ * just skip the KNOWN_COMPONENTS block when no seed data is available).
+ */
+export async function getRegistryByProductClass(
+  productClass: string,
+  limit = 60,
+): Promise<CharacterRegistryRow[]> {
+  if (!productClass) return []
+  const sb = getSupabase()
+  try {
+    const { data, error } = await sb
+      .from('character_registry')
+      .select(REGISTRY_SELECT_COLUMNS)
+      .contains('product_classes', [productClass])
+      // PostgREST .order() lets us sort by source_grade ENUM directly — Supabase
+      // returns enum strings in alphabetical order which is NOT our priority
+      // order; we'll sort client-side after fetching. Fetch a larger buffer
+      // and slice after ranking.
+      .limit(Math.max(limit * 2, 100))
+    if (error) {
+      console.warn(`[character-registry] product_class lookup failed (${productClass}): ${error.message}`)
+      return []
+    }
+    const rows: CharacterRegistryRow[] = []
+    for (const raw of (data ?? []) as unknown as Record<string, unknown>[]) {
+      const row = normaliseRow(raw)
+      if (row) rows.push(row)
+    }
+    // Rank by source_grade strength + confidence_score
+    const gradeRank: Record<CharacterRegistrySourceGrade, number> = {
+      verified: 5, priced: 4, canonical: 3, plausible: 2, unverified: 1,
+    }
+    rows.sort((a, b) => {
+      const ga = gradeRank[a.source_grade] ?? 0
+      const gb = gradeRank[b.source_grade] ?? 0
+      if (ga !== gb) return gb - ga
+      const ca = a.confidence_score ?? 0
+      const cb = b.confidence_score ?? 0
+      return cb - ca
+    })
+    return rows.slice(0, limit)
+  } catch (err) {
+    console.warn(`[character-registry] product_class lookup threw (${productClass}): ${(err as Error).message}`)
+    return []
+  }
+}
+
+/**
  * Upsert a discovery into the registry.
  *
  * On conflict (character_id is UNIQUE):

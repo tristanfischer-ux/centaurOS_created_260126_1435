@@ -1,0 +1,480 @@
+{
+  "summary": {
+    "rows": 30,
+    "briefSupported": 1,
+    "modelPresent": 6,
+    "reviewRequired": 8,
+    "sourceRequired": 15,
+    "blocked": 0,
+    "architectureBlockers": 0,
+    "bomBlockers": 15
+  },
+  "rows": [
+    {
+      "linkedRequirements": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:dc_power_kw",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "DC output power",
+      "assumption": "DC output power = 120 kW is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "metric:headline_output",
+      "category": "derived_metric",
+      "status": "review_required",
+      "scope": "Annual energy dispensed",
+      "assumption": "Annual energy dispensed uses dc_power_kw * equivalent_full_power_hours_per_day * days_per_year with medium confidence.",
+      "basis": "class_pack:ev_charger.class_pack; formula:dc_power_kw * equivalent_full_power_hours_per_day * days_per_year",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:capex_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated CAPEX",
+      "assumption": "Estimated CAPEX uses an implicit model with low confidence.",
+      "basis": "formula:capex=sum(bom.totalCostGbp); class_pack:ev_charger.class_pack",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:opex_annual_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated annual OPEX",
+      "assumption": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "basis": "formula:opex=capex*0.04",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:evcharger_power_level",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "DC Charger Power Level",
+      "assumption": "DC Charger Power Level currently evaluates as pass against 50 to 350 kW for common public DC fast-charger classes; >350 kW needs heavier cable, grid and cooling evidence.",
+      "basis": "brief:input.brief; model:engineering_sanity.ev_charger; model:engineering_sanity.ev_charger",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:evcharger_protocol_closure",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Vehicle/Backend Protocol Closure",
+      "assumption": "Vehicle/Backend Protocol Closure currently evaluates as pass against CCS2, ISO 15118 PLC, OCPP network and metering bus present.",
+      "basis": "model:engineering_sanity.ev_charger; model:engineering_sanity.ev_charger",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "dc_power_kw"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:evcharger_power_safety_chain",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Power And Safety Chain",
+      "assumption": "Power And Safety Chain currently evaluates as pass against AC input, DC output, cooling, insulation monitoring, emergency stop and protective earth present.",
+      "basis": "model:engineering_sanity.ev_charger; model:engineering_sanity.ev_charger",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "ac_input_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:power_distribution:energy_conversion_transduction:ac_input_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "power_distribution -> energy_conversion_transduction",
+      "assumption": "ac_input_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Grid input switchgear must feed the power-conversion stack over a protected AC bus.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "dc_output_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:energy_conversion_transduction:charging_connector_interface:dc_output_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "energy_conversion_transduction -> charging_connector_interface",
+      "assumption": "dc_output_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Power modules must feed the CCS2 connector over a protected DC output bus.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "iso15118_plc"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:charging_connector_interface:iso15118_plc",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> charging_connector_interface",
+      "assumption": "iso15118_plc is named on both endpoint modules in the generated architecture.",
+      "basis": "Charge controller must communicate with the vehicle for ISO 15118 / PLC handshakes.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "control_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:energy_conversion_transduction:control_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> energy_conversion_transduction",
+      "assumption": "control_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Charge controller must command power module output states.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "metering_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:sensing_instrumentation:control_compute_communication:metering_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "assumption": "metering_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Energy and safety measurements must feed session control and billing.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "coolant_loop"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:environmental_interface:energy_conversion_transduction:coolant_loop",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "environmental_interface -> energy_conversion_transduction",
+      "assumption": "coolant_loop is named on both endpoint modules in the generated architecture.",
+      "basis": "Power conversion heat must couple into the charger cooling loop.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "ac_input_breaker_and_spd"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:power_distribution_ac_input_switchgear_ac_input_breaker_and_spd",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "AC input breaker and SPD",
+      "assumption": "AC input breaker and SPD is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "dc_output_contactor_set"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:power_distribution_dc_output_switchgear_dc_output_contactor_set",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "DC output contactor set",
+      "assumption": "DC output contactor set is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "mid_energy_meter"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:power_distribution_billing_metering_branch_mid_energy_meter",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "MID energy meter",
+      "assumption": "MID energy meter is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "power_module_stack"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_conversion_transduction_rectifier_power_modules_power_module_stack",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Power module stack",
+      "assumption": "Power module stack is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "ccs2_liquid_cooled_cable_and_connector"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:charging_connector_interface_ccs2_cable_connector_ccs2_liquid_cooled_cable_and_connector",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "CCS2 liquid-cooled cable and connector",
+      "assumption": "CCS2 liquid-cooled cable and connector is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "iso_15118_plc_modem"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:charging_connector_interface_vehicle_communication_frontend_iso_15118_plc_modem",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "ISO 15118 PLC modem",
+      "assumption": "ISO 15118 PLC modem is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "ocpp_communications_gateway"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_backend_gateway_ocpp_communications_gateway",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "OCPP communications gateway",
+      "assumption": "OCPP communications gateway is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "iso_15118_plc_modem"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_protocol_stack_iso_15118_plc_modem",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "ISO 15118 PLC modem",
+      "assumption": "ISO 15118 PLC modem is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "mid_energy_meter"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_energy_metering_mid_energy_meter",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "MID energy meter",
+      "assumption": "MID energy meter is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "insulation_monitoring_device"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_insulation_fault_detection_insulation_monitoring_device",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Insulation monitoring device",
+      "assumption": "Insulation monitoring device is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "cooling_loop_assembly"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_liquid_cooling_loop_cooling_loop_assembly",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Cooling loop assembly",
+      "assumption": "Cooling loop assembly is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "emergency_stop_and_safety_interlock_set"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:safety_protection_emergency_stop_chain_emergency_stop_and_safety_interlock_set",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Emergency stop and safety interlock set",
+      "assumption": "Emergency stop and safety interlock set is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "insulation_monitoring_device"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:safety_protection_dc_fault_protection_insulation_monitoring_device",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Insulation monitoring device",
+      "assumption": "Insulation monitoring device is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.ev_charger",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:IEC-61851",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "IEC-61851",
+      "assumption": "Conductive charging system requirements is relevant to this product class in UK/EU.",
+      "basis": "class_pack:ev_charger.class_pack",
+      "evidenceRequired": "Charging modes, control pilot and safety-function evidence."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:IEC-62196-3",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "IEC-62196-3",
+      "assumption": "DC vehicle connector requirements is relevant to this product class in UK/EU.",
+      "basis": "class_pack:ev_charger.class_pack",
+      "evidenceRequired": "CCS2 connector rating, cable assembly and temperature evidence."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:ISO-15118",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "ISO-15118",
+      "assumption": "Vehicle-to-grid communication interface is relevant to this product class in Global / EU.",
+      "basis": "class_pack:ev_charger.class_pack",
+      "evidenceRequired": "PLC communication, Plug and Charge and session-state evidence where applicable."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:OCPP-1.6J/2.0.1",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "OCPP-1.6J/2.0.1",
+      "assumption": "Charge point backend protocol is relevant to this product class in Operator requirement.",
+      "basis": "class_pack:ev_charger.class_pack",
+      "evidenceRequired": "Backend session, metering, fault and firmware-management evidence."
+    }
+  ]
+}

@@ -25,6 +25,8 @@
  * All callers go through these — no per-tier ad-hoc merging.
  */
 
+import { scoreModuleAllGates, scoreCrossModuleAllGates } from './class-arithmetic-gates'
+import { getClassReferenceGraph } from '../class-reference-graph.js'
 import type {
   ModuleBrief,
   ModuleSpec,
@@ -238,6 +240,17 @@ export function synthesiseTier2Modules(
       if (v.module_brief.length > bestBrief.length) bestBrief = v.module_brief
     }
 
+    // overview_paragraph_en (Tristan unified-prose 2026-05-13): pick the variant
+    // with the highest numeric-coherence score against the synthesised
+    // derived_parameters (which are computed below). Two-pass: first collect
+    // the overview variants, then score after derived_parameters is built.
+    const overviewVariants: string[] = []
+    for (const v of variants) {
+      if (typeof v.overview_paragraph_en === 'string' && v.overview_paragraph_en.length > 0) {
+        overviewVariants.push(v.overview_paragraph_en)
+      }
+    }
+
     // derived_parameters: numeric median, string modal
     const allKeys = new Set<string>()
     for (const v of variants) {
@@ -296,9 +309,41 @@ export function synthesiseTier2Modules(
     }
     const secondary = secSet.size > 0 ? Array.from(secSet) : undefined
 
+    // Pick best overview_paragraph_en (Tristan unified-prose 2026-05-13).
+    // Score = count of derived_parameters numeric values that appear in the
+    // paragraph within ±2 % tolerance. Tie-break on length (more detail).
+    let bestOverview: string | undefined
+    if (overviewVariants.length > 0) {
+      const derivedNumbers: number[] = []
+      for (const v of Object.values(derived)) {
+        if (typeof v === 'number' && Number.isFinite(v)) derivedNumbers.push(v)
+      }
+      let bestScore = -1
+      let bestLen = -1
+      for (const ov of overviewVariants) {
+        const parsed = (ov.match(/-?\d[\d,]*(\.\d+)?/g) ?? []).map(s => Number(s.replace(/,/g, '')))
+        let hits = 0
+        for (const target of derivedNumbers) {
+          if (target === 0) continue
+          for (const p of parsed) {
+            if (Number.isFinite(p) && Math.abs(p - target) / Math.abs(target) <= 0.02) {
+              hits++
+              break
+            }
+          }
+        }
+        if (hits > bestScore || (hits === bestScore && ov.length > bestLen)) {
+          bestScore = hits
+          bestLen = ov.length
+          bestOverview = ov
+        }
+      }
+    }
+
     includedModules.push({
       module: mod,
       module_brief: bestBrief,
+      overview_paragraph_en: bestOverview,
       derived_parameters: derived,
       allowed_radicals: allowedRadicals,
       applicability_confidence: appConf,
@@ -1177,106 +1222,90 @@ function synthesiseQuantityModifierMulti(
   return { multiplicity: best, agreement: 'minority', rawValues }
 }
 
+
+// scoreVariantForAnchor / scoreCrossModuleForAnchor REMOVED 2026-05-14
+// (Tristan: universal restructure after council). Per-module + cross-module
+// scoring now lives in ../radical/class-arithmetic-gates.ts as a class-driven
+// registry, so heat-pump / vertical-farm / etc. get their own arithmetic
+// gates instead of having BESS-only checks applied to them. See
+// pickGlobalAnchor below for the active selection logic.
+
+
 /**
- * Synthesise a single ModuleSpec from N emitter variants. All variants share
- * the same `module` key (matched by majority vote upstream).
+ * Pick the GLOBAL anchor emitter from a list of payloads. The winner takes
+ * ALL modules. Per-module override is permitted ONLY when the global winner
+ * arithmetic-FAILS a specific module and another emitter passes it cleanly.
+ *
+ * Returns the chosen module list (already overridden where needed), plus
+ * telemetry for the synthesis notes.
+ *
+ * Tristan/Grok/Opus council 2026-05-13: replaces per-module anchor selection,
+ * which fabricated cross-module conflicts between independently-picked
+ * emitters that then needed Grok repair to reconcile.
  */
-function synthesiseModule(
-  moduleKey: UniversalModule,
-  variants: ModuleSpec[],
-  speakingEmitters: number,
+function pickGlobalAnchor(
+  payloads: MultiEmitterDecompositionPayload[],
+  productClass: string | null | undefined,
   notes: string[],
-): ModuleSpec {
-  // module_brief: longest
-  let bestBrief = variants[0].module_brief
-  for (const v of variants) {
-    if (v.module_brief.length > bestBrief.length) bestBrief = v.module_brief
-  }
-
-  // derived_parameters: numeric median, string modal
-  const allKeys = new Set<string>()
-  for (const v of variants) {
-    for (const k of Object.keys(v.derived_parameters ?? {})) allKeys.add(k)
-  }
-  const derived: DerivedParameters = {}
-  for (const k of allKeys) {
-    const numeric: number[] = []
-    const stringVals: string[] = []
-    for (const v of variants) {
-      const val = v.derived_parameters?.[k]
-      if (typeof val === 'number') numeric.push(val)
-      else if (typeof val === 'string') stringVals.push(val)
+): { modules: ModuleSpec[]; winnerIdx: number } {
+  const scored = payloads.map((p, idx) => {
+    let total = 0
+    const perModule: string[] = []
+    for (const m of p.modules ?? []) {
+      const r = scoreModuleAllGates(m, productClass)
+      total += r.score
+      perModule.push(`${m.module}=${r.score}`)
     }
-    if (numeric.length > 0) {
-      const m = median(numeric)
-      if (m !== null) derived[k] = m
-    } else if (stringVals.length > 0) {
-      const modal = modalString(stringVals)
-      if (modal !== null) derived[k] = modal
+    const cross = scoreCrossModuleAllGates(p.modules ?? [], productClass)
+    total += cross.score
+    return { idx, total, payload: p, perModule, cross }
+  })
+  scored.sort((a, b) => b.total - a.total)
+  const winner = scored[0]
+  notes.push(`[global-anchor] productClass=${productClass ?? 'unknown'} emitter#${winner.idx} wins with score ${winner.total} (cross-module ${winner.cross.score})`)
+  for (const r of winner.cross.reasons) notes.push(`[global-anchor] ${r}`)
+  for (let i = 1; i < Math.min(scored.length, 5); i++) {
+    notes.push(`[global-anchor] runner-up emitter#${scored[i].idx} score=${scored[i].total}`)
+  }
+
+  // Per-module override on arithmetic FAIL
+  const winnerModules = winner.payload.modules ?? []
+  const finalModules: ModuleSpec[] = []
+  for (const wMod of winnerModules) {
+    const wScore = scoreModuleAllGates(wMod, productClass).score
+    if (wScore >= 0) {
+      finalModules.push(wMod)
+      continue
     }
-  }
-
-  // allowed_radicals: union
-  const radicalSet = new Set<string>()
-  for (const v of variants) {
-    for (const r of v.allowed_radicals ?? []) radicalSet.add(r)
-  }
-
-  // applicability_confidence: median rank
-  const confRank: Record<ApplicabilityConfidence, number> = { low: 0, medium: 1, high: 2 }
-  const confValues = variants.map(v => confRank[v.applicability_confidence] ?? 0)
-  const medConf = median(confValues)
-  let appConf: ApplicabilityConfidence = 'low'
-  if (medConf !== null) {
-    const rounded = Math.round(medConf)
-    appConf = rounded >= 2 ? 'high' : rounded >= 1 ? 'medium' : 'low'
-  }
-
-  // secondary_modules: union
-  const secSet = new Set<UniversalModule>()
-  for (const v of variants) {
-    for (const s of v.secondary_modules ?? []) secSet.add(s)
-  }
-  const secondary = secSet.size > 0 ? Array.from(secSet) : undefined
-
-  // sub_modules: union by id (any emitter contributes)
-  const subById = new Map<string, SubModuleSpec[]>()
-  for (const v of variants) {
-    for (const sm of v.sub_modules ?? []) {
-      const arr = subById.get(sm.id) ?? []
-      arr.push(sm)
-      subById.set(sm.id, arr)
+    // Winner fails on this module — look for a cleaner override
+    let override: ModuleSpec | null = null
+    let overrideScore = wScore
+    for (const cand of scored.slice(1)) {
+      const candMod = (cand.payload.modules ?? []).find(m => m.module === wMod.module)
+      if (!candMod) continue
+      const cScore = scoreModuleAllGates(candMod, productClass).score
+      if (cScore > overrideScore) {
+        overrideScore = cScore
+        override = candMod
+      }
+    }
+    if (override) {
+      notes.push(`[global-anchor] module ${wMod.module}: winner score ${wScore} too low; overrode with emitter score ${overrideScore}`)
+      finalModules.push(override)
+    } else {
+      notes.push(`[global-anchor] module ${wMod.module}: winner score ${wScore} but no better override available`)
+      finalModules.push(wMod)
     }
   }
-  const subModules: SubModuleSpec[] = []
-  for (const [subId, smVariants] of subById) {
-    const merged = synthesiseSubModule(subId, smVariants, speakingEmitters, notes)
-    if (merged) subModules.push(merged)
-  }
-
-  // grammar_links: union, dedupe by (from, to, mechanism)
-  const glSeen = new Set<string>()
-  const grammarLinks: GrammarLink[] = []
-  for (const v of variants) {
-    for (const gl of v.grammar_links ?? []) {
-      const key = `${gl.from_sub_module}::${gl.to_sub_module}::${gl.mechanism}::${gl.type}`
-      if (glSeen.has(key)) continue
-      glSeen.add(key)
-      grammarLinks.push(gl)
-    }
-  }
-
-  return {
-    module: moduleKey,
-    module_brief: bestBrief,
-    derived_parameters: derived,
-    allowed_radicals: Array.from(radicalSet),
-    applicability_confidence: appConf,
-    secondary_modules: secondary,
-    sub_modules: subModules,
-    grammar_links: grammarLinks,
-  }
+  return { modules: finalModules, winnerIdx: winner.idx }
 }
+
+// synthesiseModule(): REMOVED 2026-05-14 (council Sonnet seat B1, Opus seat
+// concur). After the global-anchor refactor `synthesiseMultiEmitterDecomposition`
+// no longer calls per-module synthesis — pickGlobalAnchor returns the winning
+// emitter's modules as-is. The previous function had a latent crash on empty
+// variants and a dead median-merge branch; rather than guard the dead code we
+// delete it. See pickGlobalAnchor for the active selection logic.
 
 /**
  * Top-level monolith multi-emitter synthesiser.
@@ -1306,6 +1335,7 @@ function synthesiseModule(
 export function synthesiseMultiEmitterDecomposition(
   emitters: MultiEmitterOutput[],
   judges: JudgeVerdict[],
+  productClassHint?: string | null,
 ): MultiEmitterSynthesisResult {
   const speaking = emitters.filter(e => e.ok && e.data)
   const speakingPayloads = speaking.map(e => e.data!)
@@ -1342,30 +1372,31 @@ export function synthesiseMultiEmitterDecomposition(
     )
   }
 
-  // Module-level inclusion: majority vote ≥3 of 6 (scaled to speaking count)
+  // Module-level inclusion: majority vote ≥3 of 6 (scaled to speaking count).
+  // Used for excluded_modules threshold below; global-anchor itself takes
+  // the winning emitter's module set whole.
   const incThresh = moduleInclusionThreshold(speakingCount)
   const excThresh = excludedInclusionThreshold(speakingCount)
 
-  const moduleVotes = new Map<UniversalModule, ModuleSpec[]>()
-  for (const payload of speakingPayloads) {
-    for (const m of payload.modules ?? []) {
-      const arr = moduleVotes.get(m.module) ?? []
-      arr.push(m)
-      moduleVotes.set(m.module, arr)
-    }
-  }
+  // GLOBAL ANCHOR (Tristan/Grok/Opus council 2026-05-13): pick the single
+  // emitter whose summed arithmetic + cross-module + sub-module scores are
+  // highest, then use ALL of that emitter's modules. Per-module override
+  // only when the winner FAILS that module's arithmetic. Replaces the
+  // previous per-module anchor selection which fabricated cross-module
+  // conflicts between independently-picked emitters.
+  const anchorResult = pickGlobalAnchor(speakingPayloads, productClassHint ?? null, notes)
+  const includedModules: ModuleSpec[] = anchorResult.modules
+  const includedKeys = new Set<UniversalModule>(includedModules.map(m => m.module))
 
-  const includedModules: ModuleSpec[] = []
-  const includedKeys = new Set<UniversalModule>()
-  for (const [moduleKey, variants] of moduleVotes) {
-    if (variants.length < incThresh) {
+  // Sanity: warn (not drop) modules that ≥half of other emitters did NOT emit.
+  // Keeps the winner's full set intact while flagging unusual choices.
+  for (const m of includedModules) {
+    const supporters = speakingPayloads.filter(p => (p.modules ?? []).some(x => x.module === m.module)).length
+    if (supporters < incThresh) {
       notes.push(
-        `[multi-emitter] module "${moduleKey}" emitted by ${variants.length}/${speakingCount} (threshold ${incThresh}); dropped`,
+        `[global-anchor] module "${m.module}" emitted by only ${supporters}/${speakingCount} (typical threshold ${incThresh}); keeping per anchor winner`,
       )
-      continue
     }
-    includedModules.push(synthesiseModule(moduleKey, variants, speakingCount, notes))
-    includedKeys.add(moduleKey)
   }
 
   // Excluded: intersection — only if ≥4 of 6 emitters emit it as excluded
@@ -1375,7 +1406,7 @@ export function synthesiseMultiEmitterDecomposition(
       excVotes.set(e, (excVotes.get(e) ?? 0) + 1)
     }
   }
-  const excluded: UniversalModule[] = []
+  let excluded: UniversalModule[] = []
   for (const [m, c] of excVotes) {
     if (c >= excThresh && !includedKeys.has(m)) {
       excluded.push(m)
@@ -1384,6 +1415,138 @@ export function synthesiseMultiEmitterDecomposition(
         `[multi-emitter] module "${m}" emitted as excluded by only ${c}/${speakingCount} (threshold ${excThresh}); not added to excluded`,
       )
     }
+  }
+
+  // ── K10-8 override (Tristan 2026-05-18) ──────────────────────────────────
+  // Module-presence enforcement operates at the SYNTHESIS level, not just at
+  // the emitter-prompt level. Two conditions to fix:
+  //   (a) A module is in `excluded` but the K10 reference graph requires
+  //       edges to/from it. We must remove it from `excluded` so the
+  //       cross-link union can include the relevant edges.
+  //   (b) A module is missing from BOTH `includedModules` AND `excluded` —
+  //       e.g. the global-anchor's emitter dropped it but no excluded vote
+  //       quorum was reached. The K10 graph still requires edges to/from
+  //       this module. Pull the module spec from a speaking emitter that
+  //       DID include it (first available) and add it back.
+  //
+  // Without this override the synthesis silently drops K10-required modules
+  // and the cross_module_grammar_links union filters out every edge involving
+  // them (filter at line ~1439), producing missing_required edges in K10
+  // shadow validation even though the underlying emitters had the data.
+  //
+  // K10 graph slug resolution: try a DIRECT registry lookup first (covers
+  // already-correct slugs like `bess-utility-scale`), then a small inline
+  // alias map (covers classifier-shortened slugs like `heat_pump`). The
+  // canonical alias map lives in stages/1.7-module-decomposition.ts;
+  // duplicated here to avoid circular import. Keep in sync.
+  const k10ProductClassRaw = (productClassHint && productClassHint.trim().length > 0)
+    ? productClassHint.trim()
+    : (speakingPayloads.find(p => typeof p.product_class === 'string' && p.product_class.length > 0)?.product_class ?? '')
+  const k10ProductClassLower = k10ProductClassRaw.toLowerCase()
+  const K10_CLASS_ALIASES_SYNTH: Readonly<Record<string, string>> = {
+    'bess':                          'bess-utility-scale',
+    'energy_storage':                'bess-utility-scale',
+    'battery_energy_storage':        'bess-utility-scale',
+    'battery_energy_storage_system': 'bess-utility-scale',
+    'heat_pump':                     'heat-pump-residential',
+    'heat-pump':                     'heat-pump-residential',
+    'thermal_system':                'heat-pump-residential',
+    'vfd':                           'vfd-motor-drive',
+    'motor_drive':                   'vfd-motor-drive',
+    'ev_charger':                    'dc_fast_ev_charger',
+    'pv_inverter':                   'pv_string_inverter',
+    'solar_inverter':                'pv_string_inverter',
+    'string_inverter':               'pv_string_inverter',
+    'robot_arm':                     'industrial_robot_arm',
+    'industrial_robot':              'industrial_robot_arm',
+    'insulin':                       'insulin_pump',
+    'fuel_cell':                     'fuel_cell_power_module',
+    '3d_printer':                    'industrial_3d_printer',
+    'metal_3d_printer':              'industrial_3d_printer',
+    'sla_printer':                   'industrial_3d_printer',
+    'electrolyser':                  'hydrogen_electrolyser',
+    'electrolyzer':                  'hydrogen_electrolyser',
+    // Added 2026-05-18 ("10 → 15 coverage" dispatch) — keep in sync with
+    // K10_CLASS_ALIASES in stages/1.7-module-decomposition.ts
+    'heat_pump_commercial':          'heat-pump-commercial',
+    'commercial_heat_pump':          'heat-pump-commercial',
+    'industrial_heat_pump':          'heat-pump-commercial',
+    'large_heat_pump':               'heat-pump-commercial',
+    'pv_module':                     'pv_module_residential',
+    'solar_module':                  'pv_module_residential',
+    'solar_panel':                   'pv_module_residential',
+    'pv_panel':                      'pv_module_residential',
+    'photovoltaic_module':           'pv_module_residential',
+    'wind_turbine':                  'wind_turbine_small',
+    'small_wind':                    'wind_turbine_small',
+    'small_wind_turbine':            'wind_turbine_small',
+    'distributed_wind':              'wind_turbine_small',
+    'auv':                           'auv-subsea',
+    'autonomous_underwater_vehicle': 'auv-subsea',
+    'subsea_auv':                    'auv-subsea',
+    'uuv':                           'auv-subsea',
+    'ev_battery':                    'vehicle_battery_pack',
+    'ev_battery_pack':               'vehicle_battery_pack',
+    'traction_battery':              'vehicle_battery_pack',
+    'traction_battery_pack':         'vehicle_battery_pack',
+    'vehicle_battery':               'vehicle_battery_pack',
+  }
+  const k10Graph = k10ProductClassLower
+    ? (getClassReferenceGraph(k10ProductClassLower)
+       ?? (K10_CLASS_ALIASES_SYNTH[k10ProductClassLower]
+           ? getClassReferenceGraph(K10_CLASS_ALIASES_SYNTH[k10ProductClassLower])
+           : null))
+    : null
+  const k10ProductClass = k10Graph?.product_class ?? k10ProductClassRaw
+  if (k10Graph) {
+    const k10RequiredModules = new Set<UniversalModule>()
+    for (const edge of k10Graph.edges) {
+      if (edge.required) {
+        k10RequiredModules.add(edge.from_class as UniversalModule)
+        k10RequiredModules.add(edge.to_class as UniversalModule)
+      }
+    }
+    // (a) Remove K10-required modules from excluded
+    const beforeExc = excluded.length
+    const droppedFromExcluded: UniversalModule[] = []
+    excluded = excluded.filter(m => {
+      if (k10RequiredModules.has(m)) {
+        droppedFromExcluded.push(m)
+        return false
+      }
+      return true
+    })
+    if (droppedFromExcluded.length > 0) {
+      notes.push(
+        `[K10-8 synthesis-override] removed [${droppedFromExcluded.join(', ')}] from excluded_modules: K10 reference graph for "${k10ProductClass}" requires edges to/from these modules. Initial excluded count ${beforeExc} → ${excluded.length}.`,
+      )
+    }
+    // (b) Add K10-required modules that are missing from BOTH includedModules
+    // AND excluded — pulling the spec from any speaking emitter that emitted it.
+    const reAdded: UniversalModule[] = []
+    for (const required of k10RequiredModules) {
+      if (includedKeys.has(required)) continue
+      if (excluded.includes(required)) continue
+      // Find a speaking emitter that emitted this module
+      for (const payload of speakingPayloads) {
+        const candidate = (payload.modules ?? []).find(m => m.module === required)
+        if (candidate) {
+          includedModules.push(candidate as ModuleSpec)
+          includedKeys.add(required)
+          reAdded.push(required)
+          break
+        }
+      }
+    }
+    if (reAdded.length > 0) {
+      notes.push(
+        `[K10-8 synthesis-override] re-added [${reAdded.join(', ')}] to modules: K10 reference graph for "${k10ProductClass}" requires edges to/from these modules but anchor emitter dropped them and no excluded-vote quorum reached. Spec pulled from the first speaking emitter that emitted it.`,
+      )
+    }
+  } else if (k10ProductClass) {
+    notes.push(
+      `[K10-8 synthesis-override] no K10 reference graph registered for product_class="${k10ProductClass}"; skipping module-presence override (call ensureGraphsRegistered() before synthesis if you want K10-8 to fire).`,
+    )
   }
 
   // rationale_excluded: union of rationales for genuinely-excluded modules

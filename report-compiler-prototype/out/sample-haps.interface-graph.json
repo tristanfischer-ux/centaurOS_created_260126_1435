@@ -1,0 +1,1059 @@
+{
+  "nodes": [
+    {
+      "id": "structure_containment",
+      "label": "Ultra-Light Wing Structure",
+      "kind": "module"
+    },
+    {
+      "id": "structure_containment.wing_primary_structure",
+      "label": "Wing primary structure",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.tail_control_structure",
+      "label": "Tail and control structure",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.payload_bay_structure",
+      "label": "Payload bay structure",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "energy_harvesting",
+      "label": "Solar Energy Harvesting",
+      "kind": "module"
+    },
+    {
+      "id": "energy_harvesting.solar_skin_array",
+      "label": "Solar skin array",
+      "kind": "submodule",
+      "moduleId": "energy_harvesting"
+    },
+    {
+      "id": "energy_harvesting.mppt_conversion",
+      "label": "MPPT conversion",
+      "kind": "submodule",
+      "moduleId": "energy_harvesting"
+    },
+    {
+      "id": "energy_harvesting.solar_health_monitoring",
+      "label": "Solar health monitoring",
+      "kind": "submodule",
+      "moduleId": "energy_harvesting"
+    },
+    {
+      "id": "energy_storage_source",
+      "label": "Night-Cycle Energy Storage",
+      "kind": "module"
+    },
+    {
+      "id": "energy_storage_source.stratospheric_battery_pack",
+      "label": "Stratospheric battery pack",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "energy_storage_source.battery_thermal_zone",
+      "label": "Battery thermal zone",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "energy_storage_source.energy_reserve_monitoring",
+      "label": "Energy reserve monitoring",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "power_distribution",
+      "label": "Flight Power Distribution",
+      "kind": "module"
+    },
+    {
+      "id": "power_distribution.solar_battery_power_management",
+      "label": "Solar and battery power management",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.low_voltage_distribution",
+      "label": "Low-voltage distribution",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.load_shed_protection",
+      "label": "Load-shed protection",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "actuation_kinematics",
+      "label": "Propulsion And Control Surfaces",
+      "kind": "module"
+    },
+    {
+      "id": "actuation_kinematics.electric_propulsion_pods",
+      "label": "Electric propulsion pods",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "actuation_kinematics.control_surface_actuation",
+      "label": "Control surface actuation",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "actuation_kinematics.station_keeping_trim",
+      "label": "Station-keeping trim",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "control_compute_communication",
+      "label": "Autonomy Control Communication",
+      "kind": "module"
+    },
+    {
+      "id": "control_compute_communication.flight_control_computer",
+      "label": "Flight control computer",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.ground_command_link",
+      "label": "Ground command link",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.energy_aware_autonomy",
+      "label": "Energy-aware autonomy",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "sensing_instrumentation",
+      "label": "Navigation And Airdata Sensing",
+      "kind": "module"
+    },
+    {
+      "id": "sensing_instrumentation.navigation_suite",
+      "label": "Navigation suite",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.airdata_weather_sensors",
+      "label": "Airdata and weather sensors",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.structural_health_sensing",
+      "label": "Structural health sensing",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "payload_communication",
+      "label": "Communications Payload",
+      "kind": "module"
+    },
+    {
+      "id": "payload_communication.payload_radio",
+      "label": "Payload radio",
+      "kind": "submodule",
+      "moduleId": "payload_communication"
+    },
+    {
+      "id": "payload_communication.antenna_aperture",
+      "label": "Antenna aperture",
+      "kind": "submodule",
+      "moduleId": "payload_communication"
+    },
+    {
+      "id": "payload_communication.payload_integration",
+      "label": "Payload integration",
+      "kind": "submodule",
+      "moduleId": "payload_communication"
+    },
+    {
+      "id": "environmental_interface",
+      "label": "Stratospheric Environmental Interface",
+      "kind": "module"
+    },
+    {
+      "id": "environmental_interface.thermal_protection",
+      "label": "Thermal protection",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.uv_surface_protection",
+      "label": "UV and surface protection",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.low_pressure_management",
+      "label": "Low-pressure electronics management",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "safety_protection",
+      "label": "Flight Safety And Recovery",
+      "kind": "module"
+    },
+    {
+      "id": "safety_protection.abort_recovery",
+      "label": "Abort and recovery",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.airspace_safety",
+      "label": "Airspace safety",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.ground_handling_safety",
+      "label": "Ground handling safety",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "maintenance_serviceability",
+      "label": "Ground Handling Serviceability",
+      "kind": "module"
+    },
+    {
+      "id": "maintenance_serviceability.wing_assembly_service",
+      "label": "Wing assembly service",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.launch_recovery_equipment",
+      "label": "Launch and recovery equipment",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.payload_checkout",
+      "label": "Payload checkout",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    }
+  ],
+  "edges": [
+    {
+      "id": "contains:structure_containment:structure_containment.wing_primary_structure:wing_primary_structure",
+      "from": "structure_containment",
+      "to": "structure_containment.wing_primary_structure",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Wing primary structure is contained by Ultra-Light Wing Structure."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.tail_control_structure:tail_control_structure",
+      "from": "structure_containment",
+      "to": "structure_containment.tail_control_structure",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Tail and control structure is contained by Ultra-Light Wing Structure."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.payload_bay_structure:payload_bay_structure",
+      "from": "structure_containment",
+      "to": "structure_containment.payload_bay_structure",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Payload bay structure is contained by Ultra-Light Wing Structure."
+    },
+    {
+      "id": "contains:energy_harvesting:energy_harvesting.solar_skin_array:solar_skin_array",
+      "from": "energy_harvesting",
+      "to": "energy_harvesting.solar_skin_array",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Solar skin array is contained by Solar Energy Harvesting."
+    },
+    {
+      "id": "contains:energy_harvesting:energy_harvesting.mppt_conversion:mppt_conversion",
+      "from": "energy_harvesting",
+      "to": "energy_harvesting.mppt_conversion",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "MPPT conversion is contained by Solar Energy Harvesting."
+    },
+    {
+      "id": "contains:energy_harvesting:energy_harvesting.solar_health_monitoring:solar_health_monitoring",
+      "from": "energy_harvesting",
+      "to": "energy_harvesting.solar_health_monitoring",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Solar health monitoring is contained by Solar Energy Harvesting."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.stratospheric_battery_pack:stratospheric_battery_pack",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.stratospheric_battery_pack",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Stratospheric battery pack is contained by Night-Cycle Energy Storage."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.battery_thermal_zone:battery_thermal_zone",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.battery_thermal_zone",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Battery thermal zone is contained by Night-Cycle Energy Storage."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.energy_reserve_monitoring:energy_reserve_monitoring",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.energy_reserve_monitoring",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Energy reserve monitoring is contained by Night-Cycle Energy Storage."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.solar_battery_power_management:solar_battery_power_management",
+      "from": "power_distribution",
+      "to": "power_distribution.solar_battery_power_management",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Solar and battery power management is contained by Flight Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.low_voltage_distribution:low_voltage_distribution",
+      "from": "power_distribution",
+      "to": "power_distribution.low_voltage_distribution",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Low-voltage distribution is contained by Flight Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.load_shed_protection:load_shed_protection",
+      "from": "power_distribution",
+      "to": "power_distribution.load_shed_protection",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Load-shed protection is contained by Flight Power Distribution."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.electric_propulsion_pods:electric_propulsion_pods",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.electric_propulsion_pods",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Electric propulsion pods is contained by Propulsion And Control Surfaces."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.control_surface_actuation:control_surface_actuation",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.control_surface_actuation",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Control surface actuation is contained by Propulsion And Control Surfaces."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.station_keeping_trim:station_keeping_trim",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.station_keeping_trim",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Station-keeping trim is contained by Propulsion And Control Surfaces."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.flight_control_computer:flight_control_computer",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.flight_control_computer",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Flight control computer is contained by Autonomy Control Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.ground_command_link:ground_command_link",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.ground_command_link",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Ground command link is contained by Autonomy Control Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.energy_aware_autonomy:energy_aware_autonomy",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.energy_aware_autonomy",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Energy-aware autonomy is contained by Autonomy Control Communication."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.navigation_suite:navigation_suite",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.navigation_suite",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Navigation suite is contained by Navigation And Airdata Sensing."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.airdata_weather_sensors:airdata_weather_sensors",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.airdata_weather_sensors",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Airdata and weather sensors is contained by Navigation And Airdata Sensing."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.structural_health_sensing:structural_health_sensing",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.structural_health_sensing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Structural health sensing is contained by Navigation And Airdata Sensing."
+    },
+    {
+      "id": "contains:payload_communication:payload_communication.payload_radio:payload_radio",
+      "from": "payload_communication",
+      "to": "payload_communication.payload_radio",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Payload radio is contained by Communications Payload."
+    },
+    {
+      "id": "contains:payload_communication:payload_communication.antenna_aperture:antenna_aperture",
+      "from": "payload_communication",
+      "to": "payload_communication.antenna_aperture",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Antenna aperture is contained by Communications Payload."
+    },
+    {
+      "id": "contains:payload_communication:payload_communication.payload_integration:payload_integration",
+      "from": "payload_communication",
+      "to": "payload_communication.payload_integration",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Payload integration is contained by Communications Payload."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.thermal_protection:thermal_protection",
+      "from": "environmental_interface",
+      "to": "environmental_interface.thermal_protection",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Thermal protection is contained by Stratospheric Environmental Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.uv_surface_protection:uv_surface_protection",
+      "from": "environmental_interface",
+      "to": "environmental_interface.uv_surface_protection",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "UV and surface protection is contained by Stratospheric Environmental Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.low_pressure_management:low_pressure_management",
+      "from": "environmental_interface",
+      "to": "environmental_interface.low_pressure_management",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Low-pressure electronics management is contained by Stratospheric Environmental Interface."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.abort_recovery:abort_recovery",
+      "from": "safety_protection",
+      "to": "safety_protection.abort_recovery",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Abort and recovery is contained by Flight Safety And Recovery."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.airspace_safety:airspace_safety",
+      "from": "safety_protection",
+      "to": "safety_protection.airspace_safety",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Airspace safety is contained by Flight Safety And Recovery."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.ground_handling_safety:ground_handling_safety",
+      "from": "safety_protection",
+      "to": "safety_protection.ground_handling_safety",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Ground handling safety is contained by Flight Safety And Recovery."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.wing_assembly_service:wing_assembly_service",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.wing_assembly_service",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Wing assembly service is contained by Ground Handling Serviceability."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.launch_recovery_equipment:launch_recovery_equipment",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.launch_recovery_equipment",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Launch and recovery equipment is contained by Ground Handling Serviceability."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.payload_checkout:payload_checkout",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.payload_checkout",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Payload checkout is contained by Ground Handling Serviceability."
+    },
+    {
+      "id": "shared_interface:structure_containment:actuation_kinematics:aero_load_path",
+      "from": "structure_containment",
+      "to": "actuation_kinematics",
+      "via": "aero_load_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare aero_load_path."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:sensing_instrumentation:aero_load_path",
+      "from": "actuation_kinematics",
+      "to": "sensing_instrumentation",
+      "via": "aero_load_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare aero_load_path."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:payload_communication:aero_load_path",
+      "from": "sensing_instrumentation",
+      "to": "payload_communication",
+      "via": "aero_load_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare aero_load_path."
+    },
+    {
+      "id": "shared_interface:payload_communication:environmental_interface:aero_load_path",
+      "from": "payload_communication",
+      "to": "environmental_interface",
+      "via": "aero_load_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare aero_load_path."
+    },
+    {
+      "id": "shared_interface:environmental_interface:safety_protection:aero_load_path",
+      "from": "environmental_interface",
+      "to": "safety_protection",
+      "via": "aero_load_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare aero_load_path."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:aero_load_path",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "aero_load_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare aero_load_path."
+    },
+    {
+      "id": "shared_interface:structure_containment:energy_harvesting:solar_mount",
+      "from": "structure_containment",
+      "to": "energy_harvesting",
+      "via": "solar_mount",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare solar_mount."
+    },
+    {
+      "id": "shared_interface:energy_harvesting:environmental_interface:solar_mount",
+      "from": "energy_harvesting",
+      "to": "environmental_interface",
+      "via": "solar_mount",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare solar_mount."
+    },
+    {
+      "id": "shared_interface:environmental_interface:maintenance_serviceability:solar_mount",
+      "from": "environmental_interface",
+      "to": "maintenance_serviceability",
+      "via": "solar_mount",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare solar_mount."
+    },
+    {
+      "id": "shared_interface:structure_containment:actuation_kinematics:propulsion_mounts",
+      "from": "structure_containment",
+      "to": "actuation_kinematics",
+      "via": "propulsion_mounts",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare propulsion_mounts."
+    },
+    {
+      "id": "shared_interface:structure_containment:energy_harvesting:service_access",
+      "from": "structure_containment",
+      "to": "energy_harvesting",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:energy_harvesting:energy_storage_source:service_access",
+      "from": "energy_harvesting",
+      "to": "energy_storage_source",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:power_distribution:service_access",
+      "from": "energy_storage_source",
+      "to": "power_distribution",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:power_distribution:control_compute_communication:service_access",
+      "from": "power_distribution",
+      "to": "control_compute_communication",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:payload_communication:service_access",
+      "from": "control_compute_communication",
+      "to": "payload_communication",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:payload_communication:environmental_interface:service_access",
+      "from": "payload_communication",
+      "to": "environmental_interface",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:environmental_interface:safety_protection:service_access",
+      "from": "environmental_interface",
+      "to": "safety_protection",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:service_access",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:energy_harvesting:power_distribution:solar_dc_bus",
+      "from": "energy_harvesting",
+      "to": "power_distribution",
+      "via": "solar_dc_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare solar_dc_bus."
+    },
+    {
+      "id": "shared_interface:energy_harvesting:energy_storage_source:sensor_bus",
+      "from": "energy_harvesting",
+      "to": "energy_storage_source",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:actuation_kinematics:sensor_bus",
+      "from": "energy_storage_source",
+      "to": "actuation_kinematics",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:control_compute_communication:sensor_bus",
+      "from": "actuation_kinematics",
+      "to": "control_compute_communication",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:sensor_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:energy_harvesting:energy_storage_source:thermal_path",
+      "from": "energy_harvesting",
+      "to": "energy_storage_source",
+      "via": "thermal_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare thermal_path."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:payload_communication:thermal_path",
+      "from": "energy_storage_source",
+      "to": "payload_communication",
+      "via": "thermal_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare thermal_path."
+    },
+    {
+      "id": "shared_interface:payload_communication:environmental_interface:thermal_path",
+      "from": "payload_communication",
+      "to": "environmental_interface",
+      "via": "thermal_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare thermal_path."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:power_distribution:battery_dc_bus",
+      "from": "energy_storage_source",
+      "to": "power_distribution",
+      "via": "battery_dc_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare battery_dc_bus."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:power_distribution:battery_monitor_bus",
+      "from": "energy_storage_source",
+      "to": "power_distribution",
+      "via": "battery_monitor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare battery_monitor_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:control_compute_communication:battery_monitor_bus",
+      "from": "power_distribution",
+      "to": "control_compute_communication",
+      "via": "battery_monitor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare battery_monitor_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:safety_protection:battery_monitor_bus",
+      "from": "control_compute_communication",
+      "to": "safety_protection",
+      "via": "battery_monitor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare battery_monitor_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:actuation_kinematics:propulsion_power_bus",
+      "from": "power_distribution",
+      "to": "actuation_kinematics",
+      "via": "propulsion_power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare propulsion_power_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:payload_communication:payload_power_bus",
+      "from": "power_distribution",
+      "to": "payload_communication",
+      "via": "payload_power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare payload_power_bus."
+    },
+    {
+      "id": "shared_interface:payload_communication:environmental_interface:payload_power_bus",
+      "from": "payload_communication",
+      "to": "environmental_interface",
+      "via": "payload_power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare payload_power_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:actuation_kinematics:low_voltage_rail",
+      "from": "power_distribution",
+      "to": "actuation_kinematics",
+      "via": "low_voltage_rail",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare low_voltage_rail."
+    },
+    {
+      "id": "shared_interface:power_distribution:control_compute_communication:hardwired_trip",
+      "from": "power_distribution",
+      "to": "control_compute_communication",
+      "via": "hardwired_trip",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare hardwired_trip."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:safety_protection:hardwired_trip",
+      "from": "control_compute_communication",
+      "to": "safety_protection",
+      "via": "hardwired_trip",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare hardwired_trip."
+    },
+    {
+      "id": "shared_interface:structure_containment:actuation_kinematics:flight_control_bus",
+      "from": "structure_containment",
+      "to": "actuation_kinematics",
+      "via": "flight_control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare flight_control_bus."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:control_compute_communication:flight_control_bus",
+      "from": "actuation_kinematics",
+      "to": "control_compute_communication",
+      "via": "flight_control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare flight_control_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:flight_control_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "flight_control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare flight_control_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:flight_control_bus",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "flight_control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare flight_control_bus."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:control_compute_communication:telemetry_link",
+      "from": "energy_storage_source",
+      "to": "control_compute_communication",
+      "via": "telemetry_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare telemetry_link."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:telemetry_link",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "telemetry_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare telemetry_link."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:telemetry_link",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "telemetry_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare telemetry_link."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:telemetry_link",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "telemetry_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare telemetry_link."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:payload_communication:payload_data_link",
+      "from": "control_compute_communication",
+      "to": "payload_communication",
+      "via": "payload_data_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare payload_data_link."
+    },
+    {
+      "id": "shared_interface:payload_communication:maintenance_serviceability:payload_data_link",
+      "from": "payload_communication",
+      "to": "maintenance_serviceability",
+      "via": "payload_data_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare payload_data_link."
+    },
+    {
+      "id": "shared_interface:payload_communication:environmental_interface:rf_aperture",
+      "from": "payload_communication",
+      "to": "environmental_interface",
+      "via": "rf_aperture",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare rf_aperture."
+    },
+    {
+      "id": "required_interface:energy_harvesting:power_distribution:solar_dc_bus",
+      "from": "energy_harvesting",
+      "to": "power_distribution",
+      "via": "solar_dc_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Solar array output must feed power management over a declared DC bus."
+    },
+    {
+      "id": "required_interface:energy_storage_source:power_distribution:battery_dc_bus",
+      "from": "energy_storage_source",
+      "to": "power_distribution",
+      "via": "battery_dc_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Night-cycle battery energy must connect into load distribution."
+    },
+    {
+      "id": "required_interface:power_distribution:actuation_kinematics:propulsion_power_bus",
+      "from": "power_distribution",
+      "to": "actuation_kinematics",
+      "via": "propulsion_power_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Propulsion loads must receive protected high-current power."
+    },
+    {
+      "id": "required_interface:control_compute_communication:actuation_kinematics:flight_control_bus",
+      "from": "control_compute_communication",
+      "to": "actuation_kinematics",
+      "via": "flight_control_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Flight controller must command propulsion and trim actuators."
+    },
+    {
+      "id": "required_interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "sensor_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Navigation, airdata and structural state must feed autonomy decisions."
+    },
+    {
+      "id": "required_interface:payload_communication:control_compute_communication:payload_data_link",
+      "from": "payload_communication",
+      "to": "control_compute_communication",
+      "via": "payload_data_link",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Payload state must be visible to vehicle autonomy and telemetry."
+    },
+    {
+      "id": "required_interface:environmental_interface:energy_storage_source:thermal_path",
+      "from": "environmental_interface",
+      "to": "energy_storage_source",
+      "via": "thermal_path",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Battery survival and night-cycle capacity depend on a declared thermal path."
+    },
+    {
+      "id": "required_interface:safety_protection:control_compute_communication:telemetry_link",
+      "from": "safety_protection",
+      "to": "control_compute_communication",
+      "via": "telemetry_link",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Abort, descent and recovery state must remain visible to ground operators."
+    }
+  ],
+  "summary": {
+    "moduleNodes": 11,
+    "subModuleNodes": 33,
+    "containsEdges": 33,
+    "sharedInterfaceEdges": 47,
+    "requiredInterfaceEdges": 8,
+    "missingRequiredInterfaceEdges": 0
+  }
+}

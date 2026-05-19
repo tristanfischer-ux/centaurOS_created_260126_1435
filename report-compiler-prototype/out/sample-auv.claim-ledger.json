@@ -1,0 +1,4839 @@
+{
+  "summary": {
+    "rows": 205,
+    "briefSupplied": 2,
+    "accepted": 0,
+    "sourceBacked": 0,
+    "calculatedNeedsReview": 3,
+    "generatedNeedsReview": 138,
+    "sourceRequired": 62,
+    "blocked": 0,
+    "blocksBom": 62,
+    "blocksPublish": 202
+  },
+  "rows": [
+    {
+      "id": "bom_source_field:actuation_kinematics_thruster_array_thruster_set:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Thruster set / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:actuation_kinematics_thruster_array_thruster_set:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Thruster set / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:actuation_kinematics_thruster_array_thruster_set:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Thruster set / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:actuation_kinematics_thruster_array_thruster_set:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Thruster set / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_acoustic_communications_acoustic_modem:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Acoustic modem / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "acoustic_modem"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_acoustic_communications_acoustic_modem:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Acoustic modem / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "acoustic_modem"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_acoustic_communications_acoustic_modem:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Acoustic modem / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "acoustic_modem"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_acoustic_communications_acoustic_modem:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Acoustic modem / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "acoustic_modem"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_mission_computer_stack_mission_computer:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Mission computer / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "mission_computer"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_mission_computer_stack_mission_computer:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Mission computer / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "mission_computer"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_mission_computer_stack_mission_computer:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Mission computer / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "mission_computer"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_mission_computer_stack_mission_computer:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Mission computer / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "mission_computer"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_storage_source_subsea_battery_pack_battery_pack:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Battery pack / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_storage_source_subsea_battery_pack_battery_pack:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Battery pack / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_storage_source_subsea_battery_pack_battery_pack:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Battery pack / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_storage_source_subsea_battery_pack_battery_pack:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Battery pack / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_dc_distribution_wet_mate_connector_set:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Wet-mate connector set / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "wet_mate_connector_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_dc_distribution_wet_mate_connector_set:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Wet-mate connector set / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "wet_mate_connector_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_dc_distribution_wet_mate_connector_set:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Wet-mate connector set / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "wet_mate_connector_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_dc_distribution_wet_mate_connector_set:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Wet-mate connector set / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "wet_mate_connector_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_abort_recovery_recovery_beacon:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Recovery beacon / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "recovery_beacon"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_abort_recovery_recovery_beacon:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Recovery beacon / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "recovery_beacon"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_abort_recovery_recovery_beacon:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Recovery beacon / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "recovery_beacon"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_abort_recovery_recovery_beacon:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Recovery beacon / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "recovery_beacon"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_leak_detection_leak_detection_sensor:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Leak detection sensor / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_leak_detection_leak_detection_sensor:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Leak detection sensor / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_leak_detection_leak_detection_sensor:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Leak detection sensor / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:safety_protection_leak_detection_leak_detection_sensor:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Leak detection sensor / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_depth_environment_sensors_depth_and_pressure_sensor:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Depth and pressure sensor / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "depth_and_pressure_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_depth_environment_sensors_depth_and_pressure_sensor:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Depth and pressure sensor / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "depth_and_pressure_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_depth_environment_sensors_depth_and_pressure_sensor:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Depth and pressure sensor / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "depth_and_pressure_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_depth_environment_sensors_depth_and_pressure_sensor:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Depth and pressure sensor / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "depth_and_pressure_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_navigation_sensor_suite_dvl:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "DVL / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dvl"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_navigation_sensor_suite_dvl:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "DVL / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dvl"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_navigation_sensor_suite_dvl:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "DVL / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dvl"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_navigation_sensor_suite_dvl:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "DVL / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dvl"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_navigation_sensor_suite_inertial_navigation_unit:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Inertial navigation unit / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "inertial_navigation_unit"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_navigation_sensor_suite_inertial_navigation_unit:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Inertial navigation unit / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "inertial_navigation_unit"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_navigation_sensor_suite_inertial_navigation_unit:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Inertial navigation unit / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "inertial_navigation_unit"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_navigation_sensor_suite_inertial_navigation_unit:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Inertial navigation unit / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "inertial_navigation_unit"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_payload_sensor_bay_forward_sonar_payload:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Forward sonar payload / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "forward_sonar_payload"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_payload_sensor_bay_forward_sonar_payload:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Forward sonar payload / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "forward_sonar_payload"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_payload_sensor_bay_forward_sonar_payload:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Forward sonar payload / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "forward_sonar_payload"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_payload_sensor_bay_forward_sonar_payload:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Forward sonar payload / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "forward_sonar_payload"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_pressure_hull_shell_pressure_hull:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Pressure hull / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_hull"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_pressure_hull_shell_pressure_hull:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Pressure hull / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_hull"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_pressure_hull_shell_pressure_hull:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Pressure hull / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_hull"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_pressure_hull_shell_pressure_hull:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Pressure hull / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_hull"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_thruster_array_thruster_set",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Thruster set",
+      "claim": "Thruster set is an architecture-derived component candidate with quantity 6 each.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_acoustic_communications_acoustic_modem",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Acoustic modem",
+      "claim": "Acoustic modem is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "acoustic_modem"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_mission_computer_stack_mission_computer",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Mission computer",
+      "claim": "Mission computer is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "mission_computer"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_subsea_battery_pack_battery_pack",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Battery pack",
+      "claim": "Battery pack is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:power_distribution_dc_distribution_wet_mate_connector_set",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Wet-mate connector set",
+      "claim": "Wet-mate connector set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "wet_mate_connector_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:safety_protection_abort_recovery_recovery_beacon",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Recovery beacon",
+      "claim": "Recovery beacon is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "recovery_beacon"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:safety_protection_leak_detection_leak_detection_sensor",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Leak detection sensor",
+      "claim": "Leak detection sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_depth_environment_sensors_depth_and_pressure_sensor",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Depth and pressure sensor",
+      "claim": "Depth and pressure sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "depth_and_pressure_sensor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_navigation_sensor_suite_dvl",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "DVL",
+      "claim": "DVL is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dvl"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_navigation_sensor_suite_inertial_navigation_unit",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Inertial navigation unit",
+      "claim": "Inertial navigation unit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "inertial_navigation_unit"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_payload_sensor_bay_forward_sonar_payload",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Forward sonar payload",
+      "claim": "Forward sonar payload is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "forward_sonar_payload"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:structure_containment_pressure_hull_shell_pressure_hull",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Pressure hull",
+      "claim": "Pressure hull is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_hull"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "headline_metric:capex_gbp",
+      "kind": "headline_metric",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Estimated CAPEX",
+      "claim": "Estimated CAPEX = 0 GBP.",
+      "provenanceRefs": [
+        "formula:capex=sum(bom.totalCostGbp)",
+        "class_pack:auv.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed BoM costs before treating this cost metric as a claim."
+    },
+    {
+      "id": "headline_metric:opex_annual_gbp",
+      "kind": "headline_metric",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Estimated annual OPEX",
+      "claim": "Estimated annual OPEX = 0 GBP/year.",
+      "provenanceRefs": [
+        "formula:opex=capex*0.04"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed BoM costs before treating this cost metric as a claim."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_drive_electronics_controller_heat_spreader",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "controller heat spreader",
+      "claim": "controller heat spreader is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "controller_heat_spreader"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_drive_electronics_current_sensor_channel_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "current sensor channel set",
+      "claim": "current sensor channel set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "current_sensor_channel_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_drive_electronics_thrust_calibration_table",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "thrust calibration table",
+      "claim": "thrust calibration table is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thrust_calibration_table"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_drive_electronics_thruster_motor_controller_stack",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "thruster motor controller stack",
+      "claim": "thruster motor controller stack is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_motor_controller_stack"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_thruster_array_motor_phase_harness",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "motor phase harness",
+      "claim": "motor phase harness is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "motor_phase_harness"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_thruster_array_thruster_mounting_bracket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "thruster mounting bracket",
+      "claim": "thruster mounting bracket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_mounting_bracket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_thruster_array_thruster_nozzle_guard",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "thruster nozzle guard",
+      "claim": "thruster nozzle guard is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_nozzle_guard"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_trim_surfaces_adjustable_trim_fin",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "adjustable trim fin",
+      "claim": "adjustable trim fin is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "adjustable_trim_fin"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_trim_surfaces_ballast_trim_block",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "ballast trim block",
+      "claim": "ballast trim block is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "ballast_trim_block"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_trim_surfaces_roll_trim_screw_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "roll trim screw set",
+      "claim": "roll trim screw set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "roll_trim_screw_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:actuation_kinematics_trim_surfaces_tow_tank_trim_mark",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "tow-tank trim mark",
+      "claim": "tow-tank trim mark is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "tow_tank_trim_mark"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_acoustic_communications_acoustic_isolation_pad",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "acoustic isolation pad",
+      "claim": "acoustic isolation pad is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "acoustic_isolation_pad"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_acoustic_communications_acoustic_transducer_mount",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "acoustic transducer mount",
+      "claim": "acoustic transducer mount is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "acoustic_transducer_mount"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_acoustic_communications_surface_command_protocol_adapter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "surface command protocol adapter",
+      "claim": "surface command protocol adapter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "surface_command_protocol_adapter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_mission_computer_stack_mission_data_recorder",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "mission data recorder",
+      "claim": "mission data recorder is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "mission_data_recorder"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_mission_computer_stack_real_time_control_board",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "real-time control board",
+      "claim": "real-time control board is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "real_time_control_board"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_mission_computer_stack_watchdog_supervisor_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "watchdog supervisor module",
+      "claim": "watchdog supervisor module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "watchdog_supervisor_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_software_health_management_configuration_backup_storage",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "configuration backup storage",
+      "claim": "configuration backup storage is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "configuration_backup_storage"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_software_health_management_debug_service_port",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "debug service port",
+      "claim": "debug service port is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "debug_service_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_software_health_management_failsafe_state_machine",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "failsafe state machine",
+      "claim": "failsafe state machine is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "failsafe_state_machine"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_software_health_management_time_sync_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "time sync module",
+      "claim": "time sync module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "time_sync_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_charging_interface_battery_vent_inspection_plug",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "battery vent inspection plug",
+      "claim": "battery vent inspection plug is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "battery_vent_inspection_plug"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_charging_interface_charge_interlock_plug",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "charge interlock plug",
+      "claim": "charge interlock plug is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "charge_interlock_plug"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_charging_interface_shore_charger_adapter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "shore charger adapter",
+      "claim": "shore charger adapter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "shore_charger_adapter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_charging_interface_state_of_charge_display_puck",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "state-of-charge display puck",
+      "claim": "state-of-charge display puck is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "state_of_charge_display_puck"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_energy_monitoring_battery_telemetry_isolator",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "battery telemetry isolator",
+      "claim": "battery telemetry isolator is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "battery_telemetry_isolator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_energy_monitoring_coulomb_counter_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "coulomb counter module",
+      "claim": "coulomb counter module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "coulomb_counter_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_energy_monitoring_energy_reserve_indicator",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "energy reserve indicator",
+      "claim": "energy reserve indicator is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "energy_reserve_indicator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_energy_monitoring_pack_temperature_sensor_strip",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pack temperature sensor strip",
+      "claim": "pack temperature sensor strip is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "pack_temperature_sensor_strip"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_subsea_battery_pack_battery_management_board",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "battery management board",
+      "claim": "battery management board is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "battery_management_board"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_subsea_battery_pack_pack_isolation_fuse",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pack isolation fuse",
+      "claim": "pack isolation fuse is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "pack_isolation_fuse"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_storage_source_subsea_battery_pack_pressure_rated_battery_enclosure",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pressure-rated battery enclosure",
+      "claim": "pressure-rated battery enclosure is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_rated_battery_enclosure"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_buoyancy_trim_ballast_rail",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "ballast rail",
+      "claim": "ballast rail is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "ballast_rail"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_buoyancy_trim_buoyancy_calibration_tag",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "buoyancy calibration tag",
+      "claim": "buoyancy calibration tag is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "buoyancy_calibration_tag"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_buoyancy_trim_field_trim_worksheet",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "field trim worksheet",
+      "claim": "field trim worksheet is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "field_trim_worksheet"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_buoyancy_trim_syntactic_foam_block_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "syntactic foam block set",
+      "claim": "syntactic foam block set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "syntactic_foam_block_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_pressure_boundary_management_cable_penetrator_seal",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "cable penetrator seal",
+      "claim": "cable penetrator seal is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "cable_penetrator_seal"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_pressure_boundary_management_oil_fill_service_port",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "oil-fill service port",
+      "claim": "oil-fill service port is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "oil_fill_service_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_pressure_boundary_management_pressure_compensation_bladder",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pressure compensation bladder",
+      "claim": "pressure compensation bladder is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_compensation_bladder"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_pressure_boundary_management_pressure_equalisation_valve",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pressure equalisation valve",
+      "claim": "pressure equalisation valve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_equalisation_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_thermal_path_battery_thermal_pad",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "battery thermal pad",
+      "claim": "battery thermal pad is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "battery_thermal_pad"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_thermal_path_electronics_thermal_bridge",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "electronics thermal bridge",
+      "claim": "electronics thermal bridge is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "electronics_thermal_bridge"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_thermal_path_hull_heat_spreader_plate",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "hull heat spreader plate",
+      "claim": "hull heat spreader plate is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "hull_heat_spreader_plate"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_thermal_path_thruster_heat_sink_collar",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "thruster heat sink collar",
+      "claim": "thruster heat sink collar is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_heat_sink_collar"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_deck_recovery_deck_recovery_handle",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "deck recovery handle",
+      "claim": "deck recovery handle is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "deck_recovery_handle"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_deck_recovery_launch_cradle_interface",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "launch cradle interface",
+      "claim": "launch cradle interface is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "launch_cradle_interface"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_deck_recovery_lifting_bridle",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "lifting bridle",
+      "claim": "lifting bridle is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "lifting_bridle"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_deck_recovery_tow_point_fitting",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "tow point fitting",
+      "claim": "tow point fitting is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "tow_point_fitting"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_field_transport_desiccant_cartridge",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "desiccant cartridge",
+      "claim": "desiccant cartridge is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "desiccant_cartridge"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_field_transport_maintenance_log_tag",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "maintenance log tag",
+      "claim": "maintenance log tag is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "maintenance_log_tag"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_field_transport_protective_nose_cover",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "protective nose cover",
+      "claim": "protective nose cover is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "protective_nose_cover"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_field_transport_transport_cradle",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "transport cradle",
+      "claim": "transport cradle is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "transport_cradle"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_service_access_diagnostic_connector",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "diagnostic connector",
+      "claim": "diagnostic connector is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "diagnostic_connector"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_service_access_o_ring_grease_kit",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "O-ring grease kit",
+      "claim": "O-ring grease kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "o_ring_grease_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_service_access_service_checklist_card",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "service checklist card",
+      "claim": "service checklist card is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "service_checklist_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_service_access_vacuum_leak_test_port",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "vacuum leak test port",
+      "claim": "vacuum leak test port is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "vacuum_leak_test_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_dc_distribution_bus_voltage_monitor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "bus voltage monitor",
+      "claim": "bus voltage monitor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "bus_voltage_monitor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_dc_distribution_fused_dc_distribution_board",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fused DC distribution board",
+      "claim": "fused DC distribution board is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "fused_dc_distribution_board"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_dc_distribution_main_power_enable_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "main power enable relay",
+      "claim": "main power enable relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "main_power_enable_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_isolation_grounding_chassis_bonding_strap",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "chassis bonding strap",
+      "claim": "chassis bonding strap is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "chassis_bonding_strap"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_isolation_grounding_fault_annunciator_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fault annunciator module",
+      "claim": "fault annunciator module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "fault_annunciator_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_isolation_grounding_ground_fault_monitor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "ground fault monitor",
+      "claim": "ground fault monitor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "ground_fault_monitor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_isolation_grounding_service_isolation_key",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "service isolation key",
+      "claim": "service isolation key is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "service_isolation_key"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_low_voltage_rails_12_v_payload_converter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "12 V payload converter",
+      "claim": "12 V payload converter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "12_v_payload_converter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_low_voltage_rails_24_v_dc_converter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "24 V DC converter",
+      "claim": "24 V DC converter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "24_v_dc_converter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_low_voltage_rails_5_v_avionics_converter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "5 V avionics converter",
+      "claim": "5 V avionics converter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "5_v_avionics_converter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_low_voltage_rails_emi_power_filter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "EMI power filter",
+      "claim": "EMI power filter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "emi_power_filter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_abort_recovery_drop_weight_release",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "drop-weight release",
+      "claim": "drop-weight release is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "drop_weight_release"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_abort_recovery_emergency_strobe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "emergency strobe",
+      "claim": "emergency strobe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "emergency_strobe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_abort_recovery_surface_flag_float",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "surface flag float",
+      "claim": "surface flag float is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "surface_flag_float"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_leak_detection_absorbent_witness_pad",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "absorbent witness pad",
+      "claim": "absorbent witness pad is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "absorbent_witness_pad"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_leak_detection_bilge_moisture_strip",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "bilge moisture strip",
+      "claim": "bilge moisture strip is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "bilge_moisture_strip"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_leak_detection_leak_alarm_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "leak alarm relay",
+      "claim": "leak alarm relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_alarm_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_pressure_fail_safe_battery_isolation_contactor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "battery isolation contactor",
+      "claim": "battery isolation contactor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "battery_isolation_contactor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_pressure_fail_safe_over_depth_abort_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "over-depth abort switch",
+      "claim": "over-depth abort switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "over_depth_abort_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_pressure_fail_safe_pressure_relief_service_plug",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pressure relief service plug",
+      "claim": "pressure relief service plug is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_relief_service_plug"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_pressure_fail_safe_watchdog_kill_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "watchdog kill relay",
+      "claim": "watchdog kill relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "watchdog_kill_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_depth_environment_sensors_conductivity_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "conductivity sensor",
+      "claim": "conductivity sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "conductivity_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_depth_environment_sensors_internal_humidity_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "internal humidity sensor",
+      "claim": "internal humidity sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "internal_humidity_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_depth_environment_sensors_water_temperature_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "water temperature probe",
+      "claim": "water temperature probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "water_temperature_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_navigation_sensor_suite_gnss_surface_receiver",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "GNSS surface receiver",
+      "claim": "GNSS surface receiver is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "gnss_surface_receiver"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_navigation_sensor_suite_magnetic_compass_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "magnetic compass module",
+      "claim": "magnetic compass module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "magnetic_compass_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_payload_sensor_bay_camera_viewport_window",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "camera viewport window",
+      "claim": "camera viewport window is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "camera_viewport_window"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_payload_sensor_bay_payload_data_link_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "payload data link module",
+      "claim": "payload data link module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "payload_data_link_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_payload_sensor_bay_payload_sync_trigger",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "payload sync trigger",
+      "claim": "payload sync trigger is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "payload_sync_trigger"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_hydrodynamic_fairing_access_hatch_latch_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "access hatch latch set",
+      "claim": "access hatch latch set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "access_hatch_latch_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_hydrodynamic_fairing_nose_fairing",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "nose fairing",
+      "claim": "nose fairing is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "nose_fairing"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_hydrodynamic_fairing_stabilising_fin_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "stabilising fin set",
+      "claim": "stabilising fin set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "stabilising_fin_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_hydrodynamic_fairing_tail_cone_fairing",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "tail cone fairing",
+      "claim": "tail cone fairing is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "tail_cone_fairing"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_internal_mounting_frame_battery_cradle_frame",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "battery cradle frame",
+      "claim": "battery cradle frame is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "battery_cradle_frame"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_internal_mounting_frame_electronics_tray_rail",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "electronics tray rail",
+      "claim": "electronics tray rail is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "electronics_tray_rail"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_internal_mounting_frame_payload_mounting_rail",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "payload mounting rail",
+      "claim": "payload mounting rail is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "payload_mounting_rail"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_internal_mounting_frame_trim_weight_pocket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "trim weight pocket",
+      "claim": "trim weight pocket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "trim_weight_pocket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_pressure_hull_shell_double_o_ring_gland_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "double O-ring gland set",
+      "claim": "double O-ring gland set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "double_o_ring_gland_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_pressure_hull_shell_endcap_clamp_ring",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "endcap clamp ring",
+      "claim": "endcap clamp ring is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "endcap_clamp_ring"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_pressure_hull_shell_hull_proof_test_port",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "hull proof-test port",
+      "claim": "hull proof-test port is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.auv"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "hull_proof_test_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "module_allocation:actuation_kinematics",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thruster Actuation Kinematics",
+      "claim": "Thruster Actuation Kinematics is a top-level functional module: Generates controlled surge, heave, yaw and station-keeping authority underwater.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness",
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table",
+        "adjustable_trim_fin",
+        "ballast_trim_block",
+        "roll_trim_screw_set",
+        "tow_tank_trim_mark"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Autonomy Compute Communication",
+      "claim": "Autonomy Compute Communication is a top-level functional module: Runs mission autonomy, navigation fusion, acoustic messaging, payload logging and fail-safe states.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder",
+        "acoustic_modem",
+        "acoustic_transducer_mount",
+        "acoustic_isolation_pad",
+        "surface_command_protocol_adapter",
+        "failsafe_state_machine",
+        "time_sync_module",
+        "configuration_backup_storage",
+        "debug_service_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:energy_storage_source",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Subsea Energy Storage",
+      "claim": "Subsea Energy Storage is a top-level functional module: Stores enough mission energy for roughly 8 hours before detailed drag, hotel-load and reserve calculations.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack",
+        "battery_management_board",
+        "pack_isolation_fuse",
+        "pressure_rated_battery_enclosure",
+        "charge_interlock_plug",
+        "shore_charger_adapter",
+        "state_of_charge_display_puck",
+        "battery_vent_inspection_plug",
+        "coulomb_counter_module",
+        "pack_temperature_sensor_strip",
+        "energy_reserve_indicator",
+        "battery_telemetry_isolator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Pressure Thermal Buoyancy Interface",
+      "claim": "Pressure Thermal Buoyancy Interface is a top-level functional module: Manages pressure boundary support, heat rejection, buoyancy and trim interactions with seawater.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "cable_penetrator_seal",
+        "pressure_compensation_bladder",
+        "oil_fill_service_port",
+        "pressure_equalisation_valve",
+        "electronics_thermal_bridge",
+        "hull_heat_spreader_plate",
+        "battery_thermal_pad",
+        "thruster_heat_sink_collar",
+        "syntactic_foam_block_set",
+        "ballast_rail",
+        "buoyancy_calibration_tag",
+        "field_trim_worksheet"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Deck Recovery And Service",
+      "claim": "Deck Recovery And Service is a top-level functional module: Supports launch, recovery, charging, leak testing and field service without disturbing verified settings unnecessarily.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "lifting_bridle",
+        "deck_recovery_handle",
+        "launch_cradle_interface",
+        "tow_point_fitting",
+        "o_ring_grease_kit",
+        "vacuum_leak_test_port",
+        "diagnostic_connector",
+        "service_checklist_card",
+        "transport_cradle",
+        "protective_nose_cover",
+        "desiccant_cartridge",
+        "maintenance_log_tag"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Subsea Power Distribution",
+      "claim": "Subsea Power Distribution is a top-level functional module: Routes protected power to thrusters, mission computer, navigation sensors and payloads.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor",
+        "24_v_dc_converter",
+        "12_v_payload_converter",
+        "5_v_avionics_converter",
+        "emi_power_filter",
+        "ground_fault_monitor",
+        "chassis_bonding_strap",
+        "service_isolation_key",
+        "fault_annunciator_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Leak Abort And Recovery Safety",
+      "claim": "Leak Abort And Recovery Safety is a top-level functional module: Detects water ingress, over-depth risk and lost-vehicle states, then drives abort and recovery behaviour.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad",
+        "recovery_beacon",
+        "drop_weight_release",
+        "emergency_strobe",
+        "surface_flag_float",
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Navigation And Payload Sensing",
+      "claim": "Navigation And Payload Sensing is a top-level functional module: Measures vehicle state, seabed-relative movement, depth and inspection payload data.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dvl",
+        "inertial_navigation_unit",
+        "magnetic_compass_module",
+        "gnss_surface_receiver",
+        "depth_and_pressure_sensor",
+        "water_temperature_probe",
+        "conductivity_sensor",
+        "internal_humidity_sensor",
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Pressure Structure Containment",
+      "claim": "Pressure Structure Containment is a top-level functional module: Maintains a dry electronics and battery envelope for a 300 m underwater operating target.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port",
+        "electronics_tray_rail",
+        "battery_cradle_frame",
+        "payload_mounting_rail",
+        "trim_weight_pocket",
+        "nose_fairing",
+        "tail_cone_fairing",
+        "stabilising_fin_set",
+        "access_hatch_latch_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "regulatory_standard:EMC-MARINE-COMMS-REVIEW",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "EMC-MARINE-COMMS-REVIEW",
+      "claim": "EMC-MARINE-COMMS-REVIEW: Marine communications and EMC review is relevant in Project engineering gate.",
+      "provenanceRefs": [
+        "class_pack:auv.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Acoustic modem integration, antenna/transducer mounting, cable shielding and data-loss behaviour."
+    },
+    {
+      "id": "regulatory_standard:PRESSURE-BOUNDARY-REVIEW",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "PRESSURE-BOUNDARY-REVIEW",
+      "claim": "PRESSURE-BOUNDARY-REVIEW: Depth-rated pressure boundary review is relevant in Project engineering gate.",
+      "provenanceRefs": [
+        "class_pack:auv.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Depth rating calculation, hull material allowables, endcap seal design and proof-pressure plan."
+    },
+    {
+      "id": "regulatory_standard:SUBSEA-LEAK-ABORT-REVIEW",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "SUBSEA-LEAK-ABORT-REVIEW",
+      "claim": "SUBSEA-LEAK-ABORT-REVIEW: Leak detection and abort-state review is relevant in Project engineering gate.",
+      "provenanceRefs": [
+        "class_pack:auv.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Leak sensor placement, abort state machine, battery isolation and recovery procedure."
+    },
+    {
+      "id": "risk_hazard:1",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Pressure hull or seal failure at depth",
+      "claim": "Pressure hull or seal failure at depth has provisional RPN 120 with mitigation: Depth-rated pressure calculation, hydrostatic proof test, leak test and seal inspection workflow.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "risk_hazard:2",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Loss of navigation or communications underwater",
+      "claim": "Loss of navigation or communications underwater has provisional RPN 160 with mitigation: DVL/INS/depth fusion, acoustic link health monitoring and timed abort behaviour.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "risk_hazard:3",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Unable to recover vehicle after abort",
+      "claim": "Unable to recover vehicle after abort has provisional RPN 96 with mitigation: Recovery beacon, drop-weight/recovery procedure, deck handling points and mission reserve energy.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:drive_electronics",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thruster Actuation Kinematics / Drive electronics",
+      "claim": "Drive electronics is allocated under Thruster Actuation Kinematics: Converts command inputs into motor phase drive while reporting current and faults.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:thruster_array",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thruster Actuation Kinematics / Thruster array",
+      "claim": "Thruster array is allocated under Thruster Actuation Kinematics: Provides vectored propulsion channels for survey and manoeuvre control.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:trim_surfaces",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Thruster Actuation Kinematics / Trim and stability surfaces",
+      "claim": "Trim and stability surfaces is allocated under Thruster Actuation Kinematics: Improves passive stability and reduces control effort.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedComponentWordIds": [
+        "adjustable_trim_fin",
+        "ballast_trim_block",
+        "roll_trim_screw_set",
+        "tow_tank_trim_mark"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:acoustic_communications",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Autonomy Compute Communication / Acoustic communications",
+      "claim": "Acoustic communications is allocated under Autonomy Compute Communication: Provides low-bandwidth underwater command, health and recovery messaging.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "acoustic_modem",
+        "acoustic_transducer_mount",
+        "acoustic_isolation_pad",
+        "surface_command_protocol_adapter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:mission_computer_stack",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Autonomy Compute Communication / Mission computer stack",
+      "claim": "Mission computer stack is allocated under Autonomy Compute Communication: Executes mission state machine, vehicle control and payload logging.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:software_health_management",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Autonomy Compute Communication / Software health management",
+      "claim": "Software health management is allocated under Autonomy Compute Communication: Defines safe modes, reserve-energy logic and post-mission evidence.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "failsafe_state_machine",
+        "time_sync_module",
+        "configuration_backup_storage",
+        "debug_service_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:charging_interface",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Subsea Energy Storage / Charging interface",
+      "claim": "Charging interface is allocated under Subsea Energy Storage: Enables deck charging and state verification without compromising the pressure boundary.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "charge_interlock_plug",
+        "shore_charger_adapter",
+        "state_of_charge_display_puck",
+        "battery_vent_inspection_plug"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:energy_monitoring",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Subsea Energy Storage / Energy monitoring",
+      "claim": "Energy monitoring is allocated under Subsea Energy Storage: Tracks reserve energy and supports abort decisions.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "coulomb_counter_module",
+        "pack_temperature_sensor_strip",
+        "energy_reserve_indicator",
+        "battery_telemetry_isolator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:subsea_battery_pack",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Subsea Energy Storage / Subsea battery pack",
+      "claim": "Subsea battery pack is allocated under Subsea Energy Storage: Supplies mission energy with reserve margin and pressure-rated containment.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack",
+        "battery_management_board",
+        "pack_isolation_fuse",
+        "pressure_rated_battery_enclosure"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:buoyancy_trim",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Pressure Thermal Buoyancy Interface / Buoyancy and trim",
+      "claim": "Buoyancy and trim is allocated under Pressure Thermal Buoyancy Interface: Sets neutral buoyancy, trim and recoverable mass distribution.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "syntactic_foam_block_set",
+        "ballast_rail",
+        "buoyancy_calibration_tag",
+        "field_trim_worksheet"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:pressure_boundary_management",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Pressure Thermal Buoyancy Interface / Pressure boundary management",
+      "claim": "Pressure boundary management is allocated under Pressure Thermal Buoyancy Interface: Handles penetrators, pressure compensation and pressure-test interfaces.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "cable_penetrator_seal",
+        "pressure_compensation_bladder",
+        "oil_fill_service_port",
+        "pressure_equalisation_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:thermal_path",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Pressure Thermal Buoyancy Interface / Thermal path",
+      "claim": "Thermal path is allocated under Pressure Thermal Buoyancy Interface: Conducts electronics and battery heat into the hull and surrounding seawater.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "electronics_thermal_bridge",
+        "hull_heat_spreader_plate",
+        "battery_thermal_pad",
+        "thruster_heat_sink_collar"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:deck_recovery",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Deck Recovery And Service / Deck recovery",
+      "claim": "Deck recovery is allocated under Deck Recovery And Service: Provides safe handling points for launch and retrieval operations.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "lifting_bridle",
+        "deck_recovery_handle",
+        "launch_cradle_interface",
+        "tow_point_fitting"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:field_transport",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Deck Recovery And Service / Field transport",
+      "claim": "Field transport is allocated under Deck Recovery And Service: Protects the vehicle and records environmental exposure between missions.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "transport_cradle",
+        "protective_nose_cover",
+        "desiccant_cartridge",
+        "maintenance_log_tag"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:service_access",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Deck Recovery And Service / Service access",
+      "claim": "Service access is allocated under Deck Recovery And Service: Enables repeatable checks for seals, charging and diagnostics.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "o_ring_grease_kit",
+        "vacuum_leak_test_port",
+        "diagnostic_connector",
+        "service_checklist_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:dc_distribution",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Subsea Power Distribution / DC distribution",
+      "claim": "DC distribution is allocated under Subsea Power Distribution: Switches and protects the main battery bus before branch loads.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:isolation_grounding",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Subsea Power Distribution / Isolation and grounding",
+      "claim": "Isolation and grounding is allocated under Subsea Power Distribution: Controls leakage, bonding and service isolation paths in a flooded environment.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "ground_fault_monitor",
+        "chassis_bonding_strap",
+        "service_isolation_key",
+        "fault_annunciator_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:low_voltage_rails",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Subsea Power Distribution / Low-voltage rails",
+      "claim": "Low-voltage rails is allocated under Subsea Power Distribution: Creates stable avionics and payload supply rails.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "24_v_dc_converter",
+        "12_v_payload_converter",
+        "5_v_avionics_converter",
+        "emi_power_filter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:abort_recovery",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Leak Abort And Recovery Safety / Abort and recovery",
+      "claim": "Abort and recovery is allocated under Leak Abort And Recovery Safety: Supports vehicle location and recovery after fault or mission completion.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "recovery_beacon",
+        "drop_weight_release",
+        "emergency_strobe",
+        "surface_flag_float"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:leak_detection",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Leak Abort And Recovery Safety / Leak detection",
+      "claim": "Leak detection is allocated under Leak Abort And Recovery Safety: Detects internal water ingress before catastrophic electronics damage.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:pressure_fail_safe",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Leak Abort And Recovery Safety / Pressure fail-safe",
+      "claim": "Pressure fail-safe is allocated under Leak Abort And Recovery Safety: Prevents over-depth operation and isolates hazardous energy under fault.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:depth_environment_sensors",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Navigation And Payload Sensing / Depth and environment sensors",
+      "claim": "Depth and environment sensors is allocated under Navigation And Payload Sensing: Measures depth, water conditions and pressure-boundary state.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "depth_and_pressure_sensor",
+        "water_temperature_probe",
+        "conductivity_sensor",
+        "internal_humidity_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:navigation_sensor_suite",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Navigation And Payload Sensing / Navigation sensor suite",
+      "claim": "Navigation sensor suite is allocated under Navigation And Payload Sensing: Combines bottom-track velocity, inertial attitude and surface fixes.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "dvl",
+        "inertial_navigation_unit",
+        "magnetic_compass_module",
+        "gnss_surface_receiver"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:payload_sensor_bay",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Navigation And Payload Sensing / Payload sensor bay",
+      "claim": "Payload sensor bay is allocated under Navigation And Payload Sensing: Carries inspection payloads and synchronises payload data with navigation state.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:hydrodynamic_fairing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Pressure Structure Containment / Hydrodynamic fairing",
+      "claim": "Hydrodynamic fairing is allocated under Pressure Structure Containment: Reduces drag and protects external appendages during survey runs.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "nose_fairing",
+        "tail_cone_fairing",
+        "stabilising_fin_set",
+        "access_hatch_latch_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:internal_mounting_frame",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Pressure Structure Containment / Internal mounting frame",
+      "claim": "Internal mounting frame is allocated under Pressure Structure Containment: Locates dry electronics, batteries and payload interface hardware.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "electronics_tray_rail",
+        "battery_cradle_frame",
+        "payload_mounting_rail",
+        "trim_weight_pocket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:pressure_hull_shell",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Pressure Structure Containment / Pressure hull shell",
+      "claim": "Pressure hull shell is allocated under Pressure Structure Containment: Forms the dry pressure boundary and endcap sealing envelope.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "engineering_calculation:auv_endurance_minutes",
+      "kind": "engineering_calculation",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "AUV endurance minutes",
+      "claim": "AUV endurance minutes: 480 minutes using endurance_hours * 60.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "power_distribution",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack",
+        "fused_dc_distribution_board",
+        "thruster_set",
+        "mission_computer"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Confirm speed profile, payload load, reserve margin, battery derating and recovery scenario."
+    },
+    {
+      "id": "engineering_calculation:auv_hydrostatic_pressure_bar",
+      "kind": "engineering_calculation",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "AUV hydrostatic pressure",
+      "claim": "AUV hydrostatic pressure: 31 bar abs using 1 + depth_rating_m / 10.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_hull",
+        "cable_penetrator_seal",
+        "leak_detection_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm hull material, safety factor, penetrators, seals, buckling margin and test pressure."
+    },
+    {
+      "id": "headline_metric:headline_output",
+      "kind": "headline_metric",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Survey endurance",
+      "claim": "Survey endurance = 8 hours.",
+      "provenanceRefs": [
+        "class_pack:auv.class_pack",
+        "formula:endurance_hours"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review the formula, input values and operating envelope before treating this metric as accepted."
+    },
+    {
+      "id": "brief_requirement:depth_rating_m",
+      "kind": "brief_requirement",
+      "status": "brief_supplied",
+      "basis": "brief",
+      "scope": "Depth rating",
+      "claim": "Depth rating = 300 m.",
+      "provenanceRefs": [
+        "brief:input.brief"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_hull",
+        "cable_penetrator_seal",
+        "leak_detection_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm requirement value, tolerance and acceptance condition with the project owner."
+    },
+    {
+      "id": "brief_requirement:endurance_hours",
+      "kind": "brief_requirement",
+      "status": "brief_supplied",
+      "basis": "brief",
+      "scope": "Endurance",
+      "claim": "Endurance = 8 hours.",
+      "provenanceRefs": [
+        "brief:input.brief"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "power_distribution",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack",
+        "fused_dc_distribution_board",
+        "thruster_set",
+        "mission_computer"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm requirement value, tolerance and acceptance condition with the project owner."
+    }
+  ]
+}

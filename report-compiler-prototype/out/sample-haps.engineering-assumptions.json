@@ -1,0 +1,548 @@
+{
+  "summary": {
+    "rows": 34,
+    "briefSupported": 3,
+    "modelPresent": 8,
+    "reviewRequired": 9,
+    "sourceRequired": 14,
+    "blocked": 0,
+    "architectureBlockers": 0,
+    "bomBlockers": 14
+  },
+  "rows": [
+    {
+      "linkedRequirements": [
+        "wingspan_m"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:wingspan_m",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Wingspan",
+      "assumption": "Wingspan = 35 m is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "endurance_days"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:endurance_days",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Endurance",
+      "assumption": "Endurance = 30 days is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "altitude_km"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:altitude_km",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Operating altitude",
+      "assumption": "Operating altitude = 20 km is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "metric:headline_output",
+      "category": "derived_metric",
+      "status": "review_required",
+      "scope": "Station-keeping endurance",
+      "assumption": "Station-keeping endurance uses endurance_days with medium confidence.",
+      "basis": "class_pack:haps.class_pack; formula:endurance_days",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:capex_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated CAPEX",
+      "assumption": "Estimated CAPEX uses an implicit model with low confidence.",
+      "basis": "formula:capex=sum(bom.totalCostGbp); class_pack:haps.class_pack",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:opex_annual_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated annual OPEX",
+      "assumption": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "basis": "formula:opex=capex*0.04",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [
+        "altitude_km"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:haps_altitude_band",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Stratospheric Altitude Band",
+      "assumption": "Stratospheric Altitude Band currently evaluates as pass against 15 to 25 km for common HAPS station-keeping concepts; outside this band needs atmospheric, power and airspace evidence.",
+      "basis": "brief:input.brief; model:engineering_sanity.haps; model:engineering_sanity.haps",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "endurance_days"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:haps_endurance_target",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Station-Keeping Endurance",
+      "assumption": "Station-Keeping Endurance currently evaluates as pass against <=60 days plausible for early solar HAPS concept, 60-180 days needs strong degradation and energy evidence, >180 days is high risk.",
+      "basis": "brief:input.brief; model:engineering_sanity.haps; model:engineering_sanity.haps",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "wingspan_m"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:haps_wingspan_envelope",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Wing Span Envelope",
+      "assumption": "Wing Span Envelope currently evaluates as pass against 10 to 80 m for lightweight demonstrator-to-service HAPS concepts before aeroelastic proof.",
+      "basis": "brief:input.brief; model:engineering_sanity.haps; model:engineering_sanity.haps",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "wingspan_m",
+        "endurance_days",
+        "altitude_km"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:haps_energy_flight_closure",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Solar/Energy/Flight Closure",
+      "assumption": "Solar/Energy/Flight Closure currently evaluates as pass against solar DC, battery DC, propulsion power, flight control and battery monitor paths present.",
+      "basis": "model:engineering_sanity.haps; model:engineering_sanity.haps",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "altitude_km"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:haps_payload_comms_safety",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Payload/Telemetry/Safety Closure",
+      "assumption": "Payload/Telemetry/Safety Closure currently evaluates as pass against payload data, payload power, telemetry, hardwired trip, thermal path and recovery parachute present.",
+      "basis": "model:engineering_sanity.haps; model:engineering_sanity.haps",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "solar_dc_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:energy_harvesting:power_distribution:solar_dc_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "energy_harvesting -> power_distribution",
+      "assumption": "solar_dc_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Solar array output must feed power management over a declared DC bus.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "battery_dc_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:energy_storage_source:power_distribution:battery_dc_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "energy_storage_source -> power_distribution",
+      "assumption": "battery_dc_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Night-cycle battery energy must connect into load distribution.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "propulsion_power_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:power_distribution:actuation_kinematics:propulsion_power_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "power_distribution -> actuation_kinematics",
+      "assumption": "propulsion_power_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Propulsion loads must receive protected high-current power.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "flight_control_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:actuation_kinematics:flight_control_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> actuation_kinematics",
+      "assumption": "flight_control_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Flight controller must command propulsion and trim actuators.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "sensor_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "assumption": "sensor_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Navigation, airdata and structural state must feed autonomy decisions.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "payload_data_link"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:payload_communication:control_compute_communication:payload_data_link",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "payload_communication -> control_compute_communication",
+      "assumption": "payload_data_link is named on both endpoint modules in the generated architecture.",
+      "basis": "Payload state must be visible to vehicle autonomy and telemetry.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "thermal_path"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:environmental_interface:energy_storage_source:thermal_path",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "environmental_interface -> energy_storage_source",
+      "assumption": "thermal_path is named on both endpoint modules in the generated architecture.",
+      "basis": "Battery survival and night-cycle capacity depend on a declared thermal path.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "telemetry_link"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:safety_protection:control_compute_communication:telemetry_link",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "safety_protection -> control_compute_communication",
+      "assumption": "telemetry_link is named on both endpoint modules in the generated architecture.",
+      "basis": "Abort, descent and recovery state must remain visible to ground operators.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "high_aspect_ratio_wing_structure"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:structure_containment_wing_primary_structure_high_aspect_ratio_wing_structure",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "High-aspect-ratio wing structure",
+      "assumption": "High-aspect-ratio wing structure is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "solar_cell_array"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_harvesting_solar_skin_array_solar_cell_array",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Solar cell array",
+      "assumption": "Solar cell array is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "mppt_power_tracker"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_harvesting_mppt_conversion_mppt_power_tracker",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "MPPT power tracker",
+      "assumption": "MPPT power tracker is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "stratospheric_battery_pack"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_storage_source_stratospheric_battery_pack_stratospheric_battery_pack",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Stratospheric battery pack",
+      "assumption": "Stratospheric battery pack is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "electric_propulsion_pod"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:actuation_kinematics_electric_propulsion_pods_electric_propulsion_pod",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Electric propulsion pod",
+      "assumption": "Electric propulsion pod is a critical architecture-derived component candidate with quantity 4 each.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "flight_control_computer"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_flight_control_computer_flight_control_computer",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Flight control computer",
+      "assumption": "Flight control computer is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "ground_control_link"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_ground_command_link_ground_control_link",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Ground control link",
+      "assumption": "Ground control link is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "gnss_ins_navigation_unit"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_navigation_suite_gnss_ins_navigation_unit",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "GNSS INS navigation unit",
+      "assumption": "GNSS INS navigation unit is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "stratospheric_communications_payload"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:payload_communication_payload_radio_stratospheric_communications_payload",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Stratospheric communications payload",
+      "assumption": "Stratospheric communications payload is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "payload_antenna_array"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:payload_communication_antenna_aperture_payload_antenna_array",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Payload antenna array",
+      "assumption": "Payload antenna array is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "thermal_insulation_blanket"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_thermal_protection_thermal_insulation_blanket",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Thermal insulation blanket",
+      "assumption": "Thermal insulation blanket is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "recovery_parachute_system"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:safety_protection_abort_recovery_recovery_parachute_system",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Recovery parachute system",
+      "assumption": "Recovery parachute system is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.haps",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:CAA-UAS-OPS",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "CAA-UAS-OPS",
+      "assumption": "High-altitude unmanned aircraft operational safety case is relevant to this product class in UK / aviation authority review.",
+      "basis": "class_pack:haps.class_pack",
+      "evidenceRequired": "Airspace concept of operations, detect-and-avoid assumptions, command link and recovery evidence."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:DO-160-ENV",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "DO-160-ENV",
+      "assumption": "Airborne equipment environmental conditions is relevant to this product class in Aviation engineering reference.",
+      "basis": "class_pack:haps.class_pack",
+      "evidenceRequired": "Temperature, vibration, electrical power and EMC environmental evidence tailored to stratospheric operation."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:SOLAR-ENERGY-BALANCE-REVIEW",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "SOLAR-ENERGY-BALANCE-REVIEW",
+      "assumption": "Solar day/night energy balance review is relevant to this product class in Project engineering gate.",
+      "basis": "class_pack:haps.class_pack",
+      "evidenceRequired": "Solar collection, battery night-cycle, propulsion load and station-keeping wind model evidence."
+    }
+  ]
+}

@@ -1,0 +1,1799 @@
+FORGE ENGINEERING REPORT
+
+
+
+
+Battery Energy Storage Sys-
+tem (BESS)
+Brief and module decomposition. First-cut engineering report covering the product
+brief and the modules and sub-modules that comprise the design.
+
+
+
+
+Project: chain-v2-1778912383963                                 Generated 2026-05-16
+S E C T I O N 0 · O P E R AT I O N A L H E A D L I N E                                            chain-v2-1778912383963
+
+
+
+
+Operational Headline
+What this design must deliver, physically and operationally. The modules and sub-modules that follow are
+in service of these numbers.
+
+
+
+Annual MWh throughput (estimated)
+                                                                                    1,022 MWh / year
+Usable energy capacity (brief target)                                                                       3.5 MWh
+
+Round-trip efficiency                                                                                      0.92 ratio
+
+Cell count                                                                                               4,896 cells
+
+Cycles per year (assumed)                                                                            365 cycles/yr
+
+
+
+    Deployment context
+    Per unit: 40-ft refrigerated ISO container.
+
+
+
+
+    Financial metrics suppressed
+    Capital expenditure, operating expenditure, revenue, and payback are deliberately omitted at this stage. They
+    will be added in a later phase that aggregates per-component costs from the Bill of Materials and references an
+    explicit assumptions ledger (electricity tariffs, grid-service prices, labour rates, maintenance schedule). Numbers
+    invented before the BoM exists are unreliable and have been removed.
+
+
+
+Assumptions
+• Annual MWh throughput (estimated): Cells not yet specified in the design; estimated from brief target 3.5 MWh x 0.8
+DoD x 365 cycles/year. Will tighten once cell components are emitted.
+• Usable energy capacity (brief target): Brief target: 3.5 MWh usable at 80% DoD, beginning of life.
+• Round-trip efficiency: Industry-typical 0.92 (PCS + thermal losses). Not yet specified in design derived parameters;
+surface a value once the energy conversion module emits efficiency percent.
+• Cell count: Total LFP prismatic cells in cell string sub-modules.
+• Cycles per year (assumed): BESS-standard daily-cycling assumption.
+SECTION 1 · BRIEF & REQUIREMENTS                                                   chain-v2-1778912383963
+
+
+
+
+Brief and Requirements
+What the product is and what it must do.
+
+
+
+
+   Physical specification
+   Derived from structure_containment.derived_parameters — not LLM prose.
+
+
+   Envelope volume                          86.08 m³
+
+   Maximum gross mass                       28,000 kg
+
+   Operating temperature                    -20 to 50 °C
+
+   Target capacity                          3.5 MWh
+
+
+
+
+Overview
+This engineering decomposition details a 3.5 MWh Battery Energy Storage System (BESS) housed
+within a standard 40-foot ISO container. The system is designed around 4,896 CATL 280 Ah LFP
+prismatic cells, configured into 18 racks to provide 4.38 MWh of total energy, yielding 3.51 MWh of
+usable energy at an 80% depth of discharge. A fully integrated 1 MW Power Conversion System
+(PCS) steps the 870 V nominal DC bus to a 400 V AC output, enabling direct grid interaction. The
+architecture emphasizes rapid deployability and high energy density while strictly adhering to a 28,000
+kg maximum gross mass for standard road transport. Thermal management is handled by a 40 kW
+liquid-cooling chiller loop, ensuring the LFP cells remain within their optimal operating temperature
+range of -20 °C to +50 °C ambient. Safety is paramount, with NFPA 855 compliant Novec 1230 fire
+suppression and deflagration venting integrated into the container shell. Control and communication
+are centralized through an industrial Energy Management System (EMS) and SCADA gateway, provid-
+ing the microsecond-level response times required for grid frequency regulation. The entire system is
+factory-assembled, tested, and shipped as a single turnkey unit, minimizing on-site civil and electrical
+works.
+
+
+Mission
+To provide a factory-assembled, rapidly deployable battery energy storage system for grid stability and
+peak shaving applications, meeting a strict £180,000 ex-works cost ceiling and operational within 5
+working days of delivery.
+
+
+Target customers
+UK grid-scale frequency response and capacity market operators. Commercial and industrial (C&I)
+facilities requiring peak shaving and demand charge management.
+SECTION 1 · BRIEF & REQUIREMENTS                                                   chain-v2-1778912383963
+
+
+
+Why now
+The UK's transition to renewable energy sources has created unprecedented volatility in grid frequency,
+driving National Grid ESO to procure fast-responding ancillary services. Simultaneously, supply chain
+constraints and high capital costs demand standardized, containerised solutions that can be deployed
+rapidly without complex site integration.
+SECTION 2 · MODULES                                                      chain-v2-1778912383963
+
+
+
+
+Module Map
+Figure 1. The 11 modules and how they connect.
+
+
+
+
+                                                 1
+                                     11                  2
+
+
+
+                        10                                       3
+
+
+
+
+                      9                                              4
+
+
+
+
+                             8                               5
+
+                                             7       6
+
+
+
+
+Module legend
+
+1     40 ft ISO Container Shell & Fit-Out
+
+2     40 kW Liquid-Cooling Chiller
+
+3     Coolant Pump & Piping Loop
+
+4     Battery Cell String & BMS
+
+5     1 MW Power Conversion System
+
+6     DC Bus & AC Auxiliary Distribution
+
+7     Environmental & Gas Sensing
+
+8     EMS & SCADA Gateway
+
+9     Fire Suppression & Safety Interlocks
+
+10    HMI Touchscreen & Status Indicators
+
+11    Access, Lighting & Service
+SECTION 2 · MODULES   chain-v2-1778912383963
+SECTION 2 · MODULE 1                                                                chain-v2-1778912383963
+
+
+
+MODULE 1
+
+40 ft ISO Container Shell & Fit-Out
+Provides the primary physical envelope and passive environmental protection using a standard 12,192
+x 2,438 x 2,896 mm ISO container shell with a maximum gross mass of 28,000 kg. The ISO container
+shell is constructed from Corten steel with marine-grade paint to withstand harsh outdoor environ-
+ments. Internal partition walls separate the battery racks from the PCS and control electronics to man-
+age thermal zones and fire risks.
+
+A thermal insulation lining of polyurethane foam maintains the internal climate against ambient ex-
+tremes from -20 to +50 °C. Rack mounting rails secure the 18 battery racks to the floor cross-members,
+ensuring stability during transport and operation. The structure containment module utilizes a standard
+40-foot high-cube ISO container fabricated from Corten steel with ISO 1161 corner castings, providing
+a 12,192 x 2,438 x 2,896 mm envelope rated for 28,000 kg gross mass.
+
+Internal fire-rated partitions of galvanized steel studs, 100 mm mineral wool, and 15 mm EN 520 Type
+F plasterboard create separate battery and PCS zones. Polyurethane foam panels 50 mm thick with
+vapor barrier film and reflective aluminum facing maintain internal temperatures between 20 °C and
++50 °C. Rack mounting rails of Unistrut channels secured by M12 Hilti anchors and EPDM vibration
+pads ensure transport and seismic stability.
+
+The structural envelope is engineered to withstand dynamic transport loads and seismic events up to
+Zone 4 without permanent deformation of the rack mounting points. Floor cross-members are rein-
+forced with 4 mm steel gussets welded at 600 mm intervals, distributing the 25,800 kg payload evenly
+across the ISO corner castings. Internal partition walls are constructed from non-combustible mineral
+wool cassettes that provide 120 minutes of fire integrity, preventing thermal runaway propagation from
+the battery zone to the PCS compartment.
+
+The thermal insulation lining utilizes closed-cell polyurethane panels with a lambda value of 0.022
+W/mK, minimizing HVAC energy consumption during extreme ambient conditions. All penetrations
+through the container shell are sealed with intumescent pillows that expand at 150 °C to maintain the
+fire rating, while rack mounting rails are isolated from the floor with EPDM pads to dampen vibration
+and prevent galvanic corrosion between dissimilar metals.
+
+
+
+Sub-modules
+
+
+1.1    ISO container shell
+       The ISO container shell encloses 5 components. A Singamas corten steel shell (part
+       40HC-STD-BESS, in Corten steel, 12192 x 2438 x 2896 mm), rated 28,000 kg gross mass, oper-
+       ating over -40 to +80 °C, certified to ISO 1496-1, CSC plated. 8× corner casting, certified to ISO
+       1161.
+SECTION 2 · MODULE 1                                                                chain-v2-1778912383963
+
+
+
+      14× corrugated roof panel. 30× floor cross-member (in steel). 2× Hutchinson container door seal
+      (part ISO-DOOR-40, in EPDM, 12 m length).
+
+      standard 40-foot high-cube footprint.
+
+
+
+1.2   Internal partition walls
+      The internal partition walls separates 5 components. 20× steel stud framing (in galvanized steel).
+      40× 100 mm thick mineral wool insulation.
+
+      20× 15 mm thick fire-rated plasterboard, certified to EN 520 Type F. 10× intumescent sealant, rated
+      310 ml cartridge. 2× Hormann partition fire door (part FR-90, 2100x900 mm), rated 90 min.
+
+      creates distinct fire zones.
+
+
+
+1.3   Thermal insulation lining
+      The thermal insulation lining insulates 5 components. 60× 50 mm thick polyurethane foam panel. A
+      vapor barrier film (in polyethylene).
+
+      60× reflective aluminum foil facing. 10× 50 mm wide adhesive tape. 20× 3M insulation tape (part
+      471, in vinyl, 50 mm x 33 m).
+
+      lines all exterior-facing walls and roof.
+
+
+
+1.4   Rack mounting rails
+      The rack mounting rails secures 5 components. 36× 3 m length unistrut channel (in galvanized
+      steel). 144× M12 x 100 mm m12 anchor bolt.
+
+      72× vibration damping pad (in EPDM rubber). 18× rail splice plate (in steel). 36× Hilti floor anchor
+      plate (part HST3-M12, in galvanized steel, 120x120x8 mm).
+
+      anchors racks to container floor.
+SECTION 2 · MODULE 2                                                                     chain-v2-1778912383963
+
+
+
+MODULE 2
+
+40 kW Liquid-Cooling Chiller
+Rejects up to 40 kW of heat to the ambient environment to maintain the battery cells within their optimal
+temperature range. The chiller compressor unit circulates 12 kg of R410A refrigerant to cool the liquid
+loop via a brazed plate heat exchanger. A condenser fan assembly exhausts the extracted heat through
+the container roof using variable-speed axial fans.
+
+The HVAC air handler manages the ambient air temperature inside the PCS and control compart-
+ments. Weather louvres protect the air intakes and exhausts from rain and debris ingress while allowing
+adequate airflow. The environmental interface module delivers 40 kW cooling via a Copeland scroll
+compressor circulating 12 kg R410A through a stainless steel 316L brazed plate heat exchanger.
+
+Two 800 mm ebm-papst EC axial fans exhaust heat through the container roof while MERV 8 pleated
+filters and condensate drip pans condition air for the PCS compartment. Weather louvres with extrud-
+ed aluminum blades, stainless steel bird screens, and EPDM weatherstripping protect intakes from
+ingress while maintaining airflow for 20 °C to +50 °C ambient operation. The thermal management
+system utilizes a variable-speed scroll compressor that modulates cooling capacity between 10 kW
+and 40 kW based on the battery heat load, minimizing parasitic power consumption during low C-rate
+operation.
+
+The brazed plate heat exchanger features asymmetric channel geometry to optimize heat transfer be-
+tween the R410A refrigerant and the 30% glycol-water coolant loop, achieving a approach temperature
+of 2 K at full load. Condenser fans are driven by EC motors with integrated PWM control, ramping speed
+proportionally to the condensing pressure to maintain efficient operation across ambient temperatures
+from -20 °C to +50 °C. The HVAC air handler supplies conditioned air to the PCS compartment at a
+positive pressure of 15 Pa, preventing dust ingress through door seals while MERV 8 filters capture
+particulates down to 3 microns.
+
+Weather louvres are aerodynamically profiled to minimize pressure drop while providing 98% rain re-
+jection at 15 m/s wind speeds, ensuring reliable airflow even during heavy storms.
+
+
+
+Sub-modules
+
+
+2.1     Chiller compressor unit
+        The chiller compressor unit cools 5 components. A Copeland scroll compressor, rated 40 kW cool-
+        ing. A brazed plate heat exchanger (in stainless steel 316L).
+
+        A refrigerant accumulator (in steel). 4× vibration isolator (in rubber). 4× Mueller chiller refrigerant
+        line (part ACR-1/2, in copper, 1/2 inch x 3 m).
+
+        interfaces with coolant loop.
+
+
+
+2.2     Condenser fan assembly
+SECTION 2 · MODULE 2                                                                 chain-v2-1778912383963
+
+
+
+      The condenser fan assembly exhausts 5 components. 2× ebm-papst axial ec fan (800 mm diame-
+      ter). 2× fan grille (in powder-coated steel).
+
+      A condenser coil (in copper tube, aluminum fin). A sheet metal shroud (in galvanized steel). 2×
+      ebm-papst fan speed controller (part EC-Control-800, 120x80 mm), rated 0-10 V.
+
+      roof-mounted.
+
+
+
+2.3   HVAC air handler
+      The HVAC air handler conditions 5 components. A evaporator coil (in copper tube, aluminum fin).
+      A centrifugal blower, rated 230 V AC.
+
+      2× pleated merv 8 filter. A condensate drip pan (in stainless steel 304). A Little Giant air handler
+      drain pump (part 554401, 200x150 mm), rated 1/6 HP.
+
+      ducts air to PCS and control zones.
+
+
+
+2.4   Weather louvres
+      The weather louvres protects 5 components. 40× extruded aluminum louvre blade. 4× bird screen
+      mesh (in stainless steel).
+
+      4× rain drip sill (in aluminum). 4× weatherstripping (in EPDM rubber). 4× Ruskin louvre insect screen
+      (part ES-30, in stainless steel, mesh 1 mm).
+
+      mounted on exterior container walls.
+SECTION 2 · MODULE 3                                                                 chain-v2-1778912383963
+
+
+
+MODULE 3
+
+Coolant Pump & Piping Loop
+Circulates 120 L/min of liquid coolant at 2.5 bar through the battery racks to extract electrochemical
+heat. The coolant pump skid provides the motive force using redundant centrifugal pumps.
+
+Distribution manifolds split the main flow into 18 parallel branches, one for each battery rack. A coolant
+piping network of EPDM hoses and stainless steel pipes routes the fluid securely without leaks.
+
+An expansion tank accommodates the thermal expansion of the coolant volume across the operating
+temperature range.
+
+
+
+Sub-modules
+
+
+3.1     Coolant pump skid
+        The coolant pump skid circulates 5 components. 2× Grundfos centrifugal pump (part NB
+        32-125.1/130, in cast iron volute, stainless impeller, 320x220x280 mm), rated 120 L/min, certified
+        to IEC 60034-30 IE3. 2× pump volute (in cast iron).
+
+        2× mechanical seal (in silicon carbide). 2× three-phase motor, rated 1.5 kW. 2× Honeywell pump
+        inlet strainer (part Y-50, in stainless steel, 2 inch).
+
+        redundant duty/standby configuration.
+
+
+
+3.2     Distribution manifolds
+        The distribution manifolds distributes 5 components. A supply manifold (in stainless steel 304). A
+        return manifold (in stainless steel 304).
+
+        18× balancing valve (in brass). 2× drain cock (in brass). 2× WIKA manifold pressure gauge (part
+        111.10, 63 mm), rated 0-4 bar.
+
+        splits flow to 18 battery racks.
+
+
+
+3.3     Coolant piping network
+        The coolant piping network routes 5 components. 36× 1-inch ID epdm rubber hose (in EPDM). 10×
+        2-inch OD stainless rigid pipe.
+
+        72× o-ring face seal (in EPDM). 72× hose clamp (in stainless steel). 10× Armacell pipe insulation
+        sleeve (part HT-50, in EPDM foam, 2 inch ID).
+
+        connects manifolds to rack cold plates.
+
+
+
+3.4     Expansion tank
+SECTION 2 · MODULE 3                                                                      chain-v2-1778912383963
+
+
+
+      The expansion tank accommodates 5 components. A diaphragm expansion vessel, rated 24 L. A
+      pressure relief valve, rated 3 bar.
+
+      A fill port (in brass). A sight glass (in borosilicate glass). A Reflex expansion tank bracket (part ET-24,
+      in galvanized steel, 300x200 mm).
+
+      plumbed into pump suction line.
+
+
+
+3.5   Coolant quality sensor
+      The coolant quality sensor tracks 5 components. A Hamilton conductivity probe (part Conducell
+      4 US, in 316L stainless steel, 120 mm stem), rated 0-200 uS/cm, operating over 0 to +60 °C. A
+      Swagelok stainless flow cell (part FC-316L-1NPT, in 316L stainless steel, 1 inch NPT), rated 4 bar
+      max.
+
+      A Mettler Toledo ph electrode (part InPro 3253, in glass bulb, ceramic junction, 120 mm length), rat-
+      ed pH 0-14. A Hamilton signal transmitter module (part VisiFerm 240, in polycarbonate, 80x60x40
+      mm), rated 4-20 mA output. A Spelsberg junction box (part TK-0808, in polycarbonate, 80x80x55
+      mm), certified to IP67.
+
+      plumbed into main return manifold.
+SECTION 2 · MODULE 4                                                                  chain-v2-1778912383963
+
+
+
+MODULE 4
+
+Battery Cell String & BMS
+Stores 3.51 MWh of usable energy (4.38 MWh total at 80 % depth-of-discharge) in 4,896 LFP pris-
+matic cells rated 280 Ah at 3.2 V nominal, wired as 17 modules of 16 cells in series across 18 racks
+inside the container. The cell string carries the cells, busbars, terminal hardware, voltage tap wires, and
+insulation pads that form the electrochemical pack. The rack structure holds 18 welded steel frames
+with compression-plate preload that constrain the cells under load and cycling.
+
+The BMS slave board reads cell voltage and temperature on every rack and reports to the BMS master
+controller over a daisy-chained CAN bus, which in turn supervises pack state of charge and drives the
+contactors. The DC distribution carries the 870 V bus from the racks through main and pre-charge
+contactors to the power distribution module. The energy storage source integrates 4,896 CATL 280 Ah
+LFP prismatic cells arranged in 18 racks, each rack containing 272 cells configured as 17 modules of
+16 cells in series.
+
+Each cell is monitored by dedicated BMS slave boards using Texas Instruments BQ79616 AFE ICs
+and NTC thermistors for precise voltage and temperature measurement. The rack structure employs
+powder-coated steel frames with M12 compression tie rods applying 3.5 kN preload to mitigate cell
+swelling over the 6,000-cycle design life. DC busbars rated at 1,500 A connect the racks to the main
+contactor assembly, ensuring low-resistance paths for the 870 V nominal bus.
+
+All components comply with IEC 62619 and UL 9540A for thermal runaway prevention. A cold ambient
+heater sub-module provides 500 W PTC ceramic heating elements (DBK HP05-500/230) bonded to
+each rack cold plate, energized via Carlo Gavazzi RGS1A60D10 solid-state relays under BMS master
+control, with Thermik SNAP-45 over-temperature cutout thermostats providing independent hardware
+protection. This ensures safe LFP charge acceptance at ambient temperatures down to 20 °C, as the
+cells cannot accept charge current below 0 °C without risk of lithium plating.
+
+The BMS master enables the heaters when any cell temperature falls below 5 °C and disables them
+once all cells exceed 10 °C, while the cutout thermostats provide a hardwired 45 °C upper limit in-
+dependent of software. The electrochemical architecture relies on precise mechanical constraint and
+thermal coupling to ensure the 6,000-cycle design life is met without excessive cell swelling or im-
+pedance growth. Each 280 Ah prismatic cell is sandwiched between epoxy-glass insulation pads and
+compressed by aluminum end plates that distribute the 3.5 kN preload evenly across the 16-cell module
+stack.
+SECTION 2 · MODULE 4                                                                  chain-v2-1778912383963
+
+
+
+The BMS slave boards are conformal-coated to IPC-CC-830B standards to resist condensation and
+glycol vapour ingress, with isolated CAN transceivers preventing ground loops between racks. Voltage
+sensing harnesses utilize high-temperature silicone wire rated to 150 °C, routed away from the main
+DC busbars to minimize electromagnetic interference during high-current charge/discharge transients.
+The cold ambient heater sub-module ensures that the LFP electrolyte remains above the lithium plating
+threshold during winter deployment, with PTC elements self-regulating to prevent local hot spots that
+could degrade the separator membrane.
+
+
+
+Sub-modules
+
+
+4.1    Cell string
+       The cell string consists of 5 components. 4,896× CATL prismatic lfp prismatic cell (part
+       CB-280Ah-A-50, in LFP cathode / graphite anode, 173x72x207 mm, 5.3 kg), rated 280 Ah, operating
+       over -20 to +60 °C, certified to IEC 62619, UN 38.3 (additional: topology: 16sx17). 4,716× Custom
+       Fabrication cell-to-cell busbar (part BB-280-LFP-CU, in copper C11000, 80x20x3 mm), rated 350
+       A, operating over -40 to +85 °C, certified to IEC 62619.
+
+       4,896× Würth M6 terminal set cell terminal hardware set (part M6-SS316L-KIT, in stainless steel
+       316L, M6 bolt + spring washer + flat washer), rated M6 x 20 mm, certified to IEC 62619. 4,896×
+       JST cell voltage tap wire (part UL3302-22AWG, in tinned copper, PVC insulation, 22 AWG), rated
+       300 V AC, operating over -40 to +105 °C, certified to UL 1015. 4,896× Polytronics cell insulation pad
+       (part FR-4-173x207, in epoxy glass FR4, 173x207x0.5 mm), rated dielectric strength 20 kV/mm,
+       operating over -40 to +130 °C, certified to UL94 V-0.
+
+       A Humiseal conformal coating (part 1B31, in Acrylic, 50 micron), rated IPC-CC-830B. wired in 17
+       modules of 16 cells in series per rack.
+
+
+
+4.2    Rack structure
+       The rack structure mounts 5 components. 18× Custom Fabrication welded steel rack frame (part
+       RACK-FRAME-18, in powder-coated steel, 2200x600x800 mm), rated 500 kg load per rack, op-
+       erating over -40 to +85 °C, certified to IEC 62619, UL 9540A. 18× Custom Fabrication sheet steel
+       module top cover (part RACK-TOP-18, in powder-coated steel 2 mm, 2200x600x2 mm), rated 500
+       N distributed load, certified to UL 9540A.
+
+       18× Custom Fabrication sheet steel module bottom tray (part RACK-BOT-18, in powder-coated
+       steel 3 mm, 2200x600x3 mm), rated 800 N distributed load, certified to UL 9540A. 18× Custom
+       Fabrication compression plate (part COMP-PLT-280, in aluminum 6061-T6, 180x75x8 mm), rated
+       3.5 kN, certified to IEC 62619. 18× Würth compression tie rod set (part M12-4340-800MM, in alloy
+       steel 42CrMo4, M12x4), rated 3.5 kN preload per rod, operating over -40 to +85 °C, certified to IEC
+       62619.
+
+       18 racks per container.
+SECTION 2 · MODULE 4                                                                chain-v2-1778912383963
+
+
+
+4.3   BMS slave board
+      The BMS slave board monitors 5 components. 306× Custom PCBA bms slave pcb (assembled)
+      (part BSV-PCB-A1, in FR4 4-layer, conformal coated, 100x60x12 mm), rated 16 ch, operating over
+      -40 to +85 °C, certified to IEC 62619, RoHS (additional: topology: CAN daisy). 306× Texas Instru-
+      ments bms slave afe ic (part BQ79616, in silicon die, TQFP-48 package, 7x7 mm TQFP-48), rated
+      16-channel cell monitor, operating over -40 to +125 °C, certified to AEC-Q100.
+
+      2,448× TDK ntc thermistor (part NTCG164BH103JT1, in metal-oxide ceramic, 1.6 mm bead), rated
+      10 kohm, secondary rating ±0.5 °C, operating over -40 to +125 °C, certified to IEC 60539-1. 306×
+      Molex module voltage harness (part 5057-9416, in Tinned copper, PVC insulation, 24 AWG, 500
+      mm), rated 16 ch, certified to UL 1007. 306× Bussmann module terminal fuse (part 170M1566, in
+      ceramic body, silver-plated caps, 10x38 mm), rated 125 A, secondary rating 1000 V DC, certified
+      to IEC 60269-2.
+
+      17 per rack, daisy-chained on CAN.
+
+
+
+4.4   BMS master controller
+      The BMS master controller supervises 5 components. A Custom PCBA bms master pcb (as-
+      sembled) (part BM-PCB-M1, in FR4 4-layer, conformal coated, 120x80x15 mm), rated 1500 V
+      iso, operating over -40 to +85 °C, certified to IEC 62619. A STMicroelectronics mcu ic (part
+      STM32F427VGT6, in silicon die, LQFP-100 package, 14x14 mm LQFP), rated 168 MHz ARM Cor-
+      tex-M4, operating over -40 to +105 °C, certified to AEC-Q100.
+
+      2× NXP can transceiver (part TJA1051T, in silicon die, SOIC-8 package, 5x4 mm SOIC), rated 500
+      kbit, operating over -40 to +125 °C, certified to AEC-Q100. A Analog Devices digital isolator (part
+      ADuM1401ARWZ, in Silicon die, SOIC-16, 10x7 mm), rated 5 kV, certified to UL 1577. A Texas
+      Instruments dc-dc buck regulator (part TPS54331DR, in Silicon die, SOIC-8, 5x4 mm), rated 5V to
+      3.3V, 1A, certified to RoHS.
+
+      one master per container.
+
+
+
+4.5   DC distribution
+      The DC distribution distributes 5 components. A Custom Fabrication pack dc busbar (+) (part
+      DC-BUS-POS-1500, in tin-plated copper C11000, 100x10x1200 mm), rated 1500 A, certified to IEC
+      61439-1. A Custom Fabrication pack dc busbar (-) (part DC-BUS-NEG-1500, in Tin-plated copper
+      C11000, 100x10x1200 mm), rated 1500 A, certified to IEC 61439-1.
+
+      A TE Connectivity main dc contactor (part GX21BAB, in silver-alloy contacts, ceramic arc chamber,
+      185x115x100 mm, 4.2 kg), rated 1500 A, secondary rating 6000 A break at 900 V DC, operating over
+      -40 to +85 °C, certified to UL 508, IEC 60947-4-1. A Gigavac precharge contactor (part GX16BAA,
+      in silver-alloy contacts, ceramic arc chamber, 120x80x90 mm), rated 50 A, secondary rating 900 V
+      DC, operating over -40 to +85 °C, certified to UL 508, IEC 60947-4-1. A Arcol precharge resistor
+      (part HS50-100R-F, in wirewound ceramic core, 50x12 mm), rated 100 ohm, secondary rating 200
+      W, operating over -55 to +250 °C, certified to IEC 60115-1.
+
+      aggregates 18 racks to the main DC bus.
+SECTION 2 · MODULE 4                                                                chain-v2-1778912383963
+
+
+
+
+4.6   Rack thermal interface
+      The rack thermal interface cools 5 components. 36× Lytron aluminum cold plate (part CP12G05,
+      280x120x12 mm), rated 2.5 bar. 72× Parker quick connect fitting (part FF-1-1/2, in stainless steel,
+      1 inch).
+
+      36× Gates flexible coolant hose (part EPDM-1, in EPDM, 1 inch ID x 1 m). 36× Bergquist thermal
+      gap pad (part GP6000-0.125, in silicone gel, 280x120x3.2 mm), rated 6.0 W/mK, operating over
+      -40 to +200 °C. 36× Parker coolant manifold isolation valve (part BV-1-BSS, in stainless steel 316,
+      1 inch NPT), rated 2.5 bar, operating over -20 to +120 °C.
+
+      interfaces each rack to main coolant loop.
+
+
+
+4.7   Cold ambient heater
+      The cold ambient heater heats 5 components. 18× DBK ptc heating element (part HP05-500/230,
+      in PTC ceramic, 150x100x12 mm), rated 500 W at 230 V AC, operating over -40 to +250 °C. 18×
+      Carlo Gavazzi solid-state relay (part RGS1A60D10, in plastic housing, 75x45x28 mm), rated 10 A
+      at 24 V DC control, certified to IEC 62314.
+
+      18× Thermik over-temperature cutout thermostat (part SNAP-45, in ceramic, 30x15 mm), rated 45
+      °C trip, certified to IEC 60730. A Lapp heater power wiring (part ÖLFLEX-150-3G2.5, in copper,
+      PVC jacket, 10 m), rated 3x2.5 mm², certified to IEC 60332-1. 024.0040, in polycarbonate housing,
+      28x21x35 mm), rated 24 V DC coil, 10 A contact, operating over -40 to +85 °C, certified to IEC
+      61810-1.
+
+      one heater per rack, controlled by BMS.
+SECTION 2 · MODULE 5                                                                 chain-v2-1778912383963
+
+
+
+MODULE 5
+
+1 MW Power Conversion System
+Converts the 870 V nominal DC bus voltage to 400 V AC at 50 Hz via a 1,000 kW continuous and
+1,250 kW peak Power Conversion System (PCS). The PCS inverter module utilizes IGBTs and DC link
+capacitors to synthesize the AC waveform from the battery DC supply. An AC filter network smooths
+the switching harmonics using line reactors and filter capacitors before power reaches the grid.
+
+The isolation transformer provides galvanic separation and steps the voltage to the required 400 V
+AC output. The PCS control board manages the high-frequency switching and synchronizes with the
+grid under the supervision of the site EMS. The energy conversion transduction module employs six
+Infineon 1,700 V 1,000 A IGBT modules in a three-phase bridge topology, supported by twelve 1,000
+uF 1,100 V DC link capacitors.
+
+An LCL filter network comprising three 100 uH 1,500 A line reactors and six 200 uF 690 V AC capaci-
+tors attenuates switching harmonics below IEEE 519 limits. The isolation transformer, rated Dyn11 with
+silicon steel core and copper windings, steps the inverter output to 400 V AC while providing galvanic
+isolation per IEC 62477-1. The PCS control board utilizes a Texas Instruments 200 MHz DSP and
+50k-cell FPGA for microsecond-level grid synchronization and frequency response.
+
+The power conversion topology utilizes a three-level neutral-point-clamped inverter architecture to
+minimize switching losses and reduce dv/dt stress on the motor windings and filter components. The
+IGBT modules are mounted on liquid-cooled cold plates with thermal interface material rated to 3.5
+W/mK, ensuring junction temperatures remain below 125 °C during 1.25 MW peak operation. Gate dri-
+ver boards feature active short-circuit protection and desaturation detection, shutting down the bridge
+within 2 us of a fault event to prevent catastrophic module failure.
+
+The LCL filter is tuned to a resonant frequency of 1.8 kHz, well above the 4 kHz switching frequency,
+with damping resistors absorbing harmonic energy to meet IEEE 519 THD limits of less than 3%. The
+isolation transformer utilizes vacuum pressure impregnated Class H insulation to withstand thermal
+cycling and moisture ingress, with integrated PT100 sensors in the windings feeding temperature data
+to the PCS control board for dynamic derating.
+
+
+
+Sub-modules
+
+
+5.1     PCS inverter module
+        The PCS inverter module synthesizes 5 components. 6× Infineon igbt module (part FF1000R17IE4,
+        in silicon IGBT, AlN substrate, 190x140x38 mm 62 mm module, 1.8 kg), rated 1700 V / 1000 A,
+        secondary rating 1700 V / 1000 A half-bridge, operating over -40 to +150 °C junction, certified to
+        IEC 62477-1, UL 61800-5-1. 12× EPCOS dc link capacitor (part B25620-S2105-K, in metallized
+        polypropylene film, 136x76x105 mm), rated 1000 uF, secondary rating 1100 V DC, operating over
+        -40 to +85 °C, certified to IEC 61071.
+SECTION 2 · MODULE 5                                                                chain-v2-1778912383963
+
+
+
+      6× Custom PCBA gate driver board (part GD-62MM-A1, in FR4 4-layer, conformal coated,
+      100x80x15 mm), rated isolated, operating over -40 to +85 °C, certified to IEC 62477-1. 3× Aavid
+      inverter heat sink (part HS-62MM-3PH, in extruded aluminum, 400x250x80 mm), rated 0.15 K/W
+      thermal resistance, certified to RoHS. 3× Custom Fabrication phase busbar (part PH-BUS-1000, in
+      copper C11000, 50x10x300 mm), rated 1000 A, certified to IEC 61439-2.
+
+      three-phase bridge configuration.
+
+
+
+5.2   AC filter network
+      The AC filter network smooths 5 components. 3× Block ac line reactor (part NKD 1500/100UH,
+      in copper winding, silicon steel core, 350x280x300 mm), rated 100 uH, secondary rating 1500
+      A, operating over -25 to +85 °C, certified to IEC 61558-1. 6× Vishay ac filter capacitor (part
+      MKP1848C62060JY2, in Metallized polypropylene film, 45x30x40 mm), rated 200 uF, secondary
+      rating 690 V AC, certified to IEC 61071.
+
+      3× Arcol damping resistor (part HS500-5R-F, in Wirewound ceramic core, 150x50x30 mm), rat-
+      ed 5 ohm, secondary rating 500 W, certified to IEC 60115-1. A Custom PCBA filter pcb (part
+      FLT-PCB-A1, in FR4, 200x150x2 mm), rated 1500 A, certified to RoHS. 3× TDK filter inductor (part
+      B82726S2203A040, 50x40x30 mm), rated 100 uH.
+
+      LCL filter topology.
+
+
+
+5.3   Isolation transformer
+      The isolation transformer isolates 5 components. A Custom Winding transformer core (part
+      XFMR-CORE-1MW, in silicon steel, 800x600x900 mm), rated 1000 kVA, 50 Hz, certified to IEC
+      60076-11. 3× Custom Winding primary winding (part XFMR-PRI-1MW, in copper, N/A), rated 870
+      V, certified to IEC 60076-11.
+
+      3× Custom Winding secondary winding (part XFMR-SEC-1MW, in copper, N/A), rated 400 V, certi-
+      fied to IEC 60076-11. A Custom Fabrication resin cast enclosure (part XFMR-ENC-1MW, in epoxy
+      resin, 1000x800x1100 mm), rated IP20, certified to IEC 60076-11. 4× Rittal transformer mounting
+      bracket (part TS 8601.000, in galvanized steel, 200x150x10 mm).
+
+      Dyn11 vector group.
+
+
+
+5.4   PCS control board
+      The PCS control board controls 5 components. A Texas Instruments dsp controller (part
+      TMS320F28379D, in silicon die, BGA-337, 16x16 mm BGA), rated 200 MHz, secondary rating
+      dual-core 200 MHz, operating over -40 to +125 °C, certified to IEC 61508 SIL2 capable. A Intel fpga
+      ic (part 10M08SAU169I7G, in silicon die, UBGA-169, 10x10 mm), rated 50k logic cells, operating
+      over -40 to +100 °C, certified to IEC 61508.
+
+      8× Analog Devices adc sensor ic (part AD7606BSTZ, in Silicon die, LQFP-64, 10x10 mm), rated
+      16-bit, certified to RoHS. 2× comms interface ic, rated Ethernet PHY. 2× Analog Devices comms
+      isolator (part ADM3053BRWZ, 10x7 mm), rated 5 kV.
+SECTION 2 · MODULE 5                                                            chain-v2-1778912383963
+
+
+
+      A Heraeus PT100 Sensor (part M222, in Platinum/Ceramic, 2x2mm), rated Class A. interfaces with
+      site EMS.
+SECTION 2 · MODULE 6                                                                  chain-v2-1778912383963
+
+
+
+MODULE 6
+
+DC Bus & AC Auxiliary Distribution
+Routes the 1,500 A DC power from the battery racks to the PCS and distributes 230 V AC auxiliary
+power. The main DC bus system utilizes heavy-duty copper busbars to aggregate the 18 rack outputs
+into a single 870 V DC node.
+
+An auxiliary AC panel distributes grid-supplied power to the chiller, pumps, and control systems via
+MCBs and RCBOs. Cable transit glands provide IP65 sealing for the 8 external power and communi-
+cation cables entering the container.
+
+A comprehensive grounding network bonds all metallic structures and enclosures to a common earth
+potential.
+
+
+
+Sub-modules
+
+
+6.1     Main DC bus system
+        The main DC bus system aggregates 5 components. 2× heavy-duty copper busbar (in copper
+        C11000), rated 1500 A. 24× standoff insulator (in polyester resin), rated 1000 V DC.
+
+        18× busbar splice plate (in copper). A heat shrink tubing (in polyolefin). 8× Aavid busbar heat sink
+        (part HS-1500, in extruded aluminum, 300x50 mm).
+
+        runs length of battery compartment.
+
+
+
+6.2     Auxiliary AC panel
+        The auxiliary AC panel distributes 5 components. A mcb distribution board, rated 24-way. 12× rcbo
+        breaker, rated 16 A / 30 mA.
+
+        2× 35 mm din rail. A neutral busbar (in brass). A Rittal ac panel enclosure (part AE-1035, in pow-
+        der-coated steel, 600x400x200 mm).
+
+        fed from external auxiliary supply.
+
+
+
+6.3     Cable transit glands
+        The cable transit glands seals 5 components. 2× transit frame (in galvanized steel). 16× elastomeric
+        sealing module (in EPDM rubber).
+
+        2× mechanical compression compression wedge. 8× blanking plug (in rubber). 8× Roxtec transit
+        blanking plug (part BP-20, in rubber, 20 mm).
+
+        installed in container floor penetrations.
+
+
+
+6.4     Grounding network
+SECTION 2 · MODULE 6                                                                chain-v2-1778912383963
+
+
+
+      The grounding network bonds 5 components. A 25 x 3 mm copper earth tape. 4× ground rod (in
+      copper-clad steel).
+
+      8× permanent weld exothermic weld joint. 36× braided copper earth bonding jumper. 36× Panduit
+      earth tape lug (part LCCF2-14A-E, in copper, M12).
+
+      connects all racks, PCS, and container shell.
+
+
+
+6.5   DC insulation monitor
+      The DC insulation monitor monitors 5 components. A Bender insulation monitor device (part
+      IRDH275-435, in polycarbonate housing, 90x70x60 mm), rated 0-1000 V DC, operating over -20 to
+      +60 °C, certified to IEC 61557-8. A Phoenix Contact din rail enclosure (part ME-22.5, in polyamide,
+      100x80x45 mm), certified to IP20.
+
+      A Belden modbus rs-485 cable (part 3106A, in tinned copper, PE insulation, 5 m length), rated
+      shielded twisted pair. A Bender setpoint relay module (part RCM470, in thermoplastic housing,
+      70x45x60 mm), rated dual setpoint 250 V AC. A Bender test signal coupler (part AGH150W, in
+      epoxy encapsulated, 60x40x30 mm), rated 1000 V DC coupling.
+
+      connected between DC bus and chassis earth.
+SECTION 2 · MODULE 7                                                                  chain-v2-1778912383963
+
+
+
+MODULE 7
+
+Environmental & Gas Sensing
+Measures critical physical states across the BESS using 12 temperature sensors, 4 gas detectors, and
+2 flow meters. The HVAC temperature sensors monitor ambient and rack-level air temperatures to drive
+the cooling system. Hydrogen gas detectors provide early warning of cell venting events by sniffing the
+container atmosphere.
+
+Coolant flow meters verify the 120 L/min circulation rate through the battery cold plates. Container
+humidity sensors track internal moisture levels to prevent condensation on high-voltage busbars. All
+sensor sub-modules communicate to the EMS controller via shared Modbus RTU and 4-20 mA analog
+input infrastructure, with JUMO PT100 RTDs on IEC 60751-compliant ceramic probes, Dräger catalyt-
+ic bead H2 sensors rated to IEC 60079-29-1 for explosive atmospheres, and ultrasonic flow meters
+verifying the 120 L/min coolant circulation rate through the battery cold plates.
+
+
+
+Sub-modules
+
+
+7.1     HVAC temperature sensors
+        The HVAC temperature sensors monitors 5 components. 12× JUMO pt100 rtd sensor (part
+        902820/10-1000-1/2-6-100-0, in platinum thin-film on ceramic, 6 mm probe x 100 mm stem), rated
+        Class A ±0.15 °C, operating over -50 to +500 °C, certified to IEC 60751. 12× sensor housing,
+        certified to IP65.
+
+        12× 3-core shielded shielded sensor cable. 12× mounting clip (in nylon). 12× Rittal sensor cable
+        gland (part 2412.000, M16), certified to IP68.
+
+        distributed across battery and PCS zones.
+
+
+
+7.2     Hydrogen gas detectors
+        The hydrogen gas detectors detects 5 components. 4× Dräger catalytic bead sensor (part 6810940,
+        in palladium catalyst on ceramic bead, 30 mm probe head), rated 0-100% LEL H2, operating over
+        -40 to +65 °C, certified to IEC 60079-29-1. 4× transmitter enclosure (in cast aluminum).
+
+        4× calibration port (in brass). 4× alarm relay module, rated 24 V DC. 4× Pepperl+Fuchs gas detector
+        mount (part V1-G-2M-PUR, in stainless steel, 80x60 mm).
+
+        mounted near ceiling in battery zone.
+
+
+
+7.3     Coolant flow meters
+        The coolant flow meters verifies 5 components. 2× ultrasonic flow sensor, rated 0-200 L/min. 4×
+        2-inch NPT brass pipe fitting.
+
+        2× signal transmitter, rated 4-20 mA output. 2× power cable, rated 24 V DC. 2× Lapp flow meter
+        cable (part 1136204, 5 m), rated 4-20 mA.
+SECTION 2 · MODULE 7                                                             chain-v2-1778912383963
+
+
+
+      installed on main supply and return lines.
+
+
+
+7.4   Container humidity sensors
+      The container humidity sensors tracks 5 components. 4× capacitive humidity sensor, rated 0-100%
+      RH. 4× sintered bronze filter (in sintered bronze).
+
+      4× abs enclosure (in ABS plastic). 4× analog output module, rated 0-10 V. 4× Hammond humidity
+      sensor mount (part 1551H, in ABS, 50x40x20 mm).
+
+      distributed across container interior.
+SECTION 2 · MODULE 8                                                               chain-v2-1778912383963
+
+
+
+MODULE 8
+
+EMS & SCADA Gateway
+Supervises the entire BESS operation via a 1,200 MHz EMS controller that coordinates the PCS, BMS,
+and thermal management. The EMS controller executes the peak shaving and frequency response
+algorithms required for the UK grid market.
+
+A SCADA gateway translates internal CAN and Modbus traffic into DNP3 or IEC 61850 for the utility
+dispatch center. The network switch routes Ethernet traffic between the 16 internal IP-enabled devices.
+
+A 3,000 VA UPS backup power unit ensures the control and communication systems remain online
+during grid outages.
+
+
+
+Sub-modules
+
+
+8.1    EMS controller
+       The EMS controller executes 5 components. A Beckhoff DIN-rail mount industrial pc enclosure (part
+       CX5140-0125, in die-cast aluminum, 126x100x67 mm), rated 1.4 GHz quad-core ARM, operating
+       over -25 to +60 °C, certified to IEC 61131-2, CE. A arm cortex-a53 cpu, rated 1200 MHz.
+
+       A ddr4 ram module, rated 4 GB. A ssd storage drive, rated 64 GB. A Moxa ems ethernet switch (part
+       EDS-208A, 50x115x30 mm), rated 8-port.
+
+       central node for all site logic.
+
+
+
+8.2    SCADA gateway
+       The SCADA gateway translates 5 components. A protocol converter gateway, certified to IEC 61850
+       / DNP3. 4× rs-485 transceiver, rated isolated.
+
+       2× ethernet phy ic, rated Gigabit. A gateway power supply, rated 24 V DC. 4× Belden scada serial
+       cable (part 9841, 10 m), rated RS-485.
+
+       interfaces with utility dispatch.
+
+
+
+8.3    Network switch
+       The network switch routes 5 components. A 16-port gigabit switch, rated managed Layer 2. 2× fiber
+       optic sfp uplink module.
+
+       16× rj45 patch cable, rated Cat6. 2× rack-mount ear (in steel). 2× Cisco switch sfp module (part
+       GLC-SX-MMD, 56x14x9 mm), rated 1 Gbps.
+
+       star topology for internal LAN.
+
+
+
+8.4    UPS backup power
+SECTION 2 · MODULE 8                                                            chain-v2-1778912383963
+
+
+
+      The UPS backup power sustains 5 components. A ups unit 3kva, rated 3000 VA (additional: topol-
+      ogy: online double conversion). 4× vrla battery pack, rated 12 V 9 Ah.
+
+      A pure sine wave ups inverter board. A manual ups bypass switch. A Schneider ups bypass cable
+      (part SUA3000RM2U, 480x680x90 mm), rated 3000 VA.
+
+      powers EMS, SCADA, and network switch.
+SECTION 2 · MODULE 9                                                                   chain-v2-1778912383963
+
+
+
+MODULE 9
+
+Fire Suppression & Safety Interlocks
+Detects and mitigates operation-time hazards, including a 150 L Novec 1230 fire suppression system
+compliant with NFPA 855. The fire suppression cylinders are piped to discharge nozzles above the
+battery racks upon confirmed thermal events. Deflagration vent panels provide 2.5 square meters of
+pressure relief area to safely direct explosion forces outside the container.
+
+Smoke and heat detectors form the primary detection loop, triggering alarms and interlocks before sup-
+pression release. An emergency stop loop allows operators to instantly open all DC and AC contactors
+via manual pushbuttons. The safety protection module integrates a 150 L Novec 1230 suppression
+system with two 75 L cylinders, solenoid valves, and brass discharge nozzles compliant with NFPA
+855.
+
+Four 0.625 sqm rupture panels provide 2.5 m² deflagration venting area at 0.1 bar burst pressure.
+Cross-zoned optical smoke and 58 °C rate-of-rise heat detectors feed a 2-zone fire alarm panel that
+triggers suppression and E-stop loops. A SIL3 safety relay and twist-to-release E-stop pushbuttons in
+IP65 yellow enclosures provide hardwired contactor trip capability independent of software control.
+
+Door interlock switches (Schmersal AZM400-B1 coded magnetic actuators) on both personnel doors
+feed a Pilz PNOZ s4 dual-channel SIL2 safety relay that trips the main DC contactors whenever a
+door is opened, ensuring operators cannot access high-voltage compartments while the battery bus is
+energized. This interlock is wired in series with the emergency stop loop so that either a door opening
+or an E-stop activation produces the same HV isolation action, compliant with IEC 60947-5-3 and
+NFPA 855 access control requirements. The safety architecture implements a defense-in-depth strat-
+egy combining passive containment, active suppression, and hardwired interlocks to mitigate thermal
+runaway and electrical hazards.
+
+Novec 1230 cylinders are pressurized to 25 bar with nitrogen superpressurization, delivering a 10-sec-
+ond flood discharge that achieves a 4.5% design concentration without reducing oxygen levels below
+safe limits for personnel evacuation. Deflagration vent panels are calibrated to burst at 0.1 bar, directing
+overpressure waves vertically away from site infrastructure while weather covers prevent rain ingress
+during normal operation. The emergency stop loop utilizes dual-channel architecture with monitored
+safety relays that detect contact welding or wire breaks, ensuring a SIL3 probability of dangerous failure
+below 10^-7 per hour.
+
+Door interlock switches are coded magnetic devices that cannot be defeated with standard tools, feed-
+ing directly into the safety PLC which isolates the DC bus and disables the PCS inverter before the
+personnel door can be fully opened.
+
+
+
+Sub-modules
+
+
+9.1     Fire suppression cylinders
+SECTION 2 · MODULE 9                                                                  chain-v2-1778912383963
+
+
+
+      The fire suppression cylinders suppresses 5 components. 2× novec 1230 cylinder, rated 75 L, cer-
+      tified to NFPA 855. 2× solenoid release valve, rated 24 V DC.
+
+      2× pressure gauge, rated 0-40 bar. 8× discharge nozzle (in brass). 2× cylinder mounting bracket (in
+      steel).
+
+      floods battery compartment.
+
+
+
+9.2   Deflagration vent panels
+      The deflagration vent panels vents 5 components. 4× 0.625 sqm rupture panel, rated 0.1 bar burst.
+      4× weather cover (in aluminum).
+
+      4× magnetic reed switch burst sensor. 4× vent mounting frame (in steel). 4× Fike vent weather cover
+      (part DV-625, in aluminum, 800x800 mm).
+
+      mounted on container roof.
+
+
+
+9.3   Smoke and heat detectors
+      The smoke and heat detectors detects 5 components. 6× photoelectric optical smoke sensor. 4×
+      rate-of-rise heat sensor, rated 58 °C threshold.
+
+      10× standard base detector base. A fire alarm control panel, rated 2-zone. 10× Apollo detector base
+      plate (part 45681-210, in polycarbonate, 100 mm dia).
+
+      cross-zoned for verified alarm.
+
+
+
+9.4   Emergency stop loop
+      The emergency stop loop interrupts 5 components. 4× twist-to-release e-stop pushbutton. 8× Nor-
+      mally Closed (NC) contact block.
+
+      4× yellow enclosure, certified to IP65. A safety relay, certified to SIL3. 4× Brady e-stop label plate
+      (part M71-31-423, in polyester, 50x25 mm).
+
+      hardwired to main contactor coils.
+
+
+
+9.5   Smoke vent interlock
+      The smoke vent interlock interlocks 5 components. A Pilz safety plc (part PNOZsigma, 120x90 mm),
+      rated SIL3. 4× Schneider interlock relay (part RM4, 22 mm), rated 24 V DC.
+
+      2× Eaton manual reset button (part M22-E-ST, in polycarbonate, 22 mm). A Belden interlock wiring
+      harness (part 8443-006, in copper, PVC jacket, 25 m), rated 6-conductor shielded, certified to IEC
+      60332-1. 2× Werma interlock status indicator (part 623.610.55, in polycarbonate, 22 mm mount),
+      rated 24 V DC LED green/red, certified to IP67.
+
+      links detection to venting.
+SECTION 2 · MODULE 9                                                                chain-v2-1778912383963
+
+
+
+9.6   Door interlock switches
+      The door interlock switches isolates 5 components. 2× Schmersal magnetic safety switch (part
+      AZM400-B1, in glass-fibre reinforced thermoplastic, 80x40x25 mm), rated coded magnetic actuator,
+      certified to IEC 60947-5-3 SIL2. A Pilz dual-channel safety relay (part PNOZ s4, in plastic housing,
+      22.5x99x114 mm), rated dual-channel SIL2, certified to IEC 61508 SIL2.
+
+      2× Schmersal coded actuator target (part AZM400-A1, in glass-fibre reinforced thermoplastic,
+      50x20x10 mm), rated coded magnetic, certified to IP67. A Belden interlock cable (part 8443-004, in
+      copper, PVC jacket, 5 m), rated 4-conductor shielded, certified to IEC 60332-1. 4× Hawke interlock
+      conduit fitting (part 501/414-M20, in nickel-plated brass, M20 x 1.5 mm), rated M20 compression,
+      certified to IEC 60529 and IP66.
+
+      one switch per personnel door, series-wired to safety relay.
+SECTION 2 · MODULE 10                                                                    chain-v2-1778912383963
+
+
+
+MODULE 10
+
+HMI Touchscreen & Status Indicators
+Provides operator-facing touchpoints for local monitoring and control via a 15-inch touchscreen. The
+main HMI panel displays system state of charge, active alarms, and power flow diagrams to site tech-
+nicians.
+
+A status beacon tower uses 3 colors to visually broadcast the BESS operational state across the site.
+Manual override switches allow operators to force the system into standby or maintenance modes
+without accessing the software interface.
+
+
+
+Sub-modules
+
+
+10.1       Main HMI panel
+           The main HMI panel displays 5 components. A 15-inch capacitive touchscreen. A panel mount bezel
+           (in anodized aluminum).
+
+           A lcd display matrix, rated 1080p resolution. A USB interface touch controller pcb. A 3M hmi pro-
+           tective overlay (part HP-100, in polyester, 15 inch).
+
+           mounted on main control cabinet door.
+
+
+
+10.2       Status beacon tower
+           The status beacon tower indicates 5 components. A Red/Yellow/Green led tower light. A buzzer
+           module, rated 85 dB.
+
+           A mounting pole (in aluminum). A base bracket (in steel). A Werma beacon mounting bracket (part
+           975.840, in aluminum, 100 mm).
+
+           visible from exterior of container.
+
+
+
+10.3       Manual override switches
+           The manual override switches overrides 5 components. 2× 3-position rotary selector switch. 4×
+           NO/NC switch contact block.
+
+           2× engraved plastic legend plate. A panel enclosure, certified to IP65. 2× Schneider override switch
+           guard (part ZB5-AZ, in polycarbonate, 30 mm).
+
+           located adjacent to main HMI.
+SECTION 2 · MODULE 11                                                                  chain-v2-1778912383963
+
+
+
+MODULE 11
+
+Access, Lighting & Service
+Affords safe offline inspection and service access through 2 dedicated personnel doors. The access
+doors hardware includes panic bars and heavy-duty weather seals for secure, reliable entry.
+
+Internal LED lighting illuminates the 40-foot container interior with 6 fixtures to ensure visibility during
+maintenance. Service receptacles provide 230 V AC power for diagnostic laptops and power tools at
+4 locations.
+
+A safety signage kit clearly marks high-voltage hazards, egress routes, and fire suppression manual
+releases.
+
+
+
+Sub-modules
+
+
+11.1    Access doors hardware
+        The access doors hardware secures 5 components. 2× steel personnel door, rated fire-rated. 2×
+        panic bar latch (in stainless steel).
+
+        6× heavy-duty hinge (in steel). 2× door weather seal (in EPDM rubber). 2× Dorma door hold open
+        arm (part TS-93, in stainless steel, 300 mm).
+
+        one door per main compartment.
+
+
+
+11.2    Internal LED lighting
+        The internal LED lighting illuminates 5 components. 6× led batten fixture, rated 4000K white. 2× PIR
+        motion sensor switch.
+
+        2× emergency battery backup, rated 3-hour duration. 6× lighting conduit drop (in PVC). 6× Philips
+        lighting diffuser (part CoreLine-4ft, in polycarbonate, 1200 mm).
+
+        ceiling-mounted along central aisle.
+
+
+
+11.3    Service receptacles
+        The service receptacles powers 5 components. 4× ip65 service socket, rated 230 V AC 13 A, cer-
+        tified to IP65. 4× socket back box (in polycarbonate).
+
+        8× M20 conduit gland. 4× 3-way push-in wiring terminal block. 4× Legrand receptacle cover plate
+        (part 069721, in polycarbonate, 86x86 mm).
+
+        distributed along container walls.
+
+
+
+11.4    Safety signage kit
+SECTION 2 · MODULE 11                                                                 chain-v2-1778912383963
+
+
+
+      The safety signage kit warns 5 components. 10× high-voltage warning sign (in adhesive vinyl). 4×
+      arc flash label (in adhesive vinyl).
+
+      4× photoluminescent egress route sign. 2× fire extinguisher sign (in rigid plastic). 20× Brady signage
+      mounting kit (part SIGN-KIT-ISO, in stainless steel, M4 screws).
+
+      applied to doors, racks, and switchgear.
+S E C T I O N 2 · R E G U L ATO RY & C O M P L I A N C E                                                 chain-v2-1778912383963
+
+
+
+
+Regulatory & Compliance
+Standards that govern this product class. Compliance is dictated by jurisdiction + use case BEFORE the
+design exists; the design downstream must demonstrate conformity with the mandatory items below.
+
+
+Stationary BESS compliance is driven by cell-level safety (IEC 62619), system-level thermal-runaway
+containment (UL 9540A + NFPA 855), and grid-connection requirements (G99 in UK / EN 50549 in EU).
+Transport of installed cells additionally requires UN 38.3.
+
+
+CODE                      STANDARD                                                              JURIS.         STATUS
+
+
+
+                          Secondary cells and batteries containing alkaline or other
+                          non-acid electrolytes - Safety requirements for stationary cells
+IEC 62619                 and batteries                                                         IEC            Mandatory
+
+                          Mandatory cell-level safety for any stationary Li-ion installation; tests internal short-circuit,
+                          overcharge, and thermal abuse on production cells.
+
+
+                          Test Method for Evaluating Thermal Runaway Fire Propaga-
+UL 9540A                  tion in Battery Energy Storage Systems                                US             Mandatory
+
+                          Standardised cell-to-module-to-installation thermal-runaway propagation test; AHJ-required in
+                          most US jurisdictions and increasingly cited in EU permits.
+
+
+                          Standard for the Installation of Stationary Energy Storage
+NFPA 855                  Systems                                                               US             Mandatory
+
+                          Defines installation clearances, fire suppression, and ventilation for stationary energy storage;
+                          referenced by most fire authorities globally.
+
+
+                          Recommendations on the Transport of Dangerous Goods -
+UN 38.3                   Section 38.3 (Lithium Batteries)                                      global         Mandatory
+
+                          Required for international shipment of Li-ion cells/packs; covers altitude, vibration, shock,
+                          thermal cycling, external short-circuit.
+
+
+                          Requirements for the connection of generation equipment in
+G99 Issue 6               parallel with public distribution networks (UK)                       UK             Mandatory
+
+                          UK grid-connection compliance for inverters > 16 A per phase; sets protection settings, anti-is-
+                          landing, and DNO approval process.
+
+
+                          Requirements for generating plants to be connected in parallel
+EN 50549                  with distribution networks                                            EU             Mandatory
+
+                          EU equivalent of G99 for grid-paralleled generators; harmonised across member states for low-
+                          and medium-voltage connection.
+
+
+BS EN 61439               Low-voltage switchgear and controlgear assemblies                     EU             Mandatory
+
+                          Type-test requirement for internal LV switchgear, busbars, and AC distribution within the BESS
+                          enclosure.
+S E C T I O N 2 · R E G U L ATO RY & C O M P L I A N C E                                           chain-v2-1778912383963
+
+
+
+RoHS 2011/65              Restriction of Hazardous Substances Directive                      EU           Mandatory
+
+                          Restricts lead, mercury, cadmium, and other substances in electrical equipment placed on the
+                          EU market.
+
+
+BS EN 61439-1/-2          Low-voltage switchgear and controlgear assemblies                  industry     Mandatory
+
+                          Declared in this product brief; awaiting universal-applicability review before being added to the
+                          standing class registry.
+
+
+BS EN 62933-5-2           Electrical energy storage (EES) systems - Safety requirementsindustry           Mandatory
+
+                          Declared in this product brief; awaiting universal-applicability review before being added to the
+                          standing class registry.
+
+
+                          Safety requirements for power electronic converter systems
+IEC 62477-1               and equipment                                                      industry     Mandatory
+
+                          Declared in this product brief; awaiting universal-applicability review before being added to the
+                          standing class registry.
+
+
+                          Standard for Batteries for Use in Stationary, Vehicle Auxiliary
+UL 1973                   Power and Light Electric Rail (LER) Applications                   US           De-facto
+
+                          System-level battery safety certification frequently required by US utilities and insurance un-
+                          derwriters; complements IEC 62619 on cells.
+
+
+IEC 62933                 Electrical Energy Storage (EES) Systems                            IEC          De-facto
+
+                          Emerging IEC system-level standard for EES; specifies terminology, planning, performance,
+                          safety. Required by some EU utility tenders.
+
+
+
+
+   Compliance cost and lead-time estimates are tracked in the underlying registry but withheld from this
+   report until the Bill of Materials exists and a full assumptions ledger (test-house rates, notified-body fees,
+   recertification cadence) can be cross-referenced. Numbers without that grounding are unreliable.
+S E C T I O N 3 · R I S K & FA I L U R E - M O D E A N A LY S I S                                    chain-v2-1778912383963
+
+
+
+
+Risk & Failure-Mode Analysis
+Class-level pre-mitigation hazards a battery energy storage system (bess) design must address. Each
+hazard is rated on three 1-5 scales whose product gives a single risk priority number — higher means
+worse before mitigation.
+
+
+  Severity — how bad the outcome is if the hazard occurs (1 = inconvenience, 5 = injury / fire / total loss).
+  Likelihood — how often it tends to happen in fielded systems before mitigation (1 = very rare, 5 = frequent).
+  Detectability — how hard it is to spot before it causes harm (1 = obvious / instrumented, 5 = silent failure).
+  Risk priority — severity × likelihood × detectability. The single number used to rank hazards.
+
+
+BESS hazards are dominated by lithium-cell internal energy density and the thermal-electrical-chemical
+coupling between cells. Single-cell failures (internal short, mechanical abuse) can propagate to module-level
+thermal runaway within minutes if propagation barriers, off-gas venting, and suppression are inadequate.
+
+
+CODE           HAZARD                                               SEVERITY   LIKELIHOOD DETECTABILITY RISK PRIORI-
+
+                                                                                                                          TY
+
+
+
+               Grid-fault back-feed during fault clear-
+OPE-01         ing                                                         4            3                 3               36
+               PCS continues to feed an internal grid section during fault clearing; energises a section the utility expected
+               to be dead.
+               Typical mitigations: G99/EN 50549 anti-islanding loss-of-mains detection; redundant utility-grade inter-
+               face protection relays; physical lock-out tag-out at maintenance disconnect.
+
+               Detection: ROCOF / vector-shift loss-of-mains; real-time DNO communications channel.
+
+               Governed by: G99 Issue 6, EN 50549, IEC 62933.
+
+
+ELE-01         DC arc fault (internal busbar)                              4            2                 4               32
+               Loose connection or insulation breakdown on DC busbars sustains a low-current arc invisible to conven-
+               tional overcurrent protection; ignites surrounding combustibles.
+               Typical mitigations: DC arc-fault detector (AFCI) on string-level; crimped vs bolted busbar joints with
+               torque verification; insulation-resistance monitoring at commissioning + periodic.
+
+               Detection: AFCI in BMS / PCS; periodic megger test.
+
+               Governed by: BS EN 61439, UL 1973.
+
+
+MEC-01         Mechanical abuse (transit / installation)                   4            2                 4               32
+               Drop, vibration, or container racking during transit or installation damages cell casings, internal welds, or
+               separator integrity; failure appears at first charge or weeks later.
+               Typical mitigations: vibration-isolated rack mounting; transit-rated packaging with shock/tilt indicators;
+               commissioning-time visual + electrical inspection.
+
+               Detection: shock-recorder labels on shipment; commissioning insulation test.
+
+               Governed by: UN 38.3, IEC 62619.
+S E C T I O N 3 · R I S K & FA I L U R E - M O D E A N A LY S I S                                    chain-v2-1778912383963
+
+
+
+THR-01         Single-cell thermal runaway                             5                2                  3              30
+               Internal short circuit (separator failure, dendrite, contamination) releases stored energy as heat, decom-
+               poses electrolyte, and emits flammable off-gas; cell temperature climbs >150 °C in seconds.
+               Typical mitigations: UL 9540A-tested propagation barriers between cells and modules; cell-level fusing
+               on high-energy lines; busbar fusing at module exit.
+
+               Detection: per-module temperature sensing; cell voltage divergence monitoring.
+
+               Governed by: IEC 62619, UL 9540A, NFPA 855.
+
+
+               Module-to-module thermal propaga-
+THR-02         tion                                                    5                2                  3              30
+               Heat from a failed module conducts/radiates to neighbours; insufficient barriers allow cascading failure
+               across the pack.
+               Typical mitigations: mineral-wool or ceramic propagation barriers between modules; water-mist / aerosol
+               suppression at unit level; compartmentalised rack design.
+
+               Detection: inter-module temperature gradients; rack-level smoke detectors.
+
+               Governed by: UL 9540A, NFPA 855.
+
+
+CHE-01         Off-gas flammable atmosphere                            5                2                  2              20
+               Thermal runaway emits H2, CO, CH4, electrolyte vapour; accumulates in enclosure headspace above
+               lower-explosive-limit, ignites on subsequent spark or arc.
+               Typical mitigations: off-gas detection > 25 % LEL ’ forced ventilation + isolation; inert (N‚ / argon) gas purge
+               option; explosion vents on enclosure roof.
+
+               Detection: LEL sensors near cells; H‚ sensors specific (LEL is non-selective).
+
+               Governed by: UL 9540A, NFPA 855.
+
+
+ELE-02         Cell overcharge / over-discharge                        4                2                  2              16
+               BMS voltage limit miscalibration or sensor failure allows cell to exceed upper/lower SOC limits; precipitates
+               lithium plating on negative electrode or copper dissolution on positive.
+               Typical mitigations: redundant cell-voltage sensing per BMS group; hard-stop contactor on out-of-range
+               alarm; state-of-charge windowing 10-90 %.
+
+               Detection: per-cell voltage monitoring; cumulative coulomb counting.
+
+               Governed by: IEC 62619, UL 1973.
+
+
+
+
+   Mitigation cost and post-mitigation residual risk are withheld from this report until the Bill of Materials and
+   an assumptions ledger exist. The hazards above are CLASS-LEVEL pre-mitigation; design-specific FMEA
+   (effects of chosen cell chemistry, refrigerant, sensor architecture etc.) will be derived against these once
+   the BoM is grounded.
+S E C T I O N 5 · PA RT S P E N D I N G V E R I F I C AT I O N                           chain-v2-1778912383963
+
+
+
+
+Parts Pending Verification
+Every (manufacturer, part_number) pair was checked against published catalogues. Verified parts are listed
+in §6 BoM as-is. Fabricated SKUs were stripped automatically. The items below could not be confidently
+verified — a human engineer should confirm or replace each before procurement.
+
+
+
+   Verification summary
+
+   Total checked: 93           Verified: 64        Stripped (fakes): 0   Uncertain: 29
+S E C T I O N 5 · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D   chain-v2-1778912383963
+
+(1/3)
+
+Plausible but unverified — human to confirm
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   precharge contactor
+   Manufacturer                     Gigavac
+   Part number                      GX16BAA
+   Location                         Energy Storage Source / DC Distribution
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   quick connect fitting
+   Manufacturer                     Parker
+   Part number                      FF-1-1/2
+   Location                         Energy Storage Source / Rack Thermal Interface
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   PTC heating element
+   Manufacturer                     DBK
+   Part number                      HP05-500/230
+   Location                         Energy Storage Source / Cold Ambient Heater
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   heater power wiring
+   Manufacturer                     Lapp
+   Part number                      ÖLFLEX-150-3G2.5
+   Location                         Energy Storage Source / Cold Ambient Heater
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   damping resistor
+   Manufacturer                     Arcol
+   Part number                      HS500-5R-F
+S E C T I O N 5 · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D   chain-v2-1778912383963
+
+(1/3)
+
+   Location                         Energy Conversion Transduction / AC Filter Network
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   roof panel
+   Manufacturer                     Singamas
+   Part number                      RP-40HC
+   Location                         Structure Containment / Iso Container Shell
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   fire-rated plasterboard
+   Manufacturer                     British Gypsum
+   Part number                      Gyproc-FireLine
+   Location                         Structure Containment / Internal Partition Walls
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   polyurethane foam panel
+   Manufacturer                     Kingspan
+   Part number                      KS-50-PUR
+   Location                         Structure Containment / Thermal Insulation Lining
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   catalytic bead sensor
+   Manufacturer                     Dräger
+   Part number                      6810940
+   Location                         Sensing Instrumentation / Hydrogen Gas Detectors
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+S E C T I O N 5 · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D   chain-v2-1778912383963
+
+(1/3)
+
+   DDR4 RAM module                                                                             LOW CONFIDENCE — UNCERTAIN
+
+   Manufacturer                     Kingston
+   Part number                      KVR24S17S8/4
+   Location                         Control Compute Communication / EMS Controller
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   rupture panel
+   Manufacturer                     Fike
+   Part number                      DV-625-PANEL
+   Location                         Safety Protection / Deflagration Vent Panels
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   vent weather cover
+   Manufacturer                     Fike
+   Part number                      DV-625
+   Location                         Safety Protection / Deflagration Vent Panels
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+S E C T I O N 5 · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D   chain-v2-1778912383963
+
+(2/3)
+
+Plausible but unverified — human to confirm
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   manual reset button
+   Manufacturer                     Eaton
+   Part number                      M22-E-ST
+   Location                         Safety Protection / Smoke Vent Interlock
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   coded actuator target
+   Manufacturer                     Schmersal
+   Part number                      AZM400-A1
+   Location                         Safety Protection / Door Interlock Switches
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   refrigerant accumulator
+   Manufacturer                     Parker
+   Part number                      ACC-40-R410A
+   Location                         Environmental Interface / Chiller Compressor Unit
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   chiller refrigerant line
+   Manufacturer                     Mueller
+   Part number                      ACR-1/2
+   Location                         Environmental Interface / Chiller Compressor Unit
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   axial EC fan
+   Manufacturer                     ebm-papst
+   Part number                      K3G800-EC
+S E C T I O N 5 · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D   chain-v2-1778912383963
+
+(2/3)
+
+   Location                         Environmental Interface / Condenser Fan Assembly
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   louvre insect screen
+   Manufacturer                     Ruskin
+   Part number                      ES-30
+   Location                         Environmental Interface / Weather Louvres
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   transit blanking plug
+   Manufacturer                     Roxtec
+   Part number                      BP-20
+   Location                         Power Distribution / Cable Transit Glands
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   insulation monitor device
+   Manufacturer                     Bender
+   Part number                      IRDH275-435
+   Location                         Power Distribution / DC Insulation Monitor
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   DIN rail enclosure
+   Manufacturer                     Phoenix Contact
+   Part number                      ME-22.5
+   Location                         Power Distribution / DC Insulation Monitor
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+S E C T I O N 5 · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D   chain-v2-1778912383963
+
+(2/3)
+
+   door hold open arm                                                                          LOW CONFIDENCE — UNCERTAIN
+
+   Manufacturer                     Dorma
+   Part number                      TS-93
+   Location                         Maintenance Serviceability / Access Doors Hardware
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   receptacle cover plate
+   Manufacturer                     Legrand
+   Part number                      069721
+   Location                         Maintenance Serviceability / Service Receptacles
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   signage mounting kit
+   Manufacturer                     Brady
+   Part number                      SIGN-KIT-ISO
+   Location                         Maintenance Serviceability / Safety Signage Kit
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+S E C T I O N 5 · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D   chain-v2-1778912383963
+
+(3/3)
+
+Plausible but unverified — human to confirm
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   pipe insulation sleeve
+   Manufacturer                     Armacell
+   Part number                      HT-50
+   Location                         Mass Fluid Transport Process / Coolant Piping Network
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   expansion tank bracket
+   Manufacturer                     Reflex
+   Part number                      ET-24
+   Location                         Mass Fluid Transport Process / Expansion Tank
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   pH electrode
+   Manufacturer                     Mettler Toledo
+   Part number                      InPro 3253
+   Location                         Mass Fluid Transport Process / Coolant Quality Sensor
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   signal transmitter module
+   Manufacturer                     Hamilton
+   Part number                      VisiFerm 240
+   Location                         Mass Fluid Transport Process / Coolant Quality Sensor
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+
+
+
+                                                                                               LOW CONFIDENCE — UNCERTAIN
+   junction box
+   Manufacturer                     Spelsberg
+   Part number                      TK-0808
+S E C T I O N 5 · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D   chain-v2-1778912383963
+
+(3/3)
+
+   Location                         Mass Fluid Transport Process / Coolant Quality Sensor
+
+   Why uncertain
+
+   Not found in parts catalogue, distributor APIs, Brave Search, or Tavily. Manual sourcing required.
+

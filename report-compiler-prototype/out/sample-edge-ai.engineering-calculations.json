@@ -1,0 +1,49 @@
+{
+  "summary": {
+    "rows": 2,
+    "withinEnvelope": 2,
+    "needsReview": 0,
+    "outsideEnvelope": 0,
+    "blocked": 0
+  },
+  "rows": [
+    {
+      "id": "edge_ai_tops_per_watt",
+      "status": "within_envelope",
+      "label": "Edge AI accelerator efficiency",
+      "formula": "compute_tops / power_budget_w",
+      "inputs": {
+        "compute_tops": 200,
+        "power_budget_w": 700
+      },
+      "result": 0.29,
+      "unit": "TOPS/W",
+      "envelope": ">=0.1 TOPS/W is a broad plausibility floor before accelerator selection.",
+      "interpretation": "0.29 TOPS/W using total appliance power budget.",
+      "evidenceRequired": "Confirm workload precision, sustained throughput, accelerator SKU, thermal derating and host overhead.",
+      "linkedRequirements": [
+        "compute_tops",
+        "power_budget_w"
+      ]
+    },
+    {
+      "id": "edge_ai_power_density_w_per_u",
+      "status": "within_envelope",
+      "label": "Rack power density",
+      "formula": "power_budget_w / rack_units",
+      "inputs": {
+        "power_budget_w": 700,
+        "rack_units": 1
+      },
+      "result": 700,
+      "unit": "W/U",
+      "envelope": "<=1,000 W/U is plausible for dense air-cooled edge equipment before thermal proof.",
+      "interpretation": "700 W/U rack density before thermal validation.",
+      "evidenceRequired": "Confirm inlet temperature, airflow, fan curve, acoustic limit, PSU derating and service clearance.",
+      "linkedRequirements": [
+        "power_budget_w",
+        "rack_units"
+      ]
+    }
+  ]
+}

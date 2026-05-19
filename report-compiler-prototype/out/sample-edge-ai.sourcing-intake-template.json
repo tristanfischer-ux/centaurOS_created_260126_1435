@@ -1,0 +1,216 @@
+{
+  "dossierId": "sample-edge-ai",
+  "productClass": "edge_ai",
+  "criticalOnly": true,
+  "instructions": [
+    "Fill only from supplier, manufacturer, distributor, quote, catalogue or datasheet evidence.",
+    "Do not use benchmark averages, LLM estimates, class-pack defaults or unsourced model output.",
+    "The intake record is only admitted when every required field validates and componentWordId matches a candidate BoM line."
+  ],
+  "drafts": [
+    {
+      "componentWordId": "1u_rack_chassis",
+      "description": "1U rack chassis",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "ai_accelerator_module",
+      "description": "AI accelerator module",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "cpu_module",
+      "description": "CPU module",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "ecc_memory",
+      "description": "ECC memory",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "system_motherboard",
+      "description": "System motherboard",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "high_speed_nic",
+      "description": "High-speed NIC",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "nvme_ssd",
+      "description": "NVMe SSD",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "bmc_management_controller",
+      "description": "BMC management controller",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "redundant_power_supply",
+      "description": "Redundant power supply",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "fan_wall_assembly",
+      "description": "Fan wall assembly",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "heatsink_cold_plate",
+      "description": "Heatsink cold plate",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "tpm_security_module",
+      "description": "TPM security module",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    }
+  ]
+}

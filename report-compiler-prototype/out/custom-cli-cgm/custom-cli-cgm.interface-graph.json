@@ -1,0 +1,865 @@
+{
+  "nodes": [
+    {
+      "id": "skin_patient_interface",
+      "label": "Skin Patient Interface",
+      "kind": "module"
+    },
+    {
+      "id": "skin_patient_interface.adhesive_patch_stack",
+      "label": "Adhesive patch stack",
+      "kind": "submodule",
+      "moduleId": "skin_patient_interface"
+    },
+    {
+      "id": "skin_patient_interface.cannula_skin_contact",
+      "label": "Sensor skin contact",
+      "kind": "submodule",
+      "moduleId": "skin_patient_interface"
+    },
+    {
+      "id": "skin_patient_interface.wear_comfort_retention",
+      "label": "Wear comfort and retention",
+      "kind": "submodule",
+      "moduleId": "skin_patient_interface"
+    },
+    {
+      "id": "sensing_instrumentation",
+      "label": "Glucose Sensing Instrumentation",
+      "kind": "module"
+    },
+    {
+      "id": "sensing_instrumentation.glucose_filament_stack",
+      "label": "Glucose filament stack",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.analog_front_end",
+      "label": "Analog front end",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.calibration_drift_monitoring",
+      "label": "Calibration and drift monitoring",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "actuation_kinematics",
+      "label": "Applicator Insertion Mechanism",
+      "kind": "module"
+    },
+    {
+      "id": "actuation_kinematics.disposable_applicator",
+      "label": "Disposable applicator",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "actuation_kinematics.insertion_mechanism",
+      "label": "Insertion mechanism",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "actuation_kinematics.sharps_lockout",
+      "label": "Sharps lockout",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "structure_containment",
+      "label": "Transmitter Housing Structure",
+      "kind": "module"
+    },
+    {
+      "id": "structure_containment.transmitter_housing",
+      "label": "Transmitter housing",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.patch_mechanical_frame",
+      "label": "Patch mechanical frame",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.ingress_boundary",
+      "label": "Ingress boundary",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "energy_storage_source",
+      "label": "Wearable Energy Source",
+      "kind": "module"
+    },
+    {
+      "id": "energy_storage_source.battery_cell",
+      "label": "Battery cell",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "energy_storage_source.power_reserve",
+      "label": "Power reserve",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "energy_storage_source.battery_safety",
+      "label": "Battery safety",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "power_distribution",
+      "label": "Low-Power Distribution",
+      "kind": "module"
+    },
+    {
+      "id": "power_distribution.low_power_rails",
+      "label": "Low-power rails",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.analog_excitation",
+      "label": "Analog excitation",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.power_fault_handling",
+      "label": "Power fault handling",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "control_compute_communication",
+      "label": "Control Compute Communication",
+      "kind": "module"
+    },
+    {
+      "id": "control_compute_communication.mcu_firmware",
+      "label": "MCU firmware",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.ble_telemetry",
+      "label": "BLE telemetry",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.data_buffering",
+      "label": "Data buffering",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "environmental_interface",
+      "label": "Wear Environment Compensation",
+      "kind": "module"
+    },
+    {
+      "id": "environmental_interface.temperature_compensation",
+      "label": "Temperature compensation",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.sweat_water_boundary",
+      "label": "Sweat and water boundary",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.motion_pressure",
+      "label": "Motion and pressure artefact control",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "safety_protection",
+      "label": "Patient Safety Protection",
+      "kind": "module"
+    },
+    {
+      "id": "safety_protection.patient_alarm_logic",
+      "label": "Patient alarm logic",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.biocompatibility_controls",
+      "label": "Biocompatibility controls",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.sterile_sharps_safety",
+      "label": "Sterile and sharps safety",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "maintenance_serviceability",
+      "label": "Packaging Traceability Serviceability",
+      "kind": "module"
+    },
+    {
+      "id": "maintenance_serviceability.sterile_packaging",
+      "label": "Sterile packaging",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.lot_traceability",
+      "label": "Lot traceability",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.user_setup",
+      "label": "User setup",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    }
+  ],
+  "edges": [
+    {
+      "id": "contains:skin_patient_interface:skin_patient_interface.adhesive_patch_stack:adhesive_patch_stack",
+      "from": "skin_patient_interface",
+      "to": "skin_patient_interface.adhesive_patch_stack",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Adhesive patch stack is contained by Skin Patient Interface."
+    },
+    {
+      "id": "contains:skin_patient_interface:skin_patient_interface.cannula_skin_contact:cannula_skin_contact",
+      "from": "skin_patient_interface",
+      "to": "skin_patient_interface.cannula_skin_contact",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Sensor skin contact is contained by Skin Patient Interface."
+    },
+    {
+      "id": "contains:skin_patient_interface:skin_patient_interface.wear_comfort_retention:wear_comfort_retention",
+      "from": "skin_patient_interface",
+      "to": "skin_patient_interface.wear_comfort_retention",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Wear comfort and retention is contained by Skin Patient Interface."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.glucose_filament_stack:glucose_filament_stack",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.glucose_filament_stack",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Glucose filament stack is contained by Glucose Sensing Instrumentation."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.analog_front_end:analog_front_end",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.analog_front_end",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Analog front end is contained by Glucose Sensing Instrumentation."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.calibration_drift_monitoring:calibration_drift_monitoring",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.calibration_drift_monitoring",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Calibration and drift monitoring is contained by Glucose Sensing Instrumentation."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.disposable_applicator:disposable_applicator",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.disposable_applicator",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Disposable applicator is contained by Applicator Insertion Mechanism."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.insertion_mechanism:insertion_mechanism",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.insertion_mechanism",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Insertion mechanism is contained by Applicator Insertion Mechanism."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.sharps_lockout:sharps_lockout",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.sharps_lockout",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Sharps lockout is contained by Applicator Insertion Mechanism."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.transmitter_housing:transmitter_housing",
+      "from": "structure_containment",
+      "to": "structure_containment.transmitter_housing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Transmitter housing is contained by Transmitter Housing Structure."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.patch_mechanical_frame:patch_mechanical_frame",
+      "from": "structure_containment",
+      "to": "structure_containment.patch_mechanical_frame",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Patch mechanical frame is contained by Transmitter Housing Structure."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.ingress_boundary:ingress_boundary",
+      "from": "structure_containment",
+      "to": "structure_containment.ingress_boundary",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Ingress boundary is contained by Transmitter Housing Structure."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.battery_cell:battery_cell",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.battery_cell",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Battery cell is contained by Wearable Energy Source."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.power_reserve:power_reserve",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.power_reserve",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Power reserve is contained by Wearable Energy Source."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.battery_safety:battery_safety",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.battery_safety",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Battery safety is contained by Wearable Energy Source."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.low_power_rails:low_power_rails",
+      "from": "power_distribution",
+      "to": "power_distribution.low_power_rails",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Low-power rails is contained by Low-Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.analog_excitation:analog_excitation",
+      "from": "power_distribution",
+      "to": "power_distribution.analog_excitation",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Analog excitation is contained by Low-Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.power_fault_handling:power_fault_handling",
+      "from": "power_distribution",
+      "to": "power_distribution.power_fault_handling",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Power fault handling is contained by Low-Power Distribution."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.mcu_firmware:mcu_firmware",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.mcu_firmware",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "MCU firmware is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.ble_telemetry:ble_telemetry",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.ble_telemetry",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "BLE telemetry is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.data_buffering:data_buffering",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.data_buffering",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Data buffering is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.temperature_compensation:temperature_compensation",
+      "from": "environmental_interface",
+      "to": "environmental_interface.temperature_compensation",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Temperature compensation is contained by Wear Environment Compensation."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.sweat_water_boundary:sweat_water_boundary",
+      "from": "environmental_interface",
+      "to": "environmental_interface.sweat_water_boundary",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Sweat and water boundary is contained by Wear Environment Compensation."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.motion_pressure:motion_pressure",
+      "from": "environmental_interface",
+      "to": "environmental_interface.motion_pressure",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Motion and pressure artefact control is contained by Wear Environment Compensation."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.patient_alarm_logic:patient_alarm_logic",
+      "from": "safety_protection",
+      "to": "safety_protection.patient_alarm_logic",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Patient alarm logic is contained by Patient Safety Protection."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.biocompatibility_controls:biocompatibility_controls",
+      "from": "safety_protection",
+      "to": "safety_protection.biocompatibility_controls",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Biocompatibility controls is contained by Patient Safety Protection."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.sterile_sharps_safety:sterile_sharps_safety",
+      "from": "safety_protection",
+      "to": "safety_protection.sterile_sharps_safety",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Sterile and sharps safety is contained by Patient Safety Protection."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.sterile_packaging:sterile_packaging",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.sterile_packaging",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Sterile packaging is contained by Packaging Traceability Serviceability."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.lot_traceability:lot_traceability",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.lot_traceability",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Lot traceability is contained by Packaging Traceability Serviceability."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.user_setup:user_setup",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.user_setup",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "User setup is contained by Packaging Traceability Serviceability."
+    },
+    {
+      "id": "shared_interface:skin_patient_interface:structure_containment:adhesive_skin_boundary",
+      "from": "skin_patient_interface",
+      "to": "structure_containment",
+      "via": "adhesive_skin_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare adhesive_skin_boundary."
+    },
+    {
+      "id": "shared_interface:structure_containment:environmental_interface:adhesive_skin_boundary",
+      "from": "structure_containment",
+      "to": "environmental_interface",
+      "via": "adhesive_skin_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare adhesive_skin_boundary."
+    },
+    {
+      "id": "shared_interface:environmental_interface:safety_protection:adhesive_skin_boundary",
+      "from": "environmental_interface",
+      "to": "safety_protection",
+      "via": "adhesive_skin_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare adhesive_skin_boundary."
+    },
+    {
+      "id": "shared_interface:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+      "from": "skin_patient_interface",
+      "to": "sensing_instrumentation",
+      "via": "interstitial_fluid_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare interstitial_fluid_path."
+    },
+    {
+      "id": "shared_interface:skin_patient_interface:actuation_kinematics:sterile_boundary",
+      "from": "skin_patient_interface",
+      "to": "actuation_kinematics",
+      "via": "sterile_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sterile_boundary."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:safety_protection:sterile_boundary",
+      "from": "actuation_kinematics",
+      "to": "safety_protection",
+      "via": "sterile_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sterile_boundary."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:sterile_boundary",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "sterile_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sterile_boundary."
+    },
+    {
+      "id": "shared_interface:skin_patient_interface:actuation_kinematics:insertion_path",
+      "from": "skin_patient_interface",
+      "to": "actuation_kinematics",
+      "via": "insertion_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare insertion_path."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:structure_containment:insertion_path",
+      "from": "actuation_kinematics",
+      "to": "structure_containment",
+      "via": "insertion_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare insertion_path."
+    },
+    {
+      "id": "shared_interface:skin_patient_interface:actuation_kinematics:service_access",
+      "from": "skin_patient_interface",
+      "to": "actuation_kinematics",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:structure_containment:service_access",
+      "from": "actuation_kinematics",
+      "to": "structure_containment",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:structure_containment:energy_storage_source:service_access",
+      "from": "structure_containment",
+      "to": "energy_storage_source",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:safety_protection:service_access",
+      "from": "energy_storage_source",
+      "to": "safety_protection",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:service_access",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:power_distribution:sensor_signal_bus",
+      "from": "sensing_instrumentation",
+      "to": "power_distribution",
+      "via": "sensor_signal_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_signal_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:control_compute_communication:sensor_signal_bus",
+      "from": "power_distribution",
+      "to": "control_compute_communication",
+      "via": "sensor_signal_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_signal_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:environmental_interface:sensor_signal_bus",
+      "from": "control_compute_communication",
+      "to": "environmental_interface",
+      "via": "sensor_signal_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_signal_bus."
+    },
+    {
+      "id": "shared_interface:environmental_interface:safety_protection:sensor_signal_bus",
+      "from": "environmental_interface",
+      "to": "safety_protection",
+      "via": "sensor_signal_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_signal_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:control_compute_communication:calibration_data_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "calibration_data_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare calibration_data_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:power_distribution:analog_power_rail",
+      "from": "sensing_instrumentation",
+      "to": "power_distribution",
+      "via": "analog_power_rail",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare analog_power_rail."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:control_compute_communication:temperature_compensation_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "temperature_compensation_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare temperature_compensation_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:environmental_interface:temperature_compensation_bus",
+      "from": "control_compute_communication",
+      "to": "environmental_interface",
+      "via": "temperature_compensation_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare temperature_compensation_bus."
+    },
+    {
+      "id": "shared_interface:structure_containment:environmental_interface:ingress_boundary",
+      "from": "structure_containment",
+      "to": "environmental_interface",
+      "via": "ingress_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare ingress_boundary."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:power_distribution:cell_power_bus",
+      "from": "energy_storage_source",
+      "to": "power_distribution",
+      "via": "cell_power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare cell_power_bus."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:maintenance_serviceability:lot_traceability",
+      "from": "energy_storage_source",
+      "to": "maintenance_serviceability",
+      "via": "lot_traceability",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare lot_traceability."
+    },
+    {
+      "id": "shared_interface:power_distribution:control_compute_communication:low_power_rail",
+      "from": "power_distribution",
+      "to": "control_compute_communication",
+      "via": "low_power_rail",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare low_power_rail."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:hardwired_trip",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "hardwired_trip",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare hardwired_trip."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:maintenance_serviceability:ble_link",
+      "from": "control_compute_communication",
+      "to": "maintenance_serviceability",
+      "via": "ble_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare ble_link."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:safety_protection:alarm_state_bus",
+      "from": "control_compute_communication",
+      "to": "safety_protection",
+      "via": "alarm_state_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_state_bus."
+    },
+    {
+      "id": "required_interface:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+      "from": "skin_patient_interface",
+      "to": "sensing_instrumentation",
+      "via": "interstitial_fluid_path",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Sensor chemistry must access interstitial fluid through a declared patient interface."
+    },
+    {
+      "id": "required_interface:actuation_kinematics:skin_patient_interface:insertion_path",
+      "from": "actuation_kinematics",
+      "to": "skin_patient_interface",
+      "via": "insertion_path",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Applicator insertion path must align with the adhesive patch and skin boundary."
+    },
+    {
+      "id": "required_interface:sensing_instrumentation:control_compute_communication:sensor_signal_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "sensor_signal_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Analog sensing output must feed the processing and telemetry stack."
+    },
+    {
+      "id": "required_interface:sensing_instrumentation:control_compute_communication:calibration_data_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "calibration_data_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Factory calibration and drift state must be visible to the reader algorithm."
+    },
+    {
+      "id": "required_interface:energy_storage_source:power_distribution:cell_power_bus",
+      "from": "energy_storage_source",
+      "to": "power_distribution",
+      "via": "cell_power_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Battery output must feed protected low-power rails."
+    },
+    {
+      "id": "required_interface:power_distribution:sensing_instrumentation:analog_power_rail",
+      "from": "power_distribution",
+      "to": "sensing_instrumentation",
+      "via": "analog_power_rail",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Electrochemical analog front-end needs a low-noise supply path."
+    },
+    {
+      "id": "required_interface:power_distribution:control_compute_communication:low_power_rail",
+      "from": "power_distribution",
+      "to": "control_compute_communication",
+      "via": "low_power_rail",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "MCU and BLE telemetry need duty-cycled digital power."
+    },
+    {
+      "id": "required_interface:environmental_interface:control_compute_communication:temperature_compensation_bus",
+      "from": "environmental_interface",
+      "to": "control_compute_communication",
+      "via": "temperature_compensation_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Body-temperature context must feed the glucose compensation algorithm."
+    },
+    {
+      "id": "required_interface:control_compute_communication:safety_protection:alarm_state_bus",
+      "from": "control_compute_communication",
+      "to": "safety_protection",
+      "via": "alarm_state_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Patient alarm and stale-data states must route through safety logic."
+    },
+    {
+      "id": "required_interface:maintenance_serviceability:skin_patient_interface:sterile_boundary",
+      "from": "maintenance_serviceability",
+      "to": "skin_patient_interface",
+      "via": "sterile_boundary",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Sterile packaging evidence must connect to the patient-contact boundary."
+    }
+  ],
+  "summary": {
+    "moduleNodes": 10,
+    "subModuleNodes": 30,
+    "containsEdges": 30,
+    "sharedInterfaceEdges": 29,
+    "requiredInterfaceEdges": 10,
+    "missingRequiredInterfaceEdges": 0
+  }
+}

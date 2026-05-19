@@ -1,0 +1,66 @@
+{
+  "summary": {
+    "rows": 3,
+    "withinEnvelope": 2,
+    "needsReview": 1,
+    "outsideEnvelope": 0,
+    "blocked": 0
+  },
+  "rows": [
+    {
+      "id": "bess_discharge_duration_h",
+      "status": "within_envelope",
+      "label": "BESS discharge duration",
+      "formula": "capacity_mwh / power_mw",
+      "inputs": {
+        "capacity_mwh": 3.5,
+        "power_mw": 1
+      },
+      "result": 3.5,
+      "unit": "h",
+      "envelope": "2 to 8 h is a common grid-storage concept envelope before duty-cycle proof.",
+      "interpretation": "3.5 h implied by nameplate capacity and PCS power.",
+      "evidenceRequired": "Confirm use case, PCS rating, usable energy window, C-rate limits and warranty throughput.",
+      "linkedRequirements": [
+        "capacity_mwh",
+        "power_mw"
+      ]
+    },
+    {
+      "id": "bess_system_energy_density_wh_per_kg",
+      "status": "within_envelope",
+      "label": "BESS system energy density",
+      "formula": "(capacity_mwh * 1,000,000) / mass_kg",
+      "inputs": {
+        "capacity_mwh": 3.5,
+        "mass_kg": 28000
+      },
+      "result": 125,
+      "unit": "Wh/kg",
+      "envelope": "60 to 180 Wh/kg is a broad containerised LFP system envelope before packaging proof.",
+      "interpretation": "125 Wh/kg implied by energy and gross mass.",
+      "evidenceRequired": "Review cell mass, racks, enclosure, HVAC, fire protection, transformer/PCS boundary and shipping mass allowance.",
+      "linkedRequirements": [
+        "capacity_mwh",
+        "mass_kg"
+      ]
+    },
+    {
+      "id": "bess_nameplate_annual_throughput_mwh",
+      "status": "needs_review",
+      "label": "BESS annual nameplate throughput",
+      "formula": "capacity_mwh * 365",
+      "inputs": {
+        "capacity_mwh": 3.5
+      },
+      "result": 1277.5,
+      "unit": "MWh/year",
+      "envelope": "Arithmetic only; real throughput depends on dispatch, degradation, auxiliary load and warranty.",
+      "interpretation": "1277.5 MWh/year assumes one full equivalent cycle per day.",
+      "evidenceRequired": "Confirm cycles per year, usable depth of discharge, round-trip efficiency and degradation assumptions.",
+      "linkedRequirements": [
+        "capacity_mwh"
+      ]
+    }
+  ]
+}

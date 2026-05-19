@@ -1,0 +1,145 @@
+{
+  "verdict": "accepted_interfaces",
+  "summary": {
+    "rows": 3,
+    "acceptedRows": 3,
+    "reviewReadyRows": 0,
+    "pendingEvidenceRows": 0,
+    "deferredRows": 0,
+    "blockedRows": 0,
+    "presentContracts": 3,
+    "missingContracts": 0,
+    "carrierCompleteRows": 3,
+    "verificationActivityRows": 3,
+    "acceptedEvidenceRatio": 1,
+    "structuralPassRatio": 1
+  },
+  "rows": [
+    {
+      "id": "required:energy_storage_source:energy_conversion_transduction:dc_bus",
+      "interfaceId": "dc_bus",
+      "fromModuleId": "energy_storage_source",
+      "fromModuleName": "Energy Storage Source",
+      "toModuleId": "energy_conversion_transduction",
+      "toModuleName": "Power Conversion System",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "cell_string",
+        "dc_string_output"
+      ],
+      "toCarrierSubModules": [
+        "pcs_inverter"
+      ],
+      "componentWordIds": [
+        "lfp_prismatic_cells",
+        "cell_to_cell_busbar",
+        "cell_terminal_hardware_set",
+        "cell_insulation_pad",
+        "module_fuse",
+        "dc_contactor_or_breaker",
+        "precharge_resistor",
+        "hv_fuse_holder",
+        "pack_current_sensor",
+        "service_disconnect",
+        "pcs_inverter",
+        "igbt_power_module",
+        "dc_link_capacitor_bank",
+        "gate_driver_board",
+        "inverter_control_board",
+        "liquid_cooled_heatsink"
+      ],
+      "verificationActivityId": "interface_review:energy_storage_source:energy_conversion_transduction:dc_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "accepted",
+      "status": "accepted",
+      "blockers": [],
+      "requiredAction": "Interface contract has accepted reviewer evidence; keep evidence attached."
+    },
+    {
+      "id": "required:energy_storage_source:environmental_interface:thermal_loop",
+      "interfaceId": "thermal_loop",
+      "fromModuleId": "energy_storage_source",
+      "fromModuleName": "Energy Storage Source",
+      "toModuleId": "environmental_interface",
+      "toModuleName": "Environmental Interface",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "cell_string",
+        "rack_thermal_interface"
+      ],
+      "toCarrierSubModules": [
+        "hvac_unit",
+        "ventilation_path",
+        "heat_rejection_coil"
+      ],
+      "componentWordIds": [
+        "lfp_prismatic_cells",
+        "cell_to_cell_busbar",
+        "cell_terminal_hardware_set",
+        "cell_insulation_pad",
+        "module_fuse",
+        "rack_cold_plate_manifold",
+        "thermally_conductive_gap_pad",
+        "coolant_quick_connector_pair",
+        "rack_drip_tray",
+        "leak_detection_rope",
+        "container_hvac_unit",
+        "air_filter_element",
+        "condensate_drain_kit",
+        "hvac_controller",
+        "intake_louvre",
+        "exhaust_louvre",
+        "ec_fan_assembly",
+        "airflow_baffle",
+        "dry_cooler_coil",
+        "ec_condenser_fan",
+        "fan_contactor",
+        "coil_guard_grille",
+        "drain_safe_condensate_pan"
+      ],
+      "verificationActivityId": "interface_review:energy_storage_source:environmental_interface:thermal_loop",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "accepted",
+      "status": "accepted",
+      "blockers": [],
+      "requiredAction": "Interface contract has accepted reviewer evidence; keep evidence attached."
+    },
+    {
+      "id": "required:energy_storage_source:control_compute_communication:bms_network",
+      "interfaceId": "bms_network",
+      "fromModuleId": "energy_storage_source",
+      "fromModuleName": "Energy Storage Source",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Control Compute And Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "bms_slave"
+      ],
+      "toCarrierSubModules": [
+        "bms_master"
+      ],
+      "componentWordIds": [
+        "bms_slave_pcb",
+        "afe_monitor_ic",
+        "ntc_thermistor_harness",
+        "isolated_can_transceiver",
+        "conformal_coating",
+        "bms_master_controller",
+        "isolation_interface",
+        "contactor_driver_output",
+        "soc_estimation_firmware"
+      ],
+      "verificationActivityId": "interface_review:energy_storage_source:control_compute_communication:bms_network",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "accepted",
+      "status": "accepted",
+      "blockers": [],
+      "requiredAction": "Interface contract has accepted reviewer evidence; keep evidence attached."
+    }
+  ],
+  "blockers": [],
+  "nextActions": []
+}

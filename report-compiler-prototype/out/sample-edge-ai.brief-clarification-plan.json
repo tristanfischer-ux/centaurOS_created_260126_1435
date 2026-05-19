@@ -1,0 +1,14 @@
+{
+  "verdict": "no_clarification_needed",
+  "summary": {
+    "rows": 0,
+    "requiredRows": 0,
+    "recommendedRows": 0,
+    "optionalRows": 0,
+    "architectureBlockingRows": 0,
+    "productClass": "edge_ai",
+    "intakeVerdict": "brief_ready_for_architecture",
+    "nextQuestionId": null
+  },
+  "questions": []
+}

@@ -1,0 +1,179 @@
+{
+  "rule": {
+    "baseScore": 9,
+    "blockerDeduction": 3,
+    "majorDeduction": 1.5,
+    "minorDeduction": 0.5,
+    "floorScore": 1,
+    "targetScore": 8,
+    "scoreKind": "deterministic_gate",
+    "limitation": "This is a deterministic gate score from current validators, not an external reviewer score or proof of real-world engineering quality. Reviewer acceptance is tracked separately in the verification ledger."
+  },
+  "summary": {
+    "sections": 6,
+    "sectionsAtOrAboveTarget": 5,
+    "sectionsBelowTarget": 1,
+    "meanScore": 7.67,
+    "totalIssues": 9,
+    "totalDeduction": 25.5
+  },
+  "rows": [
+    {
+      "section": "executive_summary",
+      "baseScore": 9,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "totalDeduction": 0,
+      "rawScore": 9,
+      "finalScore": 9,
+      "floorApplied": false,
+      "targetScore": 8,
+      "passesTarget": true,
+      "scoreKind": "deterministic_gate",
+      "issueDeductions": [],
+      "rationale": "No current deterministic validator issue is attached to this scored section.",
+      "limitation": "This is a deterministic gate score from current validators, not an external reviewer score or proof of real-world engineering quality. Reviewer acceptance is tracked separately in the verification ledger."
+    },
+    {
+      "section": "brief_requirements",
+      "baseScore": 9,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "totalDeduction": 0,
+      "rawScore": 9,
+      "finalScore": 9,
+      "floorApplied": false,
+      "targetScore": 8,
+      "passesTarget": true,
+      "scoreKind": "deterministic_gate",
+      "issueDeductions": [],
+      "rationale": "No current deterministic validator issue is attached to this scored section.",
+      "limitation": "This is a deterministic gate score from current validators, not an external reviewer score or proof of real-world engineering quality. Reviewer acceptance is tracked separately in the verification ledger."
+    },
+    {
+      "section": "design_modules",
+      "baseScore": 9,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "totalDeduction": 0,
+      "rawScore": 9,
+      "finalScore": 9,
+      "floorApplied": false,
+      "targetScore": 8,
+      "passesTarget": true,
+      "scoreKind": "deterministic_gate",
+      "issueDeductions": [],
+      "rationale": "No current deterministic validator issue is attached to this scored section.",
+      "limitation": "This is a deterministic gate score from current validators, not an external reviewer score or proof of real-world engineering quality. Reviewer acceptance is tracked separately in the verification ledger."
+    },
+    {
+      "section": "bom",
+      "baseScore": 9,
+      "blockerCount": 8,
+      "majorCount": 1,
+      "minorCount": 0,
+      "totalDeduction": 25.5,
+      "rawScore": -16.5,
+      "finalScore": 1,
+      "floorApplied": true,
+      "targetScore": 8,
+      "passesTarget": false,
+      "scoreKind": "deterministic_gate",
+      "issueDeductions": [
+        {
+          "severity": "blocker",
+          "code": "critical_part_unpriced",
+          "deduction": 3,
+          "message": "Carbon airframe is critical but has no credible unit cost."
+        },
+        {
+          "severity": "blocker",
+          "code": "critical_part_unpriced",
+          "deduction": 3,
+          "message": "Flight battery pack is critical but has no credible unit cost."
+        },
+        {
+          "severity": "blocker",
+          "code": "critical_part_unpriced",
+          "deduction": 3,
+          "message": "Brushless motors is critical but has no credible unit cost."
+        },
+        {
+          "severity": "blocker",
+          "code": "critical_part_unpriced",
+          "deduction": 3,
+          "message": "ESC is critical but has no credible unit cost."
+        },
+        {
+          "severity": "blocker",
+          "code": "critical_part_unpriced",
+          "deduction": 3,
+          "message": "Propeller set is critical but has no credible unit cost."
+        },
+        {
+          "severity": "blocker",
+          "code": "critical_part_unpriced",
+          "deduction": 3,
+          "message": "Flight controller is critical but has no credible unit cost."
+        },
+        {
+          "severity": "blocker",
+          "code": "critical_part_unpriced",
+          "deduction": 3,
+          "message": "Radio and GNSS link is critical but has no credible unit cost."
+        },
+        {
+          "severity": "blocker",
+          "code": "critical_part_unpriced",
+          "deduction": 3,
+          "message": "4K camera payload is critical but has no credible unit cost."
+        },
+        {
+          "severity": "major",
+          "code": "low_priced_line_ratio",
+          "deduction": 1.5,
+          "message": "Only 0% of BoM lines have prices."
+        }
+      ],
+      "rationale": "Score is base minus deterministic deductions for attached section issues.",
+      "limitation": "This is a deterministic gate score from current validators, not an external reviewer score or proof of real-world engineering quality. Reviewer acceptance is tracked separately in the verification ledger."
+    },
+    {
+      "section": "feasibility_notes",
+      "baseScore": 9,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "totalDeduction": 0,
+      "rawScore": 9,
+      "finalScore": 9,
+      "floorApplied": false,
+      "targetScore": 8,
+      "passesTarget": true,
+      "scoreKind": "deterministic_gate",
+      "issueDeductions": [],
+      "rationale": "No current deterministic validator issue is attached to this scored section.",
+      "limitation": "This is a deterministic gate score from current validators, not an external reviewer score or proof of real-world engineering quality. Reviewer acceptance is tracked separately in the verification ledger."
+    },
+    {
+      "section": "sources_references",
+      "baseScore": 9,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "totalDeduction": 0,
+      "rawScore": 9,
+      "finalScore": 9,
+      "floorApplied": false,
+      "targetScore": 8,
+      "passesTarget": true,
+      "scoreKind": "deterministic_gate",
+      "issueDeductions": [],
+      "rationale": "No current deterministic validator issue is attached to this scored section.",
+      "limitation": "This is a deterministic gate score from current validators, not an external reviewer score or proof of real-world engineering quality. Reviewer acceptance is tracked separately in the verification ledger."
+    }
+  ]
+}

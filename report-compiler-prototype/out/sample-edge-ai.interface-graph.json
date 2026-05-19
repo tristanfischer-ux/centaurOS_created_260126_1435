@@ -1,0 +1,937 @@
+{
+  "nodes": [
+    {
+      "id": "structure_containment",
+      "label": "Rack Structure Containment",
+      "kind": "module"
+    },
+    {
+      "id": "structure_containment.rack_chassis",
+      "label": "Rack chassis",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.accelerator_mounting",
+      "label": "Accelerator mounting",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.service_labelling",
+      "label": "Service labelling",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "compute_acceleration",
+      "label": "Compute Acceleration",
+      "kind": "module"
+    },
+    {
+      "id": "compute_acceleration.accelerator_module",
+      "label": "Accelerator module",
+      "kind": "submodule",
+      "moduleId": "compute_acceleration"
+    },
+    {
+      "id": "compute_acceleration.cpu_memory_complex",
+      "label": "CPU and memory complex",
+      "kind": "submodule",
+      "moduleId": "compute_acceleration"
+    },
+    {
+      "id": "compute_acceleration.signal_power_integrity",
+      "label": "Signal and power integrity",
+      "kind": "submodule",
+      "moduleId": "compute_acceleration"
+    },
+    {
+      "id": "network_io",
+      "label": "Network IO",
+      "kind": "module"
+    },
+    {
+      "id": "network_io.high_speed_network",
+      "label": "High-speed network",
+      "kind": "submodule",
+      "moduleId": "network_io"
+    },
+    {
+      "id": "network_io.timing_ingest",
+      "label": "Timing and ingest",
+      "kind": "submodule",
+      "moduleId": "network_io"
+    },
+    {
+      "id": "network_io.io_isolation_routing",
+      "label": "IO isolation and routing",
+      "kind": "submodule",
+      "moduleId": "network_io"
+    },
+    {
+      "id": "data_storage",
+      "label": "Data Storage",
+      "kind": "module"
+    },
+    {
+      "id": "data_storage.nvme_storage",
+      "label": "NVMe storage",
+      "kind": "submodule",
+      "moduleId": "data_storage"
+    },
+    {
+      "id": "data_storage.model_cache",
+      "label": "Model cache and recovery",
+      "kind": "submodule",
+      "moduleId": "data_storage"
+    },
+    {
+      "id": "data_storage.log_buffer",
+      "label": "Log and evidence buffer",
+      "kind": "submodule",
+      "moduleId": "data_storage"
+    },
+    {
+      "id": "control_compute_communication",
+      "label": "Control Compute Communication",
+      "kind": "module"
+    },
+    {
+      "id": "control_compute_communication.host_control",
+      "label": "Host control",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.runtime_orchestration",
+      "label": "Runtime orchestration",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.remote_management",
+      "label": "Remote management",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "power_distribution",
+      "label": "Power Distribution",
+      "kind": "module"
+    },
+    {
+      "id": "power_distribution.ac_input_conversion",
+      "label": "AC input conversion",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.dc_rail_distribution",
+      "label": "DC rail distribution",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.hold_up_protection",
+      "label": "Hold-up and protection",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "environmental_interface",
+      "label": "Thermal Airflow Interface",
+      "kind": "module"
+    },
+    {
+      "id": "environmental_interface.forced_air_cooling",
+      "label": "Forced-air cooling",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.heat_transfer",
+      "label": "Heat transfer path",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.inlet_outlet_management",
+      "label": "Inlet and outlet management",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "sensing_instrumentation",
+      "label": "Telemetry Instrumentation",
+      "kind": "module"
+    },
+    {
+      "id": "sensing_instrumentation.thermal_sensors",
+      "label": "Thermal sensors",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.power_fan_telemetry",
+      "label": "Power and fan telemetry",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.front_panel_status",
+      "label": "Front panel status",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "safety_protection",
+      "label": "Security And Safety Protection",
+      "kind": "module"
+    },
+    {
+      "id": "safety_protection.secure_boot",
+      "label": "Secure boot",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.thermal_shutdown",
+      "label": "Thermal shutdown",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.electrical_safety",
+      "label": "Electrical safety",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "maintenance_serviceability",
+      "label": "Field Maintenance Serviceability",
+      "kind": "module"
+    },
+    {
+      "id": "maintenance_serviceability.field_replaceable_units",
+      "label": "Field-replaceable units",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.rack_installation",
+      "label": "Rack installation",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.service_workflow",
+      "label": "Service workflow",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    }
+  ],
+  "edges": [
+    {
+      "id": "contains:structure_containment:structure_containment.rack_chassis:rack_chassis",
+      "from": "structure_containment",
+      "to": "structure_containment.rack_chassis",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Rack chassis is contained by Rack Structure Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.accelerator_mounting:accelerator_mounting",
+      "from": "structure_containment",
+      "to": "structure_containment.accelerator_mounting",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Accelerator mounting is contained by Rack Structure Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.service_labelling:service_labelling",
+      "from": "structure_containment",
+      "to": "structure_containment.service_labelling",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Service labelling is contained by Rack Structure Containment."
+    },
+    {
+      "id": "contains:compute_acceleration:compute_acceleration.accelerator_module:accelerator_module",
+      "from": "compute_acceleration",
+      "to": "compute_acceleration.accelerator_module",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Accelerator module is contained by Compute Acceleration."
+    },
+    {
+      "id": "contains:compute_acceleration:compute_acceleration.cpu_memory_complex:cpu_memory_complex",
+      "from": "compute_acceleration",
+      "to": "compute_acceleration.cpu_memory_complex",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "CPU and memory complex is contained by Compute Acceleration."
+    },
+    {
+      "id": "contains:compute_acceleration:compute_acceleration.signal_power_integrity:signal_power_integrity",
+      "from": "compute_acceleration",
+      "to": "compute_acceleration.signal_power_integrity",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Signal and power integrity is contained by Compute Acceleration."
+    },
+    {
+      "id": "contains:network_io:network_io.high_speed_network:high_speed_network",
+      "from": "network_io",
+      "to": "network_io.high_speed_network",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "High-speed network is contained by Network IO."
+    },
+    {
+      "id": "contains:network_io:network_io.timing_ingest:timing_ingest",
+      "from": "network_io",
+      "to": "network_io.timing_ingest",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Timing and ingest is contained by Network IO."
+    },
+    {
+      "id": "contains:network_io:network_io.io_isolation_routing:io_isolation_routing",
+      "from": "network_io",
+      "to": "network_io.io_isolation_routing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "IO isolation and routing is contained by Network IO."
+    },
+    {
+      "id": "contains:data_storage:data_storage.nvme_storage:nvme_storage",
+      "from": "data_storage",
+      "to": "data_storage.nvme_storage",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "NVMe storage is contained by Data Storage."
+    },
+    {
+      "id": "contains:data_storage:data_storage.model_cache:model_cache",
+      "from": "data_storage",
+      "to": "data_storage.model_cache",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Model cache and recovery is contained by Data Storage."
+    },
+    {
+      "id": "contains:data_storage:data_storage.log_buffer:log_buffer",
+      "from": "data_storage",
+      "to": "data_storage.log_buffer",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Log and evidence buffer is contained by Data Storage."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.host_control:host_control",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.host_control",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Host control is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.runtime_orchestration:runtime_orchestration",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.runtime_orchestration",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Runtime orchestration is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.remote_management:remote_management",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.remote_management",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Remote management is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.ac_input_conversion:ac_input_conversion",
+      "from": "power_distribution",
+      "to": "power_distribution.ac_input_conversion",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "AC input conversion is contained by Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.dc_rail_distribution:dc_rail_distribution",
+      "from": "power_distribution",
+      "to": "power_distribution.dc_rail_distribution",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "DC rail distribution is contained by Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.hold_up_protection:hold_up_protection",
+      "from": "power_distribution",
+      "to": "power_distribution.hold_up_protection",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Hold-up and protection is contained by Power Distribution."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.forced_air_cooling:forced_air_cooling",
+      "from": "environmental_interface",
+      "to": "environmental_interface.forced_air_cooling",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Forced-air cooling is contained by Thermal Airflow Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.heat_transfer:heat_transfer",
+      "from": "environmental_interface",
+      "to": "environmental_interface.heat_transfer",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Heat transfer path is contained by Thermal Airflow Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.inlet_outlet_management:inlet_outlet_management",
+      "from": "environmental_interface",
+      "to": "environmental_interface.inlet_outlet_management",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Inlet and outlet management is contained by Thermal Airflow Interface."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.thermal_sensors:thermal_sensors",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.thermal_sensors",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Thermal sensors is contained by Telemetry Instrumentation."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.power_fan_telemetry:power_fan_telemetry",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.power_fan_telemetry",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Power and fan telemetry is contained by Telemetry Instrumentation."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.front_panel_status:front_panel_status",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.front_panel_status",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Front panel status is contained by Telemetry Instrumentation."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.secure_boot:secure_boot",
+      "from": "safety_protection",
+      "to": "safety_protection.secure_boot",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Secure boot is contained by Security And Safety Protection."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.thermal_shutdown:thermal_shutdown",
+      "from": "safety_protection",
+      "to": "safety_protection.thermal_shutdown",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Thermal shutdown is contained by Security And Safety Protection."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.electrical_safety:electrical_safety",
+      "from": "safety_protection",
+      "to": "safety_protection.electrical_safety",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Electrical safety is contained by Security And Safety Protection."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.field_replaceable_units:field_replaceable_units",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.field_replaceable_units",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Field-replaceable units is contained by Field Maintenance Serviceability."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.rack_installation:rack_installation",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.rack_installation",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Rack installation is contained by Field Maintenance Serviceability."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.service_workflow:service_workflow",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.service_workflow",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Service workflow is contained by Field Maintenance Serviceability."
+    },
+    {
+      "id": "shared_interface:structure_containment:maintenance_serviceability:rack_mount",
+      "from": "structure_containment",
+      "to": "maintenance_serviceability",
+      "via": "rack_mount",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare rack_mount."
+    },
+    {
+      "id": "shared_interface:structure_containment:environmental_interface:airflow_path",
+      "from": "structure_containment",
+      "to": "environmental_interface",
+      "via": "airflow_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare airflow_path."
+    },
+    {
+      "id": "shared_interface:environmental_interface:maintenance_serviceability:airflow_path",
+      "from": "environmental_interface",
+      "to": "maintenance_serviceability",
+      "via": "airflow_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare airflow_path."
+    },
+    {
+      "id": "shared_interface:structure_containment:network_io:service_access",
+      "from": "structure_containment",
+      "to": "network_io",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:network_io:data_storage:service_access",
+      "from": "network_io",
+      "to": "data_storage",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:data_storage:control_compute_communication:service_access",
+      "from": "data_storage",
+      "to": "control_compute_communication",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:power_distribution:service_access",
+      "from": "control_compute_communication",
+      "to": "power_distribution",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:power_distribution:environmental_interface:service_access",
+      "from": "power_distribution",
+      "to": "environmental_interface",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:environmental_interface:sensing_instrumentation:service_access",
+      "from": "environmental_interface",
+      "to": "sensing_instrumentation",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:service_access",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:service_access",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:structure_containment:network_io:protective_earth",
+      "from": "structure_containment",
+      "to": "network_io",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:network_io:power_distribution:protective_earth",
+      "from": "network_io",
+      "to": "power_distribution",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:protective_earth",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:compute_acceleration:network_io:pcie_fabric",
+      "from": "compute_acceleration",
+      "to": "network_io",
+      "via": "pcie_fabric",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pcie_fabric."
+    },
+    {
+      "id": "shared_interface:network_io:data_storage:pcie_fabric",
+      "from": "network_io",
+      "to": "data_storage",
+      "via": "pcie_fabric",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pcie_fabric."
+    },
+    {
+      "id": "shared_interface:data_storage:control_compute_communication:pcie_fabric",
+      "from": "data_storage",
+      "to": "control_compute_communication",
+      "via": "pcie_fabric",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pcie_fabric."
+    },
+    {
+      "id": "shared_interface:compute_acceleration:power_distribution:gpu_power_bus",
+      "from": "compute_acceleration",
+      "to": "power_distribution",
+      "via": "gpu_power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare gpu_power_bus."
+    },
+    {
+      "id": "shared_interface:compute_acceleration:environmental_interface:thermal_path",
+      "from": "compute_acceleration",
+      "to": "environmental_interface",
+      "via": "thermal_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare thermal_path."
+    },
+    {
+      "id": "shared_interface:compute_acceleration:control_compute_communication:sensor_bus",
+      "from": "compute_acceleration",
+      "to": "control_compute_communication",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:power_distribution:sensor_bus",
+      "from": "control_compute_communication",
+      "to": "power_distribution",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:environmental_interface:sensor_bus",
+      "from": "power_distribution",
+      "to": "environmental_interface",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:environmental_interface:sensing_instrumentation:sensor_bus",
+      "from": "environmental_interface",
+      "to": "sensing_instrumentation",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:network_io:control_compute_communication:inference_network",
+      "from": "network_io",
+      "to": "control_compute_communication",
+      "via": "inference_network",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare inference_network."
+    },
+    {
+      "id": "shared_interface:network_io:data_storage:management_network",
+      "from": "network_io",
+      "to": "data_storage",
+      "via": "management_network",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare management_network."
+    },
+    {
+      "id": "shared_interface:data_storage:control_compute_communication:management_network",
+      "from": "data_storage",
+      "to": "control_compute_communication",
+      "via": "management_network",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare management_network."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:management_network",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "management_network",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare management_network."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:management_network",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "management_network",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare management_network."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:management_network",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "management_network",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare management_network."
+    },
+    {
+      "id": "shared_interface:data_storage:control_compute_communication:storage_bus",
+      "from": "data_storage",
+      "to": "control_compute_communication",
+      "via": "storage_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare storage_bus."
+    },
+    {
+      "id": "shared_interface:data_storage:control_compute_communication:secure_boot_chain",
+      "from": "data_storage",
+      "to": "control_compute_communication",
+      "via": "secure_boot_chain",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare secure_boot_chain."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:safety_protection:secure_boot_chain",
+      "from": "control_compute_communication",
+      "to": "safety_protection",
+      "via": "secure_boot_chain",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare secure_boot_chain."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:secure_boot_chain",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "secure_boot_chain",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare secure_boot_chain."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:thermal_alarm_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "thermal_alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare thermal_alarm_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:thermal_alarm_bus",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "thermal_alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare thermal_alarm_bus."
+    },
+    {
+      "id": "shared_interface:compute_acceleration:power_distribution:low_voltage_rail",
+      "from": "compute_acceleration",
+      "to": "power_distribution",
+      "via": "low_voltage_rail",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare low_voltage_rail."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:hardwired_trip",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "hardwired_trip",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare hardwired_trip."
+    },
+    {
+      "id": "shared_interface:environmental_interface:sensing_instrumentation:fan_control_bus",
+      "from": "environmental_interface",
+      "to": "sensing_instrumentation",
+      "via": "fan_control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare fan_control_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:fan_control_bus",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "fan_control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare fan_control_bus."
+    },
+    {
+      "id": "required_interface:control_compute_communication:compute_acceleration:pcie_fabric",
+      "from": "control_compute_communication",
+      "to": "compute_acceleration",
+      "via": "pcie_fabric",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Host control must enumerate and command the accelerator over a declared PCIe fabric."
+    },
+    {
+      "id": "required_interface:power_distribution:compute_acceleration:gpu_power_bus",
+      "from": "power_distribution",
+      "to": "compute_acceleration",
+      "via": "gpu_power_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Accelerator power must be isolated from lower-power appliance rails."
+    },
+    {
+      "id": "required_interface:network_io:control_compute_communication:inference_network",
+      "from": "network_io",
+      "to": "control_compute_communication",
+      "via": "inference_network",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Inference traffic must reach host software and runtime orchestration."
+    },
+    {
+      "id": "required_interface:data_storage:control_compute_communication:storage_bus",
+      "from": "data_storage",
+      "to": "control_compute_communication",
+      "via": "storage_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Model cache and logs must be visible to host software."
+    },
+    {
+      "id": "required_interface:environmental_interface:compute_acceleration:thermal_path",
+      "from": "environmental_interface",
+      "to": "compute_acceleration",
+      "via": "thermal_path",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Accelerator and CPU heat must couple into the cooling path."
+    },
+    {
+      "id": "required_interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "sensor_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Thermal and power telemetry must feed management control."
+    },
+    {
+      "id": "required_interface:safety_protection:power_distribution:hardwired_trip",
+      "from": "safety_protection",
+      "to": "power_distribution",
+      "via": "hardwired_trip",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Thermal and electrical safety faults must force power shutdown."
+    },
+    {
+      "id": "required_interface:structure_containment:environmental_interface:airflow_path",
+      "from": "structure_containment",
+      "to": "environmental_interface",
+      "via": "airflow_path",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "The rack chassis must preserve the front-to-back airflow path used by cooling."
+    }
+  ],
+  "summary": {
+    "moduleNodes": 10,
+    "subModuleNodes": 30,
+    "containsEdges": 30,
+    "sharedInterfaceEdges": 39,
+    "requiredInterfaceEdges": 8,
+    "missingRequiredInterfaceEdges": 0
+  }
+}

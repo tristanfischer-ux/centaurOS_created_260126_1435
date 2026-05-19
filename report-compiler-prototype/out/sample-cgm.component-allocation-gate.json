@@ -1,0 +1,1123 @@
+{
+  "verdict": "allocation_ready",
+  "summary": {
+    "modules": 10,
+    "subModules": 30,
+    "componentWords": 120,
+    "readySubModules": 30,
+    "reviewSubModules": 0,
+    "blockedSubModules": 0,
+    "interfaceCarrierSubModules": 30,
+    "interfaceCarrierWithoutComponents": 0,
+    "requiredCriticalParts": 12,
+    "allocatedCriticalParts": 12,
+    "missingCriticalParts": 0,
+    "bomLines": 120,
+    "criticalBomLines": 12,
+    "duplicateComponentGroups": 0,
+    "duplicateCriticalComponentGroups": 0,
+    "allocationRatio": 1,
+    "criticalAllocationRatio": 1
+  },
+  "subModules": [
+    {
+      "id": "skin_patient_interface:adhesive_patch_stack",
+      "moduleId": "skin_patient_interface",
+      "moduleName": "Skin Patient Interface",
+      "subModuleId": "adhesive_patch_stack",
+      "subModuleName": "Adhesive patch stack",
+      "purpose": "Keeps the patch attached while preserving skin comfort and fluid access.",
+      "interfaces": [
+        "adhesive_skin_boundary",
+        "interstitial_fluid_path",
+        "sterile_boundary"
+      ],
+      "componentWordIds": [
+        "adhesive_skin_patch",
+        "hydrocolloid_edge_seal",
+        "breathable_backing_film",
+        "pull_tab_liner"
+      ],
+      "componentNames": [
+        "Adhesive skin patch",
+        "hydrocolloid edge seal",
+        "breathable backing film",
+        "pull tab liner"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "adhesive_skin_patch"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "skin_patient_interface:cannula_skin_contact",
+      "moduleId": "skin_patient_interface",
+      "moduleName": "Skin Patient Interface",
+      "subModuleId": "cannula_skin_contact",
+      "subModuleName": "Sensor skin contact",
+      "purpose": "Positions the filament entry site and protects the skin boundary.",
+      "interfaces": [
+        "interstitial_fluid_path",
+        "insertion_path",
+        "sterile_boundary"
+      ],
+      "componentWordIds": [
+        "skin_contact_gasket",
+        "filament_entry_seal",
+        "antimicrobial_contact_pad",
+        "insertion_site_spacing_ring"
+      ],
+      "componentNames": [
+        "skin contact gasket",
+        "filament entry seal",
+        "antimicrobial contact pad",
+        "insertion site spacing ring"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "skin_patient_interface:wear_comfort_retention",
+      "moduleId": "skin_patient_interface",
+      "moduleName": "Skin Patient Interface",
+      "subModuleId": "wear_comfort_retention",
+      "subModuleName": "Wear comfort and retention",
+      "purpose": "Controls patch flex, sweat movement and user removal.",
+      "interfaces": [
+        "adhesive_skin_boundary",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "flex_relief_bridge",
+        "sweat_channel_texture",
+        "patch_stretch_zone",
+        "removal_aid_tab"
+      ],
+      "componentNames": [
+        "flex relief bridge",
+        "sweat channel texture",
+        "patch stretch zone",
+        "removal aid tab"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:glucose_filament_stack",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Glucose Sensing Instrumentation",
+      "subModuleId": "glucose_filament_stack",
+      "subModuleName": "Glucose filament stack",
+      "purpose": "Combines electrochemical layers into the patient-contact sensing path.",
+      "interfaces": [
+        "interstitial_fluid_path",
+        "electrode_signal_path",
+        "analog_power_rail"
+      ],
+      "componentWordIds": [
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode",
+        "diffusion_limiting_membrane"
+      ],
+      "componentNames": [
+        "Glucose sensing filament",
+        "Enzyme reagent membrane",
+        "Reference electrode",
+        "diffusion limiting membrane"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:analog_front_end",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Glucose Sensing Instrumentation",
+      "subModuleId": "analog_front_end",
+      "subModuleName": "Analog front end",
+      "purpose": "Biases, reads and filters the electrochemical sensor signal.",
+      "interfaces": [
+        "electrode_signal_path",
+        "sensor_signal_bus",
+        "analog_power_rail"
+      ],
+      "componentWordIds": [
+        "potentiostat_afe",
+        "low_leakage_input_guard",
+        "electrode_flex_tail",
+        "sensor_bias_resistor_network"
+      ],
+      "componentNames": [
+        "potentiostat AFE",
+        "low-leakage input guard",
+        "electrode flex tail",
+        "sensor bias resistor network"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:calibration_drift_monitoring",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Glucose Sensing Instrumentation",
+      "subModuleId": "calibration_drift_monitoring",
+      "subModuleName": "Calibration and drift monitoring",
+      "purpose": "Stores factory calibration and tracks signal quality.",
+      "interfaces": [
+        "sensor_signal_bus",
+        "calibration_data_bus",
+        "temperature_compensation_bus"
+      ],
+      "componentWordIds": [
+        "calibration_data_eeprom",
+        "drift_estimator_firmware_table",
+        "factory_calibration_code",
+        "signal_integrity_test_pad"
+      ],
+      "componentNames": [
+        "calibration data EEPROM",
+        "drift estimator firmware table",
+        "factory calibration code",
+        "signal integrity test pad"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:disposable_applicator",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Applicator Insertion Mechanism",
+      "subModuleId": "disposable_applicator",
+      "subModuleName": "Disposable applicator",
+      "purpose": "Presents the sensor and insertion action to the user.",
+      "interfaces": [
+        "insertion_path",
+        "sterile_boundary",
+        "user_trigger"
+      ],
+      "componentWordIds": [
+        "disposable_applicator",
+        "spring_insertion_driver",
+        "trigger_button",
+        "safety_cap"
+      ],
+      "componentNames": [
+        "Disposable applicator",
+        "spring insertion driver",
+        "trigger button",
+        "safety cap"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "disposable_applicator"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:insertion_mechanism",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Applicator Insertion Mechanism",
+      "subModuleId": "insertion_mechanism",
+      "subModuleName": "Insertion mechanism",
+      "purpose": "Guides filament placement and retracts introducer hardware.",
+      "interfaces": [
+        "insertion_path",
+        "user_trigger"
+      ],
+      "componentWordIds": [
+        "introducer_needle",
+        "filament_deployment_shuttle",
+        "depth_stop_collar",
+        "retraction_latch"
+      ],
+      "componentNames": [
+        "introducer needle",
+        "filament deployment shuttle",
+        "depth stop collar",
+        "retraction latch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:sharps_lockout",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Applicator Insertion Mechanism",
+      "subModuleId": "sharps_lockout",
+      "subModuleName": "Sharps lockout",
+      "purpose": "Prevents reuse and shields the needle after application.",
+      "interfaces": [
+        "service_access",
+        "sterile_boundary"
+      ],
+      "componentWordIds": [
+        "needle_shield",
+        "post_use_lock_tab",
+        "applicator_status_window",
+        "trigger_interlock_spring"
+      ],
+      "componentNames": [
+        "needle shield",
+        "post-use lock tab",
+        "applicator status window",
+        "trigger interlock spring"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:transmitter_housing",
+      "moduleId": "structure_containment",
+      "moduleName": "Transmitter Housing Structure",
+      "subModuleId": "transmitter_housing",
+      "subModuleName": "Transmitter housing",
+      "purpose": "Protects electronics while staying wearable under clothing.",
+      "interfaces": [
+        "electronics_mount",
+        "ingress_boundary",
+        "adhesive_skin_boundary"
+      ],
+      "componentWordIds": [
+        "protective_transmitter_housing",
+        "ultrasonic_weld_seam",
+        "electronics_carrier_tray",
+        "ingress_gasket"
+      ],
+      "componentNames": [
+        "Protective transmitter housing",
+        "ultrasonic weld seam",
+        "electronics carrier tray",
+        "ingress gasket"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "protective_transmitter_housing"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:patch_mechanical_frame",
+      "moduleId": "structure_containment",
+      "moduleName": "Transmitter Housing Structure",
+      "subModuleId": "patch_mechanical_frame",
+      "subModuleName": "Patch mechanical frame",
+      "purpose": "Links adhesive patch, sensor port and transmitter latch features.",
+      "interfaces": [
+        "electronics_mount",
+        "adhesive_skin_boundary",
+        "insertion_path"
+      ],
+      "componentWordIds": [
+        "flexible_patch_frame",
+        "sensor_port_boss",
+        "transmitter_latch_rail",
+        "strain_relief_web"
+      ],
+      "componentNames": [
+        "flexible patch frame",
+        "sensor port boss",
+        "transmitter latch rail",
+        "strain relief web"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:ingress_boundary",
+      "moduleId": "structure_containment",
+      "moduleName": "Transmitter Housing Structure",
+      "subModuleId": "ingress_boundary",
+      "subModuleName": "Ingress boundary",
+      "purpose": "Controls sweat, splash and cleaning exposure around the electronics.",
+      "interfaces": [
+        "ingress_boundary",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "hydrophobic_vent_membrane",
+        "ip_ingress_seal",
+        "splash_shield_lip",
+        "housing_serial_marking"
+      ],
+      "componentNames": [
+        "hydrophobic vent membrane",
+        "IP ingress seal",
+        "splash shield lip",
+        "housing serial marking"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:battery_cell",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Wearable Energy Source",
+      "subModuleId": "battery_cell",
+      "subModuleName": "Battery cell",
+      "purpose": "Provides compact stored energy for the wear period.",
+      "interfaces": [
+        "cell_power_bus",
+        "lot_traceability"
+      ],
+      "componentWordIds": [
+        "thin_film_battery",
+        "battery_weld_tab",
+        "battery_pouch_insulator",
+        "state_of_charge_witness_pad"
+      ],
+      "componentNames": [
+        "Thin-film battery",
+        "battery weld tab",
+        "battery pouch insulator",
+        "state-of-charge witness pad"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "thin_film_battery"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:power_reserve",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Wearable Energy Source",
+      "subModuleId": "power_reserve",
+      "subModuleName": "Power reserve",
+      "purpose": "Preserves operation during radio bursts and end-of-wear reserve.",
+      "interfaces": [
+        "cell_power_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "brownout_hold_up_capacitor",
+        "battery_cut_off_tab",
+        "shelf_life_isolation_film",
+        "activation_pull_strip"
+      ],
+      "componentNames": [
+        "brownout hold-up capacitor",
+        "battery cut-off tab",
+        "shelf-life isolation film",
+        "activation pull strip"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:battery_safety",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Wearable Energy Source",
+      "subModuleId": "battery_safety",
+      "subModuleName": "Battery safety",
+      "purpose": "Controls battery fault, traceability and shelf handling hazards.",
+      "interfaces": [
+        "cell_power_bus",
+        "lot_traceability"
+      ],
+      "componentWordIds": [
+        "battery_vent_clearance",
+        "reverse_polarity_fuse",
+        "pack_temperature_dot",
+        "battery_lot_barcode"
+      ],
+      "componentNames": [
+        "battery vent clearance",
+        "reverse polarity fuse",
+        "pack temperature dot",
+        "battery lot barcode"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:low_power_rails",
+      "moduleId": "power_distribution",
+      "moduleName": "Low-Power Distribution",
+      "subModuleId": "low_power_rails",
+      "subModuleName": "Low-power rails",
+      "purpose": "Creates efficient rails for digital control and BLE telemetry.",
+      "interfaces": [
+        "cell_power_bus",
+        "low_power_rail",
+        "hardwired_trip"
+      ],
+      "componentWordIds": [
+        "nanoamp_power_switch",
+        "digital_buck_regulator",
+        "rail_measurement_divider",
+        "wake_timer_oscillator"
+      ],
+      "componentNames": [
+        "nanoamp power switch",
+        "digital buck regulator",
+        "rail measurement divider",
+        "wake timer oscillator"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:analog_excitation",
+      "moduleId": "power_distribution",
+      "moduleName": "Low-Power Distribution",
+      "subModuleId": "analog_excitation",
+      "subModuleName": "Analog excitation",
+      "purpose": "Feeds low-noise power to electrochemical sensing.",
+      "interfaces": [
+        "cell_power_bus",
+        "analog_power_rail",
+        "sensor_signal_bus"
+      ],
+      "componentWordIds": [
+        "sensor_excitation_mux",
+        "analog_power_filter",
+        "electrode_guard_driver",
+        "afe_wake_timer"
+      ],
+      "componentNames": [
+        "sensor excitation mux",
+        "analog power filter",
+        "electrode guard driver",
+        "AFE wake timer"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:power_fault_handling",
+      "moduleId": "power_distribution",
+      "moduleName": "Low-Power Distribution",
+      "subModuleId": "power_fault_handling",
+      "subModuleName": "Power fault handling",
+      "purpose": "Protects against rail collapse or unsafe current draw.",
+      "interfaces": [
+        "hardwired_trip",
+        "low_power_rail",
+        "analog_power_rail"
+      ],
+      "componentWordIds": [
+        "hardwired_reset_supervisor",
+        "overcurrent_limiter",
+        "load_gate_transistor",
+        "fault_latch"
+      ],
+      "componentNames": [
+        "hardwired reset supervisor",
+        "overcurrent limiter",
+        "load gate transistor",
+        "fault latch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:mcu_firmware",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "mcu_firmware",
+      "subModuleName": "MCU firmware",
+      "purpose": "Runs sampling, compensation, filtering and device-state logic.",
+      "interfaces": [
+        "sensor_signal_bus",
+        "calibration_data_bus",
+        "low_power_rail",
+        "temperature_compensation_bus"
+      ],
+      "componentWordIds": [
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock"
+      ],
+      "componentNames": [
+        "Low-power microcontroller",
+        "firmware image",
+        "secure boot key store",
+        "real-time clock"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "low_power_microcontroller"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:ble_telemetry",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "ble_telemetry",
+      "subModuleName": "BLE telemetry",
+      "purpose": "Pairs with a reader or phone and sends trend data.",
+      "interfaces": [
+        "ble_link",
+        "low_power_rail",
+        "alarm_state_bus"
+      ],
+      "componentWordIds": [
+        "ble_radio_module",
+        "printed_antenna",
+        "pairing_button_pad",
+        "encrypted_session_counter"
+      ],
+      "componentNames": [
+        "BLE radio module",
+        "printed antenna",
+        "pairing button pad",
+        "encrypted session counter"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "ble_radio_module"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:data_buffering",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "data_buffering",
+      "subModuleName": "Data buffering",
+      "purpose": "Stores recent readings and diagnostic events between connections.",
+      "interfaces": [
+        "sensor_signal_bus",
+        "calibration_data_bus",
+        "alarm_state_bus"
+      ],
+      "componentWordIds": [
+        "glucose_trend_buffer_flash",
+        "event_log_memory",
+        "calibration_data_bus_bridge",
+        "clock_drift_compensator"
+      ],
+      "componentNames": [
+        "glucose trend buffer flash",
+        "event log memory",
+        "calibration data bus bridge",
+        "clock drift compensator"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:temperature_compensation",
+      "moduleId": "environmental_interface",
+      "moduleName": "Wear Environment Compensation",
+      "subModuleId": "temperature_compensation",
+      "subModuleName": "Temperature compensation",
+      "purpose": "Measures skin-side temperature for chemistry compensation.",
+      "interfaces": [
+        "temperature_compensation_bus",
+        "sensor_signal_bus"
+      ],
+      "componentWordIds": [
+        "temperature_sensor",
+        "thermal_model_table",
+        "skin_temperature_flex_tail",
+        "cold_start_delay_flag"
+      ],
+      "componentNames": [
+        "Temperature sensor",
+        "thermal model table",
+        "skin temperature flex tail",
+        "cold-start delay flag"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "temperature_sensor"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:sweat_water_boundary",
+      "moduleId": "environmental_interface",
+      "moduleName": "Wear Environment Compensation",
+      "subModuleId": "sweat_water_boundary",
+      "subModuleName": "Sweat and water boundary",
+      "purpose": "Surfaces exposure conditions that can threaten patch reliability.",
+      "interfaces": [
+        "ingress_boundary",
+        "adhesive_skin_boundary"
+      ],
+      "componentWordIds": [
+        "sweat_barrier_film",
+        "condensation_drain_groove",
+        "humidity_indicator_dot",
+        "ingress_exposure_witness"
+      ],
+      "componentNames": [
+        "sweat barrier film",
+        "condensation drain groove",
+        "humidity indicator dot",
+        "ingress exposure witness"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:motion_pressure",
+      "moduleId": "environmental_interface",
+      "moduleName": "Wear Environment Compensation",
+      "subModuleId": "motion_pressure",
+      "subModuleName": "Motion and pressure artefact control",
+      "purpose": "Flags physical conditions that can create signal artefacts.",
+      "interfaces": [
+        "adhesive_skin_boundary",
+        "sensor_signal_bus"
+      ],
+      "componentWordIds": [
+        "motion_artefact_filter_table",
+        "patch_pressure_relief_slot",
+        "compression_warning_marker",
+        "activity_context_accelerometer"
+      ],
+      "componentNames": [
+        "motion artefact filter table",
+        "patch pressure relief slot",
+        "compression warning marker",
+        "activity context accelerometer"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:patient_alarm_logic",
+      "moduleId": "safety_protection",
+      "moduleName": "Patient Safety Protection",
+      "subModuleId": "patient_alarm_logic",
+      "subModuleName": "Patient alarm logic",
+      "purpose": "Classifies clinically relevant sensor and telemetry states.",
+      "interfaces": [
+        "alarm_state_bus",
+        "sensor_signal_bus"
+      ],
+      "componentWordIds": [
+        "hypoglycaemia_alarm_state",
+        "hyperglycaemia_alarm_state",
+        "sensor_fault_classifier",
+        "stale_data_lockout"
+      ],
+      "componentNames": [
+        "hypoglycaemia alarm state",
+        "hyperglycaemia alarm state",
+        "sensor fault classifier",
+        "stale data lockout"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:biocompatibility_controls",
+      "moduleId": "safety_protection",
+      "moduleName": "Patient Safety Protection",
+      "subModuleId": "biocompatibility_controls",
+      "subModuleName": "Biocompatibility controls",
+      "purpose": "Connects material and adhesive choices to patient-contact review.",
+      "interfaces": [
+        "adhesive_skin_boundary",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "biocompatibility_material_record",
+        "adhesive_irritation_limit_tag",
+        "latex_free_label",
+        "skin_contact_change_log"
+      ],
+      "componentNames": [
+        "biocompatibility material record",
+        "adhesive irritation limit tag",
+        "latex-free label",
+        "skin-contact change log"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:sterile_sharps_safety",
+      "moduleId": "safety_protection",
+      "moduleName": "Patient Safety Protection",
+      "subModuleId": "sterile_sharps_safety",
+      "subModuleName": "Sterile and sharps safety",
+      "purpose": "Controls sterile path, warnings and disposal state.",
+      "interfaces": [
+        "sterile_boundary",
+        "hardwired_trip",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "sterile_boundary_indicator",
+        "sharps_injury_warning_label",
+        "applicator_disposal_instruction",
+        "tamper_evident_seal"
+      ],
+      "componentNames": [
+        "sterile boundary indicator",
+        "sharps injury warning label",
+        "applicator disposal instruction",
+        "tamper evident seal"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:sterile_packaging",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Packaging Traceability Serviceability",
+      "subModuleId": "sterile_packaging",
+      "subModuleName": "Sterile packaging",
+      "purpose": "Protects sensor, adhesive and applicator until use.",
+      "interfaces": [
+        "sterile_boundary",
+        "lot_traceability"
+      ],
+      "componentWordIds": [
+        "sterile_barrier_pouch",
+        "desiccant_sachet",
+        "pouch_seal_indicator",
+        "expiry_date_label"
+      ],
+      "componentNames": [
+        "Sterile barrier pouch",
+        "desiccant sachet",
+        "pouch seal indicator",
+        "expiry date label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "sterile_barrier_pouch"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:lot_traceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Packaging Traceability Serviceability",
+      "subModuleId": "lot_traceability",
+      "subModuleName": "Lot traceability",
+      "purpose": "Links device, sensor chemistry and packaging to regulated release records.",
+      "interfaces": [
+        "lot_traceability",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "udi_label_set",
+        "ifu_leaflet",
+        "lot_traceability_barcode",
+        "release_inspection_stamp"
+      ],
+      "componentNames": [
+        "UDI label set",
+        "IFU leaflet",
+        "lot traceability barcode",
+        "release inspection stamp"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "udi_label_set"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:user_setup",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Packaging Traceability Serviceability",
+      "subModuleId": "user_setup",
+      "subModuleName": "User setup",
+      "purpose": "Supports pairing, warm-up and safe removal instructions.",
+      "interfaces": [
+        "service_access",
+        "ble_link"
+      ],
+      "componentWordIds": [
+        "phone_pairing_qr_card",
+        "applicator_instruction_card",
+        "sensor_warm_up_timer_label",
+        "adhesive_removal_wipe"
+      ],
+      "componentNames": [
+        "phone pairing QR card",
+        "applicator instruction card",
+        "sensor warm-up timer label",
+        "adhesive removal wipe"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    }
+  ],
+  "criticalParts": [
+    {
+      "componentWordId": "glucose_sensing_filament",
+      "label": "Glucose sensing filament",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "glucose_filament_stack"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "enzyme_reagent_membrane",
+      "label": "Enzyme reagent membrane",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "glucose_filament_stack"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "reference_electrode",
+      "label": "Reference electrode",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "glucose_filament_stack"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "adhesive_skin_patch",
+      "label": "Adhesive skin patch",
+      "allocated": true,
+      "moduleIds": [
+        "skin_patient_interface"
+      ],
+      "subModuleIds": [
+        "adhesive_patch_stack"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "protective_transmitter_housing",
+      "label": "Protective transmitter housing",
+      "allocated": true,
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "subModuleIds": [
+        "transmitter_housing"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "disposable_applicator",
+      "label": "Disposable applicator",
+      "allocated": true,
+      "moduleIds": [
+        "actuation_kinematics"
+      ],
+      "subModuleIds": [
+        "disposable_applicator"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "low_power_microcontroller",
+      "label": "Low-power microcontroller",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "mcu_firmware"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "ble_radio_module",
+      "label": "BLE radio module",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "ble_telemetry"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "thin_film_battery",
+      "label": "Thin-film battery",
+      "allocated": true,
+      "moduleIds": [
+        "energy_storage_source"
+      ],
+      "subModuleIds": [
+        "battery_cell"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "temperature_sensor",
+      "label": "Temperature sensor",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "temperature_compensation"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "sterile_barrier_pouch",
+      "label": "Sterile barrier pouch",
+      "allocated": true,
+      "moduleIds": [
+        "maintenance_serviceability"
+      ],
+      "subModuleIds": [
+        "sterile_packaging"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "udi_label_set",
+      "label": "UDI label set",
+      "allocated": true,
+      "moduleIds": [
+        "maintenance_serviceability"
+      ],
+      "subModuleIds": [
+        "lot_traceability"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    }
+  ],
+  "duplicateGroups": [],
+  "blockers": [],
+  "nextActions": []
+}

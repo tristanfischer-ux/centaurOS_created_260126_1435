@@ -1,0 +1,547 @@
+{
+  "summary": {
+    "rows": 34,
+    "briefSupported": 3,
+    "modelPresent": 8,
+    "reviewRequired": 9,
+    "sourceRequired": 14,
+    "blocked": 0,
+    "architectureBlockers": 0,
+    "bomBlockers": 14
+  },
+  "rows": [
+    {
+      "linkedRequirements": [
+        "compute_tops"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:compute_tops",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Inference throughput",
+      "assumption": "Inference throughput = 200 TOPS is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "rack_units"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:rack_units",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Rack height",
+      "assumption": "Rack height = 1 U is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "power_budget_w"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:power_budget_w",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Power budget",
+      "assumption": "Power budget = 700 W is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "metric:headline_output",
+      "category": "derived_metric",
+      "status": "review_required",
+      "scope": "Inference throughput",
+      "assumption": "Inference throughput uses compute_tops with medium confidence.",
+      "basis": "class_pack:edge_ai.class_pack; formula:compute_tops",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:capex_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated CAPEX",
+      "assumption": "Estimated CAPEX uses an implicit model with low confidence.",
+      "basis": "formula:capex=sum(bom.totalCostGbp); class_pack:edge_ai.class_pack",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:opex_annual_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated annual OPEX",
+      "assumption": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "basis": "formula:opex=capex*0.04",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [
+        "compute_tops"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:edgeai_compute_throughput",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Inference Throughput",
+      "assumption": "Inference Throughput currently evaluates as pass against 10 to 2000 TOPS for a rack edge inference appliance before model and latency derating.",
+      "basis": "brief:input.brief; model:engineering_sanity.edge_ai; model:engineering_sanity.edge_ai",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:edgeai_power_density",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Rack Power Density",
+      "assumption": "Rack Power Density currently evaluates as pass against 100 to 1500 W/U for forced-air edge appliances; higher density needs detailed rack inlet and cooling proof.",
+      "basis": "brief:input.brief; formula:power_budget_w / rack_units; model:engineering_sanity.edge_ai; model:engineering_sanity.edge_ai",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "compute_tops"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:edgeai_data_compute_closure",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Data/Compute Closure",
+      "assumption": "Data/Compute Closure currently evaluates as pass against PCIe fabric, inference network, storage bus and management network present.",
+      "basis": "model:engineering_sanity.edge_ai; model:engineering_sanity.edge_ai",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:edgeai_thermal_power_safety",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Thermal/Power Safety",
+      "assumption": "Thermal/Power Safety currently evaluates as pass against thermal path, airflow path, fan control, AC input, protective earth, thermal alarm and hardwired trip present.",
+      "basis": "model:engineering_sanity.edge_ai; model:engineering_sanity.edge_ai",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:edgeai_secure_management",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Secure Management",
+      "assumption": "Secure Management currently evaluates as pass against secure boot chain, management network, service access and TPM present.",
+      "basis": "model:engineering_sanity.edge_ai; model:engineering_sanity.edge_ai",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "pcie_fabric"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:compute_acceleration:pcie_fabric",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> compute_acceleration",
+      "assumption": "pcie_fabric is named on both endpoint modules in the generated architecture.",
+      "basis": "Host control must enumerate and command the accelerator over a declared PCIe fabric.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "gpu_power_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:power_distribution:compute_acceleration:gpu_power_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "power_distribution -> compute_acceleration",
+      "assumption": "gpu_power_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Accelerator power must be isolated from lower-power appliance rails.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "inference_network"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:network_io:control_compute_communication:inference_network",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "network_io -> control_compute_communication",
+      "assumption": "inference_network is named on both endpoint modules in the generated architecture.",
+      "basis": "Inference traffic must reach host software and runtime orchestration.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "storage_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:data_storage:control_compute_communication:storage_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "data_storage -> control_compute_communication",
+      "assumption": "storage_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Model cache and logs must be visible to host software.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "thermal_path"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:environmental_interface:compute_acceleration:thermal_path",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "environmental_interface -> compute_acceleration",
+      "assumption": "thermal_path is named on both endpoint modules in the generated architecture.",
+      "basis": "Accelerator and CPU heat must couple into the cooling path.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "sensor_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "assumption": "sensor_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Thermal and power telemetry must feed management control.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "hardwired_trip"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:safety_protection:power_distribution:hardwired_trip",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "safety_protection -> power_distribution",
+      "assumption": "hardwired_trip is named on both endpoint modules in the generated architecture.",
+      "basis": "Thermal and electrical safety faults must force power shutdown.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "airflow_path"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:structure_containment:environmental_interface:airflow_path",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "structure_containment -> environmental_interface",
+      "assumption": "airflow_path is named on both endpoint modules in the generated architecture.",
+      "basis": "The rack chassis must preserve the front-to-back airflow path used by cooling.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "1u_rack_chassis"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:structure_containment_rack_chassis_1u_rack_chassis",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "1U rack chassis",
+      "assumption": "1U rack chassis is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "ai_accelerator_module"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:compute_acceleration_accelerator_module_ai_accelerator_module",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "AI accelerator module",
+      "assumption": "AI accelerator module is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "cpu_module"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:compute_acceleration_cpu_memory_complex_cpu_module",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "CPU module",
+      "assumption": "CPU module is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "ecc_memory"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:compute_acceleration_cpu_memory_complex_ecc_memory",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "ECC memory",
+      "assumption": "ECC memory is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "system_motherboard"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:compute_acceleration_cpu_memory_complex_system_motherboard",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "System motherboard",
+      "assumption": "System motherboard is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "high_speed_nic"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:network_io_high_speed_network_high_speed_nic",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "High-speed NIC",
+      "assumption": "High-speed NIC is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "nvme_ssd"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:data_storage_nvme_storage_nvme_ssd",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "NVMe SSD",
+      "assumption": "NVMe SSD is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "bmc_management_controller"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_host_control_bmc_management_controller",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "BMC management controller",
+      "assumption": "BMC management controller is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "redundant_power_supply"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:power_distribution_ac_input_conversion_redundant_power_supply",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Redundant power supply",
+      "assumption": "Redundant power supply is a critical architecture-derived component candidate with quantity 2 each.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "fan_wall_assembly"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_forced_air_cooling_fan_wall_assembly",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Fan wall assembly",
+      "assumption": "Fan wall assembly is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "heatsink_cold_plate"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_heat_transfer_heatsink_cold_plate",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Heatsink cold plate",
+      "assumption": "Heatsink cold plate is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "tpm_security_module"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:safety_protection_secure_boot_tpm_security_module",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "TPM security module",
+      "assumption": "TPM security module is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.edge_ai",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:IEC-62368-1",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "IEC-62368-1",
+      "assumption": "Audio/video, ICT and communication equipment safety is relevant to this product class in UK/EU/global.",
+      "basis": "class_pack:edge_ai.class_pack",
+      "evidenceRequired": "Electrical safety, enclosure, temperature and abnormal-operation evidence."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:CE-EMC",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "CE-EMC",
+      "assumption": "Electromagnetic compatibility technical file is relevant to this product class in UK/EU.",
+      "basis": "class_pack:edge_ai.class_pack",
+      "evidenceRequired": "EMC design review, pre-compliance or test evidence for rack appliance."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:SECURE-BOOT-REVIEW",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "SECURE-BOOT-REVIEW",
+      "assumption": "Secure boot and fleet-management review is relevant to this product class in Project security gate.",
+      "basis": "class_pack:edge_ai.class_pack",
+      "evidenceRequired": "TPM, measured boot, firmware signing, recovery and management-access evidence."
+    }
+  ]
+}

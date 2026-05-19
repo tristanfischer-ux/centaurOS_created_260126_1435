@@ -1,0 +1,75 @@
+{
+  "verdict": "scratch_lineage_clean",
+  "summary": {
+    "rows": 6,
+    "passRows": 6,
+    "reviewRows": 0,
+    "blockedRows": 0,
+    "passRatio": 1,
+    "productClass": "vertical_farm",
+    "scratchArchitectureSupported": true,
+    "architectureSource": "scratch_universal_architecture",
+    "designRefs": 268,
+    "sourceRefs": 0,
+    "forbiddenRefs": 0,
+    "forbiddenStageMentions": 0,
+    "unprovenancedBomClaims": 0,
+    "admittedSourcingEvidenceRows": 0,
+    "chainBenchmarkUsed": false,
+    "benchmarkSource": "prototype internal depth target",
+    "lineageClean": true,
+    "nextAction": null
+  },
+  "rows": [
+    {
+      "area": "architecture_source",
+      "verdict": "pass",
+      "signal": "Product class vertical_farm; architecture source scratch_universal_architecture; scratch grammar supported: yes.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Design content came from the scratch universal architecture stage."
+    },
+    {
+      "area": "design_provenance_refs",
+      "verdict": "pass",
+      "signal": "518 provenance ref(s); 268 design/architecture ref(s); 0 invalid kind(s); 0 forbidden ref(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "All design provenance references are in the allowed scratch provenance vocabulary."
+    },
+    {
+      "area": "bom_candidate_provenance",
+      "verdict": "pass",
+      "signal": "122 candidate BoM line(s); 0 admitted source evidence row(s); 0 unprovenanced supplier/manufacturer/MPN/cost claim(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Candidate BoM fields remain unpriced or explicitly source-backed."
+    },
+    {
+      "area": "source_evidence_boundary",
+      "verdict": "pass",
+      "signal": "0 source provenance ref(s); 0 outside admitted evidence boundary; 0 inside architecture content.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Source refs appear only in admitted source evidence, source ledger entries or matching source-backed BoM lines."
+    },
+    {
+      "area": "chain_v2_quarantine",
+      "verdict": "pass",
+      "signal": "0 forbidden provenance ref(s); 0 forbidden stage-trace mention(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "No chain-v2/state.json/modifier lineage appears inside generated design content or stage traces."
+    },
+    {
+      "area": "benchmark_isolation",
+      "verdict": "pass",
+      "signal": "Benchmark source: prototype internal depth target; chain benchmark used: no; policy: Benchmark uses aggregate counts only. Chain-v2 component names, prose, design content, prices and part numbers are not imported into the scratch generator.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Benchmark does not use chain-v2 input."
+    }
+  ],
+  "blockers": [],
+  "nextActions": []
+}

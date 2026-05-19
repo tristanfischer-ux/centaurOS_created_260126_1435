@@ -1,0 +1,148 @@
+{
+  "dossierId": "sample-farm",
+  "productClass": "vertical_farm",
+  "criticalOnly": true,
+  "instructions": [
+    "Fill only from supplier, manufacturer, distributor, quote, catalogue or datasheet evidence.",
+    "Do not use benchmark averages, LLM estimates, class-pack defaults or unsourced model output.",
+    "The intake record is only admitted when every required field validates and componentWordId matches a candidate BoM line."
+  ],
+  "drafts": [
+    {
+      "componentWordId": "growing_rack_structure",
+      "description": "Growing rack structure",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "led_grow_lights",
+      "description": "LED grow lights",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "air_circulation_fans",
+      "description": "Air circulation fans",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "co2_sensor_or_dosing",
+      "description": "CO2 sensor or dosing",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "reservoir_and_plumbing_set",
+      "description": "Reservoir and plumbing set",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "nutrient_pump",
+      "description": "Nutrient pump",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "environmental_controller",
+      "description": "Environmental controller",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "rcd_isolator_panel",
+      "description": "RCD isolator panel",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    }
+  ]
+}

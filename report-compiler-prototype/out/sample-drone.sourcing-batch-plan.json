@@ -1,0 +1,3244 @@
+{
+  "summary": {
+    "closureRows": 110,
+    "batches": 2,
+    "activeBatches": 1,
+    "waitingBatches": 0,
+    "deferredBatches": 1,
+    "activeRows": 8,
+    "waitingRows": 0,
+    "deferredRows": 102,
+    "procurementBlockingRows": 8,
+    "criticalSourceRows": 8,
+    "repairRows": 0,
+    "protocolReplacementRows": 0,
+    "identityRows": 0,
+    "candidateDeferredRows": 102,
+    "nextBatchId": "sourcing-batch:2:critical_source_collection",
+    "nextItemId": "critical_source_collection:1:esc",
+    "canUseForProcurement": false
+  },
+  "batches": [
+    {
+      "id": "sourcing-batch:2:critical_source_collection",
+      "sequence": 2,
+      "kind": "critical_source_collection",
+      "title": "Collect Critical Source Evidence",
+      "status": "active",
+      "rowCount": 8,
+      "readyRows": 8,
+      "blockedRows": 0,
+      "deferredRows": 0,
+      "procurementBlockingRows": 8,
+      "entryCriteria": [
+        "Architecture has identified critical BoM lines that are not source-backed."
+      ],
+      "exitCriteria": [
+        "Every critical line has admitted supplier/manufacturer/MPN/unit-cost evidence."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "critical_source_collection:1:esc",
+          "closureRowId": "bom-close:actuation_kinematics_esc_stack_esc",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "esc",
+          "description": "ESC",
+          "searchTerms": [
+            "ESC",
+            "ESC manufacturer part number",
+            "ESC catalogue price GBP",
+            "ESC datasheet",
+            "ESC UAV",
+            "ESC lightweight drone"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:2:brushless_motors",
+          "closureRowId": "bom-close:actuation_kinematics_motor_sets_brushless_motors",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "brushless_motors",
+          "description": "Brushless motors",
+          "searchTerms": [
+            "Brushless motors",
+            "Brushless motors manufacturer part number",
+            "Brushless motors catalogue price GBP",
+            "Brushless motors datasheet",
+            "Brushless motors UAV",
+            "Brushless motors lightweight drone"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:3:propeller_set",
+          "closureRowId": "bom-close:actuation_kinematics_propeller_sets_propeller_set",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "propeller_set",
+          "description": "Propeller set",
+          "searchTerms": [
+            "Propeller set",
+            "Propeller set manufacturer part number",
+            "Propeller set catalogue price GBP",
+            "Propeller set datasheet",
+            "Propeller set UAV",
+            "Propeller set lightweight drone"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:4:flight_controller",
+          "closureRowId": "bom-close:control_compute_communication_flight_controller_stack_flight_controller",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "flight_controller",
+          "description": "Flight controller",
+          "searchTerms": [
+            "Flight controller",
+            "Flight controller manufacturer part number",
+            "Flight controller catalogue price GBP",
+            "Flight controller datasheet",
+            "Flight controller UAV",
+            "Flight controller lightweight drone"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:5:radio_and_gnss_link",
+          "closureRowId": "bom-close:control_compute_communication_radio_navigation_link_radio_and_gnss_link",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "radio_and_gnss_link",
+          "description": "Radio and GNSS link",
+          "searchTerms": [
+            "Radio and GNSS link",
+            "Radio and GNSS link manufacturer part number",
+            "Radio and GNSS link catalogue price GBP",
+            "Radio and GNSS link datasheet",
+            "Radio and GNSS link UAV",
+            "Radio and GNSS link lightweight drone"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:6:flight_battery_pack",
+          "closureRowId": "bom-close:energy_storage_source_flight_battery_pack_flight_battery_pack",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "flight_battery_pack",
+          "description": "Flight battery pack",
+          "searchTerms": [
+            "Flight battery pack",
+            "Flight battery pack manufacturer part number",
+            "Flight battery pack catalogue price GBP",
+            "Flight battery pack datasheet",
+            "Flight battery pack UAV",
+            "Flight battery pack lightweight drone"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:7:4k_camera_payload",
+          "closureRowId": "bom-close:sensing_instrumentation_camera_payload_4k_camera_payload",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "4k_camera_payload",
+          "description": "4K camera payload",
+          "searchTerms": [
+            "4K camera payload",
+            "4K camera payload manufacturer part number",
+            "4K camera payload catalogue price GBP",
+            "4K camera payload datasheet",
+            "4K camera payload UAV",
+            "4K camera payload lightweight drone"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:8:carbon_airframe",
+          "closureRowId": "bom-close:structure_containment_carbon_airframe_carbon_airframe",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "carbon_airframe",
+          "description": "Carbon airframe",
+          "searchTerms": [
+            "Carbon airframe",
+            "Carbon airframe manufacturer part number",
+            "Carbon airframe catalogue price GBP",
+            "Carbon airframe datasheet",
+            "Carbon airframe UAV",
+            "Carbon airframe lightweight drone"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        }
+      ]
+    },
+    {
+      "id": "sourcing-batch:6:candidate_sourcing_deferred",
+      "sequence": 6,
+      "kind": "candidate_sourcing_deferred",
+      "title": "Defer Candidate-Only Sourcing",
+      "status": "deferred",
+      "rowCount": 102,
+      "readyRows": 0,
+      "blockedRows": 0,
+      "deferredRows": 102,
+      "procurementBlockingRows": 0,
+      "entryCriteria": [
+        "Candidate lines remain outside immediate procurement scope."
+      ],
+      "exitCriteria": [
+        "Candidate lines are either still explicitly deferred or promoted to critical sourcing scope."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "candidate_sourcing_deferred:1:current_telemetry_line",
+          "closureRowId": "bom-close:actuation_kinematics_esc_stack_current_telemetry_line",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "current_telemetry_line",
+          "description": "current telemetry line",
+          "searchTerms": [
+            "current telemetry line",
+            "current telemetry line manufacturer part number",
+            "current telemetry line catalogue price GBP",
+            "current telemetry line datasheet",
+            "current telemetry line UAV",
+            "current telemetry line lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:2:esc_conformal_coating",
+          "closureRowId": "bom-close:actuation_kinematics_esc_stack_esc_conformal_coating",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "esc_conformal_coating",
+          "description": "ESC conformal coating",
+          "searchTerms": [
+            "ESC conformal coating",
+            "ESC conformal coating manufacturer part number",
+            "ESC conformal coating catalogue price GBP",
+            "ESC conformal coating datasheet",
+            "ESC conformal coating UAV",
+            "ESC conformal coating lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:3:esc_cooling_plate",
+          "closureRowId": "bom-close:actuation_kinematics_esc_stack_esc_cooling_plate",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "esc_cooling_plate",
+          "description": "ESC cooling plate",
+          "searchTerms": [
+            "ESC cooling plate",
+            "ESC cooling plate manufacturer part number",
+            "ESC cooling plate catalogue price GBP",
+            "ESC cooling plate datasheet",
+            "ESC cooling plate UAV",
+            "ESC cooling plate lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:4:pwm_signal_harness",
+          "closureRowId": "bom-close:actuation_kinematics_esc_stack_pwm_signal_harness",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pwm_signal_harness",
+          "description": "PWM signal harness",
+          "searchTerms": [
+            "PWM signal harness",
+            "PWM signal harness manufacturer part number",
+            "PWM signal harness catalogue price GBP",
+            "PWM signal harness datasheet",
+            "PWM signal harness UAV",
+            "PWM signal harness lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:5:motor_bearing_shield",
+          "closureRowId": "bom-close:actuation_kinematics_motor_sets_motor_bearing_shield",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "motor_bearing_shield",
+          "description": "motor bearing shield",
+          "searchTerms": [
+            "motor bearing shield",
+            "motor bearing shield manufacturer part number",
+            "motor bearing shield catalogue price GBP",
+            "motor bearing shield datasheet",
+            "motor bearing shield UAV",
+            "motor bearing shield lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:6:motor_mounting_screw_set",
+          "closureRowId": "bom-close:actuation_kinematics_motor_sets_motor_mounting_screw_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "motor_mounting_screw_set",
+          "description": "motor mounting screw set",
+          "searchTerms": [
+            "motor mounting screw set",
+            "motor mounting screw set manufacturer part number",
+            "motor mounting screw set catalogue price GBP",
+            "motor mounting screw set datasheet",
+            "motor mounting screw set UAV",
+            "motor mounting screw set lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:7:motor_phase_lead_set",
+          "closureRowId": "bom-close:actuation_kinematics_motor_sets_motor_phase_lead_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "motor_phase_lead_set",
+          "description": "motor phase lead set",
+          "searchTerms": [
+            "motor phase lead set",
+            "motor phase lead set manufacturer part number",
+            "motor phase lead set catalogue price GBP",
+            "motor phase lead set datasheet",
+            "motor phase lead set UAV",
+            "motor phase lead set lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:8:propeller_hub_adapter",
+          "closureRowId": "bom-close:actuation_kinematics_propeller_sets_propeller_hub_adapter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "propeller_hub_adapter",
+          "description": "propeller hub adapter",
+          "searchTerms": [
+            "propeller hub adapter",
+            "propeller hub adapter manufacturer part number",
+            "propeller hub adapter catalogue price GBP",
+            "propeller hub adapter datasheet",
+            "propeller hub adapter UAV",
+            "propeller hub adapter lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:9:propeller_lock_nut",
+          "closureRowId": "bom-close:actuation_kinematics_propeller_sets_propeller_lock_nut",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "propeller_lock_nut",
+          "description": "propeller lock nut",
+          "searchTerms": [
+            "propeller lock nut",
+            "propeller lock nut manufacturer part number",
+            "propeller lock nut catalogue price GBP",
+            "propeller lock nut datasheet",
+            "propeller lock nut UAV",
+            "propeller lock nut lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:10:spare_propeller_pouch",
+          "closureRowId": "bom-close:actuation_kinematics_propeller_sets_spare_propeller_pouch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "spare_propeller_pouch",
+          "description": "spare propeller pouch",
+          "searchTerms": [
+            "spare propeller pouch",
+            "spare propeller pouch manufacturer part number",
+            "spare propeller pouch catalogue price GBP",
+            "spare propeller pouch datasheet",
+            "spare propeller pouch UAV",
+            "spare propeller pouch lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:11:barometer_foam_cover",
+          "closureRowId": "bom-close:control_compute_communication_flight_controller_stack_barometer_foam_cover",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "barometer_foam_cover",
+          "description": "barometer foam cover",
+          "searchTerms": [
+            "barometer foam cover",
+            "barometer foam cover manufacturer part number",
+            "barometer foam cover catalogue price GBP",
+            "barometer foam cover datasheet",
+            "barometer foam cover UAV",
+            "barometer foam cover lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:12:failsafe_firmware_profile",
+          "closureRowId": "bom-close:control_compute_communication_flight_controller_stack_failsafe_firmware_profile",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "failsafe_firmware_profile",
+          "description": "failsafe firmware profile",
+          "searchTerms": [
+            "failsafe firmware profile",
+            "failsafe firmware profile manufacturer part number",
+            "failsafe firmware profile catalogue price GBP",
+            "failsafe firmware profile datasheet",
+            "failsafe firmware profile UAV",
+            "failsafe firmware profile lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:13:imu_vibration_isolation_mount",
+          "closureRowId": "bom-close:control_compute_communication_flight_controller_stack_imu_vibration_isolation_mount",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "imu_vibration_isolation_mount",
+          "description": "IMU vibration isolation mount",
+          "searchTerms": [
+            "IMU vibration isolation mount",
+            "IMU vibration isolation mount manufacturer part number",
+            "IMU vibration isolation mount catalogue price GBP",
+            "IMU vibration isolation mount datasheet",
+            "IMU vibration isolation mount UAV",
+            "IMU vibration isolation mount lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:14:sd_card_flight_logger",
+          "closureRowId": "bom-close:control_compute_communication_flight_controller_stack_sd_card_flight_logger",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sd_card_flight_logger",
+          "description": "SD card flight logger",
+          "searchTerms": [
+            "SD card flight logger",
+            "SD card flight logger manufacturer part number",
+            "SD card flight logger catalogue price GBP",
+            "SD card flight logger datasheet",
+            "SD card flight logger UAV",
+            "SD card flight logger lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:15:antenna_diversity_mount",
+          "closureRowId": "bom-close:control_compute_communication_radio_navigation_link_antenna_diversity_mount",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "antenna_diversity_mount",
+          "description": "antenna diversity mount",
+          "searchTerms": [
+            "antenna diversity mount",
+            "antenna diversity mount manufacturer part number",
+            "antenna diversity mount catalogue price GBP",
+            "antenna diversity mount datasheet",
+            "antenna diversity mount UAV",
+            "antenna diversity mount lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:16:gnss_antenna_mast",
+          "closureRowId": "bom-close:control_compute_communication_radio_navigation_link_gnss_antenna_mast",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "gnss_antenna_mast",
+          "description": "GNSS antenna mast",
+          "searchTerms": [
+            "GNSS antenna mast",
+            "GNSS antenna mast manufacturer part number",
+            "GNSS antenna mast catalogue price GBP",
+            "GNSS antenna mast datasheet",
+            "GNSS antenna mast UAV",
+            "GNSS antenna mast lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:17:rc_receiver",
+          "closureRowId": "bom-close:control_compute_communication_radio_navigation_link_rc_receiver",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "rc_receiver",
+          "description": "RC receiver",
+          "searchTerms": [
+            "RC receiver",
+            "RC receiver manufacturer part number",
+            "RC receiver catalogue price GBP",
+            "RC receiver datasheet",
+            "RC receiver UAV",
+            "RC receiver lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:18:telemetry_radio_module",
+          "closureRowId": "bom-close:control_compute_communication_radio_navigation_link_telemetry_radio_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "telemetry_radio_module",
+          "description": "telemetry radio module",
+          "searchTerms": [
+            "telemetry radio module",
+            "telemetry radio module manufacturer part number",
+            "telemetry radio module catalogue price GBP",
+            "telemetry radio module datasheet",
+            "telemetry radio module UAV",
+            "telemetry radio module lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:19:hdmi_micro_cable",
+          "closureRowId": "bom-close:control_compute_communication_video_downlink_hdmi_micro_cable",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hdmi_micro_cable",
+          "description": "HDMI micro cable",
+          "searchTerms": [
+            "HDMI micro cable",
+            "HDMI micro cable manufacturer part number",
+            "HDMI micro cable catalogue price GBP",
+            "HDMI micro cable datasheet",
+            "HDMI micro cable UAV",
+            "HDMI micro cable lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:20:low_latency_video_transmitter",
+          "closureRowId": "bom-close:control_compute_communication_video_downlink_low_latency_video_transmitter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "low_latency_video_transmitter",
+          "description": "low-latency video transmitter",
+          "searchTerms": [
+            "low-latency video transmitter",
+            "low-latency video transmitter manufacturer part number",
+            "low-latency video transmitter catalogue price GBP",
+            "low-latency video transmitter datasheet",
+            "low-latency video transmitter UAV",
+            "low-latency video transmitter lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:21:video_antenna_pair",
+          "closureRowId": "bom-close:control_compute_communication_video_downlink_video_antenna_pair",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "video_antenna_pair",
+          "description": "video antenna pair",
+          "searchTerms": [
+            "video antenna pair",
+            "video antenna pair manufacturer part number",
+            "video antenna pair catalogue price GBP",
+            "video antenna pair datasheet",
+            "video antenna pair UAV",
+            "video antenna pair lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:22:video_power_filter",
+          "closureRowId": "bom-close:control_compute_communication_video_downlink_video_power_filter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "video_power_filter",
+          "description": "video power filter",
+          "searchTerms": [
+            "video power filter",
+            "video power filter manufacturer part number",
+            "video power filter catalogue price GBP",
+            "video power filter datasheet",
+            "video power filter UAV",
+            "video power filter lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:23:balance_charge_harness",
+          "closureRowId": "bom-close:energy_storage_source_charging_interface_balance_charge_harness",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "balance_charge_harness",
+          "description": "balance charge harness",
+          "searchTerms": [
+            "balance charge harness",
+            "balance charge harness manufacturer part number",
+            "balance charge harness catalogue price GBP",
+            "balance charge harness datasheet",
+            "balance charge harness UAV",
+            "balance charge harness lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:24:charging_cradle",
+          "closureRowId": "bom-close:energy_storage_source_charging_interface_charging_cradle",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "charging_cradle",
+          "description": "charging cradle",
+          "searchTerms": [
+            "charging cradle",
+            "charging cradle manufacturer part number",
+            "charging cradle catalogue price GBP",
+            "charging cradle datasheet",
+            "charging cradle UAV",
+            "charging cradle lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:25:pack_id_label",
+          "closureRowId": "bom-close:energy_storage_source_charging_interface_pack_id_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pack_id_label",
+          "description": "pack ID label",
+          "searchTerms": [
+            "pack ID label",
+            "pack ID label manufacturer part number",
+            "pack ID label catalogue price GBP",
+            "pack ID label datasheet",
+            "pack ID label UAV",
+            "pack ID label lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:26:transport_storage_case_insert",
+          "closureRowId": "bom-close:energy_storage_source_charging_interface_transport_storage_case_insert",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "transport_storage_case_insert",
+          "description": "transport storage case insert",
+          "searchTerms": [
+            "transport storage case insert",
+            "transport storage case insert manufacturer part number",
+            "transport storage case insert catalogue price GBP",
+            "transport storage case insert datasheet",
+            "transport storage case insert UAV",
+            "transport storage case insert lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:27:battery_management_pcb",
+          "closureRowId": "bom-close:energy_storage_source_flight_battery_pack_battery_management_pcb",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_management_pcb",
+          "description": "battery management PCB",
+          "searchTerms": [
+            "battery management PCB",
+            "battery management PCB manufacturer part number",
+            "battery management PCB catalogue price GBP",
+            "battery management PCB datasheet",
+            "battery management PCB UAV",
+            "battery management PCB lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:28:high_discharge_cell_group",
+          "closureRowId": "bom-close:energy_storage_source_flight_battery_pack_high_discharge_cell_group",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "high_discharge_cell_group",
+          "description": "high-discharge cell group",
+          "searchTerms": [
+            "high-discharge cell group",
+            "high-discharge cell group manufacturer part number",
+            "high-discharge cell group catalogue price GBP",
+            "high-discharge cell group datasheet",
+            "high-discharge cell group UAV",
+            "high-discharge cell group lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:29:pack_temperature_sensor",
+          "closureRowId": "bom-close:energy_storage_source_flight_battery_pack_pack_temperature_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pack_temperature_sensor",
+          "description": "pack temperature sensor",
+          "searchTerms": [
+            "pack temperature sensor",
+            "pack temperature sensor manufacturer part number",
+            "pack temperature sensor catalogue price GBP",
+            "pack temperature sensor datasheet",
+            "pack temperature sensor UAV",
+            "pack temperature sensor lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:30:xt90_anti_spark_connector",
+          "closureRowId": "bom-close:energy_storage_source_flight_battery_pack_xt90_anti_spark_connector",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "xt90_anti_spark_connector",
+          "description": "XT90 anti-spark connector",
+          "searchTerms": [
+            "XT90 anti-spark connector",
+            "XT90 anti-spark connector manufacturer part number",
+            "XT90 anti-spark connector catalogue price GBP",
+            "XT90 anti-spark connector datasheet",
+            "XT90 anti-spark connector UAV",
+            "XT90 anti-spark connector lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:31:battery_telemetry_connector",
+          "closureRowId": "bom-close:energy_storage_source_power_monitoring_battery_telemetry_connector",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_telemetry_connector",
+          "description": "battery telemetry connector",
+          "searchTerms": [
+            "battery telemetry connector",
+            "battery telemetry connector manufacturer part number",
+            "battery telemetry connector catalogue price GBP",
+            "battery telemetry connector datasheet",
+            "battery telemetry connector UAV",
+            "battery telemetry connector lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:32:low_voltage_alarm_output",
+          "closureRowId": "bom-close:energy_storage_source_power_monitoring_low_voltage_alarm_output",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "low_voltage_alarm_output",
+          "description": "low-voltage alarm output",
+          "searchTerms": [
+            "low-voltage alarm output",
+            "low-voltage alarm output manufacturer part number",
+            "low-voltage alarm output catalogue price GBP",
+            "low-voltage alarm output datasheet",
+            "low-voltage alarm output UAV",
+            "low-voltage alarm output lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:33:power_module_shunt",
+          "closureRowId": "bom-close:energy_storage_source_power_monitoring_power_module_shunt",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "power_module_shunt",
+          "description": "power module shunt",
+          "searchTerms": [
+            "power module shunt",
+            "power module shunt manufacturer part number",
+            "power module shunt catalogue price GBP",
+            "power module shunt datasheet",
+            "power module shunt UAV",
+            "power module shunt lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:34:voltage_divider_board",
+          "closureRowId": "bom-close:energy_storage_source_power_monitoring_voltage_divider_board",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "voltage_divider_board",
+          "description": "voltage divider board",
+          "searchTerms": [
+            "voltage divider board",
+            "voltage divider board manufacturer part number",
+            "voltage divider board catalogue price GBP",
+            "voltage divider board datasheet",
+            "voltage divider board UAV",
+            "voltage divider board lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:35:controller_neck_strap",
+          "closureRowId": "bom-close:hmi_ergonomics_ground_controller_controller_neck_strap",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "controller_neck_strap",
+          "description": "controller neck strap",
+          "searchTerms": [
+            "controller neck strap",
+            "controller neck strap manufacturer part number",
+            "controller neck strap catalogue price GBP",
+            "controller neck strap datasheet",
+            "controller neck strap UAV",
+            "controller neck strap lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:36:ground_station_tablet",
+          "closureRowId": "bom-close:hmi_ergonomics_ground_controller_ground_station_tablet",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ground_station_tablet",
+          "description": "ground-station tablet",
+          "searchTerms": [
+            "ground-station tablet",
+            "ground-station tablet manufacturer part number",
+            "ground-station tablet catalogue price GBP",
+            "ground-station tablet datasheet",
+            "ground-station tablet UAV",
+            "ground-station tablet lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:37:handheld_transmitter",
+          "closureRowId": "bom-close:hmi_ergonomics_ground_controller_handheld_transmitter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "handheld_transmitter",
+          "description": "handheld transmitter",
+          "searchTerms": [
+            "handheld transmitter",
+            "handheld transmitter manufacturer part number",
+            "handheld transmitter catalogue price GBP",
+            "handheld transmitter datasheet",
+            "handheld transmitter UAV",
+            "handheld transmitter lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:38:sun_hood",
+          "closureRowId": "bom-close:hmi_ergonomics_ground_controller_sun_hood",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sun_hood",
+          "description": "sun hood",
+          "searchTerms": [
+            "sun hood",
+            "sun hood manufacturer part number",
+            "sun hood catalogue price GBP",
+            "sun hood datasheet",
+            "sun hood UAV",
+            "sun hood lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:39:aircraft_id_label",
+          "closureRowId": "bom-close:hmi_ergonomics_mission_labelling_aircraft_id_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "aircraft_id_label",
+          "description": "aircraft ID label",
+          "searchTerms": [
+            "aircraft ID label",
+            "aircraft ID label manufacturer part number",
+            "aircraft ID label catalogue price GBP",
+            "aircraft ID label datasheet",
+            "aircraft ID label UAV",
+            "aircraft ID label lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:40:payload_mass_placard",
+          "closureRowId": "bom-close:hmi_ergonomics_mission_labelling_payload_mass_placard",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "payload_mass_placard",
+          "description": "payload mass placard",
+          "searchTerms": [
+            "payload mass placard",
+            "payload mass placard manufacturer part number",
+            "payload mass placard catalogue price GBP",
+            "payload mass placard datasheet",
+            "payload mass placard UAV",
+            "payload mass placard lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:41:preflight_checklist_card",
+          "closureRowId": "bom-close:hmi_ergonomics_mission_labelling_preflight_checklist_card",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "preflight_checklist_card",
+          "description": "preflight checklist card",
+          "searchTerms": [
+            "preflight checklist card",
+            "preflight checklist card manufacturer part number",
+            "preflight checklist card catalogue price GBP",
+            "preflight checklist card datasheet",
+            "preflight checklist card UAV",
+            "preflight checklist card lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:42:propeller_rotation_label",
+          "closureRowId": "bom-close:hmi_ergonomics_mission_labelling_propeller_rotation_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "propeller_rotation_label",
+          "description": "propeller rotation label",
+          "searchTerms": [
+            "propeller rotation label",
+            "propeller rotation label manufacturer part number",
+            "propeller rotation label catalogue price GBP",
+            "propeller rotation label datasheet",
+            "propeller rotation label UAV",
+            "propeller rotation label lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:43:field_fastener_kit",
+          "closureRowId": "bom-close:maintenance_serviceability_field_repair_access_field_fastener_kit",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "field_fastener_kit",
+          "description": "field fastener kit",
+          "searchTerms": [
+            "field fastener kit",
+            "field fastener kit manufacturer part number",
+            "field fastener kit catalogue price GBP",
+            "field fastener kit datasheet",
+            "field fastener kit UAV",
+            "field fastener kit lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:44:motor_alignment_gauge",
+          "closureRowId": "bom-close:maintenance_serviceability_field_repair_access_motor_alignment_gauge",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "motor_alignment_gauge",
+          "description": "motor alignment gauge",
+          "searchTerms": [
+            "motor alignment gauge",
+            "motor alignment gauge manufacturer part number",
+            "motor alignment gauge catalogue price GBP",
+            "motor alignment gauge datasheet",
+            "motor alignment gauge UAV",
+            "motor alignment gauge lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:45:propeller_torque_tool",
+          "closureRowId": "bom-close:maintenance_serviceability_field_repair_access_propeller_torque_tool",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "propeller_torque_tool",
+          "description": "propeller torque tool",
+          "searchTerms": [
+            "propeller torque tool",
+            "propeller torque tool manufacturer part number",
+            "propeller torque tool catalogue price GBP",
+            "propeller torque tool datasheet",
+            "propeller torque tool UAV",
+            "propeller torque tool lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:46:spare_arm_clamp",
+          "closureRowId": "bom-close:maintenance_serviceability_field_repair_access_spare_arm_clamp",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "spare_arm_clamp",
+          "description": "spare arm clamp",
+          "searchTerms": [
+            "spare arm clamp",
+            "spare arm clamp manufacturer part number",
+            "spare arm clamp catalogue price GBP",
+            "spare arm clamp datasheet",
+            "spare arm clamp UAV",
+            "spare arm clamp lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:47:battery_cycle_counter_label",
+          "closureRowId": "bom-close:maintenance_serviceability_inspection_points_battery_cycle_counter_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_cycle_counter_label",
+          "description": "battery cycle counter label",
+          "searchTerms": [
+            "battery cycle counter label",
+            "battery cycle counter label manufacturer part number",
+            "battery cycle counter label catalogue price GBP",
+            "battery cycle counter label datasheet",
+            "battery cycle counter label UAV",
+            "battery cycle counter label lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:48:crack_inspection_marker",
+          "closureRowId": "bom-close:maintenance_serviceability_inspection_points_crack_inspection_marker",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "crack_inspection_marker",
+          "description": "crack inspection marker",
+          "searchTerms": [
+            "crack inspection marker",
+            "crack inspection marker manufacturer part number",
+            "crack inspection marker catalogue price GBP",
+            "crack inspection marker datasheet",
+            "crack inspection marker UAV",
+            "crack inspection marker lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:49:fastener_witness_paint",
+          "closureRowId": "bom-close:maintenance_serviceability_inspection_points_fastener_witness_paint",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fastener_witness_paint",
+          "description": "fastener witness paint",
+          "searchTerms": [
+            "fastener witness paint",
+            "fastener witness paint manufacturer part number",
+            "fastener witness paint catalogue price GBP",
+            "fastener witness paint datasheet",
+            "fastener witness paint UAV",
+            "fastener witness paint lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:50:payload_latch_witness_mark",
+          "closureRowId": "bom-close:maintenance_serviceability_inspection_points_payload_latch_witness_mark",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "payload_latch_witness_mark",
+          "description": "payload latch witness mark",
+          "searchTerms": [
+            "payload latch witness mark",
+            "payload latch witness mark manufacturer part number",
+            "payload latch witness mark catalogue price GBP",
+            "payload latch witness mark datasheet",
+            "payload latch witness mark UAV",
+            "payload latch witness mark lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:51:desiccant_storage_pouch",
+          "closureRowId": "bom-close:maintenance_serviceability_transport_storage_desiccant_storage_pouch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "desiccant_storage_pouch",
+          "description": "desiccant storage pouch",
+          "searchTerms": [
+            "desiccant storage pouch",
+            "desiccant storage pouch manufacturer part number",
+            "desiccant storage pouch catalogue price GBP",
+            "desiccant storage pouch datasheet",
+            "desiccant storage pouch UAV",
+            "desiccant storage pouch lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:52:foam_transport_case",
+          "closureRowId": "bom-close:maintenance_serviceability_transport_storage_foam_transport_case",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "foam_transport_case",
+          "description": "foam transport case",
+          "searchTerms": [
+            "foam transport case",
+            "foam transport case manufacturer part number",
+            "foam transport case catalogue price GBP",
+            "foam transport case datasheet",
+            "foam transport case UAV",
+            "foam transport case lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:53:gimbal_transport_lock",
+          "closureRowId": "bom-close:maintenance_serviceability_transport_storage_gimbal_transport_lock",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "gimbal_transport_lock",
+          "description": "gimbal transport lock",
+          "searchTerms": [
+            "gimbal transport lock",
+            "gimbal transport lock manufacturer part number",
+            "gimbal transport lock catalogue price GBP",
+            "gimbal transport lock datasheet",
+            "gimbal transport lock UAV",
+            "gimbal transport lock lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:54:propeller_guard_sleeve",
+          "closureRowId": "bom-close:maintenance_serviceability_transport_storage_propeller_guard_sleeve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "propeller_guard_sleeve",
+          "description": "propeller guard sleeve",
+          "searchTerms": [
+            "propeller guard sleeve",
+            "propeller guard sleeve manufacturer part number",
+            "propeller guard sleeve catalogue price GBP",
+            "propeller guard sleeve datasheet",
+            "propeller guard sleeve UAV",
+            "propeller guard sleeve lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:55:anti_spark_loop_key",
+          "closureRowId": "bom-close:power_distribution_main_power_bus_anti_spark_loop_key",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "anti_spark_loop_key",
+          "description": "anti-spark loop key",
+          "searchTerms": [
+            "anti-spark loop key",
+            "anti-spark loop key manufacturer part number",
+            "anti-spark loop key catalogue price GBP",
+            "anti-spark loop key datasheet",
+            "anti-spark loop key UAV",
+            "anti-spark loop key lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:56:copper_bus_plane",
+          "closureRowId": "bom-close:power_distribution_main_power_bus_copper_bus_plane",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "copper_bus_plane",
+          "description": "copper bus plane",
+          "searchTerms": [
+            "copper bus plane",
+            "copper bus plane manufacturer part number",
+            "copper bus plane catalogue price GBP",
+            "copper bus plane datasheet",
+            "copper bus plane UAV",
+            "copper bus plane lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:57:main_fuse_link",
+          "closureRowId": "bom-close:power_distribution_main_power_bus_main_fuse_link",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "main_fuse_link",
+          "description": "main fuse link",
+          "searchTerms": [
+            "main fuse link",
+            "main fuse link manufacturer part number",
+            "main fuse link catalogue price GBP",
+            "main fuse link datasheet",
+            "main fuse link UAV",
+            "main fuse link lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:58:power_distribution_pcb",
+          "closureRowId": "bom-close:power_distribution_main_power_bus_power_distribution_pcb",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "power_distribution_pcb",
+          "description": "power distribution PCB",
+          "searchTerms": [
+            "power distribution PCB",
+            "power distribution PCB manufacturer part number",
+            "power distribution PCB catalogue price GBP",
+            "power distribution PCB datasheet",
+            "power distribution PCB UAV",
+            "power distribution PCB lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:59:12_v_payload_regulator",
+          "closureRowId": "bom-close:power_distribution_voltage_regulation_12_v_payload_regulator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "12_v_payload_regulator",
+          "description": "12 V payload regulator",
+          "searchTerms": [
+            "12 V payload regulator",
+            "12 V payload regulator manufacturer part number",
+            "12 V payload regulator catalogue price GBP",
+            "12 V payload regulator datasheet",
+            "12 V payload regulator UAV",
+            "12 V payload regulator lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:60:5_v_bec_regulator",
+          "closureRowId": "bom-close:power_distribution_voltage_regulation_5_v_bec_regulator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "5_v_bec_regulator",
+          "description": "5 V BEC regulator",
+          "searchTerms": [
+            "5 V BEC regulator",
+            "5 V BEC regulator manufacturer part number",
+            "5 V BEC regulator catalogue price GBP",
+            "5 V BEC regulator datasheet",
+            "5 V BEC regulator UAV",
+            "5 V BEC regulator lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:61:lc_noise_filter",
+          "closureRowId": "bom-close:power_distribution_voltage_regulation_lc_noise_filter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lc_noise_filter",
+          "description": "LC noise filter",
+          "searchTerms": [
+            "LC noise filter",
+            "LC noise filter manufacturer part number",
+            "LC noise filter catalogue price GBP",
+            "LC noise filter datasheet",
+            "LC noise filter UAV",
+            "LC noise filter lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:62:rail_status_led",
+          "closureRowId": "bom-close:power_distribution_voltage_regulation_rail_status_led",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "rail_status_led",
+          "description": "rail status LED",
+          "searchTerms": [
+            "rail status LED",
+            "rail status LED manufacturer part number",
+            "rail status LED catalogue price GBP",
+            "rail status LED datasheet",
+            "rail status LED UAV",
+            "rail status LED lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:63:braided_cable_sleeve",
+          "closureRowId": "bom-close:power_distribution_wiring_harness_braided_cable_sleeve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "braided_cable_sleeve",
+          "description": "braided cable sleeve",
+          "searchTerms": [
+            "braided cable sleeve",
+            "braided cable sleeve manufacturer part number",
+            "braided cable sleeve catalogue price GBP",
+            "braided cable sleeve datasheet",
+            "braided cable sleeve UAV",
+            "braided cable sleeve lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:64:jst_signal_harness",
+          "closureRowId": "bom-close:power_distribution_wiring_harness_jst_signal_harness",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "jst_signal_harness",
+          "description": "JST signal harness",
+          "searchTerms": [
+            "JST signal harness",
+            "JST signal harness manufacturer part number",
+            "JST signal harness catalogue price GBP",
+            "JST signal harness datasheet",
+            "JST signal harness UAV",
+            "JST signal harness lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:65:silicone_power_lead_set",
+          "closureRowId": "bom-close:power_distribution_wiring_harness_silicone_power_lead_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "silicone_power_lead_set",
+          "description": "silicone power lead set",
+          "searchTerms": [
+            "silicone power lead set",
+            "silicone power lead set manufacturer part number",
+            "silicone power lead set catalogue price GBP",
+            "silicone power lead set datasheet",
+            "silicone power lead set UAV",
+            "silicone power lead set lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:66:strain_relief_clip_set",
+          "closureRowId": "bom-close:power_distribution_wiring_harness_strain_relief_clip_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "strain_relief_clip_set",
+          "description": "strain relief clip set",
+          "searchTerms": [
+            "strain relief clip set",
+            "strain relief clip set manufacturer part number",
+            "strain relief clip set catalogue price GBP",
+            "strain relief clip set datasheet",
+            "strain relief clip set UAV",
+            "strain relief clip set lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:67:arming_switch",
+          "closureRowId": "bom-close:safety_protection_arming_interlocks_arming_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "arming_switch",
+          "description": "arming switch",
+          "searchTerms": [
+            "arming switch",
+            "arming switch manufacturer part number",
+            "arming switch catalogue price GBP",
+            "arming switch datasheet",
+            "arming switch UAV",
+            "arming switch lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:68:motor_inhibit_logic",
+          "closureRowId": "bom-close:safety_protection_arming_interlocks_motor_inhibit_logic",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "motor_inhibit_logic",
+          "description": "motor inhibit logic",
+          "searchTerms": [
+            "motor inhibit logic",
+            "motor inhibit logic manufacturer part number",
+            "motor inhibit logic catalogue price GBP",
+            "motor inhibit logic datasheet",
+            "motor inhibit logic UAV",
+            "motor inhibit logic lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:69:preflight_checklist_tag",
+          "closureRowId": "bom-close:safety_protection_arming_interlocks_preflight_checklist_tag",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "preflight_checklist_tag",
+          "description": "preflight checklist tag",
+          "searchTerms": [
+            "preflight checklist tag",
+            "preflight checklist tag manufacturer part number",
+            "preflight checklist tag catalogue price GBP",
+            "preflight checklist tag datasheet",
+            "preflight checklist tag UAV",
+            "preflight checklist tag lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:70:status_buzzer",
+          "closureRowId": "bom-close:safety_protection_arming_interlocks_status_buzzer",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "status_buzzer",
+          "description": "status buzzer",
+          "searchTerms": [
+            "status buzzer",
+            "status buzzer manufacturer part number",
+            "status buzzer catalogue price GBP",
+            "status buzzer datasheet",
+            "status buzzer UAV",
+            "status buzzer lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:71:charge_log_sheet",
+          "closureRowId": "bom-close:safety_protection_battery_safety_charge_log_sheet",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "charge_log_sheet",
+          "description": "charge log sheet",
+          "searchTerms": [
+            "charge log sheet",
+            "charge log sheet manufacturer part number",
+            "charge log sheet catalogue price GBP",
+            "charge log sheet datasheet",
+            "charge log sheet UAV",
+            "charge log sheet lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:72:fire_resistant_battery_pouch",
+          "closureRowId": "bom-close:safety_protection_battery_safety_fire_resistant_battery_pouch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fire_resistant_battery_pouch",
+          "description": "fire-resistant battery pouch",
+          "searchTerms": [
+            "fire-resistant battery pouch",
+            "fire-resistant battery pouch manufacturer part number",
+            "fire-resistant battery pouch catalogue price GBP",
+            "fire-resistant battery pouch datasheet",
+            "fire-resistant battery pouch UAV",
+            "fire-resistant battery pouch lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:73:pack_swelling_gauge",
+          "closureRowId": "bom-close:safety_protection_battery_safety_pack_swelling_gauge",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pack_swelling_gauge",
+          "description": "pack swelling gauge",
+          "searchTerms": [
+            "pack swelling gauge",
+            "pack swelling gauge manufacturer part number",
+            "pack swelling gauge catalogue price GBP",
+            "pack swelling gauge datasheet",
+            "pack swelling gauge UAV",
+            "pack swelling gauge lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:74:thermal_warning_label",
+          "closureRowId": "bom-close:safety_protection_battery_safety_thermal_warning_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "thermal_warning_label",
+          "description": "thermal warning label",
+          "searchTerms": [
+            "thermal warning label",
+            "thermal warning label manufacturer part number",
+            "thermal warning label catalogue price GBP",
+            "thermal warning label datasheet",
+            "thermal warning label UAV",
+            "thermal warning label lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:75:flight_termination_setting",
+          "closureRowId": "bom-close:safety_protection_lost_link_response_flight_termination_setting",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "flight_termination_setting",
+          "description": "flight termination setting",
+          "searchTerms": [
+            "flight termination setting",
+            "flight termination setting manufacturer part number",
+            "flight termination setting catalogue price GBP",
+            "flight termination setting datasheet",
+            "flight termination setting UAV",
+            "flight termination setting lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:76:geofence_configuration",
+          "closureRowId": "bom-close:safety_protection_lost_link_response_geofence_configuration",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "geofence_configuration",
+          "description": "geofence configuration",
+          "searchTerms": [
+            "geofence configuration",
+            "geofence configuration manufacturer part number",
+            "geofence configuration catalogue price GBP",
+            "geofence configuration datasheet",
+            "geofence configuration UAV",
+            "geofence configuration lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:77:low_battery_landing_logic",
+          "closureRowId": "bom-close:safety_protection_lost_link_response_low_battery_landing_logic",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "low_battery_landing_logic",
+          "description": "low battery landing logic",
+          "searchTerms": [
+            "low battery landing logic",
+            "low battery landing logic manufacturer part number",
+            "low battery landing logic catalogue price GBP",
+            "low battery landing logic datasheet",
+            "low battery landing logic UAV",
+            "low battery landing logic lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:78:return_to_home_failsafe",
+          "closureRowId": "bom-close:safety_protection_lost_link_response_return_to_home_failsafe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "return_to_home_failsafe",
+          "description": "return-to-home failsafe",
+          "searchTerms": [
+            "return-to-home failsafe",
+            "return-to-home failsafe manufacturer part number",
+            "return-to-home failsafe catalogue price GBP",
+            "return-to-home failsafe datasheet",
+            "return-to-home failsafe UAV",
+            "return-to-home failsafe lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:79:camera_control_cable",
+          "closureRowId": "bom-close:sensing_instrumentation_camera_payload_camera_control_cable",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "camera_control_cable",
+          "description": "camera control cable",
+          "searchTerms": [
+            "camera control cable",
+            "camera control cable manufacturer part number",
+            "camera control cable catalogue price GBP",
+            "camera control cable datasheet",
+            "camera control cable UAV",
+            "camera control cable lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:80:lens_protection_hood",
+          "closureRowId": "bom-close:sensing_instrumentation_camera_payload_lens_protection_hood",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lens_protection_hood",
+          "description": "lens protection hood",
+          "searchTerms": [
+            "lens protection hood",
+            "lens protection hood manufacturer part number",
+            "lens protection hood catalogue price GBP",
+            "lens protection hood datasheet",
+            "lens protection hood UAV",
+            "lens protection hood lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:81:microsd_media_card",
+          "closureRowId": "bom-close:sensing_instrumentation_camera_payload_microsd_media_card",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "microsd_media_card",
+          "description": "microSD media card",
+          "searchTerms": [
+            "microSD media card",
+            "microSD media card manufacturer part number",
+            "microSD media card catalogue price GBP",
+            "microSD media card datasheet",
+            "microSD media card UAV",
+            "microSD media card lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:82:three_axis_gimbal",
+          "closureRowId": "bom-close:sensing_instrumentation_camera_payload_three_axis_gimbal",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "three_axis_gimbal",
+          "description": "three-axis gimbal",
+          "searchTerms": [
+            "three-axis gimbal",
+            "three-axis gimbal manufacturer part number",
+            "three-axis gimbal catalogue price GBP",
+            "three-axis gimbal datasheet",
+            "three-axis gimbal UAV",
+            "three-axis gimbal lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:83:avionics_temperature_probe",
+          "closureRowId": "bom-close:sensing_instrumentation_health_sensing_avionics_temperature_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "avionics_temperature_probe",
+          "description": "avionics temperature probe",
+          "searchTerms": [
+            "avionics temperature probe",
+            "avionics temperature probe manufacturer part number",
+            "avionics temperature probe catalogue price GBP",
+            "avionics temperature probe datasheet",
+            "avionics temperature probe UAV",
+            "avionics temperature probe lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:84:landing_contact_switch",
+          "closureRowId": "bom-close:sensing_instrumentation_health_sensing_landing_contact_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "landing_contact_switch",
+          "description": "landing contact switch",
+          "searchTerms": [
+            "landing contact switch",
+            "landing contact switch manufacturer part number",
+            "landing contact switch catalogue price GBP",
+            "landing contact switch datasheet",
+            "landing contact switch UAV",
+            "landing contact switch lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:85:payload_presence_switch",
+          "closureRowId": "bom-close:sensing_instrumentation_health_sensing_payload_presence_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "payload_presence_switch",
+          "description": "payload presence switch",
+          "searchTerms": [
+            "payload presence switch",
+            "payload presence switch manufacturer part number",
+            "payload presence switch catalogue price GBP",
+            "payload presence switch datasheet",
+            "payload presence switch UAV",
+            "payload presence switch lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:86:vibration_monitor_pad",
+          "closureRowId": "bom-close:sensing_instrumentation_health_sensing_vibration_monitor_pad",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "vibration_monitor_pad",
+          "description": "vibration monitor pad",
+          "searchTerms": [
+            "vibration monitor pad",
+            "vibration monitor pad manufacturer part number",
+            "vibration monitor pad catalogue price GBP",
+            "vibration monitor pad datasheet",
+            "vibration monitor pad UAV",
+            "vibration monitor pad lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:87:airspeed_estimate_port",
+          "closureRowId": "bom-close:sensing_instrumentation_navigation_sensors_airspeed_estimate_port",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "airspeed_estimate_port",
+          "description": "airspeed estimate port",
+          "searchTerms": [
+            "airspeed estimate port",
+            "airspeed estimate port manufacturer part number",
+            "airspeed estimate port catalogue price GBP",
+            "airspeed estimate port datasheet",
+            "airspeed estimate port UAV",
+            "airspeed estimate port lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:88:magnetometer_module",
+          "closureRowId": "bom-close:sensing_instrumentation_navigation_sensors_magnetometer_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "magnetometer_module",
+          "description": "magnetometer module",
+          "searchTerms": [
+            "magnetometer module",
+            "magnetometer module manufacturer part number",
+            "magnetometer module catalogue price GBP",
+            "magnetometer module datasheet",
+            "magnetometer module UAV",
+            "magnetometer module lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:89:optical_flow_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_navigation_sensors_optical_flow_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "optical_flow_sensor",
+          "description": "optical flow sensor",
+          "searchTerms": [
+            "optical flow sensor",
+            "optical flow sensor manufacturer part number",
+            "optical flow sensor catalogue price GBP",
+            "optical flow sensor datasheet",
+            "optical flow sensor UAV",
+            "optical flow sensor lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:90:rangefinder_altimeter",
+          "closureRowId": "bom-close:sensing_instrumentation_navigation_sensors_rangefinder_altimeter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "rangefinder_altimeter",
+          "description": "rangefinder altimeter",
+          "searchTerms": [
+            "rangefinder altimeter",
+            "rangefinder altimeter manufacturer part number",
+            "rangefinder altimeter catalogue price GBP",
+            "rangefinder altimeter datasheet",
+            "rangefinder altimeter UAV",
+            "rangefinder altimeter lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:91:anti_slip_battery_pad",
+          "closureRowId": "bom-close:structure_containment_battery_mounting_anti_slip_battery_pad",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "anti_slip_battery_pad",
+          "description": "anti-slip battery pad",
+          "searchTerms": [
+            "anti-slip battery pad",
+            "anti-slip battery pad manufacturer part number",
+            "anti-slip battery pad catalogue price GBP",
+            "anti-slip battery pad datasheet",
+            "anti-slip battery pad UAV",
+            "anti-slip battery pad lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:92:battery_retention_strap",
+          "closureRowId": "bom-close:structure_containment_battery_mounting_battery_retention_strap",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_retention_strap",
+          "description": "battery retention strap",
+          "searchTerms": [
+            "battery retention strap",
+            "battery retention strap manufacturer part number",
+            "battery retention strap catalogue price GBP",
+            "battery retention strap datasheet",
+            "battery retention strap UAV",
+            "battery retention strap lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:93:battery_tray",
+          "closureRowId": "bom-close:structure_containment_battery_mounting_battery_tray",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_tray",
+          "description": "battery tray",
+          "searchTerms": [
+            "battery tray",
+            "battery tray manufacturer part number",
+            "battery tray catalogue price GBP",
+            "battery tray datasheet",
+            "battery tray UAV",
+            "battery tray lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:94:pack_latch_sensor",
+          "closureRowId": "bom-close:structure_containment_battery_mounting_pack_latch_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pack_latch_sensor",
+          "description": "pack latch sensor",
+          "searchTerms": [
+            "pack latch sensor",
+            "pack latch sensor manufacturer part number",
+            "pack latch sensor catalogue price GBP",
+            "pack latch sensor datasheet",
+            "pack latch sensor UAV",
+            "pack latch sensor lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:95:arm_folding_hinge",
+          "closureRowId": "bom-close:structure_containment_carbon_airframe_arm_folding_hinge",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "arm_folding_hinge",
+          "description": "arm folding hinge",
+          "searchTerms": [
+            "arm folding hinge",
+            "arm folding hinge manufacturer part number",
+            "arm folding hinge catalogue price GBP",
+            "arm folding hinge datasheet",
+            "arm folding hinge UAV",
+            "arm folding hinge lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:96:carbon_fibre_arm_tube",
+          "closureRowId": "bom-close:structure_containment_carbon_airframe_carbon_fibre_arm_tube",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "carbon_fibre_arm_tube",
+          "description": "carbon fibre arm tube",
+          "searchTerms": [
+            "carbon fibre arm tube",
+            "carbon fibre arm tube manufacturer part number",
+            "carbon fibre arm tube catalogue price GBP",
+            "carbon fibre arm tube datasheet",
+            "carbon fibre arm tube UAV",
+            "carbon fibre arm tube lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:97:centre_plate_pair",
+          "closureRowId": "bom-close:structure_containment_carbon_airframe_centre_plate_pair",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "centre_plate_pair",
+          "description": "centre plate pair",
+          "searchTerms": [
+            "centre plate pair",
+            "centre plate pair manufacturer part number",
+            "centre plate pair catalogue price GBP",
+            "centre plate pair datasheet",
+            "centre plate pair UAV",
+            "centre plate pair lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:98:landing_gear_strut",
+          "closureRowId": "bom-close:structure_containment_carbon_airframe_landing_gear_strut",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "landing_gear_strut",
+          "description": "landing gear strut",
+          "searchTerms": [
+            "landing gear strut",
+            "landing gear strut manufacturer part number",
+            "landing gear strut catalogue price GBP",
+            "landing gear strut datasheet",
+            "landing gear strut UAV",
+            "landing gear strut lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:99:camera_gimbal_mount_plate",
+          "closureRowId": "bom-close:structure_containment_payload_mounting_camera_gimbal_mount_plate",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "camera_gimbal_mount_plate",
+          "description": "camera gimbal mount plate",
+          "searchTerms": [
+            "camera gimbal mount plate",
+            "camera gimbal mount plate manufacturer part number",
+            "camera gimbal mount plate catalogue price GBP",
+            "camera gimbal mount plate datasheet",
+            "camera gimbal mount plate UAV",
+            "camera gimbal mount plate lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:100:payload_cg_adjustment_rail",
+          "closureRowId": "bom-close:structure_containment_payload_mounting_payload_cg_adjustment_rail",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "payload_cg_adjustment_rail",
+          "description": "payload CG adjustment rail",
+          "searchTerms": [
+            "payload CG adjustment rail",
+            "payload CG adjustment rail manufacturer part number",
+            "payload CG adjustment rail catalogue price GBP",
+            "payload CG adjustment rail datasheet",
+            "payload CG adjustment rail UAV",
+            "payload CG adjustment rail lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:101:payload_quick_release_latch",
+          "closureRowId": "bom-close:structure_containment_payload_mounting_payload_quick_release_latch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "payload_quick_release_latch",
+          "description": "payload quick-release latch",
+          "searchTerms": [
+            "payload quick-release latch",
+            "payload quick-release latch manufacturer part number",
+            "payload quick-release latch catalogue price GBP",
+            "payload quick-release latch datasheet",
+            "payload quick-release latch UAV",
+            "payload quick-release latch lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:102:rubber_vibration_damper",
+          "closureRowId": "bom-close:structure_containment_payload_mounting_rubber_vibration_damper",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "rubber_vibration_damper",
+          "description": "rubber vibration damper",
+          "searchTerms": [
+            "rubber vibration damper",
+            "rubber vibration damper manufacturer part number",
+            "rubber vibration damper catalogue price GBP",
+            "rubber vibration damper datasheet",
+            "rubber vibration damper UAV",
+            "rubber vibration damper lightweight drone"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        }
+      ]
+    }
+  ]
+}

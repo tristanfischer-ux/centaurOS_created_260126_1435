@@ -1,0 +1,2163 @@
+{
+  "summary": {
+    "rows": 61,
+    "accepted": 0,
+    "readyForReview": 41,
+    "needsReview": 20,
+    "blocked": 0,
+    "moduleQuestions": 9,
+    "subModuleQuestions": 28,
+    "interfaceQuestions": 3,
+    "calculationQuestions": 2,
+    "assumptionQuestions": 19
+  },
+  "questions": [
+    {
+      "id": "assumption_resolution:compliance:CE-UKCA",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "CE-UKCA",
+      "reviewerQuestion": "Can the CE-UKCA assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Technical file, electrical risk assessment and declarations.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:WRAS",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "WRAS",
+      "reviewerQuestion": "Can the WRAS assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Approved fittings or evidence for water-contact components.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_environmental_controller_environmental_controller",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Environmental controller",
+      "reviewerQuestion": "Can the Environmental controller assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "environmental_controller"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_canopy_air_mixing_air_circulation_fans",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Air circulation fans",
+      "reviewerQuestion": "Can the Air circulation fans assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "air_circulation_fans"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_co2_enrichment_co2_sensor_or_dosing",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "CO2 sensor or dosing",
+      "reviewerQuestion": "Can the CO2 sensor or dosing assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "co2_sensor_or_dosing"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_horticultural_lighting_led_grow_lights",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "LED grow lights",
+      "reviewerQuestion": "Can the LED grow lights assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "led_grow_lights"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:mass_fluid_transport_process_fertigation_pumping_nutrient_pump",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Nutrient pump",
+      "reviewerQuestion": "Can the Nutrient pump assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "nutrient_pump"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Reservoir and plumbing set",
+      "reviewerQuestion": "Can the Reservoir and plumbing set assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "reservoir_and_plumbing_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:power_distribution_mains_panel_rcd_isolator_panel",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "RCD isolator panel",
+      "reviewerQuestion": "Can the RCD isolator panel assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "rcd_isolator_panel"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:structure_containment_growing_rack_stack_growing_rack_structure",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Growing rack structure",
+      "reviewerQuestion": "Can the Growing rack structure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "growing_rack_structure"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:environmental_interface:actuator_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> environmental_interface",
+      "reviewerQuestion": "Can the control_compute_communication -> environmental_interface assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "actuator_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:mass_fluid_transport_process:actuator_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> mass_fluid_transport_process",
+      "reviewerQuestion": "Can the control_compute_communication -> mass_fluid_transport_process assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "actuator_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:environmental_interface:mass_fluid_transport_process:sensor_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "environmental_interface -> mass_fluid_transport_process",
+      "reviewerQuestion": "Can the environmental_interface -> mass_fluid_transport_process assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:capex_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated CAPEX",
+      "reviewerQuestion": "Can the Estimated CAPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:headline_output",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Annual leafy-green yield",
+      "reviewerQuestion": "Can the Annual leafy-green yield assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:opex_annual_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated annual OPEX",
+      "reviewerQuestion": "Can the Estimated annual OPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:farm_footprint",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Grow Unit Footprint",
+      "reviewerQuestion": "Can the Grow Unit Footprint assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:farm_process_closure",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Climate/Nutrient/Control Closure",
+      "reviewerQuestion": "Can the Climate/Nutrient/Control Closure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:farm_wet_electrical_separation",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Wet/Electrical Separation",
+      "reviewerQuestion": "Can the Wet/Electrical Separation assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:farm_service_clearance_area_m2",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Indicative service-clearance footprint",
+      "reviewerQuestion": "Does the Indicative service-clearance footprint calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Review maintenance access, nutrient tank access, airflow paths and electrical service clearances.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "farm_service_clearance_area_m2"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:farm_footprint_check_m2",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Vertical farm footprint check",
+      "reviewerQuestion": "Does the Vertical farm footprint check calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm whether the envelope includes aisle, service clearance, reservoir and electrical cabinet space.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "farm_footprint_check_m2"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_contract:control_compute_communication:environmental_interface:actuator_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Recipe Control And Communications -> Light Climate And Gas Environment via actuator_bus",
+      "reviewerQuestion": "Is the actuator_bus interface between Recipe Control And Communications and Light Climate And Gas Environment correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "environmental_controller",
+        "canopy_air_mixing",
+        "humidity_temperature_control",
+        "co2_enrichment"
+      ],
+      "linkedComponentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module",
+        "air_circulation_fans",
+        "fan_guard_grille",
+        "airflow_baffle_plate",
+        "replaceable_intake_filter",
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay",
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "actuator_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:control_compute_communication:mass_fluid_transport_process:actuator_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Recipe Control And Communications -> Nutrient And Water Transport Process via actuator_bus",
+      "reviewerQuestion": "Is the actuator_bus interface between Recipe Control And Communications and Nutrient And Water Transport Process correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "environmental_controller",
+        "fertigation_pumping",
+        "nutrient_dosing"
+      ],
+      "linkedComponentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module",
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount",
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "actuator_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:environmental_interface:mass_fluid_transport_process:sensor_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Light Climate And Gas Environment -> Nutrient And Water Transport Process via sensor_bus",
+      "reviewerQuestion": "Is the sensor_bus interface between Light Climate And Gas Environment and Nutrient And Water Transport Process correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface",
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "humidity_temperature_control",
+        "co2_enrichment",
+        "fertigation_pumping",
+        "nutrient_dosing"
+      ],
+      "linkedComponentWordIds": [
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay",
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube",
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount",
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Recipe Control And Communications",
+      "reviewerQuestion": "Does Recipe Control And Communications have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "environmental_controller",
+        "recipe_management",
+        "remote_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module",
+        "recipe_database",
+        "set_point_scheduler",
+        "alarm_historian",
+        "data_export_module",
+        "industrial_ethernet_switch",
+        "wi_fi_gateway",
+        "mqtt_telemetry_bridge",
+        "sms_alarm_modem"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "actuator_bus",
+        "lighting_control",
+        "video_link",
+        "operator_network"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Light Climate And Gas Environment",
+      "reviewerQuestion": "Does Light Climate And Gas Environment have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "horticultural_lighting",
+        "canopy_air_mixing",
+        "humidity_temperature_control",
+        "co2_enrichment"
+      ],
+      "linkedComponentWordIds": [
+        "led_grow_lights",
+        "dimmable_led_driver",
+        "lighting_suspension_bracket",
+        "ppfd_calibration_target",
+        "glare_shield",
+        "air_circulation_fans",
+        "fan_guard_grille",
+        "airflow_baffle_plate",
+        "replaceable_intake_filter",
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay",
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "lighting_control",
+        "airflow",
+        "sensor_bus",
+        "actuator_bus",
+        "mains_supply",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:hmi_ergonomics",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Operator HMI And Labelling",
+      "reviewerQuestion": "Does Operator HMI And Labelling have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "local_hmi",
+        "labelling_workflows"
+      ],
+      "linkedComponentWordIds": [
+        "touchscreen_hmi",
+        "recipe_selector_control",
+        "alarm_buzzer_beacon",
+        "usb_data_export_port",
+        "crop_lot_label_holder",
+        "chemical_hazard_label_set",
+        "cleaning_checklist_card",
+        "electrical_isolation_placard"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "operator_network",
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Harvest Cleaning And Serviceability",
+      "reviewerQuestion": "Does Harvest Cleaning And Serviceability have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "harvest_access",
+        "cleaning_access",
+        "consumable_service"
+      ],
+      "linkedComponentWordIds": [
+        "slide_out_tray_handle",
+        "shelf_stop_latch",
+        "harvest_work_ledge",
+        "removable_seedling_cassette",
+        "quick_release_manifold_union",
+        "removable_sump_screen",
+        "washdown_hose_connection",
+        "drying_fan_mode_switch",
+        "filter_service_hatch",
+        "probe_calibration_cup",
+        "dosing_bottle_tray",
+        "spare_gasket_kit"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "washdown_boundary",
+        "nutrient_loop",
+        "tray_support"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:mass_fluid_transport_process",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Nutrient And Water Transport Process",
+      "reviewerQuestion": "Does Nutrient And Water Transport Process have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "reservoir_plumbing",
+        "fertigation_pumping",
+        "nutrient_dosing",
+        "filtration_sanitation"
+      ],
+      "linkedComponentWordIds": [
+        "reservoir_and_plumbing_set",
+        "opaque_nutrient_reservoir",
+        "bulkhead_fitting_set",
+        "pvc_u_manifold",
+        "return_drain_header",
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount",
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor",
+        "inline_mesh_filter",
+        "uv_steriliser",
+        "drain_valve",
+        "sample_port"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "nutrient_loop",
+        "sensor_bus",
+        "actuator_bus",
+        "service_access",
+        "washdown_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wet-Zone Power Distribution",
+      "reviewerQuestion": "Does Wet-Zone Power Distribution have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "mains_panel",
+        "lighting_power",
+        "low_voltage_power"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_isolator_panel",
+        "lockable_main_isolator",
+        "rcbo_breaker_bank",
+        "protective_earth_bar",
+        "surge_protection_device",
+        "lighting_bus_trunk",
+        "ip65_cable_gland_set",
+        "driver_mounting_rail",
+        "fused_spur_module",
+        "24_v_dc_power_supply",
+        "dc_distribution_terminal",
+        "ups_buffer_module",
+        "control_cabinet_heater"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mains_supply",
+        "lighting_control",
+        "actuator_bus",
+        "protective_earth",
+        "service_access",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Food-Safe Safety And Protection",
+      "reviewerQuestion": "Does Food-Safe Safety And Protection have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "leak_containment",
+        "operator_interlocks",
+        "food_contact_controls"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_rope",
+        "bunded_base_tray",
+        "overflow_standpipe",
+        "floor_drain_adapter",
+        "door_interlock_switch",
+        "lighting_inhibit_relay",
+        "chemical_storage_latch",
+        "emergency_stop_button",
+        "food_grade_tubing_set",
+        "cleaning_validation_swab_kit",
+        "material_traceability_label",
+        "washdown_sop_placard"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mains_supply",
+        "washdown_boundary",
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Crop And Process Instrumentation",
+      "reviewerQuestion": "Does Crop And Process Instrumentation have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "climate_sensors",
+        "nutrient_sensors",
+        "crop_observation"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_humidity_probe",
+        "par_light_sensor",
+        "leaf_temperature_sensor",
+        "differential_pressure_switch",
+        "ph_probe",
+        "ec_probe",
+        "reservoir_level_sensor",
+        "solution_temperature_probe",
+        "rgb_crop_camera",
+        "camera_light_shield",
+        "time_lapse_controller",
+        "calibration_colour_card"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "video_link",
+        "nutrient_loop",
+        "airflow"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Growing Structure And Containment",
+      "reviewerQuestion": "Does Growing Structure And Containment have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "growing_rack_stack",
+        "crop_tray_carriers",
+        "enclosure_panels"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure",
+        "aluminium_extrusion_upright",
+        "cross_brace_set",
+        "adjustable_levelling_foot",
+        "tray_slide_rail",
+        "food_safe_grow_tray",
+        "nft_channel_insert",
+        "seedling_raft",
+        "root_zone_cover",
+        "tray_drain_fitting",
+        "washdown_side_panel",
+        "clear_inspection_door",
+        "epdm_door_gasket",
+        "condensate_drip_channel"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "tray_support",
+        "washdown_boundary",
+        "mains_supply",
+        "nutrient_loop",
+        "airflow"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:environmental_controller",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Recipe Control And Communications / Environmental controller",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Environmental controller make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "environmental_controller"
+      ],
+      "linkedComponentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "actuator_bus",
+        "lighting_control"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:recipe_management",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Recipe Control And Communications / Recipe management",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Recipe management make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "recipe_management"
+      ],
+      "linkedComponentWordIds": [
+        "recipe_database",
+        "set_point_scheduler",
+        "alarm_historian",
+        "data_export_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "operator_network",
+        "lighting_control"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:remote_monitoring",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Recipe Control And Communications / Remote monitoring",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Remote monitoring make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "remote_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "industrial_ethernet_switch",
+        "wi_fi_gateway",
+        "mqtt_telemetry_bridge",
+        "sms_alarm_modem"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "operator_network",
+        "video_link"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:canopy_air_mixing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Light Climate And Gas Environment / Canopy air mixing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Canopy air mixing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "canopy_air_mixing"
+      ],
+      "linkedComponentWordIds": [
+        "air_circulation_fans",
+        "fan_guard_grille",
+        "airflow_baffle_plate",
+        "replaceable_intake_filter"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "airflow",
+        "actuator_bus"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:co2_enrichment",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Light Climate And Gas Environment / CO2 enrichment",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to CO2 enrichment make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "co2_enrichment"
+      ],
+      "linkedComponentWordIds": [
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "airflow",
+        "sensor_bus",
+        "actuator_bus"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:horticultural_lighting",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Light Climate And Gas Environment / Horticultural lighting",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Horticultural lighting make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "horticultural_lighting"
+      ],
+      "linkedComponentWordIds": [
+        "led_grow_lights",
+        "dimmable_led_driver",
+        "lighting_suspension_bracket",
+        "ppfd_calibration_target",
+        "glare_shield"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "lighting_control",
+        "mains_supply",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:humidity_temperature_control",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Light Climate And Gas Environment / Humidity and temperature control",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Humidity and temperature control make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "humidity_temperature_control"
+      ],
+      "linkedComponentWordIds": [
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "airflow",
+        "sensor_bus",
+        "actuator_bus"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:labelling_workflows",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Operator HMI And Labelling / Labelling and workflows",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Labelling and workflows make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "labelling_workflows"
+      ],
+      "linkedComponentWordIds": [
+        "crop_lot_label_holder",
+        "chemical_hazard_label_set",
+        "cleaning_checklist_card",
+        "electrical_isolation_placard"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:local_hmi",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Operator HMI And Labelling / Local HMI",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Local HMI make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "local_hmi"
+      ],
+      "linkedComponentWordIds": [
+        "touchscreen_hmi",
+        "recipe_selector_control",
+        "alarm_buzzer_beacon",
+        "usb_data_export_port"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "operator_network",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:cleaning_access",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Harvest Cleaning And Serviceability / Cleaning access",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Cleaning access make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "cleaning_access"
+      ],
+      "linkedComponentWordIds": [
+        "quick_release_manifold_union",
+        "removable_sump_screen",
+        "washdown_hose_connection",
+        "drying_fan_mode_switch"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "washdown_boundary",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:consumable_service",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Harvest Cleaning And Serviceability / Consumable service",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Consumable service make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "consumable_service"
+      ],
+      "linkedComponentWordIds": [
+        "filter_service_hatch",
+        "probe_calibration_cup",
+        "dosing_bottle_tray",
+        "spare_gasket_kit"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "nutrient_loop"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:harvest_access",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Harvest Cleaning And Serviceability / Harvest access",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Harvest access make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "harvest_access"
+      ],
+      "linkedComponentWordIds": [
+        "slide_out_tray_handle",
+        "shelf_stop_latch",
+        "harvest_work_ledge",
+        "removable_seedling_cassette"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "tray_support"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:fertigation_pumping",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Nutrient And Water Transport Process / Fertigation pumping",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Fertigation pumping make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "fertigation_pumping"
+      ],
+      "linkedComponentWordIds": [
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "nutrient_loop",
+        "actuator_bus",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:filtration_sanitation",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Nutrient And Water Transport Process / Filtration and sanitation",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Filtration and sanitation make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "filtration_sanitation"
+      ],
+      "linkedComponentWordIds": [
+        "inline_mesh_filter",
+        "uv_steriliser",
+        "drain_valve",
+        "sample_port"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "nutrient_loop",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:nutrient_dosing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Nutrient And Water Transport Process / Nutrient dosing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Nutrient dosing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "nutrient_dosing"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "nutrient_loop",
+        "actuator_bus",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:reservoir_plumbing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Nutrient And Water Transport Process / Reservoir and plumbing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Reservoir and plumbing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "reservoir_plumbing"
+      ],
+      "linkedComponentWordIds": [
+        "reservoir_and_plumbing_set",
+        "opaque_nutrient_reservoir",
+        "bulkhead_fitting_set",
+        "pvc_u_manifold",
+        "return_drain_header"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "nutrient_loop",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:lighting_power",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wet-Zone Power Distribution / Lighting power distribution",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Lighting power distribution make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "lighting_power"
+      ],
+      "linkedComponentWordIds": [
+        "lighting_bus_trunk",
+        "ip65_cable_gland_set",
+        "driver_mounting_rail",
+        "fused_spur_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mains_supply",
+        "lighting_control"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:low_voltage_power",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wet-Zone Power Distribution / Low-voltage control power",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Low-voltage control power make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "low_voltage_power"
+      ],
+      "linkedComponentWordIds": [
+        "24_v_dc_power_supply",
+        "dc_distribution_terminal",
+        "ups_buffer_module",
+        "control_cabinet_heater"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "actuator_bus",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:mains_panel",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wet-Zone Power Distribution / Mains isolation panel",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Mains isolation panel make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "mains_panel"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_isolator_panel",
+        "lockable_main_isolator",
+        "rcbo_breaker_bank",
+        "protective_earth_bar",
+        "surge_protection_device"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mains_supply",
+        "protective_earth",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:food_contact_controls",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Food-Safe Safety And Protection / Food contact controls",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Food contact controls make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "food_contact_controls"
+      ],
+      "linkedComponentWordIds": [
+        "food_grade_tubing_set",
+        "cleaning_validation_swab_kit",
+        "material_traceability_label",
+        "washdown_sop_placard"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "washdown_boundary",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:leak_containment",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Food-Safe Safety And Protection / Leak containment",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Leak containment make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "leak_containment"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_rope",
+        "bunded_base_tray",
+        "overflow_standpipe",
+        "floor_drain_adapter"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "washdown_boundary",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:operator_interlocks",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Food-Safe Safety And Protection / Operator interlocks",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Operator interlocks make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "operator_interlocks"
+      ],
+      "linkedComponentWordIds": [
+        "door_interlock_switch",
+        "lighting_inhibit_relay",
+        "chemical_storage_latch",
+        "emergency_stop_button"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:climate_sensors",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Crop And Process Instrumentation / Climate sensors",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Climate sensors make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "climate_sensors"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_humidity_probe",
+        "par_light_sensor",
+        "leaf_temperature_sensor",
+        "differential_pressure_switch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "airflow"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:crop_observation",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Crop And Process Instrumentation / Crop observation",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Crop observation make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "crop_observation"
+      ],
+      "linkedComponentWordIds": [
+        "rgb_crop_camera",
+        "camera_light_shield",
+        "time_lapse_controller",
+        "calibration_colour_card"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "video_link",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:nutrient_sensors",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Crop And Process Instrumentation / Nutrient sensors",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Nutrient sensors make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "nutrient_sensors"
+      ],
+      "linkedComponentWordIds": [
+        "ph_probe",
+        "ec_probe",
+        "reservoir_level_sensor",
+        "solution_temperature_probe"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "nutrient_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:crop_tray_carriers",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Growing Structure And Containment / Crop tray carriers",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Crop tray carriers make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "crop_tray_carriers"
+      ],
+      "linkedComponentWordIds": [
+        "food_safe_grow_tray",
+        "nft_channel_insert",
+        "seedling_raft",
+        "root_zone_cover",
+        "tray_drain_fitting"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "tray_support",
+        "nutrient_loop"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:enclosure_panels",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Growing Structure And Containment / Enclosure panels",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Enclosure panels make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "enclosure_panels"
+      ],
+      "linkedComponentWordIds": [
+        "washdown_side_panel",
+        "clear_inspection_door",
+        "epdm_door_gasket",
+        "condensate_drip_channel"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "washdown_boundary",
+        "airflow"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:growing_rack_stack",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Growing Structure And Containment / Growing rack stack",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Growing rack stack make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "growing_rack_stack"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure",
+        "aluminium_extrusion_upright",
+        "cross_brace_set",
+        "adjustable_levelling_foot",
+        "tray_slide_rail"
+      ],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaceIds": [
+        "tray_support",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "blockers": []
+    }
+  ]
+}

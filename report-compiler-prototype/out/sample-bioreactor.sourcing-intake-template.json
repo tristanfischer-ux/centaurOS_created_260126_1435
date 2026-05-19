@@ -1,0 +1,199 @@
+{
+  "dossierId": "sample-bioreactor",
+  "productClass": "bioreactor",
+  "criticalOnly": true,
+  "instructions": [
+    "Fill only from supplier, manufacturer, distributor, quote, catalogue or datasheet evidence.",
+    "Do not use benchmark averages, LLM estimates, class-pack defaults or unsourced model output.",
+    "The intake record is only admitted when every required field validates and componentWordId matches a candidate BoM line."
+  ],
+  "drafts": [
+    {
+      "componentWordId": "single_use_bioreactor_bag",
+      "description": "Single-use bioreactor bag",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "sterile_tubing_and_connector_set",
+      "description": "Sterile tubing and connector set",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "agitation_drive",
+      "description": "Agitation drive",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "peristaltic_feed_pump",
+      "description": "Peristaltic feed pump",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "sparger_and_gas_mix_manifold",
+      "description": "Sparger and gas-mix manifold",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "temperature_control_loop",
+      "description": "Temperature control loop",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "exhaust_filter_and_pressure_relief_set",
+      "description": "Exhaust filter and pressure relief set",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "dissolved_oxygen_optical_sensor",
+      "description": "Dissolved oxygen optical sensor",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "single_use_ph_sensor",
+      "description": "Single-use pH sensor",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "load_cell_set",
+      "description": "Load cell set",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "bioreactor_controller",
+      "description": "Bioreactor controller",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    }
+  ]
+}

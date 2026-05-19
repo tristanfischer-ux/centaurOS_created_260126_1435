@@ -1,0 +1,236 @@
+{
+  "summary": {
+    "modules": 10,
+    "readyModules": 3,
+    "sourcingBlockedModules": 7,
+    "attentionModules": 0,
+    "criticalUnpricedLines": 13,
+    "issueCount": 0
+  },
+  "modules": [
+    {
+      "moduleId": "power_distribution",
+      "moduleName": "AC Input And DC Output Distribution",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "dc_power_kw"
+      ],
+      "sanityCheckIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "criticalUnpricedLines": [
+        "ac_input_breaker_and_spd",
+        "dc_output_contactor_set",
+        "mid_energy_meter"
+      ],
+      "candidateUnpricedLines": 9,
+      "issueCodes": [],
+      "notes": [
+        "3 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion Stack",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 4,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "dc_power_kw"
+      ],
+      "sanityCheckIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "criticalUnpricedLines": [
+        "power_module_stack"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "charging_connector_interface",
+      "moduleName": "Vehicle Charging Interface",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 8,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "dc_power_kw"
+      ],
+      "sanityCheckIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "criticalUnpricedLines": [
+        "ccs2_liquid_cooled_cable_and_connector",
+        "iso_15118_plc_modem"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 3,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "ocpp_communications_gateway",
+        "iso_15118_plc_modem"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Metering And Electrical Sensing",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 8,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "mid_energy_meter",
+        "insulation_monitoring_device"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal And Environmental Interface",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "dc_power_kw"
+      ],
+      "sanityCheckIds": [
+        "evcharger_power_level",
+        "evcharger_power_safety_chain",
+        "evcharger_protocol_closure"
+      ],
+      "criticalUnpricedLines": [
+        "cooling_loop_assembly"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "structure_containment",
+      "moduleName": "Cabinet Structure And Containment",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 7,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "emergency_stop_and_safety_interlock_set",
+        "insulation_monitoring_device"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Commissioning",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "User Payment And HMI",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    }
+  ]
+}

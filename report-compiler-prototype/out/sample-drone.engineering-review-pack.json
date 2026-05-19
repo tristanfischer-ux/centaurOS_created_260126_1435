@@ -1,0 +1,2027 @@
+{
+  "summary": {
+    "rows": 59,
+    "accepted": 0,
+    "readyForReview": 39,
+    "needsReview": 20,
+    "blocked": 0,
+    "moduleQuestions": 9,
+    "subModuleQuestions": 26,
+    "interfaceQuestions": 3,
+    "calculationQuestions": 2,
+    "assumptionQuestions": 19
+  },
+  "questions": [
+    {
+      "id": "assumption_resolution:compliance:CE-EMC",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "CE-EMC",
+      "reviewerQuestion": "Can the CE-EMC assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "EMC test plan and declarations.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:UK-UAS",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "UK-UAS",
+      "reviewerQuestion": "Can the UK-UAS assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Mass, geofencing and operating-category evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:actuation_kinematics_esc_stack_esc",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "ESC",
+      "reviewerQuestion": "Can the ESC assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "esc"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:actuation_kinematics_motor_sets_brushless_motors",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Brushless motors",
+      "reviewerQuestion": "Can the Brushless motors assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "brushless_motors"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:actuation_kinematics_propeller_sets_propeller_set",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Propeller set",
+      "reviewerQuestion": "Can the Propeller set assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "propeller_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_flight_controller_stack_flight_controller",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Flight controller",
+      "reviewerQuestion": "Can the Flight controller assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "flight_controller"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_radio_navigation_link_radio_and_gnss_link",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Radio and GNSS link",
+      "reviewerQuestion": "Can the Radio and GNSS link assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "radio_and_gnss_link"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_storage_source_flight_battery_pack_flight_battery_pack",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Flight battery pack",
+      "reviewerQuestion": "Can the Flight battery pack assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "flight_battery_pack"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_camera_payload_4k_camera_payload",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "4K camera payload",
+      "reviewerQuestion": "Can the 4K camera payload assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "4k_camera_payload"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:structure_containment_carbon_airframe_carbon_airframe",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Carbon airframe",
+      "reviewerQuestion": "Can the Carbon airframe assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "carbon_airframe"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:actuation_kinematics:motor_drive",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> actuation_kinematics",
+      "reviewerQuestion": "Can the control_compute_communication -> actuation_kinematics assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "motor_drive"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:sensing_instrumentation:sensor_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> sensing_instrumentation",
+      "reviewerQuestion": "Can the control_compute_communication -> sensing_instrumentation assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:energy_storage_source:actuation_kinematics:power_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "energy_storage_source -> actuation_kinematics",
+      "reviewerQuestion": "Can the energy_storage_source -> actuation_kinematics assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:capex_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated CAPEX",
+      "reviewerQuestion": "Can the Estimated CAPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:headline_output",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Flight endurance",
+      "reviewerQuestion": "Can the Flight endurance assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:opex_annual_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated annual OPEX",
+      "reviewerQuestion": "Can the Estimated annual OPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:drone_control_power_chain",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Control/Power/Actuation Chain",
+      "reviewerQuestion": "Can the Control/Power/Actuation Chain assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:drone_endurance_target",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Endurance Target",
+      "reviewerQuestion": "Can the Endurance Target assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:drone_propulsion_quads",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Quad Propulsion Allocation",
+      "reviewerQuestion": "Can the Quad Propulsion Allocation assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:drone_reserve_time_minutes",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Drone 20% reserve time",
+      "reviewerQuestion": "Does the Drone 20% reserve time calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm return-to-home reserve, hover reserve, battery ageing, wind case and payload power.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "drone_reserve_time_minutes"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:drone_endurance_hours",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Drone endurance hours",
+      "reviewerQuestion": "Does the Drone endurance hours calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm payload mass, hover power, battery usable energy, reserve margin, wind and take-off weight.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "drone_endurance_hours"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_contract:control_compute_communication:actuation_kinematics:motor_drive",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Control Compute And Communications -> Propulsion And Flight Actuation via motor_drive",
+      "reviewerQuestion": "Is the motor_drive interface between Flight Control Compute And Communications and Propulsion And Flight Actuation correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "flight_controller_stack",
+        "motor_sets",
+        "esc_stack"
+      ],
+      "linkedComponentWordIds": [
+        "flight_controller",
+        "imu_vibration_isolation_mount",
+        "barometer_foam_cover",
+        "sd_card_flight_logger",
+        "failsafe_firmware_profile",
+        "brushless_motors",
+        "motor_mounting_screw_set",
+        "motor_phase_lead_set",
+        "motor_bearing_shield",
+        "esc",
+        "esc_cooling_plate",
+        "pwm_signal_harness",
+        "current_telemetry_line",
+        "esc_conformal_coating"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "motor_drive"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:control_compute_communication:sensing_instrumentation:sensor_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Control Compute And Communications -> Navigation And Cinematography Sensing via sensor_bus",
+      "reviewerQuestion": "Is the sensor_bus interface between Flight Control Compute And Communications and Navigation And Cinematography Sensing correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "flight_controller_stack",
+        "radio_navigation_link",
+        "navigation_sensors",
+        "health_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "flight_controller",
+        "imu_vibration_isolation_mount",
+        "barometer_foam_cover",
+        "sd_card_flight_logger",
+        "failsafe_firmware_profile",
+        "radio_and_gnss_link",
+        "gnss_antenna_mast",
+        "rc_receiver",
+        "telemetry_radio_module",
+        "antenna_diversity_mount",
+        "magnetometer_module",
+        "rangefinder_altimeter",
+        "optical_flow_sensor",
+        "airspeed_estimate_port",
+        "vibration_monitor_pad",
+        "payload_presence_switch",
+        "avionics_temperature_probe",
+        "landing_contact_switch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:energy_storage_source:actuation_kinematics:power_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Energy Storage -> Propulsion And Flight Actuation via power_bus",
+      "reviewerQuestion": "Is the power_bus interface between Flight Energy Storage and Propulsion And Flight Actuation correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "flight_battery_pack",
+        "power_monitoring",
+        "motor_sets",
+        "esc_stack"
+      ],
+      "linkedComponentWordIds": [
+        "flight_battery_pack",
+        "high_discharge_cell_group",
+        "battery_management_pcb",
+        "xt90_anti_spark_connector",
+        "pack_temperature_sensor",
+        "power_module_shunt",
+        "voltage_divider_board",
+        "low_voltage_alarm_output",
+        "battery_telemetry_connector",
+        "brushless_motors",
+        "motor_mounting_screw_set",
+        "motor_phase_lead_set",
+        "motor_bearing_shield",
+        "esc",
+        "esc_cooling_plate",
+        "pwm_signal_harness",
+        "current_telemetry_line",
+        "esc_conformal_coating"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "module_allocation:actuation_kinematics",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Propulsion And Flight Actuation",
+      "reviewerQuestion": "Does Propulsion And Flight Actuation have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "motor_sets",
+        "esc_stack",
+        "propeller_sets"
+      ],
+      "linkedComponentWordIds": [
+        "brushless_motors",
+        "motor_mounting_screw_set",
+        "motor_phase_lead_set",
+        "motor_bearing_shield",
+        "esc",
+        "esc_cooling_plate",
+        "pwm_signal_harness",
+        "current_telemetry_line",
+        "esc_conformal_coating",
+        "propeller_set",
+        "propeller_hub_adapter",
+        "propeller_lock_nut",
+        "spare_propeller_pouch"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "motor_drive",
+        "motor_mounts",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Control Compute And Communications",
+      "reviewerQuestion": "Does Flight Control Compute And Communications have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "flight_controller_stack",
+        "radio_navigation_link",
+        "video_downlink"
+      ],
+      "linkedComponentWordIds": [
+        "flight_controller",
+        "imu_vibration_isolation_mount",
+        "barometer_foam_cover",
+        "sd_card_flight_logger",
+        "failsafe_firmware_profile",
+        "radio_and_gnss_link",
+        "gnss_antenna_mast",
+        "rc_receiver",
+        "telemetry_radio_module",
+        "antenna_diversity_mount",
+        "low_latency_video_transmitter",
+        "video_antenna_pair",
+        "hdmi_micro_cable",
+        "video_power_filter"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "motor_drive",
+        "radio_link",
+        "video_link",
+        "power_bus"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:energy_storage_source",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Energy Storage",
+      "reviewerQuestion": "Does Flight Energy Storage have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "flight_battery_pack",
+        "power_monitoring",
+        "charging_interface"
+      ],
+      "linkedComponentWordIds": [
+        "flight_battery_pack",
+        "high_discharge_cell_group",
+        "battery_management_pcb",
+        "xt90_anti_spark_connector",
+        "pack_temperature_sensor",
+        "power_module_shunt",
+        "voltage_divider_board",
+        "low_voltage_alarm_output",
+        "battery_telemetry_connector",
+        "balance_charge_harness",
+        "charging_cradle",
+        "pack_id_label",
+        "transport_storage_case_insert"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "charger_interface",
+        "battery_mount",
+        "sensor_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:hmi_ergonomics",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Ground Operator Interface",
+      "reviewerQuestion": "Does Ground Operator Interface have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "ground_controller",
+        "mission_labelling"
+      ],
+      "linkedComponentWordIds": [
+        "handheld_transmitter",
+        "ground_station_tablet",
+        "sun_hood",
+        "controller_neck_strap",
+        "aircraft_id_label",
+        "propeller_rotation_label",
+        "payload_mass_placard",
+        "preflight_checklist_card"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "radio_link",
+        "video_link",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Field Maintenance And Serviceability",
+      "reviewerQuestion": "Does Field Maintenance And Serviceability have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "field_repair_access",
+        "inspection_points",
+        "transport_storage"
+      ],
+      "linkedComponentWordIds": [
+        "spare_arm_clamp",
+        "motor_alignment_gauge",
+        "propeller_torque_tool",
+        "field_fastener_kit",
+        "crack_inspection_marker",
+        "fastener_witness_paint",
+        "battery_cycle_counter_label",
+        "payload_latch_witness_mark",
+        "foam_transport_case",
+        "propeller_guard_sleeve",
+        "gimbal_transport_lock",
+        "desiccant_storage_pouch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "motor_mounts",
+        "payload_mount"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Aircraft Power Distribution",
+      "reviewerQuestion": "Does Aircraft Power Distribution have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "main_power_bus",
+        "voltage_regulation",
+        "wiring_harness"
+      ],
+      "linkedComponentWordIds": [
+        "power_distribution_pcb",
+        "copper_bus_plane",
+        "main_fuse_link",
+        "anti_spark_loop_key",
+        "5_v_bec_regulator",
+        "12_v_payload_regulator",
+        "lc_noise_filter",
+        "rail_status_led",
+        "silicone_power_lead_set",
+        "jst_signal_harness",
+        "braided_cable_sleeve",
+        "strain_relief_clip_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "protective_earth",
+        "motor_drive",
+        "video_link",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Safety And Containment",
+      "reviewerQuestion": "Does Flight Safety And Containment have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "arming_interlocks",
+        "lost_link_response",
+        "battery_safety"
+      ],
+      "linkedComponentWordIds": [
+        "arming_switch",
+        "status_buzzer",
+        "motor_inhibit_logic",
+        "preflight_checklist_tag",
+        "return_to_home_failsafe",
+        "geofence_configuration",
+        "low_battery_landing_logic",
+        "flight_termination_setting",
+        "fire_resistant_battery_pouch",
+        "pack_swelling_gauge",
+        "charge_log_sheet",
+        "thermal_warning_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "radio_link",
+        "power_bus",
+        "service_access",
+        "alarm_bus",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Cinematography Sensing",
+      "reviewerQuestion": "Does Navigation And Cinematography Sensing have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "camera_payload",
+        "navigation_sensors",
+        "health_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "4k_camera_payload",
+        "three_axis_gimbal",
+        "camera_control_cable",
+        "lens_protection_hood",
+        "microsd_media_card",
+        "magnetometer_module",
+        "rangefinder_altimeter",
+        "optical_flow_sensor",
+        "airspeed_estimate_port",
+        "vibration_monitor_pad",
+        "payload_presence_switch",
+        "avionics_temperature_probe",
+        "landing_contact_switch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "video_link",
+        "payload_mount"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Airframe Structure And Payload Mounting",
+      "reviewerQuestion": "Does Airframe Structure And Payload Mounting have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "carbon_airframe",
+        "payload_mounting",
+        "battery_mounting"
+      ],
+      "linkedComponentWordIds": [
+        "carbon_airframe",
+        "carbon_fibre_arm_tube",
+        "centre_plate_pair",
+        "arm_folding_hinge",
+        "landing_gear_strut",
+        "camera_gimbal_mount_plate",
+        "rubber_vibration_damper",
+        "payload_quick_release_latch",
+        "payload_cg_adjustment_rail",
+        "battery_tray",
+        "battery_retention_strap",
+        "anti_slip_battery_pad",
+        "pack_latch_sensor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "motor_mounts",
+        "payload_mount",
+        "battery_mount",
+        "service_access",
+        "video_link",
+        "power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:esc_stack",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Propulsion And Flight Actuation / ESC stack",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to ESC stack make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "esc_stack"
+      ],
+      "linkedComponentWordIds": [
+        "esc",
+        "esc_cooling_plate",
+        "pwm_signal_harness",
+        "current_telemetry_line",
+        "esc_conformal_coating"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "motor_drive",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:motor_sets",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Propulsion And Flight Actuation / Motor sets",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Motor sets make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "motor_sets"
+      ],
+      "linkedComponentWordIds": [
+        "brushless_motors",
+        "motor_mounting_screw_set",
+        "motor_phase_lead_set",
+        "motor_bearing_shield"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "motor_drive",
+        "motor_mounts"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:propeller_sets",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Propulsion And Flight Actuation / Propeller sets",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Propeller sets make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "propeller_sets"
+      ],
+      "linkedComponentWordIds": [
+        "propeller_set",
+        "propeller_hub_adapter",
+        "propeller_lock_nut",
+        "spare_propeller_pouch"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "motor_mounts"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:flight_controller_stack",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Control Compute And Communications / Flight controller stack",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Flight controller stack make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "flight_controller_stack"
+      ],
+      "linkedComponentWordIds": [
+        "flight_controller",
+        "imu_vibration_isolation_mount",
+        "barometer_foam_cover",
+        "sd_card_flight_logger",
+        "failsafe_firmware_profile"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "motor_drive",
+        "power_bus"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:radio_navigation_link",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Control Compute And Communications / Radio and navigation link",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Radio and navigation link make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "radio_navigation_link"
+      ],
+      "linkedComponentWordIds": [
+        "radio_and_gnss_link",
+        "gnss_antenna_mast",
+        "rc_receiver",
+        "telemetry_radio_module",
+        "antenna_diversity_mount"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "radio_link",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:video_downlink",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Control Compute And Communications / Video downlink",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Video downlink make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "video_downlink"
+      ],
+      "linkedComponentWordIds": [
+        "low_latency_video_transmitter",
+        "video_antenna_pair",
+        "hdmi_micro_cable",
+        "video_power_filter"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "video_link",
+        "power_bus"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:charging_interface",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Energy Storage / Charging interface",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Charging interface make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "charging_interface"
+      ],
+      "linkedComponentWordIds": [
+        "balance_charge_harness",
+        "charging_cradle",
+        "pack_id_label",
+        "transport_storage_case_insert"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "charger_interface",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:flight_battery_pack",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Energy Storage / Flight battery pack",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Flight battery pack make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "flight_battery_pack"
+      ],
+      "linkedComponentWordIds": [
+        "flight_battery_pack",
+        "high_discharge_cell_group",
+        "battery_management_pcb",
+        "xt90_anti_spark_connector",
+        "pack_temperature_sensor"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "charger_interface",
+        "battery_mount"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:power_monitoring",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Energy Storage / Power monitoring",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Power monitoring make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "power_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "power_module_shunt",
+        "voltage_divider_board",
+        "low_voltage_alarm_output",
+        "battery_telemetry_connector"
+      ],
+      "linkedRequirementIds": [
+        "duration_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:ground_controller",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Ground Operator Interface / Ground controller",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Ground controller make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "ground_controller"
+      ],
+      "linkedComponentWordIds": [
+        "handheld_transmitter",
+        "ground_station_tablet",
+        "sun_hood",
+        "controller_neck_strap"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "radio_link",
+        "video_link"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:mission_labelling",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Ground Operator Interface / Mission labelling",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Mission labelling make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "mission_labelling"
+      ],
+      "linkedComponentWordIds": [
+        "aircraft_id_label",
+        "propeller_rotation_label",
+        "payload_mass_placard",
+        "preflight_checklist_card"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:field_repair_access",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Field Maintenance And Serviceability / Field repair access",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Field repair access make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "field_repair_access"
+      ],
+      "linkedComponentWordIds": [
+        "spare_arm_clamp",
+        "motor_alignment_gauge",
+        "propeller_torque_tool",
+        "field_fastener_kit"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "motor_mounts"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:inspection_points",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Field Maintenance And Serviceability / Inspection points",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Inspection points make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "inspection_points"
+      ],
+      "linkedComponentWordIds": [
+        "crack_inspection_marker",
+        "fastener_witness_paint",
+        "battery_cycle_counter_label",
+        "payload_latch_witness_mark"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:transport_storage",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Field Maintenance And Serviceability / Transport and storage",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Transport and storage make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "transport_storage"
+      ],
+      "linkedComponentWordIds": [
+        "foam_transport_case",
+        "propeller_guard_sleeve",
+        "gimbal_transport_lock",
+        "desiccant_storage_pouch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "payload_mount"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:main_power_bus",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Aircraft Power Distribution / Main power bus",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Main power bus make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "main_power_bus"
+      ],
+      "linkedComponentWordIds": [
+        "power_distribution_pcb",
+        "copper_bus_plane",
+        "main_fuse_link",
+        "anti_spark_loop_key"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "motor_drive"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:voltage_regulation",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Aircraft Power Distribution / Voltage regulation",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Voltage regulation make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "voltage_regulation"
+      ],
+      "linkedComponentWordIds": [
+        "5_v_bec_regulator",
+        "12_v_payload_regulator",
+        "lc_noise_filter",
+        "rail_status_led"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "video_link"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:wiring_harness",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Aircraft Power Distribution / Wiring harness",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Wiring harness make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "wiring_harness"
+      ],
+      "linkedComponentWordIds": [
+        "silicone_power_lead_set",
+        "jst_signal_harness",
+        "braided_cable_sleeve",
+        "strain_relief_clip_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "sensor_bus",
+        "video_link"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:arming_interlocks",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Safety And Containment / Arming interlocks",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Arming interlocks make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "arming_interlocks"
+      ],
+      "linkedComponentWordIds": [
+        "arming_switch",
+        "status_buzzer",
+        "motor_inhibit_logic",
+        "preflight_checklist_tag"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:battery_safety",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Safety And Containment / Battery safety",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Battery safety make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "battery_safety"
+      ],
+      "linkedComponentWordIds": [
+        "fire_resistant_battery_pouch",
+        "pack_swelling_gauge",
+        "charge_log_sheet",
+        "thermal_warning_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "power_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:lost_link_response",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Flight Safety And Containment / Lost-link response",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Lost-link response make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "lost_link_response"
+      ],
+      "linkedComponentWordIds": [
+        "return_to_home_failsafe",
+        "geofence_configuration",
+        "low_battery_landing_logic",
+        "flight_termination_setting"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "radio_link",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:camera_payload",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Cinematography Sensing / Camera payload",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Camera payload make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "camera_payload"
+      ],
+      "linkedComponentWordIds": [
+        "4k_camera_payload",
+        "three_axis_gimbal",
+        "camera_control_cable",
+        "lens_protection_hood",
+        "microsd_media_card"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "video_link",
+        "payload_mount"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:health_sensing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Cinematography Sensing / Health sensing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Health sensing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "health_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "vibration_monitor_pad",
+        "payload_presence_switch",
+        "avionics_temperature_probe",
+        "landing_contact_switch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "payload_mount"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:navigation_sensors",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Cinematography Sensing / Navigation sensors",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Navigation sensors make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "navigation_sensors"
+      ],
+      "linkedComponentWordIds": [
+        "magnetometer_module",
+        "rangefinder_altimeter",
+        "optical_flow_sensor",
+        "airspeed_estimate_port"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:battery_mounting",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Airframe Structure And Payload Mounting / Battery mounting",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Battery mounting make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "battery_mounting"
+      ],
+      "linkedComponentWordIds": [
+        "battery_tray",
+        "battery_retention_strap",
+        "anti_slip_battery_pad",
+        "pack_latch_sensor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "battery_mount",
+        "power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:carbon_airframe",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Airframe Structure And Payload Mounting / Carbon airframe",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Carbon airframe make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "carbon_airframe"
+      ],
+      "linkedComponentWordIds": [
+        "carbon_airframe",
+        "carbon_fibre_arm_tube",
+        "centre_plate_pair",
+        "arm_folding_hinge",
+        "landing_gear_strut"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "motor_mounts",
+        "payload_mount",
+        "battery_mount"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:payload_mounting",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Airframe Structure And Payload Mounting / Payload mounting",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Payload mounting make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "payload_mounting"
+      ],
+      "linkedComponentWordIds": [
+        "camera_gimbal_mount_plate",
+        "rubber_vibration_damper",
+        "payload_quick_release_latch",
+        "payload_cg_adjustment_rail"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "payload_mount",
+        "video_link"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    }
+  ]
+}

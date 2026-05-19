@@ -1,0 +1,360 @@
+{
+  "includeSourceEvidence": false,
+  "instructions": [
+    "Use this intake for engineering design-review, calculation, interface-review and compliance evidence only.",
+    "Do not admit BoM supplier, manufacturer, MPN, unit-cost or lead-time claims through this intake; use the sourcing intake instead.",
+    "Every admitted record must name the reviewer, verdict, evidence reference, evidence note and review timestamp."
+  ],
+  "drafts": [
+    {
+      "activityId": "design_review:structure_containment",
+      "activity": "Review Ultra-Light Wing Structure architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:structure_containment",
+      "activity": "Verify Ultra-Light Wing Structure requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:energy_harvesting",
+      "activity": "Review Solar Energy Harvesting architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:energy_harvesting",
+      "activity": "Verify Solar Energy Harvesting requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:energy_storage_source",
+      "activity": "Review Night-Cycle Energy Storage architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:energy_storage_source",
+      "activity": "Verify Night-Cycle Energy Storage requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:power_distribution",
+      "activity": "Review Flight Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:power_distribution",
+      "activity": "Verify Flight Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:actuation_kinematics",
+      "activity": "Review Propulsion And Control Surfaces architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:actuation_kinematics",
+      "activity": "Verify Propulsion And Control Surfaces requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:control_compute_communication",
+      "activity": "Review Autonomy Control Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:control_compute_communication",
+      "activity": "Verify Autonomy Control Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:sensing_instrumentation",
+      "activity": "Review Navigation And Airdata Sensing architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:sensing_instrumentation",
+      "activity": "Verify Navigation And Airdata Sensing requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:payload_communication",
+      "activity": "Review Communications Payload architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:environmental_interface",
+      "activity": "Review Stratospheric Environmental Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:environmental_interface",
+      "activity": "Verify Stratospheric Environmental Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:safety_protection",
+      "activity": "Review Flight Safety And Recovery architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:safety_protection",
+      "activity": "Verify Flight Safety And Recovery requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:maintenance_serviceability",
+      "activity": "Review Ground Handling Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:maintenance_serviceability",
+      "activity": "Verify Ground Handling Serviceability requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:energy_harvesting:power_distribution:solar_dc_bus",
+      "activity": "Verify solar_dc_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:energy_storage_source:power_distribution:battery_dc_bus",
+      "activity": "Verify battery_dc_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:power_distribution:actuation_kinematics:propulsion_power_bus",
+      "activity": "Verify propulsion_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:control_compute_communication:actuation_kinematics:flight_control_bus",
+      "activity": "Verify flight_control_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:payload_communication:control_compute_communication:payload_data_link",
+      "activity": "Verify payload_data_link interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:environmental_interface:energy_storage_source:thermal_path",
+      "activity": "Verify thermal_path interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:safety_protection:control_compute_communication:telemetry_link",
+      "activity": "Verify telemetry_link interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:CAA-UAS-OPS",
+      "activity": "Plan evidence for CAA-UAS-OPS",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:DO-160-ENV",
+      "activity": "Plan evidence for DO-160-ENV",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:SOLAR-ENERGY-BALANCE-REVIEW",
+      "activity": "Plan evidence for SOLAR-ENERGY-BALANCE-REVIEW",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "risk_review:1",
+      "activity": "Review risk control for Energy-negative overnight operation",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "risk_review:2",
+      "activity": "Review risk control for Wing structural failure in gust or launch handling",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "risk_review:3",
+      "activity": "Review risk control for Lost command link or uncontrolled descent",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    }
+  ]
+}

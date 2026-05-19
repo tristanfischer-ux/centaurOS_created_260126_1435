@@ -1,0 +1,999 @@
+{
+  "summary": {
+    "rows": 58,
+    "blockers": 18,
+    "majors": 40,
+    "minors": 0,
+    "architectureBlockingRows": 0,
+    "bomBlockingRows": 15,
+    "publishBlockingRows": 58,
+    "sourcingIntakeRows": 15,
+    "verificationIntakeRows": 33,
+    "engineeringReviewRows": 9,
+    "architectureRevisionRows": 0
+  },
+  "rows": [
+    {
+      "id": "readiness:1",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "bom score 1 is below 8.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "score_repair",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:2",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "12 critical BoM line(s) lack source-backed cost evidence.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:3",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "8 verification activity/activities remain blocked.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:4",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "0/31 non-sourcing verification activity/activities have accepted reviewer evidence.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "assumption:metric:headline_output",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Inference throughput",
+      "issue": "Inference throughput uses compute_tops with medium confidence.",
+      "requiredEvidence": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:metric:capex_gbp",
+      "kind": "assumption_review",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Estimated CAPEX",
+      "issue": "Estimated CAPEX uses an implicit model with low confidence.",
+      "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:metric:opex_annual_gbp",
+      "kind": "assumption_review",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Estimated annual OPEX",
+      "issue": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:edgeai_compute_throughput",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Inference Throughput",
+      "issue": "Inference Throughput currently evaluates as pass against 10 to 2000 TOPS for a rack edge inference appliance before model and latency derating.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compute_tops"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:edgeai_power_density",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Rack Power Density",
+      "issue": "Rack Power Density currently evaluates as pass against 100 to 1500 W/U for forced-air edge appliances; higher density needs detailed rack inlet and cooling proof.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "rack_units",
+        "power_budget_w"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:edgeai_data_compute_closure",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Data/Compute Closure",
+      "issue": "Data/Compute Closure currently evaluates as pass against PCIe fabric, inference network, storage bus and management network present.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compute_tops"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:edgeai_thermal_power_safety",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Thermal/Power Safety",
+      "issue": "Thermal/Power Safety currently evaluates as pass against thermal path, airflow path, fan control, AC input, protective earth, thermal alarm and hardwired trip present.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:edgeai_secure_management",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Secure Management",
+      "issue": "Secure Management currently evaluates as pass against secure boot chain, management network, service access and TPM present.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:IEC-62368-1",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "IEC-62368-1",
+      "issue": "Audio/video, ICT and communication equipment safety is relevant to this product class in UK/EU/global.",
+      "requiredEvidence": "Electrical safety, enclosure, temperature and abnormal-operation evidence.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:CE-EMC",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "CE-EMC",
+      "issue": "Electromagnetic compatibility technical file is relevant to this product class in UK/EU.",
+      "requiredEvidence": "EMC design review, pre-compliance or test evidence for rack appliance.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:SECURE-BOOT-REVIEW",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "SECURE-BOOT-REVIEW",
+      "issue": "Secure boot and fleet-management review is relevant to this product class in Project security gate.",
+      "requiredEvidence": "TPM, measured boot, firmware signing, recovery and management-access evidence.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "sourcing:1u_rack_chassis",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "1U rack chassis",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "1u_rack_chassis"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:ai_accelerator_module",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "AI accelerator module",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "ai_accelerator_module"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:cpu_module",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "CPU module",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "cpu_module"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:ecc_memory",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "ECC memory",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "ecc_memory"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:system_motherboard",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "System motherboard",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "system_motherboard"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:high_speed_nic",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "High-speed NIC",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "high_speed_nic"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:nvme_ssd",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "NVMe SSD",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "nvme_ssd"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:bmc_management_controller",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "BMC management controller",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "bmc_management_controller"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:redundant_power_supply",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Redundant power supply",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "redundant_power_supply"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:fan_wall_assembly",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Fan wall assembly",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "fan_wall_assembly"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:heatsink_cold_plate",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Heatsink cold plate",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "heatsink_cold_plate"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:tpm_security_module",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "TPM security module",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "tpm_security_module"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "verification:design_review:structure_containment",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Rack Structure Containment",
+      "issue": "Review Rack Structure Containment architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:structure_containment"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:structure_containment",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Rack Structure Containment",
+      "issue": "Verify Rack Structure Containment requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:structure_containment"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:compute_acceleration",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Compute Acceleration",
+      "issue": "Review Compute Acceleration architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:compute_acceleration"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:compute_acceleration",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Compute Acceleration",
+      "issue": "Verify Compute Acceleration requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:compute_acceleration"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:network_io",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Network IO",
+      "issue": "Review Network IO architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:network_io"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:data_storage",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Data Storage",
+      "issue": "Review Data Storage architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:data_storage"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:control_compute_communication",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Control Compute Communication",
+      "issue": "Review Control Compute Communication architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:control_compute_communication"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:control_compute_communication",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Control Compute Communication",
+      "issue": "Verify Control Compute Communication requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:control_compute_communication"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:power_distribution",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Power Distribution",
+      "issue": "Review Power Distribution architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:power_distribution"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:power_distribution",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Power Distribution",
+      "issue": "Verify Power Distribution requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:power_distribution"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:environmental_interface",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Thermal Airflow Interface",
+      "issue": "Review Thermal Airflow Interface architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:environmental_interface"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:environmental_interface",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Thermal Airflow Interface",
+      "issue": "Verify Thermal Airflow Interface requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:environmental_interface"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:sensing_instrumentation",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Telemetry Instrumentation",
+      "issue": "Review Telemetry Instrumentation architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:sensing_instrumentation"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:safety_protection",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Security And Safety Protection",
+      "issue": "Review Security And Safety Protection architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:safety_protection"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:safety_protection",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Security And Safety Protection",
+      "issue": "Verify Security And Safety Protection requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:safety_protection"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:maintenance_serviceability",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Field Maintenance Serviceability",
+      "issue": "Review Field Maintenance Serviceability architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:maintenance_serviceability"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:maintenance_serviceability",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Field Maintenance Serviceability",
+      "issue": "Verify Field Maintenance Serviceability requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:maintenance_serviceability"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:control_compute_communication:compute_acceleration:pcie_fabric",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Control Compute Communication -> Compute Acceleration",
+      "issue": "Verify pcie_fabric interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:control_compute_communication:compute_acceleration:pcie_fabric"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:power_distribution:compute_acceleration:gpu_power_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Power Distribution -> Compute Acceleration",
+      "issue": "Verify gpu_power_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:power_distribution:compute_acceleration:gpu_power_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:network_io:control_compute_communication:inference_network",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Network IO -> Control Compute Communication",
+      "issue": "Verify inference_network interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:network_io:control_compute_communication:inference_network"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:data_storage:control_compute_communication:storage_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Data Storage -> Control Compute Communication",
+      "issue": "Verify storage_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:data_storage:control_compute_communication:storage_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:environmental_interface:compute_acceleration:thermal_path",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Thermal Airflow Interface -> Compute Acceleration",
+      "issue": "Verify thermal_path interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:environmental_interface:compute_acceleration:thermal_path"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Telemetry Instrumentation -> Control Compute Communication",
+      "issue": "Verify sensor_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:safety_protection:power_distribution:hardwired_trip",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Security And Safety Protection -> Power Distribution",
+      "issue": "Verify hardwired_trip interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:safety_protection:power_distribution:hardwired_trip"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:structure_containment:environmental_interface:airflow_path",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Rack Structure Containment -> Thermal Airflow Interface",
+      "issue": "Verify airflow_path interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:structure_containment:environmental_interface:airflow_path"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:IEC-62368-1",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for IEC-62368-1",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:IEC-62368-1"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:CE-EMC",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for CE-EMC",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:CE-EMC"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:SECURE-BOOT-REVIEW",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for SECURE-BOOT-REVIEW",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:SECURE-BOOT-REVIEW"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:1",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Accelerator thermal throttling or shutdown under rack inlet conditions",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:1"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:2",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Insecure firmware or management interface compromise",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:2"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:3",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Inference outage from PSU, fan or SSD failure",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:3"
+      ],
+      "source": "verification_evidence_ledger"
+    }
+  ]
+}

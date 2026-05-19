@@ -1,0 +1,17 @@
+flowchart LR
+  structure_containment["Sterile Structure Containment"]
+  actuation_kinematics["Mixing And Agitation"]
+  mass_fluid_transport_process["Media Gas And Harvest Transport"]
+  environmental_interface["Thermal Gas Exhaust Interface"]
+  sensing_instrumentation["Process Sensing Instrumentation"]
+  control_compute_communication["Control Compute Communication"]
+  power_distribution["Power Distribution"]
+  safety_protection["Aseptic And Pressure Safety"]
+  maintenance_serviceability["Setup Calibration And Service"]
+  structure_containment -->|"sterile_fluid_path"| mass_fluid_transport_process
+  actuation_kinematics -->|"sterile_boundary"| structure_containment
+  mass_fluid_transport_process -->|"gas_path"| environmental_interface
+  sensing_instrumentation -->|"sensor_bus"| control_compute_communication
+  control_compute_communication -->|"pump_control"| mass_fluid_transport_process
+  safety_protection -->|"pressure_relief"| structure_containment
+  classDef missing stroke:#a32626,stroke-width:3px,color:#a32626;

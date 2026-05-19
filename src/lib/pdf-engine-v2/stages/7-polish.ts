@@ -17,6 +17,7 @@
 
 import type { PipelineState, Module, StageResult } from '../types'
 import { sanitiseLlmOutput } from '../sanitiser'
+import { getActionLogger } from '../lib/action-logger'
 
 const POLISH_SYSTEM_PROMPT = `You are a senior UK engineering report author. Rewrite the following module descriptions and section narratives into polished, professional engineering prose.
 
@@ -59,6 +60,8 @@ export async function runPolish(
       failureModes: m.failureModes,
     }))
 
+    const MODEL = 'xiaomi/mimo-v2.5-pro'
+    const t0 = Date.now()
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -66,7 +69,7 @@ export async function runPolish(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'xiaomi/mimo-v2.5-pro',
+        model: MODEL,
         // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
         max_tokens: 150_000,
         messages: [
@@ -77,10 +80,20 @@ export async function runPolish(
     })
 
     if (!response.ok) {
+      getActionLogger().logLlm({ step_name: 'polish', model: MODEL, latency_ms: Date.now() - t0, ok: false, error: `OpenRouter ${response.status}` })
       throw new Error(`OpenRouter API returned status ${response.status}`)
     }
 
     const json = await response.json()
+    getActionLogger().logLlm({
+      step_name: 'polish',
+      model: MODEL,
+      prompt_tokens: json?.usage?.prompt_tokens,
+      completion_tokens: json?.usage?.completion_tokens,
+      latency_ms: Date.now() - t0,
+      finish_reason: json?.choices?.[0]?.finish_reason,
+      ok: true,
+    })
     const msg = json.choices?.[0]?.message
     let raw = msg?.content || msg?.reasoning || ''
     if (!raw && msg?.reasoning_details?.length) {

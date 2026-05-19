@@ -1,0 +1,719 @@
+{
+  "nodes": [
+    {
+      "id": "structure_containment",
+      "label": "Airframe Structure And Payload Mounting",
+      "kind": "module"
+    },
+    {
+      "id": "structure_containment.carbon_airframe",
+      "label": "Carbon airframe",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.payload_mounting",
+      "label": "Payload mounting",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.battery_mounting",
+      "label": "Battery mounting",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "energy_storage_source",
+      "label": "Flight Energy Storage",
+      "kind": "module"
+    },
+    {
+      "id": "energy_storage_source.flight_battery_pack",
+      "label": "Flight battery pack",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "energy_storage_source.power_monitoring",
+      "label": "Power monitoring",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "energy_storage_source.charging_interface",
+      "label": "Charging interface",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "actuation_kinematics",
+      "label": "Propulsion And Flight Actuation",
+      "kind": "module"
+    },
+    {
+      "id": "actuation_kinematics.motor_sets",
+      "label": "Motor sets",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "actuation_kinematics.esc_stack",
+      "label": "ESC stack",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "actuation_kinematics.propeller_sets",
+      "label": "Propeller sets",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "control_compute_communication",
+      "label": "Flight Control Compute And Communications",
+      "kind": "module"
+    },
+    {
+      "id": "control_compute_communication.flight_controller_stack",
+      "label": "Flight controller stack",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.radio_navigation_link",
+      "label": "Radio and navigation link",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.video_downlink",
+      "label": "Video downlink",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "sensing_instrumentation",
+      "label": "Navigation And Cinematography Sensing",
+      "kind": "module"
+    },
+    {
+      "id": "sensing_instrumentation.camera_payload",
+      "label": "Camera payload",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.navigation_sensors",
+      "label": "Navigation sensors",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.health_sensing",
+      "label": "Health sensing",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "power_distribution",
+      "label": "Aircraft Power Distribution",
+      "kind": "module"
+    },
+    {
+      "id": "power_distribution.main_power_bus",
+      "label": "Main power bus",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.voltage_regulation",
+      "label": "Voltage regulation",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.wiring_harness",
+      "label": "Wiring harness",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "safety_protection",
+      "label": "Flight Safety And Containment",
+      "kind": "module"
+    },
+    {
+      "id": "safety_protection.arming_interlocks",
+      "label": "Arming interlocks",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.lost_link_response",
+      "label": "Lost-link response",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.battery_safety",
+      "label": "Battery safety",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "maintenance_serviceability",
+      "label": "Field Maintenance And Serviceability",
+      "kind": "module"
+    },
+    {
+      "id": "maintenance_serviceability.field_repair_access",
+      "label": "Field repair access",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.inspection_points",
+      "label": "Inspection points",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.transport_storage",
+      "label": "Transport and storage",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "hmi_ergonomics",
+      "label": "Ground Operator Interface",
+      "kind": "module"
+    },
+    {
+      "id": "hmi_ergonomics.ground_controller",
+      "label": "Ground controller",
+      "kind": "submodule",
+      "moduleId": "hmi_ergonomics"
+    },
+    {
+      "id": "hmi_ergonomics.mission_labelling",
+      "label": "Mission labelling",
+      "kind": "submodule",
+      "moduleId": "hmi_ergonomics"
+    }
+  ],
+  "edges": [
+    {
+      "id": "contains:structure_containment:structure_containment.carbon_airframe:carbon_airframe",
+      "from": "structure_containment",
+      "to": "structure_containment.carbon_airframe",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Carbon airframe is contained by Airframe Structure And Payload Mounting."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.payload_mounting:payload_mounting",
+      "from": "structure_containment",
+      "to": "structure_containment.payload_mounting",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Payload mounting is contained by Airframe Structure And Payload Mounting."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.battery_mounting:battery_mounting",
+      "from": "structure_containment",
+      "to": "structure_containment.battery_mounting",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Battery mounting is contained by Airframe Structure And Payload Mounting."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.flight_battery_pack:flight_battery_pack",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.flight_battery_pack",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Flight battery pack is contained by Flight Energy Storage."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.power_monitoring:power_monitoring",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.power_monitoring",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Power monitoring is contained by Flight Energy Storage."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.charging_interface:charging_interface",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.charging_interface",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Charging interface is contained by Flight Energy Storage."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.motor_sets:motor_sets",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.motor_sets",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Motor sets is contained by Propulsion And Flight Actuation."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.esc_stack:esc_stack",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.esc_stack",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "ESC stack is contained by Propulsion And Flight Actuation."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.propeller_sets:propeller_sets",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.propeller_sets",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Propeller sets is contained by Propulsion And Flight Actuation."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.flight_controller_stack:flight_controller_stack",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.flight_controller_stack",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Flight controller stack is contained by Flight Control Compute And Communications."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.radio_navigation_link:radio_navigation_link",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.radio_navigation_link",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Radio and navigation link is contained by Flight Control Compute And Communications."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.video_downlink:video_downlink",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.video_downlink",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Video downlink is contained by Flight Control Compute And Communications."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.camera_payload:camera_payload",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.camera_payload",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Camera payload is contained by Navigation And Cinematography Sensing."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.navigation_sensors:navigation_sensors",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.navigation_sensors",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Navigation sensors is contained by Navigation And Cinematography Sensing."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.health_sensing:health_sensing",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.health_sensing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Health sensing is contained by Navigation And Cinematography Sensing."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.main_power_bus:main_power_bus",
+      "from": "power_distribution",
+      "to": "power_distribution.main_power_bus",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Main power bus is contained by Aircraft Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.voltage_regulation:voltage_regulation",
+      "from": "power_distribution",
+      "to": "power_distribution.voltage_regulation",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Voltage regulation is contained by Aircraft Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.wiring_harness:wiring_harness",
+      "from": "power_distribution",
+      "to": "power_distribution.wiring_harness",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Wiring harness is contained by Aircraft Power Distribution."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.arming_interlocks:arming_interlocks",
+      "from": "safety_protection",
+      "to": "safety_protection.arming_interlocks",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Arming interlocks is contained by Flight Safety And Containment."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.lost_link_response:lost_link_response",
+      "from": "safety_protection",
+      "to": "safety_protection.lost_link_response",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Lost-link response is contained by Flight Safety And Containment."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.battery_safety:battery_safety",
+      "from": "safety_protection",
+      "to": "safety_protection.battery_safety",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Battery safety is contained by Flight Safety And Containment."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.field_repair_access:field_repair_access",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.field_repair_access",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Field repair access is contained by Field Maintenance And Serviceability."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.inspection_points:inspection_points",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.inspection_points",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Inspection points is contained by Field Maintenance And Serviceability."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.transport_storage:transport_storage",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.transport_storage",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Transport and storage is contained by Field Maintenance And Serviceability."
+    },
+    {
+      "id": "contains:hmi_ergonomics:hmi_ergonomics.ground_controller:ground_controller",
+      "from": "hmi_ergonomics",
+      "to": "hmi_ergonomics.ground_controller",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Ground controller is contained by Ground Operator Interface."
+    },
+    {
+      "id": "contains:hmi_ergonomics:hmi_ergonomics.mission_labelling:mission_labelling",
+      "from": "hmi_ergonomics",
+      "to": "hmi_ergonomics.mission_labelling",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Mission labelling is contained by Ground Operator Interface."
+    },
+    {
+      "id": "shared_interface:structure_containment:actuation_kinematics:motor_mounts",
+      "from": "structure_containment",
+      "to": "actuation_kinematics",
+      "via": "motor_mounts",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare motor_mounts."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:maintenance_serviceability:motor_mounts",
+      "from": "actuation_kinematics",
+      "to": "maintenance_serviceability",
+      "via": "motor_mounts",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare motor_mounts."
+    },
+    {
+      "id": "shared_interface:structure_containment:sensing_instrumentation:payload_mount",
+      "from": "structure_containment",
+      "to": "sensing_instrumentation",
+      "via": "payload_mount",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare payload_mount."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:maintenance_serviceability:payload_mount",
+      "from": "sensing_instrumentation",
+      "to": "maintenance_serviceability",
+      "via": "payload_mount",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare payload_mount."
+    },
+    {
+      "id": "shared_interface:structure_containment:energy_storage_source:battery_mount",
+      "from": "structure_containment",
+      "to": "energy_storage_source",
+      "via": "battery_mount",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare battery_mount."
+    },
+    {
+      "id": "shared_interface:structure_containment:energy_storage_source:service_access",
+      "from": "structure_containment",
+      "to": "energy_storage_source",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:safety_protection:service_access",
+      "from": "energy_storage_source",
+      "to": "safety_protection",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:service_access",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:maintenance_serviceability:hmi_ergonomics:service_access",
+      "from": "maintenance_serviceability",
+      "to": "hmi_ergonomics",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:structure_containment:energy_storage_source:power_bus",
+      "from": "structure_containment",
+      "to": "energy_storage_source",
+      "via": "power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare power_bus."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:actuation_kinematics:power_bus",
+      "from": "energy_storage_source",
+      "to": "actuation_kinematics",
+      "via": "power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare power_bus."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:control_compute_communication:power_bus",
+      "from": "actuation_kinematics",
+      "to": "control_compute_communication",
+      "via": "power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare power_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:power_distribution:power_bus",
+      "from": "control_compute_communication",
+      "to": "power_distribution",
+      "via": "power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare power_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:power_bus",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare power_bus."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:actuation_kinematics:sensor_bus",
+      "from": "energy_storage_source",
+      "to": "actuation_kinematics",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:control_compute_communication:sensor_bus",
+      "from": "actuation_kinematics",
+      "to": "control_compute_communication",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:sensor_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:power_distribution:sensor_bus",
+      "from": "sensing_instrumentation",
+      "to": "power_distribution",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:sensor_bus",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:control_compute_communication:motor_drive",
+      "from": "actuation_kinematics",
+      "to": "control_compute_communication",
+      "via": "motor_drive",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare motor_drive."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:power_distribution:motor_drive",
+      "from": "control_compute_communication",
+      "to": "power_distribution",
+      "via": "motor_drive",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare motor_drive."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:safety_protection:radio_link",
+      "from": "control_compute_communication",
+      "to": "safety_protection",
+      "via": "radio_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare radio_link."
+    },
+    {
+      "id": "shared_interface:safety_protection:hmi_ergonomics:radio_link",
+      "from": "safety_protection",
+      "to": "hmi_ergonomics",
+      "via": "radio_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare radio_link."
+    },
+    {
+      "id": "shared_interface:structure_containment:control_compute_communication:video_link",
+      "from": "structure_containment",
+      "to": "control_compute_communication",
+      "via": "video_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare video_link."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:video_link",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "video_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare video_link."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:power_distribution:video_link",
+      "from": "sensing_instrumentation",
+      "to": "power_distribution",
+      "via": "video_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare video_link."
+    },
+    {
+      "id": "shared_interface:power_distribution:hmi_ergonomics:video_link",
+      "from": "power_distribution",
+      "to": "hmi_ergonomics",
+      "via": "video_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare video_link."
+    },
+    {
+      "id": "required_interface:energy_storage_source:actuation_kinematics:power_bus",
+      "from": "energy_storage_source",
+      "to": "actuation_kinematics",
+      "via": "power_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Flight battery must feed propulsion loads through an explicit power bus."
+    },
+    {
+      "id": "required_interface:control_compute_communication:actuation_kinematics:motor_drive",
+      "from": "control_compute_communication",
+      "to": "actuation_kinematics",
+      "via": "motor_drive",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Flight controller must command ESC/motor drive outputs."
+    },
+    {
+      "id": "required_interface:control_compute_communication:sensing_instrumentation:sensor_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "sensor_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Flight controller must receive navigation and payload state."
+    }
+  ],
+  "summary": {
+    "moduleNodes": 9,
+    "subModuleNodes": 26,
+    "containsEdges": 26,
+    "sharedInterfaceEdges": 27,
+    "requiredInterfaceEdges": 3,
+    "missingRequiredInterfaceEdges": 0
+  }
+}

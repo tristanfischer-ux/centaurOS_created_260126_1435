@@ -1,0 +1,7 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+architecture_source,pass,Product class drone; architecture source scratch_universal_architecture; scratch grammar supported: yes.,1,,Design content came from the scratch universal architecture stage.
+design_provenance_refs,pass,463 provenance ref(s); 237 design/architecture ref(s); 0 invalid kind(s); 0 forbidden ref(s).,1,,All design provenance references are in the allowed scratch provenance vocabulary.
+bom_candidate_provenance,pass,110 candidate BoM line(s); 0 admitted source evidence row(s); 0 unprovenanced supplier/manufacturer/MPN/cost claim(s).,1,,Candidate BoM fields remain unpriced or explicitly source-backed.
+source_evidence_boundary,pass,0 source provenance ref(s); 0 outside admitted evidence boundary; 0 inside architecture content.,1,,"Source refs appear only in admitted source evidence, source ledger entries or matching source-backed BoM lines."
+chain_v2_quarantine,pass,0 forbidden provenance ref(s); 0 forbidden stage-trace mention(s).,1,,No chain-v2/state.json/modifier lineage appears inside generated design content or stage traces.
+benchmark_isolation,pass,"Benchmark source: prototype internal depth target; chain benchmark used: no; policy: Benchmark uses aggregate counts only. Chain-v2 component names, prose, design content, prices and part numbers are not imported into the scratch generator.",1,,Benchmark does not use chain-v2 input.

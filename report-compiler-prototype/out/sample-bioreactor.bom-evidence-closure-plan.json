@@ -1,0 +1,3201 @@
+{
+  "summary": {
+    "traceRows": 108,
+    "closureRows": 108,
+    "readyRows": 11,
+    "blockedRows": 0,
+    "deferredRows": 97,
+    "blockerRows": 11,
+    "collectSourceRows": 11,
+    "repairRejectedRows": 0,
+    "resolveIdentityRows": 0,
+    "replaceProtocolRows": 0,
+    "repairReferenceRows": 0,
+    "reviewReferenceRows": 0,
+    "deferCandidateRows": 97,
+    "procurementBlockingRows": 11,
+    "pricedReviewBlockingRows": 11,
+    "nextRowId": "bom-close:actuation_kinematics_agitation_drive_train_agitation_drive",
+    "canUseForProcurement": false
+  },
+  "rows": [
+    {
+      "id": "bom-close:actuation_kinematics_agitation_drive_train_agitation_drive",
+      "sequence": 1,
+      "action": "collect_source_evidence",
+      "status": "ready",
+      "priority": "blocker",
+      "lineId": "actuation_kinematics_agitation_drive_train_agitation_drive",
+      "componentWordId": "agitation_drive",
+      "description": "Agitation drive",
+      "traceStatus": "critical_unsourced",
+      "requiredEvidence": [
+        "supplierName",
+        "manufacturer",
+        "mpn",
+        "unitCostGbp",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+        "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+      ],
+      "rejectionCriteria": [
+        "LLM-estimated supplier/manufacturer/MPN/cost.",
+        "benchmark average without source evidence.",
+        "test-fixture:// source used as production evidence.",
+        "placeholder URL or stale retrieval timestamp."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": true,
+      "blocksProcurement": true,
+      "requiredAction": "Collect admissible source evidence for this critical line before BoM can pass."
+    },
+    {
+      "id": "bom-close:control_compute_communication_process_controller_bioreactor_controller",
+      "sequence": 2,
+      "action": "collect_source_evidence",
+      "status": "ready",
+      "priority": "blocker",
+      "lineId": "control_compute_communication_process_controller_bioreactor_controller",
+      "componentWordId": "bioreactor_controller",
+      "description": "Bioreactor controller",
+      "traceStatus": "critical_unsourced",
+      "requiredEvidence": [
+        "supplierName",
+        "manufacturer",
+        "mpn",
+        "unitCostGbp",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+        "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+      ],
+      "rejectionCriteria": [
+        "LLM-estimated supplier/manufacturer/MPN/cost.",
+        "benchmark average without source evidence.",
+        "test-fixture:// source used as production evidence.",
+        "placeholder URL or stale retrieval timestamp."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": true,
+      "blocksProcurement": true,
+      "requiredAction": "Collect admissible source evidence for this critical line before BoM can pass."
+    },
+    {
+      "id": "bom-close:environmental_interface_exhaust_filter_train_exhaust_filter_and_pressure_relief_set",
+      "sequence": 3,
+      "action": "collect_source_evidence",
+      "status": "ready",
+      "priority": "blocker",
+      "lineId": "environmental_interface_exhaust_filter_train_exhaust_filter_and_pressure_relief_set",
+      "componentWordId": "exhaust_filter_and_pressure_relief_set",
+      "description": "Exhaust filter and pressure relief set",
+      "traceStatus": "critical_unsourced",
+      "requiredEvidence": [
+        "supplierName",
+        "manufacturer",
+        "mpn",
+        "unitCostGbp",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+        "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+      ],
+      "rejectionCriteria": [
+        "LLM-estimated supplier/manufacturer/MPN/cost.",
+        "benchmark average without source evidence.",
+        "test-fixture:// source used as production evidence.",
+        "placeholder URL or stale retrieval timestamp."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": true,
+      "blocksProcurement": true,
+      "requiredAction": "Collect admissible source evidence for this critical line before BoM can pass."
+    },
+    {
+      "id": "bom-close:environmental_interface_temperature_control_loop_temperature_control_loop",
+      "sequence": 4,
+      "action": "collect_source_evidence",
+      "status": "ready",
+      "priority": "blocker",
+      "lineId": "environmental_interface_temperature_control_loop_temperature_control_loop",
+      "componentWordId": "temperature_control_loop",
+      "description": "Temperature control loop",
+      "traceStatus": "critical_unsourced",
+      "requiredEvidence": [
+        "supplierName",
+        "manufacturer",
+        "mpn",
+        "unitCostGbp",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+        "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+      ],
+      "rejectionCriteria": [
+        "LLM-estimated supplier/manufacturer/MPN/cost.",
+        "benchmark average without source evidence.",
+        "test-fixture:// source used as production evidence.",
+        "placeholder URL or stale retrieval timestamp."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": true,
+      "blocksProcurement": true,
+      "requiredAction": "Collect admissible source evidence for this critical line before BoM can pass."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_feed_pump_manifold_peristaltic_feed_pump",
+      "sequence": 5,
+      "action": "collect_source_evidence",
+      "status": "ready",
+      "priority": "blocker",
+      "lineId": "mass_fluid_transport_process_feed_pump_manifold_peristaltic_feed_pump",
+      "componentWordId": "peristaltic_feed_pump",
+      "description": "Peristaltic feed pump",
+      "traceStatus": "critical_unsourced",
+      "requiredEvidence": [
+        "supplierName",
+        "manufacturer",
+        "mpn",
+        "unitCostGbp",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+        "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+      ],
+      "rejectionCriteria": [
+        "LLM-estimated supplier/manufacturer/MPN/cost.",
+        "benchmark average without source evidence.",
+        "test-fixture:// source used as production evidence.",
+        "placeholder URL or stale retrieval timestamp."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": true,
+      "blocksProcurement": true,
+      "requiredAction": "Collect admissible source evidence for this critical line before BoM can pass."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_sparger_gas_mixing_sparger_and_gas_mix_manifold",
+      "sequence": 6,
+      "action": "collect_source_evidence",
+      "status": "ready",
+      "priority": "blocker",
+      "lineId": "mass_fluid_transport_process_sparger_gas_mixing_sparger_and_gas_mix_manifold",
+      "componentWordId": "sparger_and_gas_mix_manifold",
+      "description": "Sparger and gas-mix manifold",
+      "traceStatus": "critical_unsourced",
+      "requiredEvidence": [
+        "supplierName",
+        "manufacturer",
+        "mpn",
+        "unitCostGbp",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+        "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+      ],
+      "rejectionCriteria": [
+        "LLM-estimated supplier/manufacturer/MPN/cost.",
+        "benchmark average without source evidence.",
+        "test-fixture:// source used as production evidence.",
+        "placeholder URL or stale retrieval timestamp."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": true,
+      "blocksProcurement": true,
+      "requiredAction": "Collect admissible source evidence for this critical line before BoM can pass."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_do_ph_sensing_dissolved_oxygen_optical_sensor",
+      "sequence": 7,
+      "action": "collect_source_evidence",
+      "status": "ready",
+      "priority": "blocker",
+      "lineId": "sensing_instrumentation_do_ph_sensing_dissolved_oxygen_optical_sensor",
+      "componentWordId": "dissolved_oxygen_optical_sensor",
+      "description": "Dissolved oxygen optical sensor",
+      "traceStatus": "critical_unsourced",
+      "requiredEvidence": [
+        "supplierName",
+        "manufacturer",
+        "mpn",
+        "unitCostGbp",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+        "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+      ],
+      "rejectionCriteria": [
+        "LLM-estimated supplier/manufacturer/MPN/cost.",
+        "benchmark average without source evidence.",
+        "test-fixture:// source used as production evidence.",
+        "placeholder URL or stale retrieval timestamp."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": true,
+      "blocksProcurement": true,
+      "requiredAction": "Collect admissible source evidence for this critical line before BoM can pass."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_do_ph_sensing_single_use_ph_sensor",
+      "sequence": 8,
+      "action": "collect_source_evidence",
+      "status": "ready",
+      "priority": "blocker",
+      "lineId": "sensing_instrumentation_do_ph_sensing_single_use_ph_sensor",
+      "componentWordId": "single_use_ph_sensor",
+      "description": "Single-use pH sensor",
+      "traceStatus": "critical_unsourced",
+      "requiredEvidence": [
+        "supplierName",
+        "manufacturer",
+        "mpn",
+        "unitCostGbp",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+        "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+      ],
+      "rejectionCriteria": [
+        "LLM-estimated supplier/manufacturer/MPN/cost.",
+        "benchmark average without source evidence.",
+        "test-fixture:// source used as production evidence.",
+        "placeholder URL or stale retrieval timestamp."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": true,
+      "blocksProcurement": true,
+      "requiredAction": "Collect admissible source evidence for this critical line before BoM can pass."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_pressure_mass_temperature_sensing_load_cell_set",
+      "sequence": 9,
+      "action": "collect_source_evidence",
+      "status": "ready",
+      "priority": "blocker",
+      "lineId": "sensing_instrumentation_pressure_mass_temperature_sensing_load_cell_set",
+      "componentWordId": "load_cell_set",
+      "description": "Load cell set",
+      "traceStatus": "critical_unsourced",
+      "requiredEvidence": [
+        "supplierName",
+        "manufacturer",
+        "mpn",
+        "unitCostGbp",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+        "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+      ],
+      "rejectionCriteria": [
+        "LLM-estimated supplier/manufacturer/MPN/cost.",
+        "benchmark average without source evidence.",
+        "test-fixture:// source used as production evidence.",
+        "placeholder URL or stale retrieval timestamp."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": true,
+      "blocksProcurement": true,
+      "requiredAction": "Collect admissible source evidence for this critical line before BoM can pass."
+    },
+    {
+      "id": "bom-close:structure_containment_single_use_bag_chamber_single_use_bioreactor_bag",
+      "sequence": 10,
+      "action": "collect_source_evidence",
+      "status": "ready",
+      "priority": "blocker",
+      "lineId": "structure_containment_single_use_bag_chamber_single_use_bioreactor_bag",
+      "componentWordId": "single_use_bioreactor_bag",
+      "description": "Single-use bioreactor bag",
+      "traceStatus": "critical_unsourced",
+      "requiredEvidence": [
+        "supplierName",
+        "manufacturer",
+        "mpn",
+        "unitCostGbp",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+        "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+      ],
+      "rejectionCriteria": [
+        "LLM-estimated supplier/manufacturer/MPN/cost.",
+        "benchmark average without source evidence.",
+        "test-fixture:// source used as production evidence.",
+        "placeholder URL or stale retrieval timestamp."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": true,
+      "blocksProcurement": true,
+      "requiredAction": "Collect admissible source evidence for this critical line before BoM can pass."
+    },
+    {
+      "id": "bom-close:structure_containment_sterile_connector_panel_sterile_tubing_and_connector_set",
+      "sequence": 11,
+      "action": "collect_source_evidence",
+      "status": "ready",
+      "priority": "blocker",
+      "lineId": "structure_containment_sterile_connector_panel_sterile_tubing_and_connector_set",
+      "componentWordId": "sterile_tubing_and_connector_set",
+      "description": "Sterile tubing and connector set",
+      "traceStatus": "critical_unsourced",
+      "requiredEvidence": [
+        "supplierName",
+        "manufacturer",
+        "mpn",
+        "unitCostGbp",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Sourcing admission accepts the row.",
+        "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+        "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+      ],
+      "rejectionCriteria": [
+        "LLM-estimated supplier/manufacturer/MPN/cost.",
+        "benchmark average without source evidence.",
+        "test-fixture:// source used as production evidence.",
+        "placeholder URL or stale retrieval timestamp."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": true,
+      "blocksProcurement": true,
+      "requiredAction": "Collect admissible source evidence for this critical line before BoM can pass."
+    },
+    {
+      "id": "bom-close:actuation_kinematics_agitation_drive_train_drive_encoder",
+      "sequence": 12,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "actuation_kinematics_agitation_drive_train_drive_encoder",
+      "componentWordId": "drive_encoder",
+      "description": "drive encoder",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:actuation_kinematics_agitation_drive_train_magnetic_coupling_hub",
+      "sequence": 13,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "actuation_kinematics_agitation_drive_train_magnetic_coupling_hub",
+      "componentWordId": "magnetic_coupling_hub",
+      "description": "magnetic coupling hub",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:actuation_kinematics_agitation_drive_train_motor_mounting_plate",
+      "sequence": 14,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "actuation_kinematics_agitation_drive_train_motor_mounting_plate",
+      "componentWordId": "motor_mounting_plate",
+      "description": "motor mounting plate",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:actuation_kinematics_agitation_safety_feedback_drive_fault_relay",
+      "sequence": 15,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "actuation_kinematics_agitation_safety_feedback_drive_fault_relay",
+      "componentWordId": "drive_fault_relay",
+      "description": "drive fault relay",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:actuation_kinematics_agitation_safety_feedback_emergency_drive_stop_contactor",
+      "sequence": 16,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "actuation_kinematics_agitation_safety_feedback_emergency_drive_stop_contactor",
+      "componentWordId": "emergency_drive_stop_contactor",
+      "description": "emergency drive stop contactor",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:actuation_kinematics_agitation_safety_feedback_motor_current_sensor",
+      "sequence": 17,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "actuation_kinematics_agitation_safety_feedback_motor_current_sensor",
+      "componentWordId": "motor_current_sensor",
+      "description": "motor current sensor",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:actuation_kinematics_agitation_safety_feedback_overspeed_interlock_input",
+      "sequence": 18,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "actuation_kinematics_agitation_safety_feedback_overspeed_interlock_input",
+      "componentWordId": "overspeed_interlock_input",
+      "description": "overspeed interlock input",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:actuation_kinematics_mixing_impeller_interface_impeller_guard_insert",
+      "sequence": 19,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "actuation_kinematics_mixing_impeller_interface_impeller_guard_insert",
+      "componentWordId": "impeller_guard_insert",
+      "description": "impeller guard insert",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:actuation_kinematics_mixing_impeller_interface_mixing_validation_coupon",
+      "sequence": 20,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "actuation_kinematics_mixing_impeller_interface_mixing_validation_coupon",
+      "componentWordId": "mixing_validation_coupon",
+      "description": "mixing validation coupon",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:actuation_kinematics_mixing_impeller_interface_rocker_angle_stop",
+      "sequence": 21,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "actuation_kinematics_mixing_impeller_interface_rocker_angle_stop",
+      "componentWordId": "rocker_angle_stop",
+      "description": "rocker angle stop",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:actuation_kinematics_mixing_impeller_interface_single_use_impeller_coupling",
+      "sequence": 22,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "actuation_kinematics_mixing_impeller_interface_single_use_impeller_coupling",
+      "componentWordId": "single_use_impeller_coupling",
+      "description": "single-use impeller coupling",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:control_compute_communication_batch_record_gateway_audit_trail_storage",
+      "sequence": 23,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "control_compute_communication_batch_record_gateway_audit_trail_storage",
+      "componentWordId": "audit_trail_storage",
+      "description": "audit trail storage",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:control_compute_communication_batch_record_gateway_batch_historian_module",
+      "sequence": 24,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "control_compute_communication_batch_record_gateway_batch_historian_module",
+      "componentWordId": "batch_historian_module",
+      "description": "batch historian module",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:control_compute_communication_batch_record_gateway_ethernet_switch",
+      "sequence": 25,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "control_compute_communication_batch_record_gateway_ethernet_switch",
+      "componentWordId": "ethernet_switch",
+      "description": "ethernet switch",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:control_compute_communication_batch_record_gateway_secure_time_source",
+      "sequence": 26,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "control_compute_communication_batch_record_gateway_secure_time_source",
+      "componentWordId": "secure_time_source",
+      "description": "secure time source",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:control_compute_communication_operator_alarm_logic_alarm_annunciator",
+      "sequence": 27,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "control_compute_communication_operator_alarm_logic_alarm_annunciator",
+      "componentWordId": "alarm_annunciator",
+      "description": "alarm annunciator",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:control_compute_communication_operator_alarm_logic_batch_acknowledge_button",
+      "sequence": 28,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "control_compute_communication_operator_alarm_logic_batch_acknowledge_button",
+      "componentWordId": "batch_acknowledge_button",
+      "description": "batch acknowledge button",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:control_compute_communication_operator_alarm_logic_operator_hmi_panel",
+      "sequence": 29,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "control_compute_communication_operator_alarm_logic_operator_hmi_panel",
+      "componentWordId": "operator_hmi_panel",
+      "description": "operator HMI panel",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:control_compute_communication_operator_alarm_logic_role_access_key_switch",
+      "sequence": 30,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "control_compute_communication_operator_alarm_logic_role_access_key_switch",
+      "componentWordId": "role_access_key_switch",
+      "description": "role access key switch",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:control_compute_communication_process_controller_control_enclosure",
+      "sequence": 31,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "control_compute_communication_process_controller_control_enclosure",
+      "componentWordId": "control_enclosure",
+      "description": "control enclosure",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:control_compute_communication_process_controller_i_o_terminal_slice_set",
+      "sequence": 32,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "control_compute_communication_process_controller_i_o_terminal_slice_set",
+      "componentWordId": "i_o_terminal_slice_set",
+      "description": "I/O terminal slice set",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:control_compute_communication_process_controller_recipe_execution_firmware",
+      "sequence": 33,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "control_compute_communication_process_controller_recipe_execution_firmware",
+      "componentWordId": "recipe_execution_firmware",
+      "description": "recipe execution firmware",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:environmental_interface_ambient_enclosure_conditions_ambient_temperature_probe",
+      "sequence": 34,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "environmental_interface_ambient_enclosure_conditions_ambient_temperature_probe",
+      "componentWordId": "ambient_temperature_probe",
+      "description": "ambient temperature probe",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:environmental_interface_ambient_enclosure_conditions_clean_zone_status_beacon",
+      "sequence": 35,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "environmental_interface_ambient_enclosure_conditions_clean_zone_status_beacon",
+      "componentWordId": "clean_zone_status_beacon",
+      "description": "clean-zone status beacon",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:environmental_interface_ambient_enclosure_conditions_splash_guard_panel",
+      "sequence": 36,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "environmental_interface_ambient_enclosure_conditions_splash_guard_panel",
+      "componentWordId": "splash_guard_panel",
+      "description": "splash guard panel",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:environmental_interface_ambient_enclosure_conditions_wipe_down_surface_kit",
+      "sequence": 37,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "environmental_interface_ambient_enclosure_conditions_wipe_down_surface_kit",
+      "componentWordId": "wipe_down_surface_kit",
+      "description": "wipe-down surface kit",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:environmental_interface_exhaust_filter_train_condensate_knock_out_bottle",
+      "sequence": 38,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "environmental_interface_exhaust_filter_train_condensate_knock_out_bottle",
+      "componentWordId": "condensate_knock_out_bottle",
+      "description": "condensate knock-out bottle",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:environmental_interface_exhaust_filter_train_exhaust_heater_sleeve",
+      "sequence": 39,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "environmental_interface_exhaust_filter_train_exhaust_heater_sleeve",
+      "componentWordId": "exhaust_heater_sleeve",
+      "description": "exhaust heater sleeve",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:environmental_interface_exhaust_filter_train_pressure_relief_indicator",
+      "sequence": 40,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "environmental_interface_exhaust_filter_train_pressure_relief_indicator",
+      "componentWordId": "pressure_relief_indicator",
+      "description": "pressure relief indicator",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:environmental_interface_temperature_control_loop_cooling_plate",
+      "sequence": 41,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "environmental_interface_temperature_control_loop_cooling_plate",
+      "componentWordId": "cooling_plate",
+      "description": "cooling plate",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:environmental_interface_temperature_control_loop_heater_blanket",
+      "sequence": 42,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "environmental_interface_temperature_control_loop_heater_blanket",
+      "componentWordId": "heater_blanket",
+      "description": "heater blanket",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:environmental_interface_temperature_control_loop_thermal_interface_mat",
+      "sequence": 43,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "environmental_interface_temperature_control_loop_thermal_interface_mat",
+      "componentWordId": "thermal_interface_mat",
+      "description": "thermal interface mat",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_cleaning_turnaround_spent_bag_removal_cart_interface",
+      "sequence": 44,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_cleaning_turnaround_spent_bag_removal_cart_interface",
+      "componentWordId": "spent_bag_removal_cart_interface",
+      "description": "spent bag removal cart interface",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_cleaning_turnaround_spill_tray_liner",
+      "sequence": 45,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_cleaning_turnaround_spill_tray_liner",
+      "componentWordId": "spill_tray_liner",
+      "description": "spill tray liner",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_cleaning_turnaround_turnaround_checklist_card",
+      "sequence": 46,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_cleaning_turnaround_turnaround_checklist_card",
+      "componentWordId": "turnaround_checklist_card",
+      "description": "turnaround checklist card",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_cleaning_turnaround_wipe_down_kit_holder",
+      "sequence": 47,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_cleaning_turnaround_wipe_down_kit_holder",
+      "componentWordId": "wipe_down_kit_holder",
+      "description": "wipe-down kit holder",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_sensor_calibration_access_calibration_data_entry_hmi_page",
+      "sequence": 48,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_sensor_calibration_access_calibration_data_entry_hmi_page",
+      "componentWordId": "calibration_data_entry_hmi_page",
+      "description": "calibration data entry HMI page",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_sensor_calibration_access_do_zero_span_adapter",
+      "sequence": 49,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_sensor_calibration_access_do_zero_span_adapter",
+      "componentWordId": "do_zero_span_adapter",
+      "description": "DO zero span adapter",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_sensor_calibration_access_ph_calibration_buffer_holder",
+      "sequence": 50,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_sensor_calibration_access_ph_calibration_buffer_holder",
+      "componentWordId": "ph_calibration_buffer_holder",
+      "description": "pH calibration buffer holder",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_sensor_calibration_access_sensor_replacement_guide_label",
+      "sequence": 51,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_sensor_calibration_access_sensor_replacement_guide_label",
+      "componentWordId": "sensor_replacement_guide_label",
+      "description": "sensor replacement guide label",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_single_use_setup_bag_loading_fixture",
+      "sequence": 52,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_single_use_setup_bag_loading_fixture",
+      "componentWordId": "bag_loading_fixture",
+      "description": "bag loading fixture",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_single_use_setup_connector_cap_organiser",
+      "sequence": 53,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_single_use_setup_connector_cap_organiser",
+      "componentWordId": "connector_cap_organiser",
+      "description": "connector cap organiser",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_single_use_setup_setup_verification_barcode_sheet",
+      "sequence": 54,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_single_use_setup_setup_verification_barcode_sheet",
+      "componentWordId": "setup_verification_barcode_sheet",
+      "description": "setup verification barcode sheet",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:maintenance_serviceability_single_use_setup_tube_routing_template",
+      "sequence": 55,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "maintenance_serviceability_single_use_setup_tube_routing_template",
+      "componentWordId": "tube_routing_template",
+      "description": "tube routing template",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_feed_pump_manifold_feed_line_pinch_clamp",
+      "sequence": 56,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "mass_fluid_transport_process_feed_pump_manifold_feed_line_pinch_clamp",
+      "componentWordId": "feed_line_pinch_clamp",
+      "description": "feed line pinch clamp",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_feed_pump_manifold_media_bag_hanger",
+      "sequence": 57,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "mass_fluid_transport_process_feed_pump_manifold_media_bag_hanger",
+      "componentWordId": "media_bag_hanger",
+      "description": "media bag hanger",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_feed_pump_manifold_pump_tubing_cassette_set",
+      "sequence": 58,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "mass_fluid_transport_process_feed_pump_manifold_pump_tubing_cassette_set",
+      "componentWordId": "pump_tubing_cassette_set",
+      "description": "pump tubing cassette set",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_harvest_sampling_path_harvest_transfer_tubing_set",
+      "sequence": 59,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "mass_fluid_transport_process_harvest_sampling_path_harvest_transfer_tubing_set",
+      "componentWordId": "harvest_transfer_tubing_set",
+      "description": "harvest transfer tubing set",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_harvest_sampling_path_low_hold_up_connector",
+      "sequence": 60,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "mass_fluid_transport_process_harvest_sampling_path_low_hold_up_connector",
+      "componentWordId": "low_hold_up_connector",
+      "description": "low-hold-up connector",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_harvest_sampling_path_single_use_sample_valve",
+      "sequence": 61,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "mass_fluid_transport_process_harvest_sampling_path_single_use_sample_valve",
+      "componentWordId": "single_use_sample_valve",
+      "description": "single-use sample valve",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_harvest_sampling_path_waste_collection_bag",
+      "sequence": 62,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "mass_fluid_transport_process_harvest_sampling_path_waste_collection_bag",
+      "componentWordId": "waste_collection_bag",
+      "description": "waste collection bag",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_sparger_gas_mixing_mass_flow_controller_bank",
+      "sequence": 63,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "mass_fluid_transport_process_sparger_gas_mixing_mass_flow_controller_bank",
+      "componentWordId": "mass_flow_controller_bank",
+      "description": "mass-flow controller bank",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_sparger_gas_mixing_sparger_check_valve",
+      "sequence": 64,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "mass_fluid_transport_process_sparger_gas_mixing_sparger_check_valve",
+      "componentWordId": "sparger_check_valve",
+      "description": "sparger check valve",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:mass_fluid_transport_process_sparger_gas_mixing_sterile_gas_filter_capsule",
+      "sequence": 65,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "mass_fluid_transport_process_sparger_gas_mixing_sterile_gas_filter_capsule",
+      "componentWordId": "sterile_gas_filter_capsule",
+      "description": "sterile gas filter capsule",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_actuator_power_feeds_agitation_drive_breaker",
+      "sequence": 66,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_actuator_power_feeds_agitation_drive_breaker",
+      "componentWordId": "agitation_drive_breaker",
+      "description": "agitation drive breaker",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_actuator_power_feeds_cable_gland_plate",
+      "sequence": 67,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_actuator_power_feeds_cable_gland_plate",
+      "componentWordId": "cable_gland_plate",
+      "description": "cable gland plate",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_actuator_power_feeds_heater_output_relay",
+      "sequence": 68,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_actuator_power_feeds_heater_output_relay",
+      "componentWordId": "heater_output_relay",
+      "description": "heater output relay",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_actuator_power_feeds_pump_power_distribution_loom",
+      "sequence": 69,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_actuator_power_feeds_pump_power_distribution_loom",
+      "componentWordId": "pump_power_distribution_loom",
+      "description": "pump power distribution loom",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_backup_power_and_shutdown_power_fail_input_module",
+      "sequence": 70,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_backup_power_and_shutdown_power_fail_input_module",
+      "componentWordId": "power_fail_input_module",
+      "description": "power-fail input module",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_backup_power_and_shutdown_safe_shutdown_relay",
+      "sequence": 71,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_backup_power_and_shutdown_safe_shutdown_relay",
+      "componentWordId": "safe_shutdown_relay",
+      "description": "safe shutdown relay",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_backup_power_and_shutdown_shutdown_status_lamp",
+      "sequence": 72,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_backup_power_and_shutdown_shutdown_status_lamp",
+      "componentWordId": "shutdown_status_lamp",
+      "description": "shutdown status lamp",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_backup_power_and_shutdown_ups_buffer_module",
+      "sequence": 73,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_backup_power_and_shutdown_ups_buffer_module",
+      "componentWordId": "ups_buffer_module",
+      "description": "UPS buffer module",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_control_power_panel_24_v_dc_power_supply",
+      "sequence": 74,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_control_power_panel_24_v_dc_power_supply",
+      "componentWordId": "24_v_dc_power_supply",
+      "description": "24 V DC power supply",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_control_power_panel_panel_earth_bar",
+      "sequence": 75,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_control_power_panel_panel_earth_bar",
+      "componentWordId": "panel_earth_bar",
+      "description": "panel earth bar",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_control_power_panel_rcd_mains_isolator",
+      "sequence": 76,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_control_power_panel_rcd_mains_isolator",
+      "componentWordId": "rcd_mains_isolator",
+      "description": "RCD mains isolator",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:power_distribution_control_power_panel_terminal_block_rail",
+      "sequence": 77,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "power_distribution_control_power_panel_terminal_block_rail",
+      "componentWordId": "terminal_block_rail",
+      "description": "terminal block rail",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_aseptic_setup_controls_connector_tamper_seal_set",
+      "sequence": 78,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_aseptic_setup_controls_connector_tamper_seal_set",
+      "componentWordId": "connector_tamper_seal_set",
+      "description": "connector tamper seal set",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_aseptic_setup_controls_operator_gowning_placard",
+      "sequence": 79,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_aseptic_setup_controls_operator_gowning_placard",
+      "componentWordId": "operator_gowning_placard",
+      "description": "operator gowning placard",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_aseptic_setup_controls_pre_use_integrity_test_kit",
+      "sequence": 80,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_aseptic_setup_controls_pre_use_integrity_test_kit",
+      "componentWordId": "pre_use_integrity_test_kit",
+      "description": "pre-use integrity test kit",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_aseptic_setup_controls_sterile_connection_checklist_card",
+      "sequence": 81,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_aseptic_setup_controls_sterile_connection_checklist_card",
+      "componentWordId": "sterile_connection_checklist_card",
+      "description": "sterile connection checklist card",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_operator_electrical_safety_door_interlock_switch",
+      "sequence": 82,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_operator_electrical_safety_door_interlock_switch",
+      "componentWordId": "door_interlock_switch",
+      "description": "door interlock switch",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_operator_electrical_safety_emergency_stop_button",
+      "sequence": 83,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_operator_electrical_safety_emergency_stop_button",
+      "componentWordId": "emergency_stop_button",
+      "description": "emergency stop button",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_operator_electrical_safety_leak_tray_float_switch",
+      "sequence": 84,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_operator_electrical_safety_leak_tray_float_switch",
+      "componentWordId": "leak_tray_float_switch",
+      "description": "leak tray float switch",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_operator_electrical_safety_protective_earth_test_point",
+      "sequence": 85,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_operator_electrical_safety_protective_earth_test_point",
+      "componentWordId": "protective_earth_test_point",
+      "description": "protective earth test point",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_sterile_pressure_safety_bag_burst_shield",
+      "sequence": 86,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_sterile_pressure_safety_bag_burst_shield",
+      "componentWordId": "bag_burst_shield",
+      "description": "bag burst shield",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_sterile_pressure_safety_pressure_alarm_relay",
+      "sequence": 87,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_sterile_pressure_safety_pressure_alarm_relay",
+      "componentWordId": "pressure_alarm_relay",
+      "description": "pressure alarm relay",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_sterile_pressure_safety_single_use_pressure_relief_valve",
+      "sequence": 88,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_sterile_pressure_safety_single_use_pressure_relief_valve",
+      "componentWordId": "single_use_pressure_relief_valve",
+      "description": "single-use pressure relief valve",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:safety_protection_sterile_pressure_safety_vent_filter_integrity_tag",
+      "sequence": 89,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "safety_protection_sterile_pressure_safety_vent_filter_integrity_tag",
+      "componentWordId": "vent_filter_integrity_tag",
+      "description": "vent filter integrity tag",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_do_ph_sensing_sensor_calibration_record_card",
+      "sequence": 90,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "sensing_instrumentation_do_ph_sensing_sensor_calibration_record_card",
+      "componentWordId": "sensor_calibration_record_card",
+      "description": "sensor calibration record card",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_do_ph_sensing_sensor_patch_reader",
+      "sequence": 91,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "sensing_instrumentation_do_ph_sensing_sensor_patch_reader",
+      "componentWordId": "sensor_patch_reader",
+      "description": "sensor patch reader",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_gas_flow_sensing_co2_analyser_cell",
+      "sequence": 92,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "sensing_instrumentation_gas_flow_sensing_co2_analyser_cell",
+      "componentWordId": "co2_analyser_cell",
+      "description": "CO2 analyser cell",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_gas_flow_sensing_exhaust_pressure_sensor",
+      "sequence": 93,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "sensing_instrumentation_gas_flow_sensing_exhaust_pressure_sensor",
+      "componentWordId": "exhaust_pressure_sensor",
+      "description": "exhaust pressure sensor",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_gas_flow_sensing_gas_flow_sensor_set",
+      "sequence": 94,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "sensing_instrumentation_gas_flow_sensing_gas_flow_sensor_set",
+      "componentWordId": "gas_flow_sensor_set",
+      "description": "gas flow sensor set",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_gas_flow_sensing_oxygen_analyser_cell",
+      "sequence": 95,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "sensing_instrumentation_gas_flow_sensing_oxygen_analyser_cell",
+      "componentWordId": "oxygen_analyser_cell",
+      "description": "oxygen analyser cell",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_pressure_mass_temperature_sensing_bag_pressure_transducer",
+      "sequence": 96,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "sensing_instrumentation_pressure_mass_temperature_sensing_bag_pressure_transducer",
+      "componentWordId": "bag_pressure_transducer",
+      "description": "bag pressure transducer",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_pressure_mass_temperature_sensing_culture_temperature_probe",
+      "sequence": 97,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "sensing_instrumentation_pressure_mass_temperature_sensing_culture_temperature_probe",
+      "componentWordId": "culture_temperature_probe",
+      "description": "culture temperature probe",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:sensing_instrumentation_pressure_mass_temperature_sensing_foam_detection_probe",
+      "sequence": 98,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "sensing_instrumentation_pressure_mass_temperature_sensing_foam_detection_probe",
+      "componentWordId": "foam_detection_probe",
+      "description": "foam detection probe",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:structure_containment_single_use_bag_chamber_bag_integrity_test_label",
+      "sequence": 99,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "structure_containment_single_use_bag_chamber_bag_integrity_test_label",
+      "componentWordId": "bag_integrity_test_label",
+      "description": "bag integrity test label",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:structure_containment_single_use_bag_chamber_bag_support_tray",
+      "sequence": 100,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "structure_containment_single_use_bag_chamber_bag_support_tray",
+      "componentWordId": "bag_support_tray",
+      "description": "bag support tray",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:structure_containment_single_use_bag_chamber_port_clamp_set",
+      "sequence": 101,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "structure_containment_single_use_bag_chamber_port_clamp_set",
+      "componentWordId": "port_clamp_set",
+      "description": "port clamp set",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:structure_containment_sterile_connector_panel_aseptic_sampling_port",
+      "sequence": 102,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "structure_containment_sterile_connector_panel_aseptic_sampling_port",
+      "componentWordId": "aseptic_sampling_port",
+      "description": "aseptic sampling port",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:structure_containment_sterile_connector_panel_clamp_rail",
+      "sequence": 103,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "structure_containment_sterile_connector_panel_clamp_rail",
+      "componentWordId": "clamp_rail",
+      "description": "clamp rail",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:structure_containment_sterile_connector_panel_connector_parking_bracket",
+      "sequence": 104,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "structure_containment_sterile_connector_panel_connector_parking_bracket",
+      "componentWordId": "connector_parking_bracket",
+      "description": "connector parking bracket",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:structure_containment_support_frame_load_path_levelling_foot_set",
+      "sequence": 105,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "structure_containment_support_frame_load_path_levelling_foot_set",
+      "componentWordId": "levelling_foot_set",
+      "description": "levelling foot set",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:structure_containment_support_frame_load_path_lifting_eye_kit",
+      "sequence": 106,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "structure_containment_support_frame_load_path_lifting_eye_kit",
+      "componentWordId": "lifting_eye_kit",
+      "description": "lifting eye kit",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:structure_containment_support_frame_load_path_load_cell_mounting_bracket_set",
+      "sequence": 107,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "structure_containment_support_frame_load_path_load_cell_mounting_bracket_set",
+      "componentWordId": "load_cell_mounting_bracket_set",
+      "description": "load cell mounting bracket set",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    },
+    {
+      "id": "bom-close:structure_containment_support_frame_load_path_stainless_support_frame",
+      "sequence": 108,
+      "action": "defer_candidate_sourcing",
+      "status": "deferred",
+      "priority": "minor",
+      "lineId": "structure_containment_support_frame_load_path_stainless_support_frame",
+      "componentWordId": "stainless_support_frame",
+      "description": "stainless support frame",
+      "traceStatus": "candidate_only",
+      "requiredEvidence": [
+        "no immediate evidence required unless this candidate is promoted to procurement scope"
+      ],
+      "intakeArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv"
+      ],
+      "acceptanceCriteria": [
+        "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+      ],
+      "rejectionCriteria": [
+        "Candidate is used in procurement totals without source-backed evidence."
+      ],
+      "blocksCandidateDisplay": false,
+      "blocksPricedReview": false,
+      "blocksProcurement": false,
+      "requiredAction": "Keep as candidate-only until critical sourcing is complete or procurement planning starts."
+    }
+  ]
+}

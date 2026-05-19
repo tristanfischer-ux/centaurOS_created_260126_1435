@@ -1,0 +1,68 @@
+{
+  "verdict": "stage_trace_accepted",
+  "summary": {
+    "rows": 5,
+    "passRows": 5,
+    "reviewRows": 0,
+    "blockedRows": 0,
+    "passRatio": 1,
+    "expectedStages": 8,
+    "presentStages": 8,
+    "missingStages": [],
+    "unexpectedStages": [],
+    "orderedStages": true,
+    "stagesWithMetrics": 8,
+    "stagesWithEvidenceOrExplicitLimitation": 8,
+    "stagesWithLimitations": 8,
+    "scratchArchitectureSupported": true,
+    "architectureSource": "scratch_universal_architecture",
+    "architectureReadyForBom": true,
+    "admittedSourcingEvidenceRows": 0,
+    "admittedPricedLines": 0,
+    "provenanceViolations": 0
+  },
+  "rows": [
+    {
+      "area": "stage_sequence",
+      "verdict": "pass",
+      "signal": "8/8 expected compiler stages are present in order.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Stage sequence matches the scratch compiler contract."
+    },
+    {
+      "area": "stage_payloads",
+      "verdict": "pass",
+      "signal": "8/8 stages have metrics; 8/8 have evidence or explicit limitation; 8/8 have limitations.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Every stage carries metrics, evidence or explicit limitation, and limitations."
+    },
+    {
+      "area": "scratch_architecture_source",
+      "verdict": "pass",
+      "signal": "Product class auv; architecture source scratch_universal_architecture; scratch grammar supported: yes.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Architecture came from the scratch universal grammar."
+    },
+    {
+      "area": "architecture_before_sourcing",
+      "verdict": "pass",
+      "signal": "Architecture ready: yes; readiness stage passed; sourcing stage warning.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Sourcing stage is downstream of architecture readiness and has a consistent status."
+    },
+    {
+      "area": "sourcing_provenance_boundary",
+      "verdict": "pass",
+      "signal": "0 admitted source evidence row(s), 0 admitted priced line(s), 0 provenance violation(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Supplier, manufacturer, MPN and cost fields stay behind admitted sourcing evidence."
+    }
+  ],
+  "blockers": [],
+  "nextActions": []
+}

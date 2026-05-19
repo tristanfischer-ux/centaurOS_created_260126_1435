@@ -1,0 +1,45 @@
+{
+  "summary": {
+    "rows": 2,
+    "withinEnvelope": 1,
+    "needsReview": 1,
+    "outsideEnvelope": 0,
+    "blocked": 0
+  },
+  "rows": [
+    {
+      "id": "auv_hydrostatic_pressure_bar",
+      "status": "within_envelope",
+      "label": "AUV hydrostatic pressure",
+      "formula": "1 + depth_rating_m / 10",
+      "inputs": {
+        "depth_rating_m": 300
+      },
+      "result": 31,
+      "unit": "bar abs",
+      "envelope": "<=51 bar abs covers up to roughly 500 m before deeper-hull concept review.",
+      "interpretation": "31 bar absolute pressure implied at rated depth.",
+      "evidenceRequired": "Confirm hull material, safety factor, penetrators, seals, buckling margin and test pressure.",
+      "linkedRequirements": [
+        "depth_rating_m"
+      ]
+    },
+    {
+      "id": "auv_endurance_minutes",
+      "status": "needs_review",
+      "label": "AUV endurance minutes",
+      "formula": "endurance_hours * 60",
+      "inputs": {
+        "endurance_hours": 8
+      },
+      "result": 480,
+      "unit": "minutes",
+      "envelope": "Arithmetic only; mission endurance needs hotel load, propulsion and reserve energy proof.",
+      "interpretation": "480 minutes mission endurance before energy-budget proof.",
+      "evidenceRequired": "Confirm speed profile, payload load, reserve margin, battery derating and recovery scenario.",
+      "linkedRequirements": [
+        "endurance_hours"
+      ]
+    }
+  ]
+}

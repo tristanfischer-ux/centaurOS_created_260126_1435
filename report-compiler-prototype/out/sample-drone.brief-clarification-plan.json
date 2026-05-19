@@ -1,0 +1,82 @@
+{
+  "verdict": "clarification_recommended",
+  "summary": {
+    "rows": 4,
+    "requiredRows": 0,
+    "recommendedRows": 3,
+    "optionalRows": 1,
+    "architectureBlockingRows": 0,
+    "productClass": "drone",
+    "intakeVerdict": "brief_intake_review_required",
+    "nextQuestionId": "target_metrics:1"
+  },
+  "questions": [
+    {
+      "kind": "target_metrics",
+      "priority": "major",
+      "status": "recommended",
+      "gateArea": "requirement_quantification",
+      "question": "What are the top two or three quantified performance targets?",
+      "why": "The scratch architecture needs numeric anchors to avoid becoming assumption-heavy.",
+      "expectedAnswerFormat": "Metric name, value and unit for each target.",
+      "exampleAnswer": "40 minute flight endurance, 4K payload, 2 kg maximum take-off mass.",
+      "blocksArchitecture": false,
+      "resolves": [
+        "requirement_quantification",
+        "requirement_trace_seed"
+      ],
+      "id": "target_metrics:1",
+      "sequence": 1
+    },
+    {
+      "kind": "operating_envelope",
+      "priority": "major",
+      "status": "recommended",
+      "gateArea": "requirement_quantification",
+      "question": "What operating envelope should the design satisfy?",
+      "why": "Envelope requirements drive module sizing, interfaces, safety protection and later BoM scope.",
+      "expectedAnswerFormat": "A short list of dimensions, duty cycle, environment, runtime, capacity or output constraints.",
+      "exampleAnswer": "Outdoor wind tolerance, 40 minute mission, removable battery, transportable case.",
+      "blocksArchitecture": false,
+      "resolves": [
+        "requirement_quantification",
+        "assumption_boundary"
+      ],
+      "id": "operating_envelope:2",
+      "sequence": 2
+    },
+    {
+      "kind": "interfaces_and_integration",
+      "priority": "major",
+      "status": "recommended",
+      "gateArea": "requirement_trace_seed",
+      "question": "What external systems, users or infrastructure must this design interface with?",
+      "why": "External interfaces shape module boundaries and prevent missing integration modules.",
+      "expectedAnswerFormat": "List each external interface and any protocol, voltage, fluid, data or mechanical constraint.",
+      "exampleAnswer": "Remote controller, GPS, camera gimbal, battery charger and payload mount.",
+      "blocksArchitecture": false,
+      "resolves": [
+        "requirement_trace_seed",
+        "scratch_design_support"
+      ],
+      "id": "interfaces_and_integration:3",
+      "sequence": 3
+    },
+    {
+      "kind": "compliance_and_risk",
+      "priority": "minor",
+      "status": "optional",
+      "gateArea": "assumption_boundary",
+      "question": "Are there named standards, hazards or certification targets that must be treated as in-scope?",
+      "why": "Regulatory and hazard assumptions should be explicit before reviewer evidence or sourcing work starts.",
+      "expectedAnswerFormat": "Named standard, jurisdiction, hazard or certification target.",
+      "exampleAnswer": "Open category mass limits, radio approvals, battery transport requirements.",
+      "blocksArchitecture": false,
+      "resolves": [
+        "assumption_boundary"
+      ],
+      "id": "compliance_and_risk:4",
+      "sequence": 4
+    }
+  ]
+}

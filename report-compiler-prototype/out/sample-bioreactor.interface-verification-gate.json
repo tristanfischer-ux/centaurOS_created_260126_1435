@@ -1,0 +1,255 @@
+{
+  "verdict": "interface_review_ready",
+  "summary": {
+    "rows": 6,
+    "acceptedRows": 0,
+    "reviewReadyRows": 6,
+    "pendingEvidenceRows": 0,
+    "deferredRows": 0,
+    "blockedRows": 0,
+    "presentContracts": 6,
+    "missingContracts": 0,
+    "carrierCompleteRows": 6,
+    "verificationActivityRows": 6,
+    "acceptedEvidenceRatio": 0,
+    "structuralPassRatio": 1
+  },
+  "rows": [
+    {
+      "id": "required:structure_containment:mass_fluid_transport_process:sterile_fluid_path",
+      "interfaceId": "sterile_fluid_path",
+      "fromModuleId": "structure_containment",
+      "fromModuleName": "Sterile Structure Containment",
+      "toModuleId": "mass_fluid_transport_process",
+      "toModuleName": "Media Gas And Harvest Transport",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "single_use_bag_chamber",
+        "sterile_connector_panel"
+      ],
+      "toCarrierSubModules": [
+        "feed_pump_manifold",
+        "harvest_sampling_path",
+        "sparger_gas_mixing"
+      ],
+      "componentWordIds": [
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label",
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket",
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp",
+        "harvest_transfer_tubing_set",
+        "single_use_sample_valve",
+        "waste_collection_bag",
+        "low_hold_up_connector",
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve"
+      ],
+      "verificationActivityId": "interface_review:structure_containment:mass_fluid_transport_process:sterile_fluid_path",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:actuation_kinematics:structure_containment:sterile_boundary",
+      "interfaceId": "sterile_boundary",
+      "fromModuleId": "actuation_kinematics",
+      "fromModuleName": "Mixing And Agitation",
+      "toModuleId": "structure_containment",
+      "toModuleName": "Sterile Structure Containment",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "agitation_drive_train",
+        "mixing_impeller_interface"
+      ],
+      "toCarrierSubModules": [
+        "single_use_bag_chamber",
+        "sterile_connector_panel"
+      ],
+      "componentWordIds": [
+        "agitation_drive",
+        "magnetic_coupling_hub",
+        "drive_encoder",
+        "motor_mounting_plate",
+        "single_use_impeller_coupling",
+        "impeller_guard_insert",
+        "rocker_angle_stop",
+        "mixing_validation_coupon",
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label",
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket"
+      ],
+      "verificationActivityId": "interface_review:actuation_kinematics:structure_containment:sterile_boundary",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:mass_fluid_transport_process:environmental_interface:gas_path",
+      "interfaceId": "gas_path",
+      "fromModuleId": "mass_fluid_transport_process",
+      "fromModuleName": "Media Gas And Harvest Transport",
+      "toModuleId": "environmental_interface",
+      "toModuleName": "Thermal Gas Exhaust Interface",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "sparger_gas_mixing"
+      ],
+      "toCarrierSubModules": [
+        "exhaust_filter_train"
+      ],
+      "componentWordIds": [
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve",
+        "exhaust_filter_and_pressure_relief_set",
+        "condensate_knock_out_bottle",
+        "exhaust_heater_sleeve",
+        "pressure_relief_indicator"
+      ],
+      "verificationActivityId": "interface_review:mass_fluid_transport_process:environmental_interface:gas_path",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "fromModuleId": "sensing_instrumentation",
+      "fromModuleName": "Process Sensing Instrumentation",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Control Compute Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "do_ph_sensing",
+        "pressure_mass_temperature_sensing",
+        "gas_flow_sensing"
+      ],
+      "toCarrierSubModules": [
+        "process_controller",
+        "batch_record_gateway"
+      ],
+      "componentWordIds": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor",
+        "sensor_patch_reader",
+        "sensor_calibration_record_card",
+        "load_cell_set",
+        "bag_pressure_transducer",
+        "culture_temperature_probe",
+        "foam_detection_probe",
+        "gas_flow_sensor_set",
+        "exhaust_pressure_sensor",
+        "oxygen_analyser_cell",
+        "co2_analyser_cell",
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware",
+        "batch_historian_module",
+        "audit_trail_storage",
+        "ethernet_switch",
+        "secure_time_source"
+      ],
+      "verificationActivityId": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:control_compute_communication:mass_fluid_transport_process:pump_control",
+      "interfaceId": "pump_control",
+      "fromModuleId": "control_compute_communication",
+      "fromModuleName": "Control Compute Communication",
+      "toModuleId": "mass_fluid_transport_process",
+      "toModuleName": "Media Gas And Harvest Transport",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "process_controller"
+      ],
+      "toCarrierSubModules": [
+        "feed_pump_manifold"
+      ],
+      "componentWordIds": [
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware",
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp"
+      ],
+      "verificationActivityId": "interface_review:control_compute_communication:mass_fluid_transport_process:pump_control",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:safety_protection:structure_containment:pressure_relief",
+      "interfaceId": "pressure_relief",
+      "fromModuleId": "safety_protection",
+      "fromModuleName": "Aseptic And Pressure Safety",
+      "toModuleId": "structure_containment",
+      "toModuleName": "Sterile Structure Containment",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "sterile_pressure_safety"
+      ],
+      "toCarrierSubModules": [
+        "single_use_bag_chamber"
+      ],
+      "componentWordIds": [
+        "single_use_pressure_relief_valve",
+        "vent_filter_integrity_tag",
+        "pressure_alarm_relay",
+        "bag_burst_shield",
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label"
+      ],
+      "verificationActivityId": "interface_review:safety_protection:structure_containment:pressure_relief",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Collect named interface-review evidence through verification intake."
+  ]
+}

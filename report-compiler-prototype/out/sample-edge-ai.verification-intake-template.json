@@ -1,0 +1,320 @@
+{
+  "includeSourceEvidence": false,
+  "instructions": [
+    "Use this intake for engineering design-review, calculation, interface-review and compliance evidence only.",
+    "Do not admit BoM supplier, manufacturer, MPN, unit-cost or lead-time claims through this intake; use the sourcing intake instead.",
+    "Every admitted record must name the reviewer, verdict, evidence reference, evidence note and review timestamp."
+  ],
+  "drafts": [
+    {
+      "activityId": "design_review:structure_containment",
+      "activity": "Review Rack Structure Containment architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:structure_containment",
+      "activity": "Verify Rack Structure Containment requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:compute_acceleration",
+      "activity": "Review Compute Acceleration architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:compute_acceleration",
+      "activity": "Verify Compute Acceleration requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:network_io",
+      "activity": "Review Network IO architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:data_storage",
+      "activity": "Review Data Storage architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:control_compute_communication",
+      "activity": "Review Control Compute Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:control_compute_communication",
+      "activity": "Verify Control Compute Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:power_distribution",
+      "activity": "Review Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:power_distribution",
+      "activity": "Verify Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:environmental_interface",
+      "activity": "Review Thermal Airflow Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:environmental_interface",
+      "activity": "Verify Thermal Airflow Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:sensing_instrumentation",
+      "activity": "Review Telemetry Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:safety_protection",
+      "activity": "Review Security And Safety Protection architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:safety_protection",
+      "activity": "Verify Security And Safety Protection requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:maintenance_serviceability",
+      "activity": "Review Field Maintenance Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:maintenance_serviceability",
+      "activity": "Verify Field Maintenance Serviceability requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:control_compute_communication:compute_acceleration:pcie_fabric",
+      "activity": "Verify pcie_fabric interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:power_distribution:compute_acceleration:gpu_power_bus",
+      "activity": "Verify gpu_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:network_io:control_compute_communication:inference_network",
+      "activity": "Verify inference_network interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:data_storage:control_compute_communication:storage_bus",
+      "activity": "Verify storage_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:environmental_interface:compute_acceleration:thermal_path",
+      "activity": "Verify thermal_path interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:safety_protection:power_distribution:hardwired_trip",
+      "activity": "Verify hardwired_trip interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:structure_containment:environmental_interface:airflow_path",
+      "activity": "Verify airflow_path interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:IEC-62368-1",
+      "activity": "Plan evidence for IEC-62368-1",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:CE-EMC",
+      "activity": "Plan evidence for CE-EMC",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:SECURE-BOOT-REVIEW",
+      "activity": "Plan evidence for SECURE-BOOT-REVIEW",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "risk_review:1",
+      "activity": "Review risk control for Accelerator thermal throttling or shutdown under rack inlet conditions",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "risk_review:2",
+      "activity": "Review risk control for Insecure firmware or management interface compromise",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "risk_review:3",
+      "activity": "Review risk control for Inference outage from PSU, fan or SSD failure",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    }
+  ]
+}

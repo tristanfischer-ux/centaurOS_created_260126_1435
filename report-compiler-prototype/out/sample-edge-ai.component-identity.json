@@ -1,0 +1,11 @@
+{
+  "summary": {
+    "bomLines": 120,
+    "distinctComponentWordIds": 120,
+    "duplicateComponentGroups": 0,
+    "duplicateAllocatedLines": 0,
+    "duplicateCriticalComponentGroups": 0,
+    "canonicalReviewRequired": false
+  },
+  "groups": []
+}

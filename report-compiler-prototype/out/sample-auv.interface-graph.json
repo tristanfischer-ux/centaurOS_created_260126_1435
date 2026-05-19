@@ -1,0 +1,842 @@
+{
+  "nodes": [
+    {
+      "id": "structure_containment",
+      "label": "Pressure Structure Containment",
+      "kind": "module"
+    },
+    {
+      "id": "structure_containment.pressure_hull_shell",
+      "label": "Pressure hull shell",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.internal_mounting_frame",
+      "label": "Internal mounting frame",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.hydrodynamic_fairing",
+      "label": "Hydrodynamic fairing",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "energy_storage_source",
+      "label": "Subsea Energy Storage",
+      "kind": "module"
+    },
+    {
+      "id": "energy_storage_source.subsea_battery_pack",
+      "label": "Subsea battery pack",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "energy_storage_source.charging_interface",
+      "label": "Charging interface",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "energy_storage_source.energy_monitoring",
+      "label": "Energy monitoring",
+      "kind": "submodule",
+      "moduleId": "energy_storage_source"
+    },
+    {
+      "id": "power_distribution",
+      "label": "Subsea Power Distribution",
+      "kind": "module"
+    },
+    {
+      "id": "power_distribution.dc_distribution",
+      "label": "DC distribution",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.low_voltage_rails",
+      "label": "Low-voltage rails",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.isolation_grounding",
+      "label": "Isolation and grounding",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "actuation_kinematics",
+      "label": "Thruster Actuation Kinematics",
+      "kind": "module"
+    },
+    {
+      "id": "actuation_kinematics.thruster_array",
+      "label": "Thruster array",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "actuation_kinematics.drive_electronics",
+      "label": "Drive electronics",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "actuation_kinematics.trim_surfaces",
+      "label": "Trim and stability surfaces",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "control_compute_communication",
+      "label": "Autonomy Compute Communication",
+      "kind": "module"
+    },
+    {
+      "id": "control_compute_communication.mission_computer_stack",
+      "label": "Mission computer stack",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.acoustic_communications",
+      "label": "Acoustic communications",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.software_health_management",
+      "label": "Software health management",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "sensing_instrumentation",
+      "label": "Navigation And Payload Sensing",
+      "kind": "module"
+    },
+    {
+      "id": "sensing_instrumentation.navigation_sensor_suite",
+      "label": "Navigation sensor suite",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.depth_environment_sensors",
+      "label": "Depth and environment sensors",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.payload_sensor_bay",
+      "label": "Payload sensor bay",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "environmental_interface",
+      "label": "Pressure Thermal Buoyancy Interface",
+      "kind": "module"
+    },
+    {
+      "id": "environmental_interface.pressure_boundary_management",
+      "label": "Pressure boundary management",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.thermal_path",
+      "label": "Thermal path",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.buoyancy_trim",
+      "label": "Buoyancy and trim",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "safety_protection",
+      "label": "Leak Abort And Recovery Safety",
+      "kind": "module"
+    },
+    {
+      "id": "safety_protection.leak_detection",
+      "label": "Leak detection",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.abort_recovery",
+      "label": "Abort and recovery",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.pressure_fail_safe",
+      "label": "Pressure fail-safe",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "maintenance_serviceability",
+      "label": "Deck Recovery And Service",
+      "kind": "module"
+    },
+    {
+      "id": "maintenance_serviceability.deck_recovery",
+      "label": "Deck recovery",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.service_access",
+      "label": "Service access",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.field_transport",
+      "label": "Field transport",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    }
+  ],
+  "edges": [
+    {
+      "id": "contains:structure_containment:structure_containment.pressure_hull_shell:pressure_hull_shell",
+      "from": "structure_containment",
+      "to": "structure_containment.pressure_hull_shell",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Pressure hull shell is contained by Pressure Structure Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.internal_mounting_frame:internal_mounting_frame",
+      "from": "structure_containment",
+      "to": "structure_containment.internal_mounting_frame",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Internal mounting frame is contained by Pressure Structure Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.hydrodynamic_fairing:hydrodynamic_fairing",
+      "from": "structure_containment",
+      "to": "structure_containment.hydrodynamic_fairing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Hydrodynamic fairing is contained by Pressure Structure Containment."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.subsea_battery_pack:subsea_battery_pack",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.subsea_battery_pack",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Subsea battery pack is contained by Subsea Energy Storage."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.charging_interface:charging_interface",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.charging_interface",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Charging interface is contained by Subsea Energy Storage."
+    },
+    {
+      "id": "contains:energy_storage_source:energy_storage_source.energy_monitoring:energy_monitoring",
+      "from": "energy_storage_source",
+      "to": "energy_storage_source.energy_monitoring",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Energy monitoring is contained by Subsea Energy Storage."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.dc_distribution:dc_distribution",
+      "from": "power_distribution",
+      "to": "power_distribution.dc_distribution",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "DC distribution is contained by Subsea Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.low_voltage_rails:low_voltage_rails",
+      "from": "power_distribution",
+      "to": "power_distribution.low_voltage_rails",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Low-voltage rails is contained by Subsea Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.isolation_grounding:isolation_grounding",
+      "from": "power_distribution",
+      "to": "power_distribution.isolation_grounding",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Isolation and grounding is contained by Subsea Power Distribution."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.thruster_array:thruster_array",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.thruster_array",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Thruster array is contained by Thruster Actuation Kinematics."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.drive_electronics:drive_electronics",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.drive_electronics",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Drive electronics is contained by Thruster Actuation Kinematics."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.trim_surfaces:trim_surfaces",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.trim_surfaces",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Trim and stability surfaces is contained by Thruster Actuation Kinematics."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.mission_computer_stack:mission_computer_stack",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.mission_computer_stack",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Mission computer stack is contained by Autonomy Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.acoustic_communications:acoustic_communications",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.acoustic_communications",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Acoustic communications is contained by Autonomy Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.software_health_management:software_health_management",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.software_health_management",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Software health management is contained by Autonomy Compute Communication."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.navigation_sensor_suite:navigation_sensor_suite",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.navigation_sensor_suite",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Navigation sensor suite is contained by Navigation And Payload Sensing."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.depth_environment_sensors:depth_environment_sensors",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.depth_environment_sensors",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Depth and environment sensors is contained by Navigation And Payload Sensing."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.payload_sensor_bay:payload_sensor_bay",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.payload_sensor_bay",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Payload sensor bay is contained by Navigation And Payload Sensing."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.pressure_boundary_management:pressure_boundary_management",
+      "from": "environmental_interface",
+      "to": "environmental_interface.pressure_boundary_management",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Pressure boundary management is contained by Pressure Thermal Buoyancy Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.thermal_path:thermal_path",
+      "from": "environmental_interface",
+      "to": "environmental_interface.thermal_path",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Thermal path is contained by Pressure Thermal Buoyancy Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.buoyancy_trim:buoyancy_trim",
+      "from": "environmental_interface",
+      "to": "environmental_interface.buoyancy_trim",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Buoyancy and trim is contained by Pressure Thermal Buoyancy Interface."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.leak_detection:leak_detection",
+      "from": "safety_protection",
+      "to": "safety_protection.leak_detection",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Leak detection is contained by Leak Abort And Recovery Safety."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.abort_recovery:abort_recovery",
+      "from": "safety_protection",
+      "to": "safety_protection.abort_recovery",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Abort and recovery is contained by Leak Abort And Recovery Safety."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.pressure_fail_safe:pressure_fail_safe",
+      "from": "safety_protection",
+      "to": "safety_protection.pressure_fail_safe",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Pressure fail-safe is contained by Leak Abort And Recovery Safety."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.deck_recovery:deck_recovery",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.deck_recovery",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Deck recovery is contained by Deck Recovery And Service."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.service_access:service_access",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.service_access",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Service access is contained by Deck Recovery And Service."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.field_transport:field_transport",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.field_transport",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Field transport is contained by Deck Recovery And Service."
+    },
+    {
+      "id": "shared_interface:structure_containment:sensing_instrumentation:pressure_boundary",
+      "from": "structure_containment",
+      "to": "sensing_instrumentation",
+      "via": "pressure_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pressure_boundary."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:environmental_interface:pressure_boundary",
+      "from": "sensing_instrumentation",
+      "to": "environmental_interface",
+      "via": "pressure_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pressure_boundary."
+    },
+    {
+      "id": "shared_interface:environmental_interface:safety_protection:pressure_boundary",
+      "from": "environmental_interface",
+      "to": "safety_protection",
+      "via": "pressure_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pressure_boundary."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:pressure_boundary",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "pressure_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pressure_boundary."
+    },
+    {
+      "id": "shared_interface:structure_containment:actuation_kinematics:mechanical_mounts",
+      "from": "structure_containment",
+      "to": "actuation_kinematics",
+      "via": "mechanical_mounts",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare mechanical_mounts."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:environmental_interface:mechanical_mounts",
+      "from": "actuation_kinematics",
+      "to": "environmental_interface",
+      "via": "mechanical_mounts",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare mechanical_mounts."
+    },
+    {
+      "id": "shared_interface:environmental_interface:maintenance_serviceability:mechanical_mounts",
+      "from": "environmental_interface",
+      "to": "maintenance_serviceability",
+      "via": "mechanical_mounts",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare mechanical_mounts."
+    },
+    {
+      "id": "shared_interface:structure_containment:energy_storage_source:service_access",
+      "from": "structure_containment",
+      "to": "energy_storage_source",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:power_distribution:service_access",
+      "from": "energy_storage_source",
+      "to": "power_distribution",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:power_distribution:actuation_kinematics:service_access",
+      "from": "power_distribution",
+      "to": "actuation_kinematics",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:control_compute_communication:service_access",
+      "from": "actuation_kinematics",
+      "to": "control_compute_communication",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:service_access",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:environmental_interface:service_access",
+      "from": "sensing_instrumentation",
+      "to": "environmental_interface",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:environmental_interface:safety_protection:service_access",
+      "from": "environmental_interface",
+      "to": "safety_protection",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:service_access",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:structure_containment:actuation_kinematics:hydrodynamic_shell",
+      "from": "structure_containment",
+      "to": "actuation_kinematics",
+      "via": "hydrodynamic_shell",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare hydrodynamic_shell."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:environmental_interface:hydrodynamic_shell",
+      "from": "actuation_kinematics",
+      "to": "environmental_interface",
+      "via": "hydrodynamic_shell",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare hydrodynamic_shell."
+    },
+    {
+      "id": "shared_interface:environmental_interface:maintenance_serviceability:hydrodynamic_shell",
+      "from": "environmental_interface",
+      "to": "maintenance_serviceability",
+      "via": "hydrodynamic_shell",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare hydrodynamic_shell."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:power_distribution:dc_power_bus",
+      "from": "energy_storage_source",
+      "to": "power_distribution",
+      "via": "dc_power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare dc_power_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:dc_power_bus",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "dc_power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare dc_power_bus."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:dc_power_bus",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "dc_power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare dc_power_bus."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:control_compute_communication:battery_monitor_bus",
+      "from": "energy_storage_source",
+      "to": "control_compute_communication",
+      "via": "battery_monitor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare battery_monitor_bus."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:environmental_interface:thermal_path",
+      "from": "energy_storage_source",
+      "to": "environmental_interface",
+      "via": "thermal_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare thermal_path."
+    },
+    {
+      "id": "shared_interface:power_distribution:actuation_kinematics:thruster_power_bus",
+      "from": "power_distribution",
+      "to": "actuation_kinematics",
+      "via": "thruster_power_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare thruster_power_bus."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:control_compute_communication:thrust_command_bus",
+      "from": "actuation_kinematics",
+      "to": "control_compute_communication",
+      "via": "thrust_command_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare thrust_command_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:navigation_sensor_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "navigation_sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare navigation_sensor_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:payload_data_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "payload_data_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare payload_data_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:acoustic_link",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "acoustic_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare acoustic_link."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:acoustic_link",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "acoustic_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare acoustic_link."
+    },
+    {
+      "id": "shared_interface:energy_storage_source:power_distribution:alarm_bus",
+      "from": "energy_storage_source",
+      "to": "power_distribution",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:actuation_kinematics:alarm_bus",
+      "from": "power_distribution",
+      "to": "actuation_kinematics",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:control_compute_communication:alarm_bus",
+      "from": "actuation_kinematics",
+      "to": "control_compute_communication",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:alarm_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:alarm_bus",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "required_interface:energy_storage_source:power_distribution:dc_power_bus",
+      "from": "energy_storage_source",
+      "to": "power_distribution",
+      "via": "dc_power_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Battery energy must enter protected DC distribution through an explicit bus."
+    },
+    {
+      "id": "required_interface:power_distribution:actuation_kinematics:thruster_power_bus",
+      "from": "power_distribution",
+      "to": "actuation_kinematics",
+      "via": "thruster_power_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Thrusters must receive protected power separately from avionics and payload rails."
+    },
+    {
+      "id": "required_interface:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "from": "control_compute_communication",
+      "to": "actuation_kinematics",
+      "via": "thrust_command_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Mission control must command thruster drive states over a declared control interface."
+    },
+    {
+      "id": "required_interface:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "navigation_sensor_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "DVL, INS and depth data must feed navigation fusion before mission autonomy is credible."
+    },
+    {
+      "id": "required_interface:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "payload_data_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Inspection payload data must be logged or acted on by the mission computer."
+    },
+    {
+      "id": "required_interface:environmental_interface:structure_containment:pressure_boundary",
+      "from": "environmental_interface",
+      "to": "structure_containment",
+      "via": "pressure_boundary",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Hull, penetrators, thermal path and buoyancy hardware must share one depth-rated boundary model."
+    },
+    {
+      "id": "required_interface:safety_protection:control_compute_communication:alarm_bus",
+      "from": "safety_protection",
+      "to": "control_compute_communication",
+      "via": "alarm_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Leak, over-depth and recovery alarms must drive fail-safe mission states."
+    },
+    {
+      "id": "required_interface:safety_protection:structure_containment:pressure_boundary",
+      "from": "safety_protection",
+      "to": "structure_containment",
+      "via": "pressure_boundary",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Leak and over-depth protection must reference the same pressure boundary as the hull design."
+    }
+  ],
+  "summary": {
+    "moduleNodes": 9,
+    "subModuleNodes": 27,
+    "containsEdges": 27,
+    "sharedInterfaceEdges": 34,
+    "requiredInterfaceEdges": 8,
+    "missingRequiredInterfaceEdges": 0
+  }
+}

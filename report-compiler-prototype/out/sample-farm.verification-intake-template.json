@@ -1,0 +1,200 @@
+{
+  "includeSourceEvidence": false,
+  "instructions": [
+    "Use this intake for engineering design-review, calculation, interface-review and compliance evidence only.",
+    "Do not admit BoM supplier, manufacturer, MPN, unit-cost or lead-time claims through this intake; use the sourcing intake instead.",
+    "Every admitted record must name the reviewer, verdict, evidence reference, evidence note and review timestamp."
+  ],
+  "drafts": [
+    {
+      "activityId": "design_review:structure_containment",
+      "activity": "Review Growing Structure And Containment architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:structure_containment",
+      "activity": "Verify Growing Structure And Containment requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:environmental_interface",
+      "activity": "Review Light Climate And Gas Environment architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:environmental_interface",
+      "activity": "Verify Light Climate And Gas Environment requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:mass_fluid_transport_process",
+      "activity": "Review Nutrient And Water Transport Process architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:sensing_instrumentation",
+      "activity": "Review Crop And Process Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:control_compute_communication",
+      "activity": "Review Recipe Control And Communications architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:power_distribution",
+      "activity": "Review Wet-Zone Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:safety_protection",
+      "activity": "Review Food-Safe Safety And Protection architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:maintenance_serviceability",
+      "activity": "Review Harvest Cleaning And Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:maintenance_serviceability",
+      "activity": "Verify Harvest Cleaning And Serviceability requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:hmi_ergonomics",
+      "activity": "Review Operator HMI And Labelling architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:control_compute_communication:environmental_interface:actuator_bus",
+      "activity": "Verify actuator_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:control_compute_communication:mass_fluid_transport_process:actuator_bus",
+      "activity": "Verify actuator_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:environmental_interface:mass_fluid_transport_process:sensor_bus",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:CE-UKCA",
+      "activity": "Plan evidence for CE-UKCA",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:WRAS",
+      "activity": "Plan evidence for WRAS",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "risk_review:1",
+      "activity": "Review risk control for Crop loss from pump failure",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "risk_review:2",
+      "activity": "Review risk control for Electrical fault in humid grow area",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    }
+  ]
+}

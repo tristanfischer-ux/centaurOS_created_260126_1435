@@ -1,0 +1,8 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+sourcing_authorization,review,sourcing_authorization_review_required; authorized no; 5/6 areas pass.,0.83,,Keep BoM admission review-only until sourcing authorization clears.
+candidate_bom_scope,pass,"108 candidate BoM line(s), 11 critical line(s).",1,,Candidate BoM scope exists for sourcing and evidence collection.
+source_admission_state,review,"0 admitted source row(s), 0 rejected source row(s), 0/108 priced line(s).",0,,No source rows are admitted; keep this as a candidate-only BoM.
+critical_bom_admission,review,0/11 critical line(s) have admitted unit costs; 11 critical line(s) remain unpriced.,0,,Start with critical sourcing intake before treating any BoM cost as admitted.
+source_reference_quality,review,no_sourcing_evidence; 0/0 source-quality rows pass; 0 protocol fixture row(s).,0,,No source evidence is present; keep the BoM candidate-only.
+provenance_boundary,review,"0 source-backed claim(s), 44 critical missing-source claim(s), 0 provenance violation(s).",0.92,,Missing critical source claims are acceptable only in candidate-only mode; collect evidence before priced BoM use.
+display_mode,review,Display mode will be candidate_only.,0.25,,"Show candidate BoM as a sourcing queue with supplier, MPN and cost fields empty."

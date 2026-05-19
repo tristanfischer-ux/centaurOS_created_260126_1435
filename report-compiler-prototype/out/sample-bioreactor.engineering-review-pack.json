@@ -1,0 +1,2443 @@
+{
+  "summary": {
+    "rows": 71,
+    "accepted": 0,
+    "readyForReview": 42,
+    "needsReview": 29,
+    "blocked": 0,
+    "moduleQuestions": 9,
+    "subModuleQuestions": 27,
+    "interfaceQuestions": 6,
+    "calculationQuestions": 2,
+    "assumptionQuestions": 27
+  },
+  "questions": [
+    {
+      "id": "assumption_resolution:compliance:EU-GMP-ANNEX-11",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "EU-GMP-ANNEX-11",
+      "reviewerQuestion": "Can the EU-GMP-ANNEX-11 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Batch record integrity, audit trail and access-control evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:IEC-61010",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "IEC-61010",
+      "reviewerQuestion": "Can the IEC-61010 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Electrical safety design, protective earth and abnormal operation evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:ISO-13485",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "ISO-13485",
+      "reviewerQuestion": "Can the ISO-13485 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supplier quality evidence, change control and traceability where applicable.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:USP-CLASS-VI",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "USP-CLASS-VI",
+      "reviewerQuestion": "Can the USP-CLASS-VI assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Material certificates for single-use bag and tubing contact surfaces.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:actuation_kinematics_agitation_drive_train_agitation_drive",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Agitation drive",
+      "reviewerQuestion": "Can the Agitation drive assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "agitation_drive"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_process_controller_bioreactor_controller",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Bioreactor controller",
+      "reviewerQuestion": "Can the Bioreactor controller assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "bioreactor_controller"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_exhaust_filter_train_exhaust_filter_and_pressure_relief_set",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Exhaust filter and pressure relief set",
+      "reviewerQuestion": "Can the Exhaust filter and pressure relief set assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "exhaust_filter_and_pressure_relief_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_temperature_control_loop_temperature_control_loop",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Temperature control loop",
+      "reviewerQuestion": "Can the Temperature control loop assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "temperature_control_loop"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:mass_fluid_transport_process_feed_pump_manifold_peristaltic_feed_pump",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Peristaltic feed pump",
+      "reviewerQuestion": "Can the Peristaltic feed pump assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "peristaltic_feed_pump"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:mass_fluid_transport_process_sparger_gas_mixing_sparger_and_gas_mix_manifold",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Sparger and gas-mix manifold",
+      "reviewerQuestion": "Can the Sparger and gas-mix manifold assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "sparger_and_gas_mix_manifold"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_do_ph_sensing_dissolved_oxygen_optical_sensor",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Dissolved oxygen optical sensor",
+      "reviewerQuestion": "Can the Dissolved oxygen optical sensor assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "dissolved_oxygen_optical_sensor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_do_ph_sensing_single_use_ph_sensor",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Single-use pH sensor",
+      "reviewerQuestion": "Can the Single-use pH sensor assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "single_use_ph_sensor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_pressure_mass_temperature_sensing_load_cell_set",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Load cell set",
+      "reviewerQuestion": "Can the Load cell set assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "load_cell_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:structure_containment_single_use_bag_chamber_single_use_bioreactor_bag",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Single-use bioreactor bag",
+      "reviewerQuestion": "Can the Single-use bioreactor bag assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:structure_containment_sterile_connector_panel_sterile_tubing_and_connector_set",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Sterile tubing and connector set",
+      "reviewerQuestion": "Can the Sterile tubing and connector set assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "sterile_tubing_and_connector_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:actuation_kinematics:structure_containment:sterile_boundary",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "actuation_kinematics -> structure_containment",
+      "reviewerQuestion": "Can the actuation_kinematics -> structure_containment assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sterile_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:mass_fluid_transport_process:pump_control",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> mass_fluid_transport_process",
+      "reviewerQuestion": "Can the control_compute_communication -> mass_fluid_transport_process assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "pump_control"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:mass_fluid_transport_process:environmental_interface:gas_path",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "mass_fluid_transport_process -> environmental_interface",
+      "reviewerQuestion": "Can the mass_fluid_transport_process -> environmental_interface assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "gas_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:safety_protection:structure_containment:pressure_relief",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "safety_protection -> structure_containment",
+      "reviewerQuestion": "Can the safety_protection -> structure_containment assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "pressure_relief"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "reviewerQuestion": "Can the sensing_instrumentation -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:structure_containment:mass_fluid_transport_process:sterile_fluid_path",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "structure_containment -> mass_fluid_transport_process",
+      "reviewerQuestion": "Can the structure_containment -> mass_fluid_transport_process assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sterile_fluid_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:capex_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated CAPEX",
+      "reviewerQuestion": "Can the Estimated CAPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:headline_output",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Annual culture volume",
+      "reviewerQuestion": "Can the Annual culture volume assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:opex_annual_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated annual OPEX",
+      "reviewerQuestion": "Can the Estimated annual OPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:bioreactor_aseptic_pressure_safety",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Aseptic And Pressure Safety",
+      "reviewerQuestion": "Can the Aseptic And Pressure Safety assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process",
+        "actuation_kinematics",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:bioreactor_process_closure",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Sterile Process Closure",
+      "reviewerQuestion": "Can the Sterile Process Closure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process",
+        "actuation_kinematics",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:bioreactor_working_volume",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Single-Use Working Volume",
+      "reviewerQuestion": "Can the Single-Use Working Volume assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process",
+        "actuation_kinematics",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:bioreactor_annual_working_volume_l",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Bioreactor annual working volume",
+      "reviewerQuestion": "Does the Bioreactor annual working volume calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm batch duration, turnaround, cleaning/assembly time, hold steps and campaign model.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process",
+        "actuation_kinematics",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "bioreactor_annual_working_volume_l"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:bioreactor_nominal_bag_volume_l",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Bioreactor nominal bag volume",
+      "reviewerQuestion": "Does the Bioreactor nominal bag volume calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm bag platform, mixing turndown, foam allowance, sparging rate and working-volume range.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process",
+        "actuation_kinematics",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "bioreactor_nominal_bag_volume_l"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_contract:actuation_kinematics:structure_containment:sterile_boundary",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Mixing And Agitation -> Sterile Structure Containment via sterile_boundary",
+      "reviewerQuestion": "Is the sterile_boundary interface between Mixing And Agitation and Sterile Structure Containment correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics",
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "agitation_drive_train",
+        "mixing_impeller_interface",
+        "single_use_bag_chamber",
+        "sterile_connector_panel"
+      ],
+      "linkedComponentWordIds": [
+        "agitation_drive",
+        "magnetic_coupling_hub",
+        "drive_encoder",
+        "motor_mounting_plate",
+        "single_use_impeller_coupling",
+        "impeller_guard_insert",
+        "rocker_angle_stop",
+        "mixing_validation_coupon",
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label",
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sterile_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:control_compute_communication:mass_fluid_transport_process:pump_control",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication -> Media Gas And Harvest Transport via pump_control",
+      "reviewerQuestion": "Is the pump_control interface between Control Compute Communication and Media Gas And Harvest Transport correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "process_controller",
+        "feed_pump_manifold"
+      ],
+      "linkedComponentWordIds": [
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware",
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "pump_control"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:mass_fluid_transport_process:environmental_interface:gas_path",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Media Gas And Harvest Transport -> Thermal Gas Exhaust Interface via gas_path",
+      "reviewerQuestion": "Is the gas_path interface between Media Gas And Harvest Transport and Thermal Gas Exhaust Interface correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "sparger_gas_mixing",
+        "exhaust_filter_train"
+      ],
+      "linkedComponentWordIds": [
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve",
+        "exhaust_filter_and_pressure_relief_set",
+        "condensate_knock_out_bottle",
+        "exhaust_heater_sleeve",
+        "pressure_relief_indicator"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "gas_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:safety_protection:structure_containment:pressure_relief",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Aseptic And Pressure Safety -> Sterile Structure Containment via pressure_relief",
+      "reviewerQuestion": "Is the pressure_relief interface between Aseptic And Pressure Safety and Sterile Structure Containment correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "safety_protection",
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "sterile_pressure_safety",
+        "single_use_bag_chamber"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_pressure_relief_valve",
+        "vent_filter_integrity_tag",
+        "pressure_alarm_relay",
+        "bag_burst_shield",
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "pressure_relief"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Process Sensing Instrumentation -> Control Compute Communication via sensor_bus",
+      "reviewerQuestion": "Is the sensor_bus interface between Process Sensing Instrumentation and Control Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "do_ph_sensing",
+        "pressure_mass_temperature_sensing",
+        "gas_flow_sensing",
+        "process_controller",
+        "batch_record_gateway"
+      ],
+      "linkedComponentWordIds": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor",
+        "sensor_patch_reader",
+        "sensor_calibration_record_card",
+        "load_cell_set",
+        "bag_pressure_transducer",
+        "culture_temperature_probe",
+        "foam_detection_probe",
+        "gas_flow_sensor_set",
+        "exhaust_pressure_sensor",
+        "oxygen_analyser_cell",
+        "co2_analyser_cell",
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware",
+        "batch_historian_module",
+        "audit_trail_storage",
+        "ethernet_switch",
+        "secure_time_source"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:structure_containment:mass_fluid_transport_process:sterile_fluid_path",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Sterile Structure Containment -> Media Gas And Harvest Transport via sterile_fluid_path",
+      "reviewerQuestion": "Is the sterile_fluid_path interface between Sterile Structure Containment and Media Gas And Harvest Transport correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "single_use_bag_chamber",
+        "sterile_connector_panel",
+        "feed_pump_manifold",
+        "harvest_sampling_path",
+        "sparger_gas_mixing"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label",
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket",
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp",
+        "harvest_transfer_tubing_set",
+        "single_use_sample_valve",
+        "waste_collection_bag",
+        "low_hold_up_connector",
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sterile_fluid_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "module_allocation:actuation_kinematics",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Mixing And Agitation",
+      "reviewerQuestion": "Does Mixing And Agitation have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "agitation_drive_train",
+        "mixing_impeller_interface",
+        "agitation_safety_feedback"
+      ],
+      "linkedComponentWordIds": [
+        "agitation_drive",
+        "magnetic_coupling_hub",
+        "drive_encoder",
+        "motor_mounting_plate",
+        "single_use_impeller_coupling",
+        "impeller_guard_insert",
+        "rocker_angle_stop",
+        "mixing_validation_coupon",
+        "motor_current_sensor",
+        "overspeed_interlock_input",
+        "drive_fault_relay",
+        "emergency_drive_stop_contactor"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "mixing_drive",
+        "control_bus",
+        "sterile_boundary",
+        "sensor_bus",
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication",
+      "reviewerQuestion": "Does Control Compute Communication have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "process_controller",
+        "batch_record_gateway",
+        "operator_alarm_logic"
+      ],
+      "linkedComponentWordIds": [
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware",
+        "batch_historian_module",
+        "audit_trail_storage",
+        "ethernet_switch",
+        "secure_time_source",
+        "alarm_annunciator",
+        "operator_hmi_panel",
+        "role_access_key_switch",
+        "batch_acknowledge_button"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "control_bus",
+        "sensor_bus",
+        "pump_control",
+        "batch_record_network",
+        "alarm_bus",
+        "service_port"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal Gas Exhaust Interface",
+      "reviewerQuestion": "Does Thermal Gas Exhaust Interface have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "temperature_control_loop",
+        "exhaust_filter_train",
+        "ambient_enclosure_conditions"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_control_loop",
+        "heater_blanket",
+        "cooling_plate",
+        "thermal_interface_mat",
+        "exhaust_filter_and_pressure_relief_set",
+        "condensate_knock_out_bottle",
+        "exhaust_heater_sleeve",
+        "pressure_relief_indicator",
+        "ambient_temperature_probe",
+        "clean_zone_status_beacon",
+        "splash_guard_panel",
+        "wipe_down_surface_kit"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "thermal_loop",
+        "gas_path",
+        "exhaust_path",
+        "sterile_boundary",
+        "sensor_bus",
+        "control_bus",
+        "pressure_relief",
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Setup Calibration And Service",
+      "reviewerQuestion": "Does Setup Calibration And Service have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "single_use_setup",
+        "sensor_calibration_access",
+        "cleaning_turnaround"
+      ],
+      "linkedComponentWordIds": [
+        "bag_loading_fixture",
+        "tube_routing_template",
+        "connector_cap_organiser",
+        "setup_verification_barcode_sheet",
+        "ph_calibration_buffer_holder",
+        "do_zero_span_adapter",
+        "calibration_data_entry_hmi_page",
+        "sensor_replacement_guide_label",
+        "wipe_down_kit_holder",
+        "spill_tray_liner",
+        "spent_bag_removal_cart_interface",
+        "turnaround_checklist_card"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "sterile_fluid_path",
+        "sensor_bus",
+        "batch_record_network",
+        "sterile_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:mass_fluid_transport_process",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Media Gas And Harvest Transport",
+      "reviewerQuestion": "Does Media Gas And Harvest Transport have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "feed_pump_manifold",
+        "harvest_sampling_path",
+        "sparger_gas_mixing"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp",
+        "harvest_transfer_tubing_set",
+        "single_use_sample_valve",
+        "waste_collection_bag",
+        "low_hold_up_connector",
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "sterile_fluid_path",
+        "gas_path",
+        "pump_control",
+        "control_bus",
+        "sensor_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Distribution",
+      "reviewerQuestion": "Does Power Distribution have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "control_power_panel",
+        "actuator_power_feeds",
+        "backup_power_and_shutdown"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_mains_isolator",
+        "24_v_dc_power_supply",
+        "terminal_block_rail",
+        "panel_earth_bar",
+        "pump_power_distribution_loom",
+        "agitation_drive_breaker",
+        "heater_output_relay",
+        "cable_gland_plate",
+        "ups_buffer_module",
+        "safe_shutdown_relay",
+        "power_fail_input_module",
+        "shutdown_status_lamp"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mains_supply",
+        "protective_earth",
+        "control_bus",
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Aseptic And Pressure Safety",
+      "reviewerQuestion": "Does Aseptic And Pressure Safety have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "sterile_pressure_safety",
+        "aseptic_setup_controls",
+        "operator_electrical_safety"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_pressure_relief_valve",
+        "vent_filter_integrity_tag",
+        "pressure_alarm_relay",
+        "bag_burst_shield",
+        "sterile_connection_checklist_card",
+        "connector_tamper_seal_set",
+        "pre_use_integrity_test_kit",
+        "operator_gowning_placard",
+        "emergency_stop_button",
+        "door_interlock_switch",
+        "leak_tray_float_switch",
+        "protective_earth_test_point"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sterile_boundary",
+        "pressure_relief",
+        "exhaust_path",
+        "alarm_bus",
+        "protective_earth",
+        "service_access",
+        "mains_supply"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Process Sensing Instrumentation",
+      "reviewerQuestion": "Does Process Sensing Instrumentation have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "do_ph_sensing",
+        "pressure_mass_temperature_sensing",
+        "gas_flow_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor",
+        "sensor_patch_reader",
+        "sensor_calibration_record_card",
+        "load_cell_set",
+        "bag_pressure_transducer",
+        "culture_temperature_probe",
+        "foam_detection_probe",
+        "gas_flow_sensor_set",
+        "exhaust_pressure_sensor",
+        "oxygen_analyser_cell",
+        "co2_analyser_cell"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "sterile_fluid_path",
+        "gas_path",
+        "thermal_loop",
+        "pressure_relief",
+        "mechanical_mounts",
+        "exhaust_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Sterile Structure Containment",
+      "reviewerQuestion": "Does Sterile Structure Containment have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "single_use_bag_chamber",
+        "support_frame_load_path",
+        "sterile_connector_panel"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label",
+        "stainless_support_frame",
+        "load_cell_mounting_bracket_set",
+        "levelling_foot_set",
+        "lifting_eye_kit",
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "sterile_boundary",
+        "sterile_fluid_path",
+        "mechanical_mounts",
+        "service_access",
+        "pressure_relief"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:agitation_drive_train",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Mixing And Agitation / Agitation drive train",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Agitation drive train make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "agitation_drive_train"
+      ],
+      "linkedComponentWordIds": [
+        "agitation_drive",
+        "magnetic_coupling_hub",
+        "drive_encoder",
+        "motor_mounting_plate"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "mixing_drive",
+        "control_bus",
+        "sterile_boundary"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:agitation_safety_feedback",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Mixing And Agitation / Agitation safety feedback",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Agitation safety feedback make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "agitation_safety_feedback"
+      ],
+      "linkedComponentWordIds": [
+        "motor_current_sensor",
+        "overspeed_interlock_input",
+        "drive_fault_relay",
+        "emergency_drive_stop_contactor"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "mixing_drive",
+        "sensor_bus",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:mixing_impeller_interface",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Mixing And Agitation / Mixing impeller interface",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Mixing impeller interface make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "mixing_impeller_interface"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_impeller_coupling",
+        "impeller_guard_insert",
+        "rocker_angle_stop",
+        "mixing_validation_coupon"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "mixing_drive",
+        "sterile_boundary",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:batch_record_gateway",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Batch record gateway",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Batch record gateway make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "batch_record_gateway"
+      ],
+      "linkedComponentWordIds": [
+        "batch_historian_module",
+        "audit_trail_storage",
+        "ethernet_switch",
+        "secure_time_source"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "batch_record_network",
+        "service_port",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:operator_alarm_logic",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Operator and alarm logic",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Operator and alarm logic make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "operator_alarm_logic"
+      ],
+      "linkedComponentWordIds": [
+        "alarm_annunciator",
+        "operator_hmi_panel",
+        "role_access_key_switch",
+        "batch_acknowledge_button"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "alarm_bus",
+        "control_bus",
+        "service_port"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:process_controller",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Process controller",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Process controller make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "process_controller"
+      ],
+      "linkedComponentWordIds": [
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "control_bus",
+        "sensor_bus",
+        "pump_control",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:ambient_enclosure_conditions",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal Gas Exhaust Interface / Ambient enclosure conditions",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Ambient enclosure conditions make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "ambient_enclosure_conditions"
+      ],
+      "linkedComponentWordIds": [
+        "ambient_temperature_probe",
+        "clean_zone_status_beacon",
+        "splash_guard_panel",
+        "wipe_down_surface_kit"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "sensor_bus",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:exhaust_filter_train",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal Gas Exhaust Interface / Exhaust filter train",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Exhaust filter train make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "exhaust_filter_train"
+      ],
+      "linkedComponentWordIds": [
+        "exhaust_filter_and_pressure_relief_set",
+        "condensate_knock_out_bottle",
+        "exhaust_heater_sleeve",
+        "pressure_relief_indicator"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "exhaust_path",
+        "gas_path",
+        "sterile_boundary",
+        "pressure_relief"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:temperature_control_loop",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal Gas Exhaust Interface / Temperature control loop",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Temperature control loop make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "temperature_control_loop"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_control_loop",
+        "heater_blanket",
+        "cooling_plate",
+        "thermal_interface_mat"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "thermal_loop",
+        "control_bus",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:cleaning_turnaround",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Setup Calibration And Service / Cleaning and turnaround",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Cleaning and turnaround make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "cleaning_turnaround"
+      ],
+      "linkedComponentWordIds": [
+        "wipe_down_kit_holder",
+        "spill_tray_liner",
+        "spent_bag_removal_cart_interface",
+        "turnaround_checklist_card"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "batch_record_network"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:sensor_calibration_access",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Setup Calibration And Service / Sensor calibration access",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Sensor calibration access make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "sensor_calibration_access"
+      ],
+      "linkedComponentWordIds": [
+        "ph_calibration_buffer_holder",
+        "do_zero_span_adapter",
+        "calibration_data_entry_hmi_page",
+        "sensor_replacement_guide_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "sensor_bus",
+        "sterile_fluid_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:single_use_setup",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Setup Calibration And Service / Single-use setup",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Single-use setup make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "single_use_setup"
+      ],
+      "linkedComponentWordIds": [
+        "bag_loading_fixture",
+        "tube_routing_template",
+        "connector_cap_organiser",
+        "setup_verification_barcode_sheet"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "sterile_fluid_path",
+        "sterile_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:feed_pump_manifold",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Media Gas And Harvest Transport / Feed pump manifold",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Feed pump manifold make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "feed_pump_manifold"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "sterile_fluid_path",
+        "pump_control",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:harvest_sampling_path",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Media Gas And Harvest Transport / Harvest and sampling path",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Harvest and sampling path make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "harvest_sampling_path"
+      ],
+      "linkedComponentWordIds": [
+        "harvest_transfer_tubing_set",
+        "single_use_sample_valve",
+        "waste_collection_bag",
+        "low_hold_up_connector"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "sterile_fluid_path",
+        "service_access",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:sparger_gas_mixing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Media Gas And Harvest Transport / Sparger gas mixing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Sparger gas mixing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "sparger_gas_mixing"
+      ],
+      "linkedComponentWordIds": [
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "gas_path",
+        "sterile_fluid_path",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:actuator_power_feeds",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Distribution / Actuator power feeds",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Actuator power feeds make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "actuator_power_feeds"
+      ],
+      "linkedComponentWordIds": [
+        "pump_power_distribution_loom",
+        "agitation_drive_breaker",
+        "heater_output_relay",
+        "cable_gland_plate"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mains_supply",
+        "control_bus",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:backup_power_and_shutdown",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Distribution / Backup power and shutdown",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Backup power and shutdown make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "backup_power_and_shutdown"
+      ],
+      "linkedComponentWordIds": [
+        "ups_buffer_module",
+        "safe_shutdown_relay",
+        "power_fail_input_module",
+        "shutdown_status_lamp"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mains_supply",
+        "alarm_bus",
+        "control_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:control_power_panel",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Distribution / Control power panel",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Control power panel make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "control_power_panel"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_mains_isolator",
+        "24_v_dc_power_supply",
+        "terminal_block_rail",
+        "panel_earth_bar"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mains_supply",
+        "protective_earth",
+        "control_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:aseptic_setup_controls",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Aseptic And Pressure Safety / Aseptic setup controls",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Aseptic setup controls make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "aseptic_setup_controls"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_connection_checklist_card",
+        "connector_tamper_seal_set",
+        "pre_use_integrity_test_kit",
+        "operator_gowning_placard"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sterile_boundary",
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:operator_electrical_safety",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Aseptic And Pressure Safety / Operator electrical safety",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Operator electrical safety make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "operator_electrical_safety"
+      ],
+      "linkedComponentWordIds": [
+        "emergency_stop_button",
+        "door_interlock_switch",
+        "leak_tray_float_switch",
+        "protective_earth_test_point"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "protective_earth",
+        "mains_supply",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:sterile_pressure_safety",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Aseptic And Pressure Safety / Sterile pressure safety",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Sterile pressure safety make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "sterile_pressure_safety"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_pressure_relief_valve",
+        "vent_filter_integrity_tag",
+        "pressure_alarm_relay",
+        "bag_burst_shield"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sterile_boundary",
+        "pressure_relief",
+        "exhaust_path",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:do_ph_sensing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Process Sensing Instrumentation / DO and pH sensing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to DO and pH sensing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "do_ph_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor",
+        "sensor_patch_reader",
+        "sensor_calibration_record_card"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "sterile_fluid_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:gas_flow_sensing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Process Sensing Instrumentation / Gas flow sensing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Gas flow sensing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "gas_flow_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "gas_flow_sensor_set",
+        "exhaust_pressure_sensor",
+        "oxygen_analyser_cell",
+        "co2_analyser_cell"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "gas_path",
+        "exhaust_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:pressure_mass_temperature_sensing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Process Sensing Instrumentation / Pressure, mass and temperature sensing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Pressure, mass and temperature sensing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "pressure_mass_temperature_sensing"
+      ],
+      "linkedComponentWordIds": [
+        "load_cell_set",
+        "bag_pressure_transducer",
+        "culture_temperature_probe",
+        "foam_detection_probe"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "thermal_loop",
+        "pressure_relief",
+        "mechanical_mounts"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:single_use_bag_chamber",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Sterile Structure Containment / Single-use bag chamber",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Single-use bag chamber make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "single_use_bag_chamber"
+      ],
+      "linkedComponentWordIds": [
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "sterile_boundary",
+        "sterile_fluid_path",
+        "mechanical_mounts",
+        "service_access",
+        "pressure_relief"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:sterile_connector_panel",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Sterile Structure Containment / Sterile connector panel",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Sterile connector panel make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "sterile_connector_panel"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "sterile_boundary",
+        "sterile_fluid_path",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:support_frame_load_path",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Sterile Structure Containment / Support frame and load path",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Support frame and load path make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "support_frame_load_path"
+      ],
+      "linkedComponentWordIds": [
+        "stainless_support_frame",
+        "load_cell_mounting_bracket_set",
+        "levelling_foot_set",
+        "lifting_eye_kit"
+      ],
+      "linkedRequirementIds": [
+        "working_volume_l"
+      ],
+      "linkedInterfaceIds": [
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "blockers": []
+    }
+  ]
+}

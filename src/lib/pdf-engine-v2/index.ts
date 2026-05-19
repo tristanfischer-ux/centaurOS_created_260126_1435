@@ -18,6 +18,14 @@ import { runSizeLayout, runSizingSecondPass } from './stages/3-size-layout'
 import { runBomCost } from './stages/4-bom-cost'
 import { runSuppliers } from './stages/5-suppliers'
 import { runBomCostSuppliers } from './stages/4-bom-cost-suppliers'
+// Stage 4.5 — part-number verification, target diagram §5 P12a.
+// Walks every (manufacturer, part_number) pair on the design, confirms
+// the SKU actually exists at DigiKey / Mouser / Farnell or via a Brave
+// manufacturer-domain search; otherwise marks verified=false.
+// Gated behind PDF_ENGINE_VERIFY_PARTS=true so the existing pipeline does
+// not change behaviour until the new wiring is exercised end-to-end on
+// a few briefs.
+import { runPartNumberVerify } from './stages/4.5-part-number-verify'
 import { runReview } from './stages/6-review'
 import { runFmeaGeneration } from './stages/6b-fmea-generation'
 import PdfRenderer from './stages/7-pdf'
@@ -62,6 +70,13 @@ import { checkRequiredParts } from './lib/required-parts-manifest'
 import { validateBrief } from './brief-validator'
 import { determineFeasibility } from './feasibility-gate'
 import { runBriefRevision } from './stages/3.5-brief-revision'
+import { runComplianceGate } from './stages/3.5-compliance-gate'
+// G0 — symbolic physics ledger (council 2026-05-18 BLOCKER-5, Kimi dissent).
+// Pure-deterministic conservation-of-energy / mass / cost-floor check that
+// fires AFTER sizing and BEFORE the compliance + feasibility gates. Catches
+// adversarial briefs (perpetual motion at 50 kW for £0) that LLM-mediated
+// physics gates cannot reliably reject. See stages/0.1-physics-ledger.ts.
+import { runPhysicsLedger } from './stages/0.1-physics-ledger'
 import { scoreSection, type SectionAudit } from './universal-scorer'
 import { loadAllGroundingData } from './db-queries'
 import type { PipelineState, StageResult, BriefConstraints, StructuredBriefJSON, ResearchSynthesis } from './types'
@@ -73,6 +88,11 @@ import { isPhase2ResolutionEnabled, runRadicalResolution } from './stages/4b-rad
 import { isPhase3CostRollupEnabled, runRadicalCostRollup, logCostSummaryDiff } from './stages/4c-radical-cost-rollup'
 import { isPhase4GrammarEnabled, runRadicalGrammar } from './stages/4d-radical-grammar'
 import { isPhase5RenderEnabled } from './stages/7b-pdf-v3-radical'
+// Action-log emitter (Tristan 2026-05-18, ~/.claude/CLAUDE.md "Engine action
+// logs — REQUIRED for diagnosis"). Pipeline-level singleton; stages obtain
+// the active logger via `getActionLogger()` in lib/action-logger.ts. Pure
+// instrumentation — never affects pipeline behaviour.
+import { attachActionLogger, getActionLogger } from './lib/action-logger'
 
 export interface EngineResult {
   ok: boolean
@@ -219,6 +239,14 @@ export async function runPipeline(
     domain?: string
     ceilingGbp?: number
     projectId?: string
+    /**
+     * Action-log output directory. When set, every stage emits records to
+     * `<actionLogDir>/actions.jsonl` per the CLAUDE.md spec. When unset, the
+     * logger is a silent no-op. Resolved via env (PDF_ENGINE_ACTION_LOG_DIR)
+     * as a fallback so scripts/run-bess-iter.sh + engine-evidence-bg can
+     * opt in without changing call signatures.
+     */
+    actionLogDir?: string
   }
 ): Promise<EngineResult> {
   // H-B8 fix: telemetry log is the very first executable line so it fires on
@@ -229,6 +257,23 @@ export async function runPipeline(
   const paMode = isPaPipeline()
   const renderer = getPdfRenderer()
   console.info(`[pipeline] PA_PIPELINE=${paMode} PDF_RENDERER=${renderer}`)
+
+  // ── Action log (Tristan 2026-05-18, CLAUDE.md "Engine action logs") ──────
+  // Attach the process-wide logger to the iter dir. If neither the caller
+  // nor the env supplied one, the logger stays silent (no actions.jsonl
+  // written) — existing scripts that don't opt in keep their current
+  // behaviour.
+  const actionLogDir = options?.actionLogDir ?? process.env.PDF_ENGINE_ACTION_LOG_DIR
+  attachActionLogger(actionLogDir)
+  const actionLogger = getActionLogger()
+  actionLogger.log({
+    step_name: 'pipeline_init',
+    action_type: 'init',
+    pa_mode: paMode,
+    renderer,
+    brief_chars: briefText?.length ?? 0,
+    project_id: options?.projectId,
+  })
 
   const startTime = Date.now()
   const stages: EngineResult['stages'] = []
@@ -345,6 +390,16 @@ export async function runPipeline(
     })
     if (name !== 'pdf') llmCalls++
     console.log(`[pipeline] ${name}: ${result.ok ? 'OK' : 'FAILED'} (${result.durationMs}ms)${result.error ? ` — ${result.error}` : ''}`)
+    // Emit a stage_end action-log record so the diagnose-run timeline has
+    // a single point per stage boundary regardless of whether the stage
+    // also emitted per-LLM-call records inside.
+    actionLogger.logStage({
+      step_name: name,
+      action_type: 'stage_end',
+      outcome: result.ok ? 'ok' : 'fail',
+      duration_ms: result.durationMs,
+      error: result.error,
+    })
   }
 
   // BLOCKER-4 fix: emit a skip telemetry record so the dashboard shows
@@ -353,6 +408,13 @@ export async function runPipeline(
   function trackSkippedStage(name: string, reason: string) {
     stages.push({ name, ok: true, durationMs: 0, skipped: true, skipReason: reason })
     console.log(`[pipeline] ${name}: SKIPPED — ${reason}`)
+    actionLogger.logStage({
+      step_name: name,
+      action_type: 'stage_end',
+      outcome: 'skipped',
+      duration_ms: 0,
+      reason,
+    })
   }
 
   // A1 FIX (2026-05-06): gateResults must be function-scoped so the final
@@ -796,9 +858,96 @@ export async function runPipeline(
     feasible: (sizeResult.ok && sizeResult.data) ? (sizeResult.data.feasible ?? null) : null,
   }
 
+  // ── G0: Symbolic Physics Ledger ────────────────────────────────────────
+  // Council 2026-05-18 BLOCKER-5 (Kimi dissent). Pure-deterministic, no LLM.
+  // Fires AFTER sizing and BEFORE compliance / feasibility — adversarial
+  // briefs (perpetual motion, sub-floor cost claims, power-density violations)
+  // must be rejected before any LLM-mediated gate gets a chance to be talked
+  // into rendering an impossible design.
+  console.log('\n[pipeline] === G0: Physics Ledger ===')
+  const productClassForGates = typeof classification === 'string'
+    ? classification
+    : (classification.productClass ?? 'unknown')
+  const physicsResult = await runPhysicsLedger(
+    state.generatedBrief?.briefText || briefText,
+    state.parsedBrief ?? null,
+    productClassForGates,
+  )
+  trackStage('physics_ledger', physicsResult)
+  let physicsHalt = false
+  if (physicsResult.ok && physicsResult.data) {
+    const pl = physicsResult.data
+    ;(state as any).physicsLedger = pl
+    console.log(`[pipeline] G0 Physics Ledger: ${pl.verdict} — ${pl.reason}`)
+    for (const v of pl.violations) {
+      console.log(`[pipeline]   ${v.severity.toUpperCase()} · ${v.law}: ${v.headline}`)
+    }
+    if (pl.verdict === 'HALT') {
+      physicsHalt = true
+    }
+  } else {
+    console.warn(`[pipeline] G0 Physics Ledger evaluation failed: ${physicsResult.error}. Continuing without physics pre-check.`)
+  }
+
+  // ── G1b-pre: Compliance Feasibility Gate ───────────────────────────────
+  // Council 2026-05-18 BLOCKER-3. Compliance must precede feasibility for
+  // class-level hard regulatory blocks — regulatorily-impossible designs
+  // HALT before we spend LLM budget on envelope feasibility. Bounded
+  // FAIL → re-augment loop: max 1 retry (council BLOCKER-2 G1b branch).
+  console.log('\n[pipeline] === G1b: Compliance Feasibility Gate ===')
+  const G1B_MAX_RETRIES = 1
+  let g1bAttempt = 0
+  let g1bHalt = false
+  let g1bResult = await runComplianceGate(
+    state.generatedBrief?.briefText || briefText,
+    state.parsedBrief ?? null,
+    productClassForGates,
+  )
+  trackStage('compliance_gate', g1bResult)
+  if (g1bResult.ok && g1bResult.data) {
+    ;(state as any).complianceGate = g1bResult.data
+    console.log(`[pipeline] G1b verdict: ${g1bResult.data.verdict} — ${g1bResult.data.reason}`)
+    for (const c of g1bResult.data.conflicts) {
+      console.log(`[pipeline]   ${c.severity.toUpperCase()} · ${c.standard_code}: ${c.reason}`)
+    }
+    // FAIL → re-augment loop (council BLOCKER-2): when compliance HALT is
+    // caused by missing-jurisdiction-context conflict types, attempt ONE
+    // brief re-augmentation pass before final HALT.
+    while (g1bResult.ok && g1bResult.data && g1bResult.data.verdict === 'HALT' && g1bAttempt < G1B_MAX_RETRIES) {
+      const hasJurisdictionGap = g1bResult.data.conflicts.some(c => c.conflict_type === 'jurisdiction-gap')
+      if (!hasJurisdictionGap) break
+      g1bAttempt += 1
+      console.warn(`[pipeline] G1b HALT on jurisdiction-gap conflict — attempting brief re-augmentation pass ${g1bAttempt}/${G1B_MAX_RETRIES}...`)
+      // Re-augmentation is currently a no-op stub — runBriefAugmentation
+      // already ran upstream at P0a (run.ts:127). The retry hook is here so
+      // a future P0a expansion (jurisdiction-driven augmentation) can plug
+      // in without further pipeline restructuring. Re-evaluate the gate
+      // with the existing brief text — defensive: lets the gate stabilise
+      // if any of its inputs changed via the parsedBrief sync above.
+      g1bResult = await runComplianceGate(
+        state.generatedBrief?.briefText || briefText,
+        state.parsedBrief ?? null,
+        productClassForGates,
+      )
+      if (g1bResult.ok && g1bResult.data) {
+        ;(state as any).complianceGate = g1bResult.data
+        console.log(`[pipeline] G1b retry-${g1bAttempt} verdict: ${g1bResult.data.verdict} — ${g1bResult.data.reason}`)
+      }
+    }
+    if (g1bResult.ok && g1bResult.data && g1bResult.data.verdict === 'HALT') {
+      g1bHalt = true
+      // Attach manual-review badge state so renderer can surface it on the cover.
+      ;(state as any).g1bManualReview = g1bAttempt >= G1B_MAX_RETRIES
+    }
+  } else {
+    console.warn(`[pipeline] G1b evaluation failed: ${g1bResult.error}. Continuing without compliance pre-check.`)
+  }
+
   // ── Feasibility Gate ───────────────────────────────────────────────
-  // Runs AFTER Sizing so it incorporates the real solver verdict.
-  // If gate FAILS/WARNS → Brief Revision loop fires (max 2 iterations).
+  // Runs AFTER Sizing, G0 (Physics) and G1b (Compliance) so cheap deterministic
+  // rejects fire first. If G0 or G1b halted, fold their verdicts into the
+  // feasibility result so the existing RED short-blocked-report path picks
+  // it up. If gate FAILS/WARNS → Brief Revision loop fires (max 2 iterations).
   console.log('\n[pipeline] === Feasibility Gate ===')
   const feasibility = determineFeasibility(
     briefValidationPost,
@@ -809,6 +958,64 @@ export async function runPipeline(
   ;(state as any).feasibility = feasibility
   console.log(`[pipeline] Feasibility: ${feasibility.status} — ${feasibility.reason}`)
   console.log(`[pipeline] Allowed sections: ${feasibility.allowedSections.join(', ')}`)
+
+  // Fold G0 (physics) + G1b (compliance) HALT verdicts into feasibility so
+  // the existing RED short-blocked-report path picks them up. Council
+  // 2026-05-18 BLOCKER-3 + BLOCKER-5: these gates must hard-block the
+  // pipeline; the renderer reads state.physicsLedger / state.complianceGate
+  // for the brief-revision suggestion panel.
+  if (physicsHalt || g1bHalt) {
+    const pl = (state as any).physicsLedger
+    const cg = (state as any).complianceGate
+    feasibility.status = 'RED'
+    const newBlockers: string[] = [...(feasibility.blockers ?? [])]
+    if (physicsHalt && pl) {
+      newBlockers.push(`Physics HALT: ${pl.violations.filter((v: any) => v.severity === 'hard').map((v: any) => `${v.law} — ${v.headline}`).join('; ')}`)
+    }
+    if (g1bHalt && cg) {
+      newBlockers.push(`Compliance HALT: ${cg.conflicts.filter((c: any) => c.severity === 'hard').map((c: any) => `${c.standard_code} — ${c.conflict_type}`).join('; ')}`)
+    }
+    feasibility.blockers = newBlockers
+    feasibility.reason = physicsHalt
+      ? (pl?.reason ?? feasibility.reason)
+      : (cg?.reason ?? feasibility.reason)
+    ;(state as any).feasibility = feasibility
+    // Attach revision suggestion for the renderer (G1b first, then physics if no G1b suggestion).
+    if (g1bHalt && cg?.revision_suggestion) {
+      ;(state as any).briefRevisions = [
+        ...((state as any).briefRevisions || []),
+        {
+          revisedBriefText: '',
+          hasRevisions: true,
+          changes: [
+            {
+              constraint: cg.revision_suggestion.field,
+              original: cg.revision_suggestion.original,
+              feasibilityFinding: cg.reason,
+              revised: cg.revision_suggestion.suggested,
+              reasoning: cg.revision_suggestion.rationale,
+            },
+          ],
+        },
+      ]
+    } else if (physicsHalt && pl) {
+      ;(state as any).briefRevisions = [
+        ...((state as any).briefRevisions || []),
+        {
+          revisedBriefText: '',
+          hasRevisions: true,
+          changes: pl.violations.filter((v: any) => v.severity === 'hard').map((v: any) => ({
+            constraint: v.law,
+            original: v.claimed,
+            feasibilityFinding: v.headline,
+            revised: v.allowed,
+            reasoning: v.rationale,
+          })),
+        },
+      ]
+    }
+    console.log(`[pipeline] Feasibility folded RED via G0/G1b: ${feasibility.reason}`)
+  }
 
   // ── Feasibility → Brief Feedback Loop ───────────────────────────────
   // Fires AFTER Feasibility Gate when it FAILS/WARNS. Max 2 iterations.
@@ -932,6 +1139,16 @@ export async function runPipeline(
     console.log(`[pipeline] Rejected constraints: ${rejectedConstraints.join(', ')}`)
   }
 
+  // ── P5b: Compliance Feasibility Gate (now early-fire — see G1b above) ─────
+  // Council 2026-05-18 BLOCKER-3: compliance must precede feasibility. The
+  // compliance gate has been moved BEFORE the feasibility gate (see "G1b:
+  // Compliance Feasibility Gate" block above) so regulatorily-impossible
+  // designs HALT before we waste LLM budget on envelope feasibility. This
+  // late-firing block is now a NO-OP (the gate already ran in early-fire
+  // position with bounded FAIL → re-augment retry). Left in place so any
+  // downstream readers of state.complianceGate find it populated from the
+  // early-fire stage above.
+
   // ── PA Stage 9: Report Type Router (PA_PIPELINE=true only) ───────────────
   // Runs after the feasibility gate (and any revision loop) to determine the
   // report type and page budget. On PA_PIPELINE=false this block is skipped
@@ -993,7 +1210,15 @@ export async function runPipeline(
 
     let decomposeResult: Awaited<ReturnType<typeof runDecompose>>
 
-    if (paMode && state.parsedBrief) {
+    // Tristan minimal-prose skip (2026-05-13): PA Stage 5 Decompose is a
+    // SEPARATE legacy module emission. Stage 1.7 produces the canonical
+    // module decomposition; PA Stage 5 is only used downstream by BoM/cost/
+    // suppliers, all of which are skipped in MINIMAL_BRIEF_MODULES_ONLY mode.
+    // Skipping saves ~3-4 min and one Gemini 3.1 Pro call.
+    if (process.env.MINIMAL_BRIEF_MODULES_ONLY === 'true') {
+      console.log('[pipeline] PA Stage 5 Decompose: SKIPPED — MINIMAL_BRIEF_MODULES_ONLY=true')
+      decomposeResult = { ok: true, data: { modules: [] } as any, durationMs: 0 } as any
+    } else if (paMode && state.parsedBrief) {
       // ── PA path: runDecomposePA uses PA Stage 5 prompt + schema ───────────
       console.log('[pipeline] PA path: running PA Stage 5 Module Decomposition...')
 
@@ -1129,36 +1354,63 @@ export async function runPipeline(
           // to the deterministic paragraph_en when an LLM call throws. ~£0.05 per
           // module × ~8 modules = ~£0.40 per pipeline run.
           if (state.naturalLanguageLayer && moduleDecomposition.modules.length > 0) {
-            try {
-              const { generateLlmModuleParagraph } = await import('./radical/module-paragraph-llm')
-              const llmStartedAt = Date.now()
-              let llmSuccessCount = 0
-              let llmFailCount = 0
-              // Run sequentially — Grok rate limit isn't generous enough for parallel.
-              // Each call ~3-5s; 8 modules ≈ 30-40s wall-clock — acceptable.
+            // Unified-prose pass-through (Tristan directive 2026-05-13): if Stage 1.7
+            // emitted overview_paragraph_en on every module, route it into the
+            // naturalLanguageLayer and SKIP Piece 1F's Grok freewrite — that path
+            // was the source of the iter-09 arithmetic drift (3,920 cells vs
+            // 144 modules × 35 = 5,040 cells in one paragraph).
+            const unifiedReady = moduleDecomposition.modules.every(
+              m => typeof m.overview_paragraph_en === 'string' && m.overview_paragraph_en.length > 0,
+            )
+            if (unifiedReady) {
+              let propagated = 0
               for (const moduleSpec of moduleDecomposition.modules) {
                 const nl = state.naturalLanguageLayer.by_module[moduleSpec.module]
                 if (!nl) continue
-                try {
-                  const llmParagraph = await generateLlmModuleParagraph(moduleSpec, nl.paragraph_en)
-                  nl.paragraph_en_llm = llmParagraph
-                  llmSuccessCount += 1
-                } catch (perModuleErr) {
-                  console.warn(
-                    `[pipeline] Piece 1F: LLM paragraph failed for module="${moduleSpec.module}" (non-fatal, falling back to deterministic): ${(perModuleErr as Error).message}`
-                  )
-                  llmFailCount += 1
-                }
+                nl.paragraph_en_llm = moduleSpec.overview_paragraph_en
+                propagated += 1
               }
               console.log(
-                `[pipeline] Piece 1F: LLM paragraphs ${llmSuccessCount} ok / ${llmFailCount} fallback ` +
-                `(wall-clock ${Date.now() - llmStartedAt}ms)`
+                `[pipeline] Piece 1F SKIPPED: unified-prose Stage 1.7 emission supplies ${propagated} module paragraphs directly (no Grok freewrite drift).`
               )
-            } catch (nlfErr) {
-              console.warn(
-                `[pipeline] Piece 1F natural-language LLM augmentation failed (non-fatal): ` +
-                `${(nlfErr as Error).message}`
-              )
+            } else {
+              try {
+                const { generateLlmModuleParagraph } = await import('./radical/module-paragraph-llm')
+                const llmStartedAt = Date.now()
+                let llmSuccessCount = 0
+                let llmFailCount = 0
+                // Legacy fallback — Stage 1.7 did not emit overview_paragraph_en (older snapshots
+                // or partial emissions). Each call ~3-5s; 8 modules ≈ 30-40s wall-clock.
+                for (const moduleSpec of moduleDecomposition.modules) {
+                  const nl = state.naturalLanguageLayer.by_module[moduleSpec.module]
+                  if (!nl) continue
+                  if (typeof moduleSpec.overview_paragraph_en === 'string' && moduleSpec.overview_paragraph_en.length > 0) {
+                    // Mixed batch: this module had unified prose — prefer it.
+                    nl.paragraph_en_llm = moduleSpec.overview_paragraph_en
+                    llmSuccessCount += 1
+                    continue
+                  }
+                  try {
+                    const llmParagraph = await generateLlmModuleParagraph(moduleSpec, nl.paragraph_en)
+                    nl.paragraph_en_llm = llmParagraph
+                    llmSuccessCount += 1
+                  } catch (perModuleErr) {
+                    console.warn(
+                      `[pipeline] Piece 1F: LLM paragraph failed for module="${moduleSpec.module}" (non-fatal, falling back to deterministic): ${(perModuleErr as Error).message}`
+                    )
+                    llmFailCount += 1
+                  }
+                }
+                console.log(
+                  `[pipeline] Piece 1F: LLM paragraphs ${llmSuccessCount} ok / ${llmFailCount} fallback ` +
+                  `(wall-clock ${Date.now() - llmStartedAt}ms)`
+                )
+              } catch (nlfErr) {
+                console.warn(
+                  `[pipeline] Piece 1F natural-language LLM augmentation failed (non-fatal): ` +
+                  `${(nlfErr as Error).message}`
+                )
+              }
             }
           }
 
@@ -1185,6 +1437,44 @@ export async function runPipeline(
           // NOTE: Piece 1H + 1I previously lived here but were no-ops — state.regulatoryExtraction
           // and state.fmea aren't populated until PA Stage 4 / Stage 6b which run much later.
           // Moved to fire right after those stages complete (search "Piece 1H" / "Piece 1I").
+
+          // Tristan minimal-prose escape hatch (2026-05-13). When
+          // MINIMAL_BRIEF_MODULES_ONLY=true is set, we have everything the
+          // brief + modules + sub-modules PDF needs: parsedBrief,
+          // moduleDecomposition (with unified overview_paragraph_en),
+          // naturalLanguageLayer, briefOverviewProse. Skip Stage 4b/c/d, Stage 5,
+          // Stage 6, FMEA, Council Scoring, Phase 5 render — those exist for
+          // BoM/cost/regulatory which are out of scope. Persist a minimal
+          // state.json directly and return.
+          if (process.env.MINIMAL_BRIEF_MODULES_ONLY === 'true') {
+            const minStatePath = process.env.MINIMAL_STATE_OUTPUT
+              ? process.env.MINIMAL_STATE_OUTPUT
+              : join(process.cwd(), `radical-phase5-state-${state.projectId ?? Date.now()}.json`)
+            const minStateBody = {
+              projectId: state.projectId,
+              // Sonnet seat NF3: parsedBrief was missing from the minimal snapshot;
+              // the renderer's brief section silently lost constraint data when it
+              // tried to render constraint rows.
+              parsedBrief: state.parsedBrief ?? null,
+              moduleDecomposition: state.moduleDecomposition ?? null,
+              naturalLanguageLayer: state.naturalLanguageLayer ?? null,
+              briefOverviewProse: state.briefOverviewProse ?? null,
+              grammarVerdicts: state.grammarVerdicts ?? null,
+              savedAt: new Date().toISOString(),
+            }
+            writeFileSync(minStatePath, JSON.stringify(minStateBody, null, 2))
+            console.log(`[pipeline] MINIMAL_BRIEF_MODULES_ONLY: state snapshot written → ${minStatePath}`)
+            stages.push({ name: 'minimal_brief_modules_only', ok: true, durationMs: 0 })
+            return {
+              ok: true,
+              state,
+              stages,
+              gateResults: undefined,
+              totalDurationMs: Date.now() - startTime,
+              totalLlmCalls: 0,
+              pdf: null,
+            } as any
+          }
 
           // Per-module Stage 2
           const perModuleResult = await runDecomposeRadicalPerModule(
@@ -1611,6 +1901,63 @@ export async function runPipeline(
       { section: 'Cost', source: 'llm', detail: 'ESTIMATE_MAKE_COST sub-task (Grade D)' },
       { section: 'Suppliers', source: 'database', detail: 'Nightshift corpus semantic search' },
     )
+
+    // ── Stage 4.5 — part-number verification (P12a) ──────────────────────
+    // Walks (manufacturer, part_number) pairs and confirms via distributor
+    // APIs + Brave fallback. Mutates state.partVerifications in place.
+    // Env-flagged: PDF_ENGINE_VERIFY_PARTS=true to enable.
+    if (process.env.PDF_ENGINE_VERIFY_PARTS === 'true') {
+      console.log('[pipeline] === Stage 4.5: Part-number verification ===')
+      try {
+        const verifyResult = await runPartNumberVerify(
+          state as Parameters<typeof runPartNumberVerify>[0],
+          { concurrency: 5 },
+        )
+        if (verifyResult.ok && verifyResult.data) {
+          // Persist on state so renderer can show "?" badges next to
+          // verified=false rows.
+          ;(state as any).partVerifications = verifyResult.data.verifications
+          ;(state as any).partVerifySummary = {
+            total: verifyResult.data.total,
+            attempted: verifyResult.data.attempted,
+            verifiedCount: verifyResult.data.verifiedCount,
+            byTier: verifyResult.data.byTier,
+            durationMs: verifyResult.data.durationMs,
+          }
+          // Council 2026-05-18 BLOCKER-2 (G5): unverified parts must route to
+          // retry-with-fallback-supplier, NOT silently render. We tag the
+          // unverified rows with a fallback-supplier hint (state-level flag,
+          // surfaced to the supplier-enrichment stage on a future iteration
+          // and on the PDF as a manual-review note) rather than promote them
+          // as if they were confirmed.
+          const unverified = verifyResult.data.verifications.filter(v => v.part_number && !v.verified)
+          if (unverified.length > 0) {
+            ;(state as any).g5UnverifiedParts = unverified.map(v => ({
+              part_number: v.part_number,
+              part_name: (v as any).part_name ?? null,
+              reason: v.verification_reason,
+              fallback_action: 'flag-for-supplier-resolution',
+            }))
+            ;(state as any).g5ManualReview = true
+            console.warn(
+              `[pipeline] G5: ${unverified.length} part(s) unverified — flagged for fallback-supplier resolution; manual-review badge attached.`,
+            )
+          }
+          stages.push({ name: 'part_verify', ok: true, durationMs: verifyResult.durationMs })
+          console.log(
+            `[pipeline] part_verify: ${verifyResult.data.verifiedCount}/${verifyResult.data.attempted} verified ` +
+              `(${JSON.stringify(verifyResult.data.byTier)})`,
+          )
+        } else {
+          stages.push({ name: 'part_verify', ok: false, durationMs: verifyResult.durationMs, error: verifyResult.error })
+          console.warn('[pipeline] part_verify failed (non-fatal):', verifyResult.error)
+        }
+      } catch (err) {
+        // Non-fatal — keep going so the founder still gets a PDF.
+        console.warn('[pipeline] part_verify threw (non-fatal):', err instanceof Error ? err.message : err)
+        stages.push({ name: 'part_verify', ok: false, durationMs: 0, error: err instanceof Error ? err.message : String(err) })
+      }
+    }
   } else {
   // ── v1: original 3-stage flow (BOM + Cost) ────────────────────────
   const bomResult = await runBomCost(state.modules, state.dimensionSheet, {
@@ -1843,12 +2190,26 @@ export async function runPipeline(
   // On the legacy path (PA_PIPELINE=false), Review runs unconditionally as before.
   const _shouldRunReview = !paMode || state.reportType === 'FULL_REPORT'
   if (_shouldRunReview) {
-    console.log('\n[pipeline] === Stage 6: Review ===')
-    const reviewResult = await runReview(state.modules, state.research)
+    console.log('\n[pipeline] === Stage 6: Review (G3 Completeness) ===')
+    // Council 2026-05-18 BLOCKER-2 (G3): completeness gate must have a
+    // bounded FAIL → retry loop. Max 2 retries; on exhaustion the pipeline
+    // continues with a manual-review badge attached to state so the renderer
+    // can surface it on the cover.
+    const G3_MAX_RETRIES = 2
+    let g3Attempt = 0
+    let reviewResult = await runReview(state.modules, state.research)
+    while (!reviewResult.ok && g3Attempt < G3_MAX_RETRIES) {
+      g3Attempt += 1
+      console.warn(`[pipeline] G3 Review FAIL — retry ${g3Attempt}/${G3_MAX_RETRIES}: ${reviewResult.error ?? 'unknown'}`)
+      reviewResult = await runReview(state.modules, state.research)
+    }
     trackStage('review', reviewResult)
     if (reviewResult.ok && reviewResult.data) {
       state.reviews = reviewResult.data.reviews
       state.proofreadFindings = reviewResult.data.proofreadFindings
+    } else {
+      console.warn(`[pipeline] G3 Review exhausted ${G3_MAX_RETRIES} retries — attaching manual-review badge.`)
+      ;(state as any).g3ManualReview = true
     }
     state.sourceAttributions.push(
       { section: 'Reviews', source: 'llm', detail: 'Gemini 3.1 Pro — Fang engineering review' },

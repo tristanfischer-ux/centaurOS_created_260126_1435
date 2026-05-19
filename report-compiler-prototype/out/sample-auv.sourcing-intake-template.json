@@ -1,0 +1,216 @@
+{
+  "dossierId": "sample-auv",
+  "productClass": "auv",
+  "criticalOnly": true,
+  "instructions": [
+    "Fill only from supplier, manufacturer, distributor, quote, catalogue or datasheet evidence.",
+    "Do not use benchmark averages, LLM estimates, class-pack defaults or unsourced model output.",
+    "The intake record is only admitted when every required field validates and componentWordId matches a candidate BoM line."
+  ],
+  "drafts": [
+    {
+      "componentWordId": "pressure_hull",
+      "description": "Pressure hull",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "battery_pack",
+      "description": "Battery pack",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "wet_mate_connector_set",
+      "description": "Wet-mate connector set",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "thruster_set",
+      "description": "Thruster set",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "mission_computer",
+      "description": "Mission computer",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "acoustic_modem",
+      "description": "Acoustic modem",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "dvl",
+      "description": "DVL",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "inertial_navigation_unit",
+      "description": "Inertial navigation unit",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "depth_and_pressure_sensor",
+      "description": "Depth and pressure sensor",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "forward_sonar_payload",
+      "description": "Forward sonar payload",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "leak_detection_sensor",
+      "description": "Leak detection sensor",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    },
+    {
+      "componentWordId": "recovery_beacon",
+      "description": "Recovery beacon",
+      "priority": "critical",
+      "supplierName": "",
+      "manufacturer": "",
+      "mpn": "",
+      "unitCostGbp": null,
+      "leadTimeWeeks": null,
+      "sourceGrade": "catalogue",
+      "evidence": {
+        "kind": "source",
+        "ref": "",
+        "quote": ""
+      },
+      "retrievedAt": ""
+    }
+  ]
+}

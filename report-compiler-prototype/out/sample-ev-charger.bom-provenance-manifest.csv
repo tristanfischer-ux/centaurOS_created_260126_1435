@@ -1,0 +1,601 @@
+lineId,componentWordId,description,critical,field,value,status,sourceRef,sourceQuote,retrievedAt,nextAction
+power_distribution_ac_input_switchgear_ac_input_breaker_and_spd,ac_input_breaker_and_spd,AC input breaker and SPD,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_ac_input_switchgear_ac_input_breaker_and_spd,ac_input_breaker_and_spd,AC input breaker and SPD,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_ac_input_switchgear_ac_input_breaker_and_spd,ac_input_breaker_and_spd,AC input breaker and SPD,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_ac_input_switchgear_ac_input_breaker_and_spd,ac_input_breaker_and_spd,AC input breaker and SPD,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_ac_input_switchgear_ac_input_breaker_and_spd,ac_input_breaker_and_spd,AC input breaker and SPD,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_lockable_ac_isolator,lockable_ac_isolator,lockable AC isolator,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_lockable_ac_isolator,lockable_ac_isolator,lockable AC isolator,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_lockable_ac_isolator,lockable_ac_isolator,lockable AC isolator,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_lockable_ac_isolator,lockable_ac_isolator,lockable AC isolator,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_lockable_ac_isolator,lockable_ac_isolator,lockable AC isolator,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_surge_arrestor_cartridge,surge_arrestor_cartridge,surge arrestor cartridge,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_surge_arrestor_cartridge,surge_arrestor_cartridge,surge arrestor cartridge,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_surge_arrestor_cartridge,surge_arrestor_cartridge,surge arrestor cartridge,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_surge_arrestor_cartridge,surge_arrestor_cartridge,surge arrestor cartridge,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_surge_arrestor_cartridge,surge_arrestor_cartridge,surge arrestor cartridge,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_input_terminal_shroud,input_terminal_shroud,input terminal shroud,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_input_terminal_shroud,input_terminal_shroud,input terminal shroud,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_input_terminal_shroud,input_terminal_shroud,input terminal shroud,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_input_terminal_shroud,input_terminal_shroud,input terminal shroud,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_ac_input_switchgear_input_terminal_shroud,input_terminal_shroud,input terminal shroud,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_dc_output_contactor_set,dc_output_contactor_set,DC output contactor set,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_dc_output_switchgear_dc_output_contactor_set,dc_output_contactor_set,DC output contactor set,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_dc_output_switchgear_dc_output_contactor_set,dc_output_contactor_set,DC output contactor set,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_dc_output_switchgear_dc_output_contactor_set,dc_output_contactor_set,DC output contactor set,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_dc_output_switchgear_dc_output_contactor_set,dc_output_contactor_set,DC output contactor set,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_precharge_resistor_module,precharge_resistor_module,precharge resistor module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_precharge_resistor_module,precharge_resistor_module,precharge resistor module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_precharge_resistor_module,precharge_resistor_module,precharge resistor module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_precharge_resistor_module,precharge_resistor_module,precharge resistor module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_precharge_resistor_module,precharge_resistor_module,precharge resistor module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_dc_output_fuse_carrier,dc_output_fuse_carrier,DC output fuse carrier,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_dc_output_fuse_carrier,dc_output_fuse_carrier,DC output fuse carrier,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_dc_output_fuse_carrier,dc_output_fuse_carrier,DC output fuse carrier,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_dc_output_fuse_carrier,dc_output_fuse_carrier,DC output fuse carrier,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_dc_output_fuse_carrier,dc_output_fuse_carrier,DC output fuse carrier,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_output_polarity_label,output_polarity_label,output polarity label,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_output_polarity_label,output_polarity_label,output polarity label,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_output_polarity_label,output_polarity_label,output polarity label,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_output_polarity_label,output_polarity_label,output polarity label,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_dc_output_switchgear_output_polarity_label,output_polarity_label,output polarity label,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_mid_energy_meter,mid_energy_meter,MID energy meter,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_billing_metering_branch_mid_energy_meter,mid_energy_meter,MID energy meter,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_billing_metering_branch_mid_energy_meter,mid_energy_meter,MID energy meter,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_billing_metering_branch_mid_energy_meter,mid_energy_meter,MID energy meter,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_billing_metering_branch_mid_energy_meter,mid_energy_meter,MID energy meter,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_ct_shunt_set,meter_ct_shunt_set,meter CT shunt set,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_ct_shunt_set,meter_ct_shunt_set,meter CT shunt set,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_ct_shunt_set,meter_ct_shunt_set,meter CT shunt set,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_ct_shunt_set,meter_ct_shunt_set,meter CT shunt set,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_ct_shunt_set,meter_ct_shunt_set,meter CT shunt set,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_seal_kit,meter_seal_kit,meter seal kit,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_seal_kit,meter_seal_kit,meter seal kit,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_seal_kit,meter_seal_kit,meter seal kit,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_seal_kit,meter_seal_kit,meter seal kit,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_seal_kit,meter_seal_kit,meter seal kit,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_calibration_label,meter_calibration_label,meter calibration label,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_calibration_label,meter_calibration_label,meter calibration label,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_calibration_label,meter_calibration_label,meter calibration label,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_calibration_label,meter_calibration_label,meter calibration label,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_billing_metering_branch_meter_calibration_label,meter_calibration_label,meter calibration label,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_power_module_stack,power_module_stack,Power module stack,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+energy_conversion_transduction_rectifier_power_modules_power_module_stack,power_module_stack,Power module stack,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+energy_conversion_transduction_rectifier_power_modules_power_module_stack,power_module_stack,Power module stack,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+energy_conversion_transduction_rectifier_power_modules_power_module_stack,power_module_stack,Power module stack,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+energy_conversion_transduction_rectifier_power_modules_power_module_stack,power_module_stack,Power module stack,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_power_module_backplane,power_module_backplane,power module backplane,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_power_module_backplane,power_module_backplane,power module backplane,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_power_module_backplane,power_module_backplane,power module backplane,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_power_module_backplane,power_module_backplane,power module backplane,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_power_module_backplane,power_module_backplane,power module backplane,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_module_locking_rail,module_locking_rail,module locking rail,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_module_locking_rail,module_locking_rail,module locking rail,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_module_locking_rail,module_locking_rail,module locking rail,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_module_locking_rail,module_locking_rail,module locking rail,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_module_locking_rail,module_locking_rail,module locking rail,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_dc_link_capacitor_bank,dc_link_capacitor_bank,DC-link capacitor bank,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_dc_link_capacitor_bank,dc_link_capacitor_bank,DC-link capacitor bank,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_dc_link_capacitor_bank,dc_link_capacitor_bank,DC-link capacitor bank,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_dc_link_capacitor_bank,dc_link_capacitor_bank,DC-link capacitor bank,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_rectifier_power_modules_dc_link_capacitor_bank,dc_link_capacitor_bank,DC-link capacitor bank,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_dc_output_choke,dc_output_choke,DC output choke,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_dc_output_choke,dc_output_choke,DC output choke,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_dc_output_choke,dc_output_choke,DC output choke,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_dc_output_choke,dc_output_choke,DC output choke,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_dc_output_choke,dc_output_choke,DC output choke,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_emi_filter_assembly,emi_filter_assembly,EMI filter assembly,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_emi_filter_assembly,emi_filter_assembly,EMI filter assembly,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_emi_filter_assembly,emi_filter_assembly,EMI filter assembly,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_emi_filter_assembly,emi_filter_assembly,EMI filter assembly,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_emi_filter_assembly,emi_filter_assembly,EMI filter assembly,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_snubber_network_board,snubber_network_board,snubber network board,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_snubber_network_board,snubber_network_board,snubber network board,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_snubber_network_board,snubber_network_board,snubber network board,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_snubber_network_board,snubber_network_board,snubber network board,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_snubber_network_board,snubber_network_board,snubber network board,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_thermal_interface_pad_set,thermal_interface_pad_set,thermal interface pad set,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_thermal_interface_pad_set,thermal_interface_pad_set,thermal interface pad set,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_thermal_interface_pad_set,thermal_interface_pad_set,thermal interface pad set,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_thermal_interface_pad_set,thermal_interface_pad_set,thermal interface pad set,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_output_filtering_thermal_interface_pad_set,thermal_interface_pad_set,thermal interface pad set,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_module_health_monitor_board,module_health_monitor_board,module health monitor board,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_module_health_monitor_board,module_health_monitor_board,module health monitor board,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_module_health_monitor_board,module_health_monitor_board,module health monitor board,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_module_health_monitor_board,module_health_monitor_board,module health monitor board,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_module_health_monitor_board,module_health_monitor_board,module health monitor board,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_heatsink_temperature_probe,heatsink_temperature_probe,heatsink temperature probe,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_heatsink_temperature_probe,heatsink_temperature_probe,heatsink temperature probe,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_heatsink_temperature_probe,heatsink_temperature_probe,heatsink temperature probe,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_heatsink_temperature_probe,heatsink_temperature_probe,heatsink temperature probe,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_heatsink_temperature_probe,heatsink_temperature_probe,heatsink temperature probe,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_fan_coolant_derating_table,fan_coolant_derating_table,fan/coolant derating table,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_fan_coolant_derating_table,fan_coolant_derating_table,fan/coolant derating table,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_fan_coolant_derating_table,fan_coolant_derating_table,fan/coolant derating table,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_fan_coolant_derating_table,fan_coolant_derating_table,fan/coolant derating table,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_fan_coolant_derating_table,fan_coolant_derating_table,fan/coolant derating table,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_firmware_recovery_jumper,firmware_recovery_jumper,firmware recovery jumper,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_firmware_recovery_jumper,firmware_recovery_jumper,firmware recovery jumper,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_firmware_recovery_jumper,firmware_recovery_jumper,firmware recovery jumper,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_firmware_recovery_jumper,firmware_recovery_jumper,firmware recovery jumper,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+energy_conversion_transduction_converter_supervision_firmware_recovery_jumper,firmware_recovery_jumper,firmware recovery jumper,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_ccs2_liquid_cooled_cable_and_connector,ccs2_liquid_cooled_cable_and_connector,CCS2 liquid-cooled cable and connector,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+charging_connector_interface_ccs2_cable_connector_ccs2_liquid_cooled_cable_and_connector,ccs2_liquid_cooled_cable_and_connector,CCS2 liquid-cooled cable and connector,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+charging_connector_interface_ccs2_cable_connector_ccs2_liquid_cooled_cable_and_connector,ccs2_liquid_cooled_cable_and_connector,CCS2 liquid-cooled cable and connector,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+charging_connector_interface_ccs2_cable_connector_ccs2_liquid_cooled_cable_and_connector,ccs2_liquid_cooled_cable_and_connector,CCS2 liquid-cooled cable and connector,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+charging_connector_interface_ccs2_cable_connector_ccs2_liquid_cooled_cable_and_connector,ccs2_liquid_cooled_cable_and_connector,CCS2 liquid-cooled cable and connector,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_connector_temperature_sensor_pair,connector_temperature_sensor_pair,connector temperature sensor pair,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_connector_temperature_sensor_pair,connector_temperature_sensor_pair,connector temperature sensor pair,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_connector_temperature_sensor_pair,connector_temperature_sensor_pair,connector temperature sensor pair,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_connector_temperature_sensor_pair,connector_temperature_sensor_pair,connector temperature sensor pair,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_connector_temperature_sensor_pair,connector_temperature_sensor_pair,connector temperature sensor pair,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_proximity_pilot_resistor_set,proximity_pilot_resistor_set,proximity pilot resistor set,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_proximity_pilot_resistor_set,proximity_pilot_resistor_set,proximity pilot resistor set,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_proximity_pilot_resistor_set,proximity_pilot_resistor_set,proximity pilot resistor set,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_proximity_pilot_resistor_set,proximity_pilot_resistor_set,proximity pilot resistor set,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_proximity_pilot_resistor_set,proximity_pilot_resistor_set,proximity pilot resistor set,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_cable_strain_relief_boot,cable_strain_relief_boot,cable strain relief boot,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_cable_strain_relief_boot,cable_strain_relief_boot,cable strain relief boot,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_cable_strain_relief_boot,cable_strain_relief_boot,cable strain relief boot,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_cable_strain_relief_boot,cable_strain_relief_boot,cable strain relief boot,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_ccs2_cable_connector_cable_strain_relief_boot,cable_strain_relief_boot,cable strain relief boot,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_liquid_cooled_cable_manifold,liquid_cooled_cable_manifold,liquid-cooled cable manifold,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_liquid_cooled_cable_manifold,liquid_cooled_cable_manifold,liquid-cooled cable manifold,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_liquid_cooled_cable_manifold,liquid_cooled_cable_manifold,liquid-cooled cable manifold,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_liquid_cooled_cable_manifold,liquid_cooled_cable_manifold,liquid-cooled cable manifold,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_liquid_cooled_cable_manifold,liquid_cooled_cable_manifold,liquid-cooled cable manifold,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_quick_connect_coolant_coupler,quick_connect_coolant_coupler,quick-connect coolant coupler,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_quick_connect_coolant_coupler,quick_connect_coolant_coupler,quick-connect coolant coupler,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_quick_connect_coolant_coupler,quick_connect_coolant_coupler,quick-connect coolant coupler,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_quick_connect_coolant_coupler,quick_connect_coolant_coupler,quick-connect coolant coupler,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_quick_connect_coolant_coupler,quick_connect_coolant_coupler,quick-connect coolant coupler,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_coolant_leak_catch_tray,coolant_leak_catch_tray,coolant leak catch tray,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_coolant_leak_catch_tray,coolant_leak_catch_tray,coolant leak catch tray,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_coolant_leak_catch_tray,coolant_leak_catch_tray,coolant leak catch tray,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_coolant_leak_catch_tray,coolant_leak_catch_tray,coolant leak catch tray,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_coolant_leak_catch_tray,coolant_leak_catch_tray,coolant leak catch tray,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_cable_coolant_temperature_probe,cable_coolant_temperature_probe,cable coolant temperature probe,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_cable_coolant_temperature_probe,cable_coolant_temperature_probe,cable coolant temperature probe,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_cable_coolant_temperature_probe,cable_coolant_temperature_probe,cable coolant temperature probe,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_cable_coolant_temperature_probe,cable_coolant_temperature_probe,cable coolant temperature probe,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_connector_cooling_coupling_cable_coolant_temperature_probe,cable_coolant_temperature_probe,cable coolant temperature probe,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_iso_15118_plc_modem,iso_15118_plc_modem,ISO 15118 PLC modem,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+charging_connector_interface_vehicle_communication_frontend_iso_15118_plc_modem,iso_15118_plc_modem,ISO 15118 PLC modem,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+charging_connector_interface_vehicle_communication_frontend_iso_15118_plc_modem,iso_15118_plc_modem,ISO 15118 PLC modem,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+charging_connector_interface_vehicle_communication_frontend_iso_15118_plc_modem,iso_15118_plc_modem,ISO 15118 PLC modem,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+charging_connector_interface_vehicle_communication_frontend_iso_15118_plc_modem,iso_15118_plc_modem,ISO 15118 PLC modem,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_control_pilot_interface_board,control_pilot_interface_board,control pilot interface board,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_control_pilot_interface_board,control_pilot_interface_board,control pilot interface board,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_control_pilot_interface_board,control_pilot_interface_board,control pilot interface board,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_control_pilot_interface_board,control_pilot_interface_board,control pilot interface board,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_control_pilot_interface_board,control_pilot_interface_board,control pilot interface board,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_proximity_detection_input,proximity_detection_input,proximity detection input,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_proximity_detection_input,proximity_detection_input,proximity detection input,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_proximity_detection_input,proximity_detection_input,proximity detection input,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_proximity_detection_input,proximity_detection_input,proximity detection input,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_proximity_detection_input,proximity_detection_input,proximity detection input,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_vehicle_comms_isolation_transformer,vehicle_comms_isolation_transformer,vehicle comms isolation transformer,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_vehicle_comms_isolation_transformer,vehicle_comms_isolation_transformer,vehicle comms isolation transformer,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_vehicle_comms_isolation_transformer,vehicle_comms_isolation_transformer,vehicle comms isolation transformer,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_vehicle_comms_isolation_transformer,vehicle_comms_isolation_transformer,vehicle comms isolation transformer,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+charging_connector_interface_vehicle_communication_frontend_vehicle_comms_isolation_transformer,vehicle_comms_isolation_transformer,vehicle comms isolation transformer,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_charge_controller_pcb,charge_controller_pcb,charge controller PCB,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_charge_controller_pcb,charge_controller_pcb,charge controller PCB,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_charge_controller_pcb,charge_controller_pcb,charge controller PCB,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_charge_controller_pcb,charge_controller_pcb,charge controller PCB,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_charge_controller_pcb,charge_controller_pcb,charge controller PCB,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_safety_io_terminal_block,safety_io_terminal_block,safety IO terminal block,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_safety_io_terminal_block,safety_io_terminal_block,safety IO terminal block,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_safety_io_terminal_block,safety_io_terminal_block,safety IO terminal block,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_safety_io_terminal_block,safety_io_terminal_block,safety IO terminal block,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_safety_io_terminal_block,safety_io_terminal_block,safety IO terminal block,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_real_time_clock_module,real_time_clock_module,real-time clock module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_real_time_clock_module,real_time_clock_module,real-time clock module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_real_time_clock_module,real_time_clock_module,real-time clock module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_real_time_clock_module,real_time_clock_module,real-time clock module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_real_time_clock_module,real_time_clock_module,real-time clock module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_nonvolatile_event_log_memory,nonvolatile_event_log_memory,nonvolatile event log memory,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_nonvolatile_event_log_memory,nonvolatile_event_log_memory,nonvolatile event log memory,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_nonvolatile_event_log_memory,nonvolatile_event_log_memory,nonvolatile event log memory,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_nonvolatile_event_log_memory,nonvolatile_event_log_memory,nonvolatile event log memory,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_charge_controller_nonvolatile_event_log_memory,nonvolatile_event_log_memory,nonvolatile event log memory,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_ocpp_communications_gateway,ocpp_communications_gateway,OCPP communications gateway,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_backend_gateway_ocpp_communications_gateway,ocpp_communications_gateway,OCPP communications gateway,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_backend_gateway_ocpp_communications_gateway,ocpp_communications_gateway,OCPP communications gateway,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_backend_gateway_ocpp_communications_gateway,ocpp_communications_gateway,OCPP communications gateway,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_backend_gateway_ocpp_communications_gateway,ocpp_communications_gateway,OCPP communications gateway,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_lte_router_module,lte_router_module,LTE router module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_lte_router_module,lte_router_module,LTE router module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_lte_router_module,lte_router_module,LTE router module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_lte_router_module,lte_router_module,LTE router module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_lte_router_module,lte_router_module,LTE router module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_ethernet_surge_protector,ethernet_surge_protector,ethernet surge protector,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_ethernet_surge_protector,ethernet_surge_protector,ethernet surge protector,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_ethernet_surge_protector,ethernet_surge_protector,ethernet surge protector,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_ethernet_surge_protector,ethernet_surge_protector,ethernet surge protector,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_ethernet_surge_protector,ethernet_surge_protector,ethernet surge protector,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_secure_element_module,secure_element_module,secure element module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_secure_element_module,secure_element_module,secure element module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_secure_element_module,secure_element_module,secure element module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_secure_element_module,secure_element_module,secure element module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_backend_gateway_secure_element_module,secure_element_module,secure element module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_iso_15118_plc_modem,iso_15118_plc_modem,ISO 15118 PLC modem,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_protocol_stack_iso_15118_plc_modem,iso_15118_plc_modem,ISO 15118 PLC modem,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_protocol_stack_iso_15118_plc_modem,iso_15118_plc_modem,ISO 15118 PLC modem,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_protocol_stack_iso_15118_plc_modem,iso_15118_plc_modem,ISO 15118 PLC modem,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_protocol_stack_iso_15118_plc_modem,iso_15118_plc_modem,ISO 15118 PLC modem,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_plug_and_charge_certificate_store,plug_and_charge_certificate_store,Plug and Charge certificate store,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_plug_and_charge_certificate_store,plug_and_charge_certificate_store,Plug and Charge certificate store,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_plug_and_charge_certificate_store,plug_and_charge_certificate_store,Plug and Charge certificate store,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_plug_and_charge_certificate_store,plug_and_charge_certificate_store,Plug and Charge certificate store,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_plug_and_charge_certificate_store,plug_and_charge_certificate_store,Plug and Charge certificate store,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_charging_session_firmware_image,charging_session_firmware_image,charging session firmware image,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_charging_session_firmware_image,charging_session_firmware_image,charging session firmware image,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_charging_session_firmware_image,charging_session_firmware_image,charging session firmware image,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_charging_session_firmware_image,charging_session_firmware_image,charging session firmware image,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_charging_session_firmware_image,charging_session_firmware_image,charging session firmware image,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_protocol_debug_header,protocol_debug_header,protocol debug header,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_protocol_debug_header,protocol_debug_header,protocol debug header,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_protocol_debug_header,protocol_debug_header,protocol debug header,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_protocol_debug_header,protocol_debug_header,protocol debug header,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_protocol_stack_protocol_debug_header,protocol_debug_header,protocol debug header,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_mid_energy_meter,mid_energy_meter,MID energy meter,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+sensing_instrumentation_energy_metering_mid_energy_meter,mid_energy_meter,MID energy meter,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+sensing_instrumentation_energy_metering_mid_energy_meter,mid_energy_meter,MID energy meter,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+sensing_instrumentation_energy_metering_mid_energy_meter,mid_energy_meter,MID energy meter,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+sensing_instrumentation_energy_metering_mid_energy_meter,mid_energy_meter,MID energy meter,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_dc_voltage_transducer,dc_voltage_transducer,DC voltage transducer,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_dc_voltage_transducer,dc_voltage_transducer,DC voltage transducer,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_dc_voltage_transducer,dc_voltage_transducer,DC voltage transducer,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_dc_voltage_transducer,dc_voltage_transducer,DC voltage transducer,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_dc_voltage_transducer,dc_voltage_transducer,DC voltage transducer,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_dc_current_shunt,dc_current_shunt,DC current shunt,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_dc_current_shunt,dc_current_shunt,DC current shunt,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_dc_current_shunt,dc_current_shunt,DC current shunt,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_dc_current_shunt,dc_current_shunt,DC current shunt,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_dc_current_shunt,dc_current_shunt,DC current shunt,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_meter_pulse_output_isolator,meter_pulse_output_isolator,meter pulse output isolator,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_meter_pulse_output_isolator,meter_pulse_output_isolator,meter pulse output isolator,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_meter_pulse_output_isolator,meter_pulse_output_isolator,meter pulse output isolator,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_meter_pulse_output_isolator,meter_pulse_output_isolator,meter pulse output isolator,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_energy_metering_meter_pulse_output_isolator,meter_pulse_output_isolator,meter pulse output isolator,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_insulation_monitoring_device,insulation_monitoring_device,Insulation monitoring device,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+sensing_instrumentation_insulation_fault_detection_insulation_monitoring_device,insulation_monitoring_device,Insulation monitoring device,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+sensing_instrumentation_insulation_fault_detection_insulation_monitoring_device,insulation_monitoring_device,Insulation monitoring device,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+sensing_instrumentation_insulation_fault_detection_insulation_monitoring_device,insulation_monitoring_device,Insulation monitoring device,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+sensing_instrumentation_insulation_fault_detection_insulation_monitoring_device,insulation_monitoring_device,Insulation monitoring device,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_imd_coupling_network,imd_coupling_network,IMD coupling network,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_imd_coupling_network,imd_coupling_network,IMD coupling network,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_imd_coupling_network,imd_coupling_network,IMD coupling network,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_imd_coupling_network,imd_coupling_network,IMD coupling network,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_imd_coupling_network,imd_coupling_network,IMD coupling network,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_fault_status_relay,fault_status_relay,fault status relay,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_fault_status_relay,fault_status_relay,fault status relay,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_fault_status_relay,fault_status_relay,fault status relay,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_fault_status_relay,fault_status_relay,fault status relay,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_fault_status_relay,fault_status_relay,fault status relay,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_test_resistor_plug,test_resistor_plug,test resistor plug,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_test_resistor_plug,test_resistor_plug,test resistor plug,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_test_resistor_plug,test_resistor_plug,test resistor plug,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_test_resistor_plug,test_resistor_plug,test resistor plug,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_insulation_fault_detection_test_resistor_plug,test_resistor_plug,test resistor plug,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_connector_latch_microswitch,connector_latch_microswitch,connector latch microswitch,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_connector_latch_microswitch,connector_latch_microswitch,connector latch microswitch,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_connector_latch_microswitch,connector_latch_microswitch,connector latch microswitch,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_connector_latch_microswitch,connector_latch_microswitch,connector latch microswitch,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_connector_latch_microswitch,connector_latch_microswitch,connector latch microswitch,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_handle_temperature_sensor,handle_temperature_sensor,handle temperature sensor,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_handle_temperature_sensor,handle_temperature_sensor,handle temperature sensor,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_handle_temperature_sensor,handle_temperature_sensor,handle temperature sensor,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_handle_temperature_sensor,handle_temperature_sensor,handle temperature sensor,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_handle_temperature_sensor,handle_temperature_sensor,handle temperature sensor,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_cable_identification_resistor_reader,cable_identification_resistor_reader,cable identification resistor reader,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_cable_identification_resistor_reader,cable_identification_resistor_reader,cable identification resistor reader,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_cable_identification_resistor_reader,cable_identification_resistor_reader,cable identification resistor reader,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_cable_identification_resistor_reader,cable_identification_resistor_reader,cable identification resistor reader,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_cable_identification_resistor_reader,cable_identification_resistor_reader,cable identification resistor reader,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_holster_presence_switch,holster_presence_switch,holster presence switch,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_holster_presence_switch,holster_presence_switch,holster presence switch,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_holster_presence_switch,holster_presence_switch,holster presence switch,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_holster_presence_switch,holster_presence_switch,holster presence switch,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_connector_sensing_holster_presence_switch,holster_presence_switch,holster presence switch,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_cooling_loop_assembly,cooling_loop_assembly,Cooling loop assembly,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_liquid_cooling_loop_cooling_loop_assembly,cooling_loop_assembly,Cooling loop assembly,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_liquid_cooling_loop_cooling_loop_assembly,cooling_loop_assembly,Cooling loop assembly,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_liquid_cooling_loop_cooling_loop_assembly,cooling_loop_assembly,Cooling loop assembly,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_liquid_cooling_loop_cooling_loop_assembly,cooling_loop_assembly,Cooling loop assembly,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_coolant_pump,coolant_pump,coolant pump,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_coolant_pump,coolant_pump,coolant pump,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_coolant_pump,coolant_pump,coolant pump,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_coolant_pump,coolant_pump,coolant pump,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_coolant_pump,coolant_pump,coolant pump,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_plate_radiator,plate_radiator,plate radiator,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_plate_radiator,plate_radiator,plate radiator,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_plate_radiator,plate_radiator,plate radiator,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_plate_radiator,plate_radiator,plate radiator,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_plate_radiator,plate_radiator,plate radiator,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_coolant_reservoir,coolant_reservoir,coolant reservoir,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_coolant_reservoir,coolant_reservoir,coolant reservoir,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_coolant_reservoir,coolant_reservoir,coolant reservoir,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_coolant_reservoir,coolant_reservoir,coolant reservoir,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_liquid_cooling_loop_coolant_reservoir,coolant_reservoir,coolant reservoir,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_cabinet_fan_tray,cabinet_fan_tray,cabinet fan tray,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_cabinet_fan_tray,cabinet_fan_tray,cabinet fan tray,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_cabinet_fan_tray,cabinet_fan_tray,cabinet fan tray,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_cabinet_fan_tray,cabinet_fan_tray,cabinet fan tray,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_cabinet_fan_tray,cabinet_fan_tray,cabinet fan tray,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_inlet_filter_mat,inlet_filter_mat,inlet filter mat,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_inlet_filter_mat,inlet_filter_mat,inlet filter mat,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_inlet_filter_mat,inlet_filter_mat,inlet filter mat,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_inlet_filter_mat,inlet_filter_mat,inlet filter mat,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_inlet_filter_mat,inlet_filter_mat,inlet filter mat,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_exhaust_louvre_assembly,exhaust_louvre_assembly,exhaust louvre assembly,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_exhaust_louvre_assembly,exhaust_louvre_assembly,exhaust louvre assembly,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_exhaust_louvre_assembly,exhaust_louvre_assembly,exhaust louvre assembly,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_exhaust_louvre_assembly,exhaust_louvre_assembly,exhaust louvre assembly,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_exhaust_louvre_assembly,exhaust_louvre_assembly,exhaust louvre assembly,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_airflow_proving_switch,airflow_proving_switch,airflow proving switch,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_airflow_proving_switch,airflow_proving_switch,airflow proving switch,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_airflow_proving_switch,airflow_proving_switch,airflow proving switch,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_airflow_proving_switch,airflow_proving_switch,airflow proving switch,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_thermal_air_path_airflow_proving_switch,airflow_proving_switch,airflow proving switch,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_cabinet_drain_grommet,cabinet_drain_grommet,cabinet drain grommet,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_cabinet_drain_grommet,cabinet_drain_grommet,cabinet drain grommet,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_cabinet_drain_grommet,cabinet_drain_grommet,cabinet drain grommet,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_cabinet_drain_grommet,cabinet_drain_grommet,cabinet drain grommet,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_cabinet_drain_grommet,cabinet_drain_grommet,cabinet drain grommet,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_door_gasket_set,door_gasket_set,door gasket set,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_door_gasket_set,door_gasket_set,door gasket set,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_door_gasket_set,door_gasket_set,door gasket set,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_door_gasket_set,door_gasket_set,door gasket set,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_door_gasket_set,door_gasket_set,door gasket set,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_anti_condensation_heater,anti_condensation_heater,anti-condensation heater,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_anti_condensation_heater,anti_condensation_heater,anti-condensation heater,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_anti_condensation_heater,anti_condensation_heater,anti-condensation heater,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_anti_condensation_heater,anti_condensation_heater,anti-condensation heater,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_anti_condensation_heater,anti_condensation_heater,anti-condensation heater,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_uv_rated_cable_cover,uv_rated_cable_cover,UV-rated cable cover,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_uv_rated_cable_cover,uv_rated_cable_cover,UV-rated cable cover,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_uv_rated_cable_cover,uv_rated_cable_cover,UV-rated cable cover,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_uv_rated_cable_cover,uv_rated_cable_cover,UV-rated cable cover,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_weatherproofing_uv_rated_cable_cover,uv_rated_cable_cover,UV-rated cable cover,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_powder_coated_steel_cabinet,powder_coated_steel_cabinet,powder-coated steel cabinet,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_powder_coated_steel_cabinet,powder_coated_steel_cabinet,powder-coated steel cabinet,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_powder_coated_steel_cabinet,powder_coated_steel_cabinet,powder-coated steel cabinet,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_powder_coated_steel_cabinet,powder_coated_steel_cabinet,powder-coated steel cabinet,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_powder_coated_steel_cabinet,powder_coated_steel_cabinet,powder-coated steel cabinet,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_front_service_door,front_service_door,front service door,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_front_service_door,front_service_door,front service door,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_front_service_door,front_service_door,front service door,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_front_service_door,front_service_door,front service door,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_front_service_door,front_service_door,front service door,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_anti_vandal_hinge_set,anti_vandal_hinge_set,anti-vandal hinge set,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_anti_vandal_hinge_set,anti_vandal_hinge_set,anti-vandal hinge set,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_anti_vandal_hinge_set,anti_vandal_hinge_set,anti-vandal hinge set,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_anti_vandal_hinge_set,anti_vandal_hinge_set,anti-vandal hinge set,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_anti_vandal_hinge_set,anti_vandal_hinge_set,anti-vandal hinge set,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_plinth_mounting_kit,plinth_mounting_kit,plinth mounting kit,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_plinth_mounting_kit,plinth_mounting_kit,plinth mounting kit,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_plinth_mounting_kit,plinth_mounting_kit,plinth mounting kit,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_plinth_mounting_kit,plinth_mounting_kit,plinth mounting kit,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_outdoor_cabinet_plinth_mounting_kit,plinth_mounting_kit,plinth mounting kit,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_connector_holster,connector_holster,connector holster,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_connector_holster,connector_holster,connector holster,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_connector_holster,connector_holster,connector holster,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_connector_holster,connector_holster,connector holster,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_connector_holster,connector_holster,connector holster,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_cable_retractor_arm,cable_retractor_arm,cable retractor arm,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_cable_retractor_arm,cable_retractor_arm,cable retractor arm,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_cable_retractor_arm,cable_retractor_arm,cable retractor arm,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_cable_retractor_arm,cable_retractor_arm,cable retractor arm,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_cable_retractor_arm,cable_retractor_arm,cable retractor arm,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_cable_bend_limiter,cable_bend_limiter,cable bend limiter,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_cable_bend_limiter,cable_bend_limiter,cable bend limiter,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_cable_bend_limiter,cable_bend_limiter,cable bend limiter,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_cable_bend_limiter,cable_bend_limiter,cable bend limiter,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_cable_bend_limiter,cable_bend_limiter,cable bend limiter,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_parking_status_flag,parking_status_flag,parking status flag,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_parking_status_flag,parking_status_flag,parking status flag,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_parking_status_flag,parking_status_flag,parking status flag,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_parking_status_flag,parking_status_flag,parking status flag,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_cable_holster_boom_parking_status_flag,parking_status_flag,parking status flag,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_segregated_ac_dc_barrier,segregated_ac_dc_barrier,segregated AC/DC barrier,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_segregated_ac_dc_barrier,segregated_ac_dc_barrier,segregated AC/DC barrier,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_segregated_ac_dc_barrier,segregated_ac_dc_barrier,segregated AC/DC barrier,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_segregated_ac_dc_barrier,segregated_ac_dc_barrier,segregated AC/DC barrier,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_segregated_ac_dc_barrier,segregated_ac_dc_barrier,segregated AC/DC barrier,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_control_compartment_shield,control_compartment_shield,control compartment shield,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_control_compartment_shield,control_compartment_shield,control compartment shield,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_control_compartment_shield,control_compartment_shield,control compartment shield,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_control_compartment_shield,control_compartment_shield,control compartment shield,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_control_compartment_shield,control_compartment_shield,control compartment shield,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_service_warning_placard,service_warning_placard,service warning placard,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_service_warning_placard,service_warning_placard,service warning placard,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_service_warning_placard,service_warning_placard,service warning placard,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_service_warning_placard,service_warning_placard,service warning placard,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_service_warning_placard,service_warning_placard,service warning placard,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_earthing_braid_set,earthing_braid_set,earthing braid set,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_earthing_braid_set,earthing_braid_set,earthing braid set,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_earthing_braid_set,earthing_braid_set,earthing braid set,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_earthing_braid_set,earthing_braid_set,earthing braid set,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_internal_compartmentation_earthing_braid_set,earthing_braid_set,earthing braid set,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_emergency_stop_and_safety_interlock_set,emergency_stop_and_safety_interlock_set,Emergency stop and safety interlock set,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+safety_protection_emergency_stop_chain_emergency_stop_and_safety_interlock_set,emergency_stop_and_safety_interlock_set,Emergency stop and safety interlock set,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+safety_protection_emergency_stop_chain_emergency_stop_and_safety_interlock_set,emergency_stop_and_safety_interlock_set,Emergency stop and safety interlock set,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+safety_protection_emergency_stop_chain_emergency_stop_and_safety_interlock_set,emergency_stop_and_safety_interlock_set,Emergency stop and safety interlock set,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+safety_protection_emergency_stop_chain_emergency_stop_and_safety_interlock_set,emergency_stop_and_safety_interlock_set,Emergency stop and safety interlock set,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_e_stop_mushroom_button,e_stop_mushroom_button,E-stop mushroom button,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_e_stop_mushroom_button,e_stop_mushroom_button,E-stop mushroom button,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_e_stop_mushroom_button,e_stop_mushroom_button,E-stop mushroom button,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_e_stop_mushroom_button,e_stop_mushroom_button,E-stop mushroom button,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_e_stop_mushroom_button,e_stop_mushroom_button,E-stop mushroom button,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_door_interlock_switch,door_interlock_switch,door interlock switch,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_door_interlock_switch,door_interlock_switch,door interlock switch,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_door_interlock_switch,door_interlock_switch,door interlock switch,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_door_interlock_switch,door_interlock_switch,door interlock switch,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_door_interlock_switch,door_interlock_switch,door interlock switch,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_safety_relay_module,safety_relay_module,safety relay module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_safety_relay_module,safety_relay_module,safety relay module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_safety_relay_module,safety_relay_module,safety relay module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_safety_relay_module,safety_relay_module,safety relay module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_emergency_stop_chain_safety_relay_module,safety_relay_module,safety relay module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_insulation_monitoring_device,insulation_monitoring_device,Insulation monitoring device,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+safety_protection_dc_fault_protection_insulation_monitoring_device,insulation_monitoring_device,Insulation monitoring device,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+safety_protection_dc_fault_protection_insulation_monitoring_device,insulation_monitoring_device,Insulation monitoring device,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+safety_protection_dc_fault_protection_insulation_monitoring_device,insulation_monitoring_device,Insulation monitoring device,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+safety_protection_dc_fault_protection_insulation_monitoring_device,insulation_monitoring_device,Insulation monitoring device,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_dc_arc_detection_board,dc_arc_detection_board,DC arc detection board,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_dc_arc_detection_board,dc_arc_detection_board,DC arc detection board,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_dc_arc_detection_board,dc_arc_detection_board,DC arc detection board,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_dc_arc_detection_board,dc_arc_detection_board,DC arc detection board,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_dc_arc_detection_board,dc_arc_detection_board,DC arc detection board,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_output_contactor_weld_check_circuit,output_contactor_weld_check_circuit,output contactor weld check circuit,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_output_contactor_weld_check_circuit,output_contactor_weld_check_circuit,output contactor weld check circuit,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_output_contactor_weld_check_circuit,output_contactor_weld_check_circuit,output contactor weld check circuit,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_output_contactor_weld_check_circuit,output_contactor_weld_check_circuit,output contactor weld check circuit,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_output_contactor_weld_check_circuit,output_contactor_weld_check_circuit,output contactor weld check circuit,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_fault_discharge_resistor,fault_discharge_resistor,fault discharge resistor,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_fault_discharge_resistor,fault_discharge_resistor,fault discharge resistor,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_fault_discharge_resistor,fault_discharge_resistor,fault discharge resistor,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_fault_discharge_resistor,fault_discharge_resistor,fault discharge resistor,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_dc_fault_protection_fault_discharge_resistor,fault_discharge_resistor,fault discharge resistor,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_touch_safe_connector_shutter,touch_safe_connector_shutter,touch-safe connector shutter,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_touch_safe_connector_shutter,touch_safe_connector_shutter,touch-safe connector shutter,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_touch_safe_connector_shutter,touch_safe_connector_shutter,touch-safe connector shutter,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_touch_safe_connector_shutter,touch_safe_connector_shutter,touch-safe connector shutter,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_touch_safe_connector_shutter,touch_safe_connector_shutter,touch-safe connector shutter,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_protective_earth_continuity_strap,protective_earth_continuity_strap,protective earth continuity strap,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_protective_earth_continuity_strap,protective_earth_continuity_strap,protective earth continuity strap,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_protective_earth_continuity_strap,protective_earth_continuity_strap,protective earth continuity strap,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_protective_earth_continuity_strap,protective_earth_continuity_strap,protective earth continuity strap,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_protective_earth_continuity_strap,protective_earth_continuity_strap,protective earth continuity strap,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_charging_status_beacon,charging_status_beacon,charging status beacon,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_charging_status_beacon,charging_status_beacon,charging status beacon,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_charging_status_beacon,charging_status_beacon,charging status beacon,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_charging_status_beacon,charging_status_beacon,charging status beacon,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_charging_status_beacon,charging_status_beacon,charging status beacon,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_safety_instruction_label,safety_instruction_label,safety instruction label,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_safety_instruction_label,safety_instruction_label,safety instruction label,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_safety_instruction_label,safety_instruction_label,safety instruction label,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_safety_instruction_label,safety_instruction_label,safety instruction label,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_user_access_protection_safety_instruction_label,safety_instruction_label,safety instruction label,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_commissioning_terminal_block,commissioning_terminal_block,commissioning terminal block,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_commissioning_terminal_block,commissioning_terminal_block,commissioning terminal block,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_commissioning_terminal_block,commissioning_terminal_block,commissioning terminal block,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_commissioning_terminal_block,commissioning_terminal_block,commissioning terminal block,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_commissioning_terminal_block,commissioning_terminal_block,commissioning terminal block,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_meter_test_port,meter_test_port,meter test port,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_meter_test_port,meter_test_port,meter test port,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_meter_test_port,meter_test_port,meter test port,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_meter_test_port,meter_test_port,meter test port,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_meter_test_port,meter_test_port,meter test port,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_output_test_socket_cover,output_test_socket_cover,output test socket cover,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_output_test_socket_cover,output_test_socket_cover,output test socket cover,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_output_test_socket_cover,output_test_socket_cover,output test socket cover,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_output_test_socket_cover,output_test_socket_cover,output test socket cover,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_output_test_socket_cover,output_test_socket_cover,output test socket cover,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_commissioning_checklist_card,commissioning_checklist_card,commissioning checklist card,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_commissioning_checklist_card,commissioning_checklist_card,commissioning checklist card,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_commissioning_checklist_card,commissioning_checklist_card,commissioning checklist card,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_commissioning_checklist_card,commissioning_checklist_card,commissioning checklist card,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_commissioning_access_commissioning_checklist_card,commissioning_checklist_card,commissioning checklist card,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_slide_out_power_module_rail,slide_out_power_module_rail,slide-out power module rail,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_slide_out_power_module_rail,slide_out_power_module_rail,slide-out power module rail,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_slide_out_power_module_rail,slide_out_power_module_rail,slide-out power module rail,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_slide_out_power_module_rail,slide_out_power_module_rail,slide-out power module rail,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_slide_out_power_module_rail,slide_out_power_module_rail,slide-out power module rail,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_quick_disconnect_coolant_fitting,quick_disconnect_coolant_fitting,quick-disconnect coolant fitting,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_quick_disconnect_coolant_fitting,quick_disconnect_coolant_fitting,quick-disconnect coolant fitting,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_quick_disconnect_coolant_fitting,quick_disconnect_coolant_fitting,quick-disconnect coolant fitting,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_quick_disconnect_coolant_fitting,quick_disconnect_coolant_fitting,quick-disconnect coolant fitting,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_quick_disconnect_coolant_fitting,quick_disconnect_coolant_fitting,quick-disconnect coolant fitting,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_gateway_din_rail_carrier,gateway_din_rail_carrier,gateway DIN rail carrier,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_gateway_din_rail_carrier,gateway_din_rail_carrier,gateway DIN rail carrier,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_gateway_din_rail_carrier,gateway_din_rail_carrier,gateway DIN rail carrier,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_gateway_din_rail_carrier,gateway_din_rail_carrier,gateway DIN rail carrier,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_gateway_din_rail_carrier,gateway_din_rail_carrier,gateway DIN rail carrier,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_spare_fuse_and_link_kit,spare_fuse_and_link_kit,spare fuse and link kit,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_spare_fuse_and_link_kit,spare_fuse_and_link_kit,spare fuse and link kit,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_spare_fuse_and_link_kit,spare_fuse_and_link_kit,spare fuse and link kit,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_spare_fuse_and_link_kit,spare_fuse_and_link_kit,spare fuse and link kit,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_replaceable_modules_spare_fuse_and_link_kit,spare_fuse_and_link_kit,spare fuse and link kit,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_diagnostic_log_exporter,diagnostic_log_exporter,diagnostic log exporter,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_diagnostic_log_exporter,diagnostic_log_exporter,diagnostic log exporter,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_diagnostic_log_exporter,diagnostic_log_exporter,diagnostic log exporter,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_diagnostic_log_exporter,diagnostic_log_exporter,diagnostic log exporter,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_diagnostic_log_exporter,diagnostic_log_exporter,diagnostic log exporter,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_remote_firmware_update_agent,remote_firmware_update_agent,remote firmware update agent,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_remote_firmware_update_agent,remote_firmware_update_agent,remote firmware update agent,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_remote_firmware_update_agent,remote_firmware_update_agent,remote firmware update agent,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_remote_firmware_update_agent,remote_firmware_update_agent,remote firmware update agent,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_remote_firmware_update_agent,remote_firmware_update_agent,remote firmware update agent,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_health_telemetry_packet_schema,health_telemetry_packet_schema,health telemetry packet schema,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_health_telemetry_packet_schema,health_telemetry_packet_schema,health telemetry packet schema,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_health_telemetry_packet_schema,health_telemetry_packet_schema,health telemetry packet schema,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_health_telemetry_packet_schema,health_telemetry_packet_schema,health telemetry packet schema,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_health_telemetry_packet_schema,health_telemetry_packet_schema,health telemetry packet schema,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_service_vpn_profile,service_vpn_profile,service VPN profile,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_service_vpn_profile,service_vpn_profile,service VPN profile,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_service_vpn_profile,service_vpn_profile,service VPN profile,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_service_vpn_profile,service_vpn_profile,service VPN profile,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_remote_diagnostics_service_vpn_profile,service_vpn_profile,service VPN profile,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_touchscreen_hmi_panel,touchscreen_hmi_panel,touchscreen HMI panel,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_touchscreen_hmi_panel,touchscreen_hmi_panel,touchscreen HMI panel,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_touchscreen_hmi_panel,touchscreen_hmi_panel,touchscreen HMI panel,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_touchscreen_hmi_panel,touchscreen_hmi_panel,touchscreen HMI panel,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_touchscreen_hmi_panel,touchscreen_hmi_panel,touchscreen HMI panel,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_status_led_light_bar,status_led_light_bar,status LED light bar,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_status_led_light_bar,status_led_light_bar,status LED light bar,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_status_led_light_bar,status_led_light_bar,status LED light bar,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_status_led_light_bar,status_led_light_bar,status LED light bar,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_status_led_light_bar,status_led_light_bar,status LED light bar,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_audio_buzzer,audio_buzzer,audio buzzer,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_audio_buzzer,audio_buzzer,audio buzzer,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_audio_buzzer,audio_buzzer,audio buzzer,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_audio_buzzer,audio_buzzer,audio buzzer,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_audio_buzzer,audio_buzzer,audio buzzer,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_sunlight_readable_display_cover,sunlight_readable_display_cover,sunlight-readable display cover,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_sunlight_readable_display_cover,sunlight_readable_display_cover,sunlight-readable display cover,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_sunlight_readable_display_cover,sunlight_readable_display_cover,sunlight-readable display cover,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_sunlight_readable_display_cover,sunlight_readable_display_cover,sunlight-readable display cover,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_display_panel_sunlight_readable_display_cover,sunlight_readable_display_cover,sunlight-readable display cover,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_rfid_reader_module,rfid_reader_module,RFID reader module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_rfid_reader_module,rfid_reader_module,RFID reader module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_rfid_reader_module,rfid_reader_module,RFID reader module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_rfid_reader_module,rfid_reader_module,RFID reader module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_rfid_reader_module,rfid_reader_module,RFID reader module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_contactless_payment_terminal,contactless_payment_terminal,contactless payment terminal,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_contactless_payment_terminal,contactless_payment_terminal,contactless payment terminal,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_contactless_payment_terminal,contactless_payment_terminal,contactless payment terminal,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_contactless_payment_terminal,contactless_payment_terminal,contactless payment terminal,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_contactless_payment_terminal,contactless_payment_terminal,contactless payment terminal,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_receipt_qr_code_generator,receipt_qr_code_generator,receipt QR code generator,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_receipt_qr_code_generator,receipt_qr_code_generator,receipt QR code generator,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_receipt_qr_code_generator,receipt_qr_code_generator,receipt QR code generator,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_receipt_qr_code_generator,receipt_qr_code_generator,receipt QR code generator,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_receipt_qr_code_generator,receipt_qr_code_generator,receipt QR code generator,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_privacy_label,privacy_label,privacy label,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_privacy_label,privacy_label,privacy label,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_privacy_label,privacy_label,privacy label,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_privacy_label,privacy_label,privacy label,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_payment_identity_privacy_label,privacy_label,privacy label,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_connector_instruction_graphic,connector_instruction_graphic,connector instruction graphic,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_connector_instruction_graphic,connector_instruction_graphic,connector instruction graphic,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_connector_instruction_graphic,connector_instruction_graphic,connector instruction graphic,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_connector_instruction_graphic,connector_instruction_graphic,connector instruction graphic,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_connector_instruction_graphic,connector_instruction_graphic,connector instruction graphic,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_cable_park_indicator,cable_park_indicator,cable park indicator,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_cable_park_indicator,cable_park_indicator,cable park indicator,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_cable_park_indicator,cable_park_indicator,cable park indicator,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_cable_park_indicator,cable_park_indicator,cable park indicator,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_cable_park_indicator,cable_park_indicator,cable park indicator,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_accessibility_reach_label,accessibility_reach_label,accessibility reach label,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_accessibility_reach_label,accessibility_reach_label,accessibility reach label,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_accessibility_reach_label,accessibility_reach_label,accessibility reach label,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_accessibility_reach_label,accessibility_reach_label,accessibility reach label,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_accessibility_reach_label,accessibility_reach_label,accessibility reach label,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_session_stop_button,session_stop_button,session stop button,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_session_stop_button,session_stop_button,session stop button,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_session_stop_button,session_stop_button,session stop button,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_session_stop_button,session_stop_button,session stop button,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_user_cable_guidance_session_stop_button,session_stop_button,session stop button,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.

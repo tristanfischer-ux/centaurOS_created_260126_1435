@@ -1,0 +1,9 @@
+componentWordId,description,priority,supplierName,manufacturer,mpn,unitCostGbp,leadTimeWeeks,sourceGrade,evidence.ref,evidence.quote,retrievedAt
+carbon_airframe,Carbon airframe,critical,,,,,,catalogue,,,
+flight_battery_pack,Flight battery pack,critical,,,,,,catalogue,,,
+brushless_motors,Brushless motors,critical,,,,,,catalogue,,,
+esc,ESC,critical,,,,,,catalogue,,,
+propeller_set,Propeller set,critical,,,,,,catalogue,,,
+flight_controller,Flight controller,critical,,,,,,catalogue,,,
+radio_and_gnss_link,Radio and GNSS link,critical,,,,,,catalogue,,,
+4k_camera_payload,4K camera payload,critical,,,,,,catalogue,,,

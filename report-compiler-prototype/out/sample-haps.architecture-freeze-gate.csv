@@ -1,0 +1,7 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+admission_and_lineage,pass,Architecture admission architecture_generation_admitted; stage integrity stage_trace_accepted; scratch lineage scratch_lineage_clean.,1,,Architecture was admitted from the scratch flow with clean stage and lineage evidence.
+module_structure,review,Component allocation allocation_ready; module engineering module_engineering_review_required; 0/11 modules pass; 9 modules still have critical sourcing blocks.,0.75,,Treat the architecture as review-ready until module review questions and critical sourcing blocks close.
+interface_contracts,review,Interface verification interface_review_ready; 8/8 required interfaces have carriers; 0 accepted.,1,,Collect or accept interface-review evidence before calling the architecture fully frozen.
+requirement_coverage,review,Requirement coverage coverage_review_ready; 3/3 requirements structurally ready or accepted; accepted ratio 0.,1,,Requirement coverage is structurally ready; collect accepted reviewer evidence before full freeze.
+engineering_review_state,review,Pre-BoM engineering engineering_review_ready; 4/6 areas pass; calculations needing review 2; assumptions needing review 23.,0.67,,"Keep architecture labelled review-ready until calculations, assumptions and verification evidence are accepted."
+sourcing_boundary,pass,132 candidate BoM lines; 0 admitted sourcing evidence rows; 0 provenance violation(s); 48 critical missing source claim(s).,1,,Sourcing and BoM claims remain behind explicit admitted source evidence.

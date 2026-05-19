@@ -1,0 +1,270 @@
+{
+  "includeSourceEvidence": false,
+  "instructions": [
+    "Use this intake for engineering design-review, calculation, interface-review and compliance evidence only.",
+    "Do not admit BoM supplier, manufacturer, MPN, unit-cost or lead-time claims through this intake; use the sourcing intake instead.",
+    "Every admitted record must name the reviewer, verdict, evidence reference, evidence note and review timestamp."
+  ],
+  "drafts": [
+    {
+      "activityId": "design_review:structure_containment",
+      "activity": "Review Sterile Structure Containment architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:structure_containment",
+      "activity": "Verify Sterile Structure Containment requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:actuation_kinematics",
+      "activity": "Review Mixing And Agitation architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:actuation_kinematics",
+      "activity": "Verify Mixing And Agitation requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:mass_fluid_transport_process",
+      "activity": "Review Media Gas And Harvest Transport architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:mass_fluid_transport_process",
+      "activity": "Verify Media Gas And Harvest Transport requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:environmental_interface",
+      "activity": "Review Thermal Gas Exhaust Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "calculation:environmental_interface",
+      "activity": "Verify Thermal Gas Exhaust Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:sensing_instrumentation",
+      "activity": "Review Process Sensing Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:control_compute_communication",
+      "activity": "Review Control Compute Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:power_distribution",
+      "activity": "Review Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:safety_protection",
+      "activity": "Review Aseptic And Pressure Safety architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "design_review:maintenance_serviceability",
+      "activity": "Review Setup Calibration And Service architecture allocation",
+      "evidenceKind": "design_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:structure_containment:mass_fluid_transport_process:sterile_fluid_path",
+      "activity": "Verify sterile_fluid_path interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:actuation_kinematics:structure_containment:sterile_boundary",
+      "activity": "Verify sterile_boundary interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:mass_fluid_transport_process:environmental_interface:gas_path",
+      "activity": "Verify gas_path interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:control_compute_communication:mass_fluid_transport_process:pump_control",
+      "activity": "Verify pump_control interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "interface_review:safety_protection:structure_containment:pressure_relief",
+      "activity": "Verify pressure_relief interface contract",
+      "evidenceKind": "interface_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:ISO-13485",
+      "activity": "Plan evidence for ISO-13485",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:USP-CLASS-VI",
+      "activity": "Plan evidence for USP-CLASS-VI",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:IEC-61010",
+      "activity": "Plan evidence for IEC-61010",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "compliance_review:EU-GMP-ANNEX-11",
+      "activity": "Plan evidence for EU-GMP-ANNEX-11",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "risk_review:1",
+      "activity": "Review risk control for Loss of sterility through connector or bag handling",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "risk_review:2",
+      "activity": "Review risk control for Cell culture loss from DO or pH control failure",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    },
+    {
+      "activityId": "risk_review:3",
+      "activity": "Review risk control for Disposable bag overpressure",
+      "evidenceKind": "compliance_review",
+      "reviewerName": "",
+      "verdict": "",
+      "evidenceRef": "",
+      "evidenceNote": "",
+      "reviewedAt": ""
+    }
+  ]
+}

@@ -1,0 +1,339 @@
+{
+  "verdict": "interface_review_ready",
+  "summary": {
+    "rows": 8,
+    "acceptedRows": 0,
+    "reviewReadyRows": 8,
+    "pendingEvidenceRows": 0,
+    "deferredRows": 0,
+    "blockedRows": 0,
+    "presentContracts": 8,
+    "missingContracts": 0,
+    "carrierCompleteRows": 8,
+    "verificationActivityRows": 8,
+    "acceptedEvidenceRatio": 0,
+    "structuralPassRatio": 1
+  },
+  "rows": [
+    {
+      "id": "required:energy_storage_source:power_distribution:dc_power_bus",
+      "interfaceId": "dc_power_bus",
+      "fromModuleId": "energy_storage_source",
+      "fromModuleName": "Subsea Energy Storage",
+      "toModuleId": "power_distribution",
+      "toModuleName": "Subsea Power Distribution",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "subsea_battery_pack",
+        "charging_interface"
+      ],
+      "toCarrierSubModules": [
+        "dc_distribution",
+        "isolation_grounding"
+      ],
+      "componentWordIds": [
+        "battery_pack",
+        "battery_management_board",
+        "pack_isolation_fuse",
+        "pressure_rated_battery_enclosure",
+        "charge_interlock_plug",
+        "shore_charger_adapter",
+        "state_of_charge_display_puck",
+        "battery_vent_inspection_plug",
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor",
+        "ground_fault_monitor",
+        "chassis_bonding_strap",
+        "service_isolation_key",
+        "fault_annunciator_module"
+      ],
+      "verificationActivityId": "interface_review:energy_storage_source:power_distribution:dc_power_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:power_distribution:actuation_kinematics:thruster_power_bus",
+      "interfaceId": "thruster_power_bus",
+      "fromModuleId": "power_distribution",
+      "fromModuleName": "Subsea Power Distribution",
+      "toModuleId": "actuation_kinematics",
+      "toModuleName": "Thruster Actuation Kinematics",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "dc_distribution"
+      ],
+      "toCarrierSubModules": [
+        "thruster_array",
+        "drive_electronics"
+      ],
+      "componentWordIds": [
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor",
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness",
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table"
+      ],
+      "verificationActivityId": "interface_review:power_distribution:actuation_kinematics:thruster_power_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "interfaceId": "thrust_command_bus",
+      "fromModuleId": "control_compute_communication",
+      "fromModuleName": "Autonomy Compute Communication",
+      "toModuleId": "actuation_kinematics",
+      "toModuleName": "Thruster Actuation Kinematics",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "mission_computer_stack"
+      ],
+      "toCarrierSubModules": [
+        "thruster_array",
+        "drive_electronics"
+      ],
+      "componentWordIds": [
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder",
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness",
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table"
+      ],
+      "verificationActivityId": "interface_review:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "interfaceId": "navigation_sensor_bus",
+      "fromModuleId": "sensing_instrumentation",
+      "fromModuleName": "Navigation And Payload Sensing",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Autonomy Compute Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "navigation_sensor_suite",
+        "depth_environment_sensors",
+        "payload_sensor_bay"
+      ],
+      "toCarrierSubModules": [
+        "mission_computer_stack"
+      ],
+      "componentWordIds": [
+        "dvl",
+        "inertial_navigation_unit",
+        "magnetic_compass_module",
+        "gnss_surface_receiver",
+        "depth_and_pressure_sensor",
+        "water_temperature_probe",
+        "conductivity_sensor",
+        "internal_humidity_sensor",
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module",
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder"
+      ],
+      "verificationActivityId": "interface_review:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "interfaceId": "payload_data_bus",
+      "fromModuleId": "sensing_instrumentation",
+      "fromModuleName": "Navigation And Payload Sensing",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Autonomy Compute Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "payload_sensor_bay"
+      ],
+      "toCarrierSubModules": [
+        "mission_computer_stack"
+      ],
+      "componentWordIds": [
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module",
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder"
+      ],
+      "verificationActivityId": "interface_review:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:environmental_interface:structure_containment:pressure_boundary",
+      "interfaceId": "pressure_boundary",
+      "fromModuleId": "environmental_interface",
+      "fromModuleName": "Pressure Thermal Buoyancy Interface",
+      "toModuleId": "structure_containment",
+      "toModuleName": "Pressure Structure Containment",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "pressure_boundary_management",
+        "thermal_path"
+      ],
+      "toCarrierSubModules": [
+        "pressure_hull_shell"
+      ],
+      "componentWordIds": [
+        "cable_penetrator_seal",
+        "pressure_compensation_bladder",
+        "oil_fill_service_port",
+        "pressure_equalisation_valve",
+        "electronics_thermal_bridge",
+        "hull_heat_spreader_plate",
+        "battery_thermal_pad",
+        "thruster_heat_sink_collar",
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port"
+      ],
+      "verificationActivityId": "interface_review:environmental_interface:structure_containment:pressure_boundary",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:safety_protection:control_compute_communication:alarm_bus",
+      "interfaceId": "alarm_bus",
+      "fromModuleId": "safety_protection",
+      "fromModuleName": "Leak Abort And Recovery Safety",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Autonomy Compute Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "leak_detection",
+        "abort_recovery",
+        "pressure_fail_safe"
+      ],
+      "toCarrierSubModules": [
+        "mission_computer_stack",
+        "acoustic_communications",
+        "software_health_management"
+      ],
+      "componentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad",
+        "recovery_beacon",
+        "drop_weight_release",
+        "emergency_strobe",
+        "surface_flag_float",
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug",
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder",
+        "acoustic_modem",
+        "acoustic_transducer_mount",
+        "acoustic_isolation_pad",
+        "surface_command_protocol_adapter",
+        "failsafe_state_machine",
+        "time_sync_module",
+        "configuration_backup_storage",
+        "debug_service_port"
+      ],
+      "verificationActivityId": "interface_review:safety_protection:control_compute_communication:alarm_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:safety_protection:structure_containment:pressure_boundary",
+      "interfaceId": "pressure_boundary",
+      "fromModuleId": "safety_protection",
+      "fromModuleName": "Leak Abort And Recovery Safety",
+      "toModuleId": "structure_containment",
+      "toModuleName": "Pressure Structure Containment",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "leak_detection",
+        "pressure_fail_safe"
+      ],
+      "toCarrierSubModules": [
+        "pressure_hull_shell"
+      ],
+      "componentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad",
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug",
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port"
+      ],
+      "verificationActivityId": "interface_review:safety_protection:structure_containment:pressure_boundary",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Collect named interface-review evidence through verification intake."
+  ]
+}

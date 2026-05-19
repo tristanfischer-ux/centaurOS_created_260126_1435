@@ -1,0 +1,362 @@
+{
+  "summary": {
+    "rows": 22,
+    "briefSupported": 3,
+    "modelPresent": 3,
+    "reviewRequired": 6,
+    "sourceRequired": 10,
+    "blocked": 0,
+    "architectureBlockers": 0,
+    "bomBlockers": 10
+  },
+  "rows": [
+    {
+      "linkedRequirements": [
+        "envelope_length_m"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:envelope_length_m",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Envelope length",
+      "assumption": "Envelope length = 2.4 m is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "envelope_width_m"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:envelope_width_m",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Envelope width",
+      "assumption": "Envelope width = 1.4 m is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "footprint_m2"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:footprint_m2",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Footprint",
+      "assumption": "Footprint = 3.36 m2 is treated as a design input, not as independently verified truth.",
+      "basis": "length_m * width_m",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "metric:headline_output",
+      "category": "derived_metric",
+      "status": "review_required",
+      "scope": "Annual leafy-green yield",
+      "assumption": "Annual leafy-green yield uses class_pack_default with low confidence.",
+      "basis": "class_pack:vertical_farm.class_pack; formula:class_pack_default",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:capex_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated CAPEX",
+      "assumption": "Estimated CAPEX uses an implicit model with low confidence.",
+      "basis": "formula:capex=sum(bom.totalCostGbp); class_pack:vertical_farm.class_pack",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:opex_annual_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated annual OPEX",
+      "assumption": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "basis": "formula:opex=capex*0.04",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:farm_footprint",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Grow Unit Footprint",
+      "assumption": "Grow Unit Footprint currently evaluates as pass against 1 to 20 m2 for compact prototype grow units.",
+      "basis": "brief:input.brief; formula:length_m * width_m; model:engineering_sanity.vertical_farm; model:engineering_sanity.vertical_farm",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:farm_wet_electrical_separation",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Wet/Electrical Separation",
+      "assumption": "Wet/Electrical Separation currently evaluates as pass against washdown boundary, mains supply and protective-earth interfaces present.",
+      "basis": "model:engineering_sanity.vertical_farm; model:engineering_sanity.vertical_farm",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:farm_process_closure",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Climate/Nutrient/Control Closure",
+      "assumption": "Climate/Nutrient/Control Closure currently evaluates as pass against environmental, nutrient transport, sensing and control modules all present.",
+      "basis": "model:engineering_sanity.vertical_farm; model:engineering_sanity.vertical_farm",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "actuator_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:environmental_interface:actuator_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> environmental_interface",
+      "assumption": "actuator_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Farm controller must command lighting, CO2 dosing and airflow.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "actuator_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:mass_fluid_transport_process:actuator_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> mass_fluid_transport_process",
+      "assumption": "actuator_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Farm controller must command fertigation pumps and nutrient circulation.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "sensor_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:environmental_interface:mass_fluid_transport_process:sensor_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "environmental_interface -> mass_fluid_transport_process",
+      "assumption": "sensor_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Climate and fertigation state must be observable by the same control layer.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "growing_rack_structure"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:structure_containment_growing_rack_stack_growing_rack_structure",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Growing rack structure",
+      "assumption": "Growing rack structure is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.vertical_farm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "led_grow_lights"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_horticultural_lighting_led_grow_lights",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "LED grow lights",
+      "assumption": "LED grow lights is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.vertical_farm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "air_circulation_fans"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_canopy_air_mixing_air_circulation_fans",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Air circulation fans",
+      "assumption": "Air circulation fans is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.vertical_farm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "co2_sensor_or_dosing"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_co2_enrichment_co2_sensor_or_dosing",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "CO2 sensor or dosing",
+      "assumption": "CO2 sensor or dosing is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.vertical_farm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "reservoir_and_plumbing_set"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Reservoir and plumbing set",
+      "assumption": "Reservoir and plumbing set is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.vertical_farm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "nutrient_pump"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:mass_fluid_transport_process_fertigation_pumping_nutrient_pump",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Nutrient pump",
+      "assumption": "Nutrient pump is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.vertical_farm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "environmental_controller"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_environmental_controller_environmental_controller",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Environmental controller",
+      "assumption": "Environmental controller is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.vertical_farm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "rcd_isolator_panel"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:power_distribution_mains_panel_rcd_isolator_panel",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "RCD isolator panel",
+      "assumption": "RCD isolator panel is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.vertical_farm",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:CE-UKCA",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "CE-UKCA",
+      "assumption": "Electrical safety and UKCA/CE file is relevant to this product class in UK/EU.",
+      "basis": "class_pack:vertical_farm.class_pack",
+      "evidenceRequired": "Technical file, electrical risk assessment and declarations."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:WRAS",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "WRAS",
+      "assumption": "Water fittings compliance is relevant to this product class in UK.",
+      "basis": "class_pack:vertical_farm.class_pack",
+      "evidenceRequired": "Approved fittings or evidence for water-contact components."
+    }
+  ]
+}

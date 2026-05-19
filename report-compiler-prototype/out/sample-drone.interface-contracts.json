@@ -1,0 +1,384 @@
+{
+  "summary": {
+    "requiredContracts": 3,
+    "presentContracts": 3,
+    "missingContracts": 0,
+    "sharedInterfaces": 9,
+    "localOnlyInterfaces": 3
+  },
+  "requiredContracts": [
+    {
+      "id": "required:energy_storage_source:actuation_kinematics:power_bus",
+      "interfaceId": "power_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "energy_storage_source",
+        "moduleName": "Flight Energy Storage",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "flight_battery_pack",
+            "subModuleName": "Flight battery pack",
+            "componentWordIds": [
+              "flight_battery_pack",
+              "high_discharge_cell_group",
+              "battery_management_pcb",
+              "xt90_anti_spark_connector",
+              "pack_temperature_sensor"
+            ]
+          },
+          {
+            "subModuleId": "power_monitoring",
+            "subModuleName": "Power monitoring",
+            "componentWordIds": [
+              "power_module_shunt",
+              "voltage_divider_board",
+              "low_voltage_alarm_output",
+              "battery_telemetry_connector"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "actuation_kinematics",
+        "moduleName": "Propulsion And Flight Actuation",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "motor_sets",
+            "subModuleName": "Motor sets",
+            "componentWordIds": [
+              "brushless_motors",
+              "motor_mounting_screw_set",
+              "motor_phase_lead_set",
+              "motor_bearing_shield"
+            ]
+          },
+          {
+            "subModuleId": "esc_stack",
+            "subModuleName": "ESC stack",
+            "componentWordIds": [
+              "esc",
+              "esc_cooling_plate",
+              "pwm_signal_harness",
+              "current_telemetry_line",
+              "esc_conformal_coating"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Flight battery must feed propulsion loads through an explicit power bus.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:control_compute_communication:actuation_kinematics:motor_drive",
+      "interfaceId": "motor_drive",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Flight Control Compute And Communications",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "flight_controller_stack",
+            "subModuleName": "Flight controller stack",
+            "componentWordIds": [
+              "flight_controller",
+              "imu_vibration_isolation_mount",
+              "barometer_foam_cover",
+              "sd_card_flight_logger",
+              "failsafe_firmware_profile"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "actuation_kinematics",
+        "moduleName": "Propulsion And Flight Actuation",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "motor_sets",
+            "subModuleName": "Motor sets",
+            "componentWordIds": [
+              "brushless_motors",
+              "motor_mounting_screw_set",
+              "motor_phase_lead_set",
+              "motor_bearing_shield"
+            ]
+          },
+          {
+            "subModuleId": "esc_stack",
+            "subModuleName": "ESC stack",
+            "componentWordIds": [
+              "esc",
+              "esc_cooling_plate",
+              "pwm_signal_harness",
+              "current_telemetry_line",
+              "esc_conformal_coating"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Flight controller must command ESC/motor drive outputs.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:control_compute_communication:sensing_instrumentation:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Flight Control Compute And Communications",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "flight_controller_stack",
+            "subModuleName": "Flight controller stack",
+            "componentWordIds": [
+              "flight_controller",
+              "imu_vibration_isolation_mount",
+              "barometer_foam_cover",
+              "sd_card_flight_logger",
+              "failsafe_firmware_profile"
+            ]
+          },
+          {
+            "subModuleId": "radio_navigation_link",
+            "subModuleName": "Radio and navigation link",
+            "componentWordIds": [
+              "radio_and_gnss_link",
+              "gnss_antenna_mast",
+              "rc_receiver",
+              "telemetry_radio_module",
+              "antenna_diversity_mount"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Navigation And Cinematography Sensing",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "navigation_sensors",
+            "subModuleName": "Navigation sensors",
+            "componentWordIds": [
+              "magnetometer_module",
+              "rangefinder_altimeter",
+              "optical_flow_sensor",
+              "airspeed_estimate_port"
+            ]
+          },
+          {
+            "subModuleId": "health_sensing",
+            "subModuleName": "Health sensing",
+            "componentWordIds": [
+              "vibration_monitor_pad",
+              "payload_presence_switch",
+              "avionics_temperature_probe",
+              "landing_contact_switch"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Flight controller must receive navigation and payload state.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    }
+  ],
+  "sharedInterfaces": [
+    {
+      "interfaceId": "alarm_bus",
+      "status": "local_only",
+      "moduleIds": [
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Flight Safety And Containment"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "charger_interface",
+      "status": "local_only",
+      "moduleIds": [
+        "energy_storage_source"
+      ],
+      "moduleNames": [
+        "Flight Energy Storage"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "protective_earth",
+      "status": "local_only",
+      "moduleIds": [
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Aircraft Power Distribution"
+      ],
+      "carrierSubModuleCount": 0
+    },
+    {
+      "interfaceId": "battery_mount",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "energy_storage_source"
+      ],
+      "moduleNames": [
+        "Airframe Structure And Payload Mounting",
+        "Flight Energy Storage"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "motor_drive",
+      "status": "shared",
+      "moduleIds": [
+        "actuation_kinematics",
+        "control_compute_communication",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Propulsion And Flight Actuation",
+        "Flight Control Compute And Communications",
+        "Aircraft Power Distribution"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "motor_mounts",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "actuation_kinematics",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Airframe Structure And Payload Mounting",
+        "Propulsion And Flight Actuation",
+        "Field Maintenance And Serviceability"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "payload_mount",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "sensing_instrumentation",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Airframe Structure And Payload Mounting",
+        "Navigation And Cinematography Sensing",
+        "Field Maintenance And Serviceability"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "power_bus",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "energy_storage_source",
+        "actuation_kinematics",
+        "control_compute_communication",
+        "power_distribution",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Airframe Structure And Payload Mounting",
+        "Flight Energy Storage",
+        "Propulsion And Flight Actuation",
+        "Flight Control Compute And Communications",
+        "Aircraft Power Distribution",
+        "Flight Safety And Containment"
+      ],
+      "carrierSubModuleCount": 12
+    },
+    {
+      "interfaceId": "radio_link",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "safety_protection",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Flight Control Compute And Communications",
+        "Flight Safety And Containment",
+        "Ground Operator Interface"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "sensor_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "actuation_kinematics",
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "power_distribution",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Flight Energy Storage",
+        "Propulsion And Flight Actuation",
+        "Flight Control Compute And Communications",
+        "Navigation And Cinematography Sensing",
+        "Aircraft Power Distribution",
+        "Flight Safety And Containment"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "service_access",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "energy_storage_source",
+        "safety_protection",
+        "maintenance_serviceability",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Airframe Structure And Payload Mounting",
+        "Flight Energy Storage",
+        "Flight Safety And Containment",
+        "Field Maintenance And Serviceability",
+        "Ground Operator Interface"
+      ],
+      "carrierSubModuleCount": 6
+    },
+    {
+      "interfaceId": "video_link",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "power_distribution",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Airframe Structure And Payload Mounting",
+        "Flight Control Compute And Communications",
+        "Navigation And Cinematography Sensing",
+        "Aircraft Power Distribution",
+        "Ground Operator Interface"
+      ],
+      "carrierSubModuleCount": 6
+    }
+  ]
+}

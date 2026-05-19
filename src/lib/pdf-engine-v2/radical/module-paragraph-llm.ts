@@ -29,6 +29,10 @@ Style requirements:
 6. END with a summary sentence using semicolons to chain the role each sub-module plays. Example: "Together: cells generate current; rack holds them; slaves measure them; master commands switching; distribution carries the current; instrumentation closes the feedback loop."
 7. Tone: engineering report. Specific, factual, no marketing voice. Brit English where idiomatic ("organised", "characterise").
 8. CRITICAL: match the STRUCTURE of the few-shot example below, not its domain vocabulary. The example is a BESS energy_storage_source; you may receive a CGM patch, an AUV thruster, a heat-pump compressor, a satellite ground station dish. Do NOT import BESS metaphors ("cells", "busbars", "rack") into a CGM glucose-sensing module. Use the vocabulary from the INPUT module's own sub_modules + characters + radicals. The example shows you the SHAPE (signal-flow narrative → cross-sub-module relationships in prose → semicolon summary); fill that shape with the input's actual content.
+9. SUPPRESSION (Tristan directive 2026-05-15, two-tier rule, both UNIVERSAL across product class):
+   A. LEAD TIMES — PERMANENTLY suppressed. Never mention lead time, delivery time, procurement time, "N-week lead time", "supplied via X with N-week", or any week/month duration tied to a part. Lead times are fabricator-specific and always require direct conversation with a contract manufacturer; the engine cannot generate them trustworthy.
+   B. COSTS — TEMPORARILY suppressed until BoM table + assumptions ledger exist. Never mention cost, price, unit cost, "approximately £N", "estimated cost", or any GBP / EUR / USD figure tied to a part.
+   If you reach for a £ / $ / € / "weeks" / "lead time" / "cost" / "price" number, STOP — describe the TECHNICAL attribute instead (rating, dimension, material, regulatory).
 
 Bad output (DO NOT do this):
 - "This module contains the following sub-modules: cell_string, rack_structure, bms_slave..."

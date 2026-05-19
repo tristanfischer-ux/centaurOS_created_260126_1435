@@ -11,6 +11,7 @@
  */
 
 import type { StageResult } from '../types'
+import { getActionLogger } from '../lib/action-logger'
 
 export interface BriefRevision {
   /** The revised 5-section Brief text */
@@ -66,9 +67,18 @@ export async function runBriefRevision(
   productClass: string,
 ): Promise<StageResult<BriefRevision>> {
   const startTime = Date.now()
+  const logger = getActionLogger()
+  logger.logStage({
+    step_name: 'brief-revision',
+    action_type: 'stage_start',
+    product_class: productClass,
+    feasibility_text_length: feasibilityText.length,
+  })
   console.log('[brief-rev] Revising Brief after Feasibility findings...')
 
+  const MODEL = 'google/gemini-3.1-pro-preview'
   try {
+    const t0 = Date.now()
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -76,7 +86,7 @@ export async function runBriefRevision(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3.1-pro-preview',
+        model: MODEL,
         // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
         max_tokens: 150_000,
         temperature: 0.3,
@@ -89,12 +99,29 @@ export async function runBriefRevision(
     })
 
     if (!response.ok) {
+      logger.logLlm({
+        step_name: 'brief-revision',
+        model: MODEL,
+        latency_ms: Date.now() - t0,
+        ok: false,
+        error: `OpenRouter API ${response.status}`,
+      })
       throw new Error(`OpenRouter API ${response.status}`)
     }
 
     const json = await response.json()
+    logger.logLlm({
+      step_name: 'brief-revision',
+      model: MODEL,
+      prompt_tokens: json?.usage?.prompt_tokens,
+      completion_tokens: json?.usage?.completion_tokens,
+      latency_ms: Date.now() - t0,
+      finish_reason: json?.choices?.[0]?.finish_reason,
+      ok: true,
+    })
+
     const raw = json.choices?.[0]?.message?.content || ''
-    
+
     if (!raw) {
       throw new Error('Empty response from LLM')
     }
@@ -117,6 +144,14 @@ export async function runBriefRevision(
     const hasRevisions = changes.length > 0
     console.log(`[brief-rev] ${changes.length} revisions made`)
 
+    logger.logStage({
+      step_name: 'brief-revision',
+      action_type: 'stage_end',
+      outcome: 'ok',
+      duration_ms: Date.now() - startTime,
+      changes_count: changes.length,
+      has_revisions: hasRevisions,
+    })
     return {
       ok: true,
       data: { revisedBriefText, changes, hasRevisions },
@@ -125,6 +160,13 @@ export async function runBriefRevision(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(`[brief-rev] Failed: ${message}`)
+    logger.logStage({
+      step_name: 'brief-revision',
+      action_type: 'stage_end',
+      outcome: 'fail',
+      duration_ms: Date.now() - startTime,
+      error: message,
+    })
     return {
       ok: false,
       error: message,

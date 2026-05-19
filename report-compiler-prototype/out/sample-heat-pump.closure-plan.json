@@ -1,0 +1,563 @@
+{
+  "summary": {
+    "phases": 4,
+    "rows": 47,
+    "blockers": 15,
+    "majors": 32,
+    "minors": 0,
+    "architectureRevisionRows": 0,
+    "sourcingIntakeRows": 12,
+    "engineeringReviewRows": 7,
+    "verificationIntakeRows": 27,
+    "scoreRepairRows": 1,
+    "nextPhase": "sourcing_intake"
+  },
+  "phases": [
+    {
+      "id": "sourcing_intake",
+      "title": "Admit Source-Backed BoM Evidence",
+      "sequence": 2,
+      "rowCount": 12,
+      "blockerCount": 12,
+      "majorCount": 0,
+      "minorCount": 0,
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "entryCriteria": [
+        "Architecture is reviewable enough to identify critical component candidates."
+      ],
+      "exitCriteria": [
+        "Every critical BoM line has admitted supplier, manufacturer, MPN, unit cost and source reference.",
+        "BoM provenance manifest has zero critical missing-source claims."
+      ],
+      "rationale": "Critical BoM costs, suppliers, manufacturers and MPNs must be source-backed before cost claims are credible.",
+      "topRows": [
+        {
+          "id": "assumption:metric:capex_gbp",
+          "kind": "assumption_review",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Estimated CAPEX",
+          "issue": "Estimated CAPEX uses an implicit model with low confidence.",
+          "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:metric:opex_annual_gbp",
+          "kind": "assumption_review",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Estimated annual OPEX",
+          "issue": "Estimated annual OPEX uses an implicit model with low confidence.",
+          "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+          "linkedIds": []
+        },
+        {
+          "id": "readiness:2",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "9 critical BoM line(s) lack source-backed cost evidence.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        },
+        {
+          "id": "sourcing:brazed_plate_heat_exchanger",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Brazed plate heat exchanger",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "brazed_plate_heat_exchanger"
+          ]
+        },
+        {
+          "id": "sourcing:electronic_expansion_valve",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Electronic expansion valve",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "electronic_expansion_valve"
+          ]
+        },
+        {
+          "id": "sourcing:heat_pump_controller_pcb",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Heat pump controller PCB",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "heat_pump_controller_pcb"
+          ]
+        },
+        {
+          "id": "sourcing:hydronic_circulation_pump",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Hydronic circulation pump",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "hydronic_circulation_pump"
+          ]
+        },
+        {
+          "id": "sourcing:hydronic_safety_valve_kit",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Hydronic safety valve kit",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "hydronic_safety_valve_kit"
+          ]
+        },
+        {
+          "id": "sourcing:inverter_scroll_compressor",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Inverter scroll compressor",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "inverter_scroll_compressor"
+          ]
+        },
+        {
+          "id": "sourcing:outdoor_finned_evaporator_coil",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Outdoor finned evaporator coil",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "outdoor_finned_evaporator_coil"
+          ]
+        },
+        {
+          "id": "sourcing:refrigerant_sensor_and_pressure_transducers",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Refrigerant sensor and pressure transducers",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "refrigerant_sensor_and_pressure_transducers"
+          ]
+        },
+        {
+          "id": "sourcing:variable_speed_fan_assembly",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Variable-speed fan assembly",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "variable_speed_fan_assembly"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "engineering_review",
+      "title": "Complete Engineering Review",
+      "sequence": 3,
+      "rowCount": 7,
+      "blockerCount": 0,
+      "majorCount": 7,
+      "minorCount": 0,
+      "blocks": [
+        "publishable"
+      ],
+      "entryCriteria": [
+        "Calculations and assumptions have named scope, formula or model basis."
+      ],
+      "exitCriteria": [
+        "All calculation and assumption review rows are accepted, revised or explicitly deferred with reviewer rationale."
+      ],
+      "rationale": "Deterministic arithmetic can expose claims, but engineering judgment must review envelopes, assumptions and operating cases.",
+      "topRows": [
+        {
+          "id": "assumption:compliance:EN-14511",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "EN-14511",
+          "issue": "Heat pump performance test conditions is relevant to this product class in UK/EU.",
+          "requiredEvidence": "Capacity, COP and operating-point test evidence.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:compliance:EN-378",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "EN-378",
+          "issue": "Refrigerating systems and heat pumps safety is relevant to this product class in UK/EU.",
+          "requiredEvidence": "Refrigerant charge, pressure protection and safety assessment.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:compliance:EN-60335-2-40",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "EN-60335-2-40",
+          "issue": "Electrical safety for heat pumps and air conditioners is relevant to this product class in UK/EU.",
+          "requiredEvidence": "Electrical safety, leakage, temperature and abnormal-operation evidence.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:metric:headline_output",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "Annual useful heat output",
+          "issue": "Annual useful heat output uses thermal_output_kw * annual_full_load_hours with medium confidence.",
+          "requiredEvidence": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:sanity:heatpump_cop_input_power",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "COP And Input Power",
+          "issue": "COP And Input Power currently evaluates as pass against COP 2.5 to 5.5 for plausible air-source heat-pump operating points.",
+          "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+          "linkedIds": [
+            "thermal_output_kw",
+            "cop"
+          ]
+        },
+        {
+          "id": "assumption:sanity:heatpump_refrigerant_hydronic_closure",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "Refrigerant/Hydronic Closure",
+          "issue": "Refrigerant/Hydronic Closure currently evaluates as pass against refrigerant loop, hydronic loop, control bus and sensor bus present.",
+          "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+          "linkedIds": [
+            "thermal_output_kw",
+            "cop"
+          ]
+        },
+        {
+          "id": "assumption:sanity:heatpump_safety_serviceability",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "Safety And Serviceability Interfaces",
+          "issue": "Safety And Serviceability Interfaces currently evaluates as pass against pressure relief, protective earth, condensate drain and service access present.",
+          "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+          "linkedIds": []
+        }
+      ]
+    },
+    {
+      "id": "verification_intake",
+      "title": "Accept Reviewer Evidence",
+      "sequence": 4,
+      "rowCount": 27,
+      "blockerCount": 2,
+      "majorCount": 25,
+      "minorCount": 0,
+      "blocks": [
+        "publishable"
+      ],
+      "entryCriteria": [
+        "Verification intake template has non-source activities ready for reviewer evidence."
+      ],
+      "exitCriteria": [
+        "Every non-source verification activity is accepted, or explicitly deferred and removed from publication criteria."
+      ],
+      "rationale": "Reviewer acceptance is tracked separately from deterministic scoring and must close before publication.",
+      "topRows": [
+        {
+          "id": "readiness:3",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "5 verification activity/activities remain blocked.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        },
+        {
+          "id": "readiness:4",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "0/25 non-sourcing verification activity/activities have accepted reviewer evidence.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        },
+        {
+          "id": "verification:calculation:control_compute_communication",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Control Compute Communication",
+          "issue": "Verify Control Compute Communication requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:control_compute_communication"
+          ]
+        },
+        {
+          "id": "verification:calculation:energy_conversion_transduction",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Refrigerant Energy Conversion",
+          "issue": "Verify Refrigerant Energy Conversion requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:energy_conversion_transduction"
+          ]
+        },
+        {
+          "id": "verification:calculation:environmental_interface",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Outdoor Air Interface",
+          "issue": "Verify Outdoor Air Interface requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:environmental_interface"
+          ]
+        },
+        {
+          "id": "verification:calculation:mass_fluid_transport_process",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Hydronic Heat Delivery",
+          "issue": "Verify Hydronic Heat Delivery requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:mass_fluid_transport_process"
+          ]
+        },
+        {
+          "id": "verification:calculation:sensing_instrumentation",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Sensing Instrumentation",
+          "issue": "Verify Sensing Instrumentation requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:sensing_instrumentation"
+          ]
+        },
+        {
+          "id": "verification:compliance_review:EN-14511",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "System Compliance",
+          "issue": "Plan evidence for EN-14511",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "compliance_review:EN-14511"
+          ]
+        },
+        {
+          "id": "verification:compliance_review:EN-378",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "System Compliance",
+          "issue": "Plan evidence for EN-378",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "compliance_review:EN-378"
+          ]
+        },
+        {
+          "id": "verification:compliance_review:EN-60335-2-40",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "System Compliance",
+          "issue": "Plan evidence for EN-60335-2-40",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "compliance_review:EN-60335-2-40"
+          ]
+        },
+        {
+          "id": "verification:design_review:control_compute_communication",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Control Compute Communication",
+          "issue": "Review Control Compute Communication architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:control_compute_communication"
+          ]
+        },
+        {
+          "id": "verification:design_review:energy_conversion_transduction",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Refrigerant Energy Conversion",
+          "issue": "Review Refrigerant Energy Conversion architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:energy_conversion_transduction"
+          ]
+        },
+        {
+          "id": "verification:design_review:environmental_interface",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Outdoor Air Interface",
+          "issue": "Review Outdoor Air Interface architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:environmental_interface"
+          ]
+        },
+        {
+          "id": "verification:design_review:hmi_ergonomics",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "User And Installer Interface",
+          "issue": "Review User And Installer Interface architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:hmi_ergonomics"
+          ]
+        },
+        {
+          "id": "verification:design_review:maintenance_serviceability",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Maintenance And Commissioning",
+          "issue": "Review Maintenance And Commissioning architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:maintenance_serviceability"
+          ]
+        },
+        {
+          "id": "verification:design_review:mass_fluid_transport_process",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Hydronic Heat Delivery",
+          "issue": "Review Hydronic Heat Delivery architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:mass_fluid_transport_process"
+          ]
+        },
+        {
+          "id": "verification:design_review:power_distribution",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Electrical Power Distribution",
+          "issue": "Review Electrical Power Distribution architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:power_distribution"
+          ]
+        },
+        {
+          "id": "verification:design_review:safety_protection",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Safety Protection",
+          "issue": "Review Safety Protection architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:safety_protection"
+          ]
+        },
+        {
+          "id": "verification:design_review:sensing_instrumentation",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Sensing Instrumentation",
+          "issue": "Review Sensing Instrumentation architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:sensing_instrumentation"
+          ]
+        },
+        {
+          "id": "verification:design_review:structure_containment",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Monobloc Structure And Containment",
+          "issue": "Review Monobloc Structure And Containment architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:structure_containment"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "score_repair",
+      "title": "Repair Remaining Section Scores",
+      "sequence": 5,
+      "rowCount": 1,
+      "blockerCount": 1,
+      "majorCount": 0,
+      "minorCount": 0,
+      "blocks": [
+        "publishable"
+      ],
+      "entryCriteria": [
+        "All directly closable evidence rows have been processed, but deterministic section score gaps remain."
+      ],
+      "exitCriteria": [
+        "Every scored report section is at or above target and readiness verdict is publishable."
+      ],
+      "rationale": "After evidence intake, rerun scoring to remove residual deterministic section blockers.",
+      "topRows": [
+        {
+          "id": "readiness:1",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "bom score 1 is below 8.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        }
+      ]
+    }
+  ]
+}

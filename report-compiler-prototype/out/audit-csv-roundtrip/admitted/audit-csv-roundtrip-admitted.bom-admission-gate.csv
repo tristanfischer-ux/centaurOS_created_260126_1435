@@ -1,0 +1,8 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+sourcing_authorization,pass,sourcing_authorized; authorized yes; 6/6 areas pass.,1,,"Sourcing is authorized, so the BoM may be shown as a candidate sourcing queue."
+candidate_bom_scope,pass,"204 candidate BoM line(s), 6 critical line(s).",1,,Candidate BoM scope exists for sourcing and evidence collection.
+source_admission_state,pass,"1 admitted source row(s), 0 rejected source row(s), 1/204 priced line(s).",0,,Admitted source rows may populate only their matched BoM fields.
+critical_bom_admission,review,1/6 critical line(s) have admitted unit costs; 5 critical line(s) remain unpriced.,0.17,,"Continue sourcing until every critical BoM line has admitted source-backed supplier, MPN and price evidence."
+source_reference_quality,review,protocol_source_only; 0/1 source-quality rows pass; 1 protocol fixture row(s).,0,,"Replace weak, protocol or placeholder source references before production BoM admission."
+provenance_boundary,review,"5 source-backed claim(s), 20 critical missing-source claim(s), 0 provenance violation(s).",0.98,,Missing critical source claims are acceptable only in candidate-only mode; collect evidence before priced BoM use.
+display_mode,review,Display mode will be protocol_priced_fixture.,0.5,,Show protocol-priced rows only as fixture evidence; do not use for production cost claims.

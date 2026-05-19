@@ -1,0 +1,999 @@
+{
+  "summary": {
+    "activities": 32,
+    "readyForReview": 19,
+    "open": 7,
+    "blocked": 6,
+    "designReviewActivities": 9,
+    "calculationActivities": 4,
+    "interfaceReviewActivities": 6,
+    "sourceEvidenceActivities": 6,
+    "complianceReviewActivities": 7
+  },
+  "activities": [
+    {
+      "id": "design_review:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Sterile Structure Containment",
+      "activity": "Review Sterile Structure Containment architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "interfaceIds": [
+        "sterile_boundary",
+        "sterile_fluid_path",
+        "mechanical_mounts",
+        "service_access",
+        "pressure_relief"
+      ],
+      "componentWordIds": [
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label",
+        "stainless_support_frame",
+        "load_cell_mounting_bracket_set",
+        "levelling_foot_set",
+        "lifting_eye_kit",
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Sterile Structure Containment",
+      "activity": "Verify Sterile Structure Containment requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Sterile Structure Containment",
+      "activity": "Collect source-backed evidence for Sterile Structure Containment critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "single_use_bioreactor_bag",
+        "sterile_tubing_and_connector_set"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "single_use_bioreactor_bag",
+        "sterile_tubing_and_connector_set"
+      ]
+    },
+    {
+      "id": "design_review:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Mixing And Agitation",
+      "activity": "Review Mixing And Agitation architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "interfaceIds": [
+        "mixing_drive",
+        "control_bus",
+        "sterile_boundary",
+        "sensor_bus",
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "agitation_drive",
+        "magnetic_coupling_hub",
+        "drive_encoder",
+        "motor_mounting_plate",
+        "single_use_impeller_coupling",
+        "impeller_guard_insert",
+        "rocker_angle_stop",
+        "mixing_validation_coupon",
+        "motor_current_sensor",
+        "overspeed_interlock_input",
+        "drive_fault_relay",
+        "emergency_drive_stop_contactor"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Mixing And Agitation",
+      "activity": "Verify Mixing And Agitation requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Mixing And Agitation",
+      "activity": "Collect source-backed evidence for Mixing And Agitation critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "agitation_drive"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "agitation_drive"
+      ]
+    },
+    {
+      "id": "design_review:mass_fluid_transport_process",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Media Gas And Harvest Transport",
+      "activity": "Review Media Gas And Harvest Transport architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "interfaceIds": [
+        "sterile_fluid_path",
+        "gas_path",
+        "pump_control",
+        "control_bus",
+        "sensor_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp",
+        "harvest_transfer_tubing_set",
+        "single_use_sample_valve",
+        "waste_collection_bag",
+        "low_hold_up_connector",
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:mass_fluid_transport_process",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Media Gas And Harvest Transport",
+      "activity": "Verify Media Gas And Harvest Transport requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:mass_fluid_transport_process",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Media Gas And Harvest Transport",
+      "activity": "Collect source-backed evidence for Media Gas And Harvest Transport critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "peristaltic_feed_pump",
+        "sparger_and_gas_mix_manifold"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "peristaltic_feed_pump",
+        "sparger_and_gas_mix_manifold"
+      ]
+    },
+    {
+      "id": "design_review:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Gas Exhaust Interface",
+      "activity": "Review Thermal Gas Exhaust Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "interfaceIds": [
+        "thermal_loop",
+        "gas_path",
+        "exhaust_path",
+        "sterile_boundary",
+        "sensor_bus",
+        "control_bus",
+        "pressure_relief",
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "temperature_control_loop",
+        "heater_blanket",
+        "cooling_plate",
+        "thermal_interface_mat",
+        "exhaust_filter_and_pressure_relief_set",
+        "condensate_knock_out_bottle",
+        "exhaust_heater_sleeve",
+        "pressure_relief_indicator",
+        "ambient_temperature_probe",
+        "clean_zone_status_beacon",
+        "splash_guard_panel",
+        "wipe_down_surface_kit"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Gas Exhaust Interface",
+      "activity": "Verify Thermal Gas Exhaust Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [
+        "bioreactor_working_volume",
+        "bioreactor_process_closure",
+        "bioreactor_aseptic_pressure_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Gas Exhaust Interface",
+      "activity": "Collect source-backed evidence for Thermal Gas Exhaust Interface critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "working_volume_l"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "temperature_control_loop",
+        "exhaust_filter_and_pressure_relief_set"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "temperature_control_loop",
+        "exhaust_filter_and_pressure_relief_set"
+      ]
+    },
+    {
+      "id": "design_review:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Process Sensing Instrumentation",
+      "activity": "Review Process Sensing Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_bus",
+        "sterile_fluid_path",
+        "gas_path",
+        "thermal_loop",
+        "pressure_relief",
+        "mechanical_mounts",
+        "exhaust_path"
+      ],
+      "componentWordIds": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor",
+        "sensor_patch_reader",
+        "sensor_calibration_record_card",
+        "load_cell_set",
+        "bag_pressure_transducer",
+        "culture_temperature_probe",
+        "foam_detection_probe",
+        "gas_flow_sensor_set",
+        "exhaust_pressure_sensor",
+        "oxygen_analyser_cell",
+        "co2_analyser_cell"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Process Sensing Instrumentation",
+      "activity": "Collect source-backed evidence for Process Sensing Instrumentation critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor",
+        "load_cell_set"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor",
+        "load_cell_set"
+      ]
+    },
+    {
+      "id": "design_review:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "activity": "Review Control Compute Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "control_bus",
+        "sensor_bus",
+        "pump_control",
+        "batch_record_network",
+        "alarm_bus",
+        "service_port"
+      ],
+      "componentWordIds": [
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware",
+        "batch_historian_module",
+        "audit_trail_storage",
+        "ethernet_switch",
+        "secure_time_source",
+        "alarm_annunciator",
+        "operator_hmi_panel",
+        "role_access_key_switch",
+        "batch_acknowledge_button"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "activity": "Collect source-backed evidence for Control Compute Communication critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "bioreactor_controller"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "bioreactor_controller"
+      ]
+    },
+    {
+      "id": "design_review:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "activity": "Review Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "mains_supply",
+        "protective_earth",
+        "control_bus",
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "rcd_mains_isolator",
+        "24_v_dc_power_supply",
+        "terminal_block_rail",
+        "panel_earth_bar",
+        "pump_power_distribution_loom",
+        "agitation_drive_breaker",
+        "heater_output_relay",
+        "cable_gland_plate",
+        "ups_buffer_module",
+        "safe_shutdown_relay",
+        "power_fail_input_module",
+        "shutdown_status_lamp"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Aseptic And Pressure Safety",
+      "activity": "Review Aseptic And Pressure Safety architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sterile_boundary",
+        "pressure_relief",
+        "exhaust_path",
+        "alarm_bus",
+        "protective_earth",
+        "service_access",
+        "mains_supply"
+      ],
+      "componentWordIds": [
+        "single_use_pressure_relief_valve",
+        "vent_filter_integrity_tag",
+        "pressure_alarm_relay",
+        "bag_burst_shield",
+        "sterile_connection_checklist_card",
+        "connector_tamper_seal_set",
+        "pre_use_integrity_test_kit",
+        "operator_gowning_placard",
+        "emergency_stop_button",
+        "door_interlock_switch",
+        "leak_tray_float_switch",
+        "protective_earth_test_point"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Setup Calibration And Service",
+      "activity": "Review Setup Calibration And Service architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "service_access",
+        "sterile_fluid_path",
+        "sensor_bus",
+        "batch_record_network",
+        "sterile_boundary"
+      ],
+      "componentWordIds": [
+        "bag_loading_fixture",
+        "tube_routing_template",
+        "connector_cap_organiser",
+        "setup_verification_barcode_sheet",
+        "ph_calibration_buffer_holder",
+        "do_zero_span_adapter",
+        "calibration_data_entry_hmi_page",
+        "sensor_replacement_guide_label",
+        "wipe_down_kit_holder",
+        "spill_tray_liner",
+        "spent_bag_removal_cart_interface",
+        "turnaround_checklist_card"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:structure_containment:mass_fluid_transport_process:sterile_fluid_path",
+      "moduleId": "structure_containment:mass_fluid_transport_process",
+      "moduleName": "Sterile Structure Containment -> Media Gas And Harvest Transport",
+      "activity": "Verify sterile_fluid_path interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sterile_fluid_path"
+      ],
+      "componentWordIds": [
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label",
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket",
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp",
+        "harvest_transfer_tubing_set",
+        "single_use_sample_valve",
+        "waste_collection_bag",
+        "low_hold_up_connector",
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve"
+      ],
+      "rationale": "The sterile bag must connect to feed, harvest and sampling fluid paths.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:actuation_kinematics:structure_containment:sterile_boundary",
+      "moduleId": "actuation_kinematics:structure_containment",
+      "moduleName": "Mixing And Agitation -> Sterile Structure Containment",
+      "activity": "Verify sterile_boundary interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sterile_boundary"
+      ],
+      "componentWordIds": [
+        "agitation_drive",
+        "magnetic_coupling_hub",
+        "drive_encoder",
+        "motor_mounting_plate",
+        "single_use_impeller_coupling",
+        "impeller_guard_insert",
+        "rocker_angle_stop",
+        "mixing_validation_coupon",
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label",
+        "sterile_tubing_and_connector_set",
+        "aseptic_sampling_port",
+        "clamp_rail",
+        "connector_parking_bracket"
+      ],
+      "rationale": "Mixing drive must couple into the disposable culture boundary without breaking sterility.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:mass_fluid_transport_process:environmental_interface:gas_path",
+      "moduleId": "mass_fluid_transport_process:environmental_interface",
+      "moduleName": "Media Gas And Harvest Transport -> Thermal Gas Exhaust Interface",
+      "activity": "Verify gas_path interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "gas_path"
+      ],
+      "componentWordIds": [
+        "sparger_and_gas_mix_manifold",
+        "mass_flow_controller_bank",
+        "sterile_gas_filter_capsule",
+        "sparger_check_valve",
+        "exhaust_filter_and_pressure_relief_set",
+        "condensate_knock_out_bottle",
+        "exhaust_heater_sleeve",
+        "pressure_relief_indicator"
+      ],
+      "rationale": "Sparging and exhaust conditioning must share a declared gas path.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Process Sensing Instrumentation -> Control Compute Communication",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "dissolved_oxygen_optical_sensor",
+        "single_use_ph_sensor",
+        "sensor_patch_reader",
+        "sensor_calibration_record_card",
+        "load_cell_set",
+        "bag_pressure_transducer",
+        "culture_temperature_probe",
+        "foam_detection_probe",
+        "gas_flow_sensor_set",
+        "exhaust_pressure_sensor",
+        "oxygen_analyser_cell",
+        "co2_analyser_cell",
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware",
+        "batch_historian_module",
+        "audit_trail_storage",
+        "ethernet_switch",
+        "secure_time_source"
+      ],
+      "rationale": "DO, pH, mass and temperature measurements must feed process control.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:control_compute_communication:mass_fluid_transport_process:pump_control",
+      "moduleId": "control_compute_communication:mass_fluid_transport_process",
+      "moduleName": "Control Compute Communication -> Media Gas And Harvest Transport",
+      "activity": "Verify pump_control interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "pump_control"
+      ],
+      "componentWordIds": [
+        "bioreactor_controller",
+        "i_o_terminal_slice_set",
+        "control_enclosure",
+        "recipe_execution_firmware",
+        "peristaltic_feed_pump",
+        "pump_tubing_cassette_set",
+        "media_bag_hanger",
+        "feed_line_pinch_clamp"
+      ],
+      "rationale": "Controller must command feed, harvest and gas-flow actuators.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:safety_protection:structure_containment:pressure_relief",
+      "moduleId": "safety_protection:structure_containment",
+      "moduleName": "Aseptic And Pressure Safety -> Sterile Structure Containment",
+      "activity": "Verify pressure_relief interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "pressure_relief"
+      ],
+      "componentWordIds": [
+        "single_use_pressure_relief_valve",
+        "vent_filter_integrity_tag",
+        "pressure_alarm_relay",
+        "bag_burst_shield",
+        "single_use_bioreactor_bag",
+        "bag_support_tray",
+        "port_clamp_set",
+        "bag_integrity_test_label"
+      ],
+      "rationale": "Disposable culture containment must connect to pressure relief and sterile exhaust protection.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "compliance_review:ISO-13485",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for ISO-13485",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Quality management for medical-device-adjacent manufacturing systems",
+      "acceptanceCriteria": [
+        "Supplier quality evidence, change control and traceability where applicable."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:USP-CLASS-VI",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for USP-CLASS-VI",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Biocompatibility for polymer contact materials",
+      "acceptanceCriteria": [
+        "Material certificates for single-use bag and tubing contact surfaces."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:IEC-61010",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for IEC-61010",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Electrical safety for laboratory control equipment",
+      "acceptanceCriteria": [
+        "Electrical safety design, protective earth and abnormal operation evidence."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:EU-GMP-ANNEX-11",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for EU-GMP-ANNEX-11",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Computerised systems for GMP records",
+      "acceptanceCriteria": [
+        "Batch record integrity, audit trail and access-control evidence."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:1",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Loss of sterility through connector or bag handling",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 180; mitigation: Closed sterile connectors, pre-use integrity checks and operator setup checklist.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:2",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Cell culture loss from DO or pH control failure",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 128; mitigation: Redundant alarming, sensor calibration and conservative gas/feed control limits.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:3",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Disposable bag overpressure",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 72; mitigation: Pressure relief, vent filter monitoring and pump/gas interlocks.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    }
+  ]
+}

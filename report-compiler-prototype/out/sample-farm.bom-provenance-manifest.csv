@@ -1,0 +1,611 @@
+lineId,componentWordId,description,critical,field,value,status,sourceRef,sourceQuote,retrievedAt,nextAction
+structure_containment_growing_rack_stack_growing_rack_structure,growing_rack_structure,Growing rack structure,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+structure_containment_growing_rack_stack_growing_rack_structure,growing_rack_structure,Growing rack structure,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+structure_containment_growing_rack_stack_growing_rack_structure,growing_rack_structure,Growing rack structure,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+structure_containment_growing_rack_stack_growing_rack_structure,growing_rack_structure,Growing rack structure,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+structure_containment_growing_rack_stack_growing_rack_structure,growing_rack_structure,Growing rack structure,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_aluminium_extrusion_upright,aluminium_extrusion_upright,aluminium extrusion upright,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_aluminium_extrusion_upright,aluminium_extrusion_upright,aluminium extrusion upright,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_aluminium_extrusion_upright,aluminium_extrusion_upright,aluminium extrusion upright,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_aluminium_extrusion_upright,aluminium_extrusion_upright,aluminium extrusion upright,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_aluminium_extrusion_upright,aluminium_extrusion_upright,aluminium extrusion upright,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_cross_brace_set,cross_brace_set,cross brace set,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_cross_brace_set,cross_brace_set,cross brace set,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_cross_brace_set,cross_brace_set,cross brace set,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_cross_brace_set,cross_brace_set,cross brace set,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_cross_brace_set,cross_brace_set,cross brace set,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_adjustable_levelling_foot,adjustable_levelling_foot,adjustable levelling foot,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_adjustable_levelling_foot,adjustable_levelling_foot,adjustable levelling foot,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_adjustable_levelling_foot,adjustable_levelling_foot,adjustable levelling foot,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_adjustable_levelling_foot,adjustable_levelling_foot,adjustable levelling foot,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_adjustable_levelling_foot,adjustable_levelling_foot,adjustable levelling foot,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_tray_slide_rail,tray_slide_rail,tray slide rail,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_tray_slide_rail,tray_slide_rail,tray slide rail,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_tray_slide_rail,tray_slide_rail,tray slide rail,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_tray_slide_rail,tray_slide_rail,tray slide rail,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_growing_rack_stack_tray_slide_rail,tray_slide_rail,tray slide rail,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_food_safe_grow_tray,food_safe_grow_tray,food-safe grow tray,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_food_safe_grow_tray,food_safe_grow_tray,food-safe grow tray,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_food_safe_grow_tray,food_safe_grow_tray,food-safe grow tray,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_food_safe_grow_tray,food_safe_grow_tray,food-safe grow tray,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_food_safe_grow_tray,food_safe_grow_tray,food-safe grow tray,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_nft_channel_insert,nft_channel_insert,NFT channel insert,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_nft_channel_insert,nft_channel_insert,NFT channel insert,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_nft_channel_insert,nft_channel_insert,NFT channel insert,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_nft_channel_insert,nft_channel_insert,NFT channel insert,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_nft_channel_insert,nft_channel_insert,NFT channel insert,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_seedling_raft,seedling_raft,seedling raft,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_seedling_raft,seedling_raft,seedling raft,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_seedling_raft,seedling_raft,seedling raft,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_seedling_raft,seedling_raft,seedling raft,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_seedling_raft,seedling_raft,seedling raft,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_root_zone_cover,root_zone_cover,root-zone cover,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_root_zone_cover,root_zone_cover,root-zone cover,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_root_zone_cover,root_zone_cover,root-zone cover,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_root_zone_cover,root_zone_cover,root-zone cover,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_root_zone_cover,root_zone_cover,root-zone cover,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_tray_drain_fitting,tray_drain_fitting,tray drain fitting,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_tray_drain_fitting,tray_drain_fitting,tray drain fitting,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_tray_drain_fitting,tray_drain_fitting,tray drain fitting,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_tray_drain_fitting,tray_drain_fitting,tray drain fitting,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_crop_tray_carriers_tray_drain_fitting,tray_drain_fitting,tray drain fitting,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_washdown_side_panel,washdown_side_panel,washdown side panel,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_washdown_side_panel,washdown_side_panel,washdown side panel,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_washdown_side_panel,washdown_side_panel,washdown side panel,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_washdown_side_panel,washdown_side_panel,washdown side panel,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_washdown_side_panel,washdown_side_panel,washdown side panel,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_clear_inspection_door,clear_inspection_door,clear inspection door,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_clear_inspection_door,clear_inspection_door,clear inspection door,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_clear_inspection_door,clear_inspection_door,clear inspection door,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_clear_inspection_door,clear_inspection_door,clear inspection door,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_clear_inspection_door,clear_inspection_door,clear inspection door,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_epdm_door_gasket,epdm_door_gasket,EPDM door gasket,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_epdm_door_gasket,epdm_door_gasket,EPDM door gasket,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_epdm_door_gasket,epdm_door_gasket,EPDM door gasket,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_epdm_door_gasket,epdm_door_gasket,EPDM door gasket,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_epdm_door_gasket,epdm_door_gasket,EPDM door gasket,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_condensate_drip_channel,condensate_drip_channel,condensate drip channel,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_condensate_drip_channel,condensate_drip_channel,condensate drip channel,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_condensate_drip_channel,condensate_drip_channel,condensate drip channel,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_condensate_drip_channel,condensate_drip_channel,condensate drip channel,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+structure_containment_enclosure_panels_condensate_drip_channel,condensate_drip_channel,condensate drip channel,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_led_grow_lights,led_grow_lights,LED grow lights,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_horticultural_lighting_led_grow_lights,led_grow_lights,LED grow lights,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_horticultural_lighting_led_grow_lights,led_grow_lights,LED grow lights,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_horticultural_lighting_led_grow_lights,led_grow_lights,LED grow lights,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_horticultural_lighting_led_grow_lights,led_grow_lights,LED grow lights,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_dimmable_led_driver,dimmable_led_driver,dimmable LED driver,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_dimmable_led_driver,dimmable_led_driver,dimmable LED driver,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_dimmable_led_driver,dimmable_led_driver,dimmable LED driver,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_dimmable_led_driver,dimmable_led_driver,dimmable LED driver,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_dimmable_led_driver,dimmable_led_driver,dimmable LED driver,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_lighting_suspension_bracket,lighting_suspension_bracket,lighting suspension bracket,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_lighting_suspension_bracket,lighting_suspension_bracket,lighting suspension bracket,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_lighting_suspension_bracket,lighting_suspension_bracket,lighting suspension bracket,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_lighting_suspension_bracket,lighting_suspension_bracket,lighting suspension bracket,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_lighting_suspension_bracket,lighting_suspension_bracket,lighting suspension bracket,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_ppfd_calibration_target,ppfd_calibration_target,PPFD calibration target,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_ppfd_calibration_target,ppfd_calibration_target,PPFD calibration target,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_ppfd_calibration_target,ppfd_calibration_target,PPFD calibration target,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_ppfd_calibration_target,ppfd_calibration_target,PPFD calibration target,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_ppfd_calibration_target,ppfd_calibration_target,PPFD calibration target,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_glare_shield,glare_shield,glare shield,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_glare_shield,glare_shield,glare shield,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_glare_shield,glare_shield,glare shield,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_glare_shield,glare_shield,glare shield,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_horticultural_lighting_glare_shield,glare_shield,glare shield,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_air_circulation_fans,air_circulation_fans,Air circulation fans,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_canopy_air_mixing_air_circulation_fans,air_circulation_fans,Air circulation fans,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_canopy_air_mixing_air_circulation_fans,air_circulation_fans,Air circulation fans,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_canopy_air_mixing_air_circulation_fans,air_circulation_fans,Air circulation fans,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_canopy_air_mixing_air_circulation_fans,air_circulation_fans,Air circulation fans,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_fan_guard_grille,fan_guard_grille,fan guard grille,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_fan_guard_grille,fan_guard_grille,fan guard grille,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_fan_guard_grille,fan_guard_grille,fan guard grille,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_fan_guard_grille,fan_guard_grille,fan guard grille,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_fan_guard_grille,fan_guard_grille,fan guard grille,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_airflow_baffle_plate,airflow_baffle_plate,airflow baffle plate,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_airflow_baffle_plate,airflow_baffle_plate,airflow baffle plate,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_airflow_baffle_plate,airflow_baffle_plate,airflow baffle plate,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_airflow_baffle_plate,airflow_baffle_plate,airflow baffle plate,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_airflow_baffle_plate,airflow_baffle_plate,airflow baffle plate,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_replaceable_intake_filter,replaceable_intake_filter,replaceable intake filter,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_replaceable_intake_filter,replaceable_intake_filter,replaceable intake filter,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_replaceable_intake_filter,replaceable_intake_filter,replaceable intake filter,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_replaceable_intake_filter,replaceable_intake_filter,replaceable intake filter,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_canopy_air_mixing_replaceable_intake_filter,replaceable_intake_filter,replaceable intake filter,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_dehumidifier_module,dehumidifier_module,dehumidifier module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_dehumidifier_module,dehumidifier_module,dehumidifier module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_dehumidifier_module,dehumidifier_module,dehumidifier module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_dehumidifier_module,dehumidifier_module,dehumidifier module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_dehumidifier_module,dehumidifier_module,dehumidifier module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_heat_exchanger_coil,heat_exchanger_coil,heat exchanger coil,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_heat_exchanger_coil,heat_exchanger_coil,heat exchanger coil,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_heat_exchanger_coil,heat_exchanger_coil,heat exchanger coil,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_heat_exchanger_coil,heat_exchanger_coil,heat exchanger coil,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_heat_exchanger_coil,heat_exchanger_coil,heat exchanger coil,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_condensate_pump,condensate_pump,condensate pump,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_condensate_pump,condensate_pump,condensate pump,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_condensate_pump,condensate_pump,condensate pump,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_condensate_pump,condensate_pump,condensate pump,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_condensate_pump,condensate_pump,condensate pump,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_supply_air_temperature_probe,supply_air_temperature_probe,supply air temperature probe,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_supply_air_temperature_probe,supply_air_temperature_probe,supply air temperature probe,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_supply_air_temperature_probe,supply_air_temperature_probe,supply air temperature probe,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_supply_air_temperature_probe,supply_air_temperature_probe,supply air temperature probe,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_supply_air_temperature_probe,supply_air_temperature_probe,supply air temperature probe,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_humidity_control_relay,humidity_control_relay,humidity control relay,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_humidity_control_relay,humidity_control_relay,humidity control relay,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_humidity_control_relay,humidity_control_relay,humidity control relay,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_humidity_control_relay,humidity_control_relay,humidity control relay,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_humidity_temperature_control_humidity_control_relay,humidity_control_relay,humidity control relay,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_co2_sensor_or_dosing,co2_sensor_or_dosing,CO2 sensor or dosing,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_co2_enrichment_co2_sensor_or_dosing,co2_sensor_or_dosing,CO2 sensor or dosing,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_co2_enrichment_co2_sensor_or_dosing,co2_sensor_or_dosing,CO2 sensor or dosing,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_co2_enrichment_co2_sensor_or_dosing,co2_sensor_or_dosing,CO2 sensor or dosing,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+environmental_interface_co2_enrichment_co2_sensor_or_dosing,co2_sensor_or_dosing,CO2 sensor or dosing,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_ndir_co2_sensor_head,ndir_co2_sensor_head,NDIR CO2 sensor head,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_ndir_co2_sensor_head,ndir_co2_sensor_head,NDIR CO2 sensor head,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_ndir_co2_sensor_head,ndir_co2_sensor_head,NDIR CO2 sensor head,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_ndir_co2_sensor_head,ndir_co2_sensor_head,NDIR CO2 sensor head,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_ndir_co2_sensor_head,ndir_co2_sensor_head,NDIR CO2 sensor head,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_co2_solenoid_valve,co2_solenoid_valve,CO2 solenoid valve,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_co2_solenoid_valve,co2_solenoid_valve,CO2 solenoid valve,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_co2_solenoid_valve,co2_solenoid_valve,CO2 solenoid valve,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_co2_solenoid_valve,co2_solenoid_valve,CO2 solenoid valve,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_co2_solenoid_valve,co2_solenoid_valve,CO2 solenoid valve,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_gas_regulator,gas_regulator,gas regulator,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_gas_regulator,gas_regulator,gas regulator,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_gas_regulator,gas_regulator,gas regulator,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_gas_regulator,gas_regulator,gas regulator,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_gas_regulator,gas_regulator,gas regulator,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_co2_distribution_tube,co2_distribution_tube,CO2 distribution tube,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_co2_distribution_tube,co2_distribution_tube,CO2 distribution tube,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_co2_distribution_tube,co2_distribution_tube,CO2 distribution tube,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_co2_distribution_tube,co2_distribution_tube,CO2 distribution tube,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+environmental_interface_co2_enrichment_co2_distribution_tube,co2_distribution_tube,CO2 distribution tube,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set,reservoir_and_plumbing_set,Reservoir and plumbing set,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set,reservoir_and_plumbing_set,Reservoir and plumbing set,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set,reservoir_and_plumbing_set,Reservoir and plumbing set,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set,reservoir_and_plumbing_set,Reservoir and plumbing set,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set,reservoir_and_plumbing_set,Reservoir and plumbing set,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_opaque_nutrient_reservoir,opaque_nutrient_reservoir,opaque nutrient reservoir,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_opaque_nutrient_reservoir,opaque_nutrient_reservoir,opaque nutrient reservoir,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_opaque_nutrient_reservoir,opaque_nutrient_reservoir,opaque nutrient reservoir,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_opaque_nutrient_reservoir,opaque_nutrient_reservoir,opaque nutrient reservoir,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_opaque_nutrient_reservoir,opaque_nutrient_reservoir,opaque nutrient reservoir,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_bulkhead_fitting_set,bulkhead_fitting_set,bulkhead fitting set,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_bulkhead_fitting_set,bulkhead_fitting_set,bulkhead fitting set,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_bulkhead_fitting_set,bulkhead_fitting_set,bulkhead fitting set,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_bulkhead_fitting_set,bulkhead_fitting_set,bulkhead fitting set,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_bulkhead_fitting_set,bulkhead_fitting_set,bulkhead fitting set,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_pvc_u_manifold,pvc_u_manifold,PVC-U manifold,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_pvc_u_manifold,pvc_u_manifold,PVC-U manifold,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_pvc_u_manifold,pvc_u_manifold,PVC-U manifold,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_pvc_u_manifold,pvc_u_manifold,PVC-U manifold,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_pvc_u_manifold,pvc_u_manifold,PVC-U manifold,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_return_drain_header,return_drain_header,return drain header,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_return_drain_header,return_drain_header,return drain header,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_return_drain_header,return_drain_header,return drain header,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_return_drain_header,return_drain_header,return drain header,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_reservoir_plumbing_return_drain_header,return_drain_header,return drain header,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_nutrient_pump,nutrient_pump,Nutrient pump,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+mass_fluid_transport_process_fertigation_pumping_nutrient_pump,nutrient_pump,Nutrient pump,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+mass_fluid_transport_process_fertigation_pumping_nutrient_pump,nutrient_pump,Nutrient pump,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+mass_fluid_transport_process_fertigation_pumping_nutrient_pump,nutrient_pump,Nutrient pump,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+mass_fluid_transport_process_fertigation_pumping_nutrient_pump,nutrient_pump,Nutrient pump,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_pump_isolation_valve,pump_isolation_valve,pump isolation valve,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_pump_isolation_valve,pump_isolation_valve,pump isolation valve,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_pump_isolation_valve,pump_isolation_valve,pump isolation valve,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_pump_isolation_valve,pump_isolation_valve,pump isolation valve,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_pump_isolation_valve,pump_isolation_valve,pump isolation valve,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_check_valve,check_valve,check valve,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_check_valve,check_valve,check valve,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_check_valve,check_valve,check valve,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_check_valve,check_valve,check valve,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_check_valve,check_valve,check valve,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_flow_meter,flow_meter,flow meter,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_flow_meter,flow_meter,flow meter,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_flow_meter,flow_meter,flow meter,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_flow_meter,flow_meter,flow meter,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_flow_meter,flow_meter,flow meter,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_pump_vibration_mount,pump_vibration_mount,pump vibration mount,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_pump_vibration_mount,pump_vibration_mount,pump vibration mount,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_pump_vibration_mount,pump_vibration_mount,pump vibration mount,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_pump_vibration_mount,pump_vibration_mount,pump vibration mount,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_fertigation_pumping_pump_vibration_mount,pump_vibration_mount,pump vibration mount,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_peristaltic_dosing_pump,peristaltic_dosing_pump,peristaltic dosing pump,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_peristaltic_dosing_pump,peristaltic_dosing_pump,peristaltic dosing pump,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_peristaltic_dosing_pump,peristaltic_dosing_pump,peristaltic dosing pump,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_peristaltic_dosing_pump,peristaltic_dosing_pump,peristaltic dosing pump,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_peristaltic_dosing_pump,peristaltic_dosing_pump,peristaltic dosing pump,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_ph_dosing_pump,ph_dosing_pump,pH dosing pump,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_ph_dosing_pump,ph_dosing_pump,pH dosing pump,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_ph_dosing_pump,ph_dosing_pump,pH dosing pump,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_ph_dosing_pump,ph_dosing_pump,pH dosing pump,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_ph_dosing_pump,ph_dosing_pump,pH dosing pump,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_chemical_suction_lance,chemical_suction_lance,chemical suction lance,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_chemical_suction_lance,chemical_suction_lance,chemical suction lance,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_chemical_suction_lance,chemical_suction_lance,chemical suction lance,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_chemical_suction_lance,chemical_suction_lance,chemical suction lance,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_chemical_suction_lance,chemical_suction_lance,chemical suction lance,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_anti_siphon_valve,anti_siphon_valve,anti-siphon valve,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_anti_siphon_valve,anti_siphon_valve,anti-siphon valve,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_anti_siphon_valve,anti_siphon_valve,anti-siphon valve,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_anti_siphon_valve,anti_siphon_valve,anti-siphon valve,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_anti_siphon_valve,anti_siphon_valve,anti-siphon valve,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_mixing_eductor,mixing_eductor,mixing eductor,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_mixing_eductor,mixing_eductor,mixing eductor,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_mixing_eductor,mixing_eductor,mixing eductor,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_mixing_eductor,mixing_eductor,mixing eductor,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_nutrient_dosing_mixing_eductor,mixing_eductor,mixing eductor,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_inline_mesh_filter,inline_mesh_filter,inline mesh filter,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_inline_mesh_filter,inline_mesh_filter,inline mesh filter,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_inline_mesh_filter,inline_mesh_filter,inline mesh filter,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_inline_mesh_filter,inline_mesh_filter,inline mesh filter,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_inline_mesh_filter,inline_mesh_filter,inline mesh filter,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_uv_steriliser,uv_steriliser,UV steriliser,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_uv_steriliser,uv_steriliser,UV steriliser,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_uv_steriliser,uv_steriliser,UV steriliser,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_uv_steriliser,uv_steriliser,UV steriliser,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_uv_steriliser,uv_steriliser,UV steriliser,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_drain_valve,drain_valve,drain valve,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_drain_valve,drain_valve,drain valve,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_drain_valve,drain_valve,drain valve,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_drain_valve,drain_valve,drain valve,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_drain_valve,drain_valve,drain valve,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_sample_port,sample_port,sample port,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_sample_port,sample_port,sample port,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_sample_port,sample_port,sample port,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_sample_port,sample_port,sample port,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+mass_fluid_transport_process_filtration_sanitation_sample_port,sample_port,sample port,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_temperature_humidity_probe,temperature_humidity_probe,temperature humidity probe,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_temperature_humidity_probe,temperature_humidity_probe,temperature humidity probe,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_temperature_humidity_probe,temperature_humidity_probe,temperature humidity probe,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_temperature_humidity_probe,temperature_humidity_probe,temperature humidity probe,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_temperature_humidity_probe,temperature_humidity_probe,temperature humidity probe,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_par_light_sensor,par_light_sensor,PAR light sensor,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_par_light_sensor,par_light_sensor,PAR light sensor,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_par_light_sensor,par_light_sensor,PAR light sensor,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_par_light_sensor,par_light_sensor,PAR light sensor,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_par_light_sensor,par_light_sensor,PAR light sensor,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_leaf_temperature_sensor,leaf_temperature_sensor,leaf temperature sensor,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_leaf_temperature_sensor,leaf_temperature_sensor,leaf temperature sensor,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_leaf_temperature_sensor,leaf_temperature_sensor,leaf temperature sensor,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_leaf_temperature_sensor,leaf_temperature_sensor,leaf temperature sensor,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_leaf_temperature_sensor,leaf_temperature_sensor,leaf temperature sensor,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_differential_pressure_switch,differential_pressure_switch,differential pressure switch,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_differential_pressure_switch,differential_pressure_switch,differential pressure switch,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_differential_pressure_switch,differential_pressure_switch,differential pressure switch,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_differential_pressure_switch,differential_pressure_switch,differential pressure switch,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_climate_sensors_differential_pressure_switch,differential_pressure_switch,differential pressure switch,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_ph_probe,ph_probe,pH probe,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_ph_probe,ph_probe,pH probe,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_ph_probe,ph_probe,pH probe,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_ph_probe,ph_probe,pH probe,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_ph_probe,ph_probe,pH probe,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_ec_probe,ec_probe,EC probe,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_ec_probe,ec_probe,EC probe,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_ec_probe,ec_probe,EC probe,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_ec_probe,ec_probe,EC probe,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_ec_probe,ec_probe,EC probe,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_reservoir_level_sensor,reservoir_level_sensor,reservoir level sensor,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_reservoir_level_sensor,reservoir_level_sensor,reservoir level sensor,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_reservoir_level_sensor,reservoir_level_sensor,reservoir level sensor,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_reservoir_level_sensor,reservoir_level_sensor,reservoir level sensor,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_reservoir_level_sensor,reservoir_level_sensor,reservoir level sensor,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_solution_temperature_probe,solution_temperature_probe,solution temperature probe,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_solution_temperature_probe,solution_temperature_probe,solution temperature probe,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_solution_temperature_probe,solution_temperature_probe,solution temperature probe,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_solution_temperature_probe,solution_temperature_probe,solution temperature probe,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_nutrient_sensors_solution_temperature_probe,solution_temperature_probe,solution temperature probe,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_rgb_crop_camera,rgb_crop_camera,RGB crop camera,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_rgb_crop_camera,rgb_crop_camera,RGB crop camera,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_rgb_crop_camera,rgb_crop_camera,RGB crop camera,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_rgb_crop_camera,rgb_crop_camera,RGB crop camera,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_rgb_crop_camera,rgb_crop_camera,RGB crop camera,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_camera_light_shield,camera_light_shield,camera light shield,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_camera_light_shield,camera_light_shield,camera light shield,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_camera_light_shield,camera_light_shield,camera light shield,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_camera_light_shield,camera_light_shield,camera light shield,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_camera_light_shield,camera_light_shield,camera light shield,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_time_lapse_controller,time_lapse_controller,time-lapse controller,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_time_lapse_controller,time_lapse_controller,time-lapse controller,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_time_lapse_controller,time_lapse_controller,time-lapse controller,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_time_lapse_controller,time_lapse_controller,time-lapse controller,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_time_lapse_controller,time_lapse_controller,time-lapse controller,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_calibration_colour_card,calibration_colour_card,calibration colour card,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_calibration_colour_card,calibration_colour_card,calibration colour card,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_calibration_colour_card,calibration_colour_card,calibration colour card,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_calibration_colour_card,calibration_colour_card,calibration colour card,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+sensing_instrumentation_crop_observation_calibration_colour_card,calibration_colour_card,calibration colour card,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_environmental_controller,environmental_controller,Environmental controller,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_environmental_controller_environmental_controller,environmental_controller,Environmental controller,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_environmental_controller_environmental_controller,environmental_controller,Environmental controller,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_environmental_controller_environmental_controller,environmental_controller,Environmental controller,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+control_compute_communication_environmental_controller_environmental_controller,environmental_controller,Environmental controller,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_din_rail_plc,din_rail_plc,DIN-rail PLC,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_din_rail_plc,din_rail_plc,DIN-rail PLC,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_din_rail_plc,din_rail_plc,DIN-rail PLC,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_din_rail_plc,din_rail_plc,DIN-rail PLC,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_din_rail_plc,din_rail_plc,DIN-rail PLC,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_analog_input_module,analog_input_module,analog input module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_analog_input_module,analog_input_module,analog input module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_analog_input_module,analog_input_module,analog input module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_analog_input_module,analog_input_module,analog input module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_analog_input_module,analog_input_module,analog input module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_relay_output_module,relay_output_module,relay output module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_relay_output_module,relay_output_module,relay output module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_relay_output_module,relay_output_module,relay output module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_relay_output_module,relay_output_module,relay output module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_relay_output_module,relay_output_module,relay output module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_real_time_clock_module,real_time_clock_module,real-time clock module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_real_time_clock_module,real_time_clock_module,real-time clock module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_real_time_clock_module,real_time_clock_module,real-time clock module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_real_time_clock_module,real_time_clock_module,real-time clock module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_environmental_controller_real_time_clock_module,real_time_clock_module,real-time clock module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_recipe_database,recipe_database,recipe database,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_recipe_database,recipe_database,recipe database,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_recipe_database,recipe_database,recipe database,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_recipe_database,recipe_database,recipe database,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_recipe_database,recipe_database,recipe database,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_set_point_scheduler,set_point_scheduler,set-point scheduler,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_set_point_scheduler,set_point_scheduler,set-point scheduler,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_set_point_scheduler,set_point_scheduler,set-point scheduler,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_set_point_scheduler,set_point_scheduler,set-point scheduler,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_set_point_scheduler,set_point_scheduler,set-point scheduler,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_alarm_historian,alarm_historian,alarm historian,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_alarm_historian,alarm_historian,alarm historian,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_alarm_historian,alarm_historian,alarm historian,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_alarm_historian,alarm_historian,alarm historian,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_alarm_historian,alarm_historian,alarm historian,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_data_export_module,data_export_module,data export module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_data_export_module,data_export_module,data export module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_data_export_module,data_export_module,data export module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_data_export_module,data_export_module,data export module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_recipe_management_data_export_module,data_export_module,data export module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_industrial_ethernet_switch,industrial_ethernet_switch,industrial Ethernet switch,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_industrial_ethernet_switch,industrial_ethernet_switch,industrial Ethernet switch,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_industrial_ethernet_switch,industrial_ethernet_switch,industrial Ethernet switch,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_industrial_ethernet_switch,industrial_ethernet_switch,industrial Ethernet switch,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_industrial_ethernet_switch,industrial_ethernet_switch,industrial Ethernet switch,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_wi_fi_gateway,wi_fi_gateway,Wi-Fi gateway,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_wi_fi_gateway,wi_fi_gateway,Wi-Fi gateway,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_wi_fi_gateway,wi_fi_gateway,Wi-Fi gateway,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_wi_fi_gateway,wi_fi_gateway,Wi-Fi gateway,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_wi_fi_gateway,wi_fi_gateway,Wi-Fi gateway,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_mqtt_telemetry_bridge,mqtt_telemetry_bridge,MQTT telemetry bridge,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_mqtt_telemetry_bridge,mqtt_telemetry_bridge,MQTT telemetry bridge,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_mqtt_telemetry_bridge,mqtt_telemetry_bridge,MQTT telemetry bridge,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_mqtt_telemetry_bridge,mqtt_telemetry_bridge,MQTT telemetry bridge,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_mqtt_telemetry_bridge,mqtt_telemetry_bridge,MQTT telemetry bridge,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_sms_alarm_modem,sms_alarm_modem,SMS alarm modem,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_sms_alarm_modem,sms_alarm_modem,SMS alarm modem,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_sms_alarm_modem,sms_alarm_modem,SMS alarm modem,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_sms_alarm_modem,sms_alarm_modem,SMS alarm modem,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+control_compute_communication_remote_monitoring_sms_alarm_modem,sms_alarm_modem,SMS alarm modem,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_rcd_isolator_panel,rcd_isolator_panel,RCD isolator panel,true,supplier,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_mains_panel_rcd_isolator_panel,rcd_isolator_panel,RCD isolator panel,true,manufacturer,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_mains_panel_rcd_isolator_panel,rcd_isolator_panel,RCD isolator panel,true,mpn,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_mains_panel_rcd_isolator_panel,rcd_isolator_panel,RCD isolator panel,true,unit_cost_gbp,,missing_source,,,,Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.
+power_distribution_mains_panel_rcd_isolator_panel,rcd_isolator_panel,RCD isolator panel,true,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_lockable_main_isolator,lockable_main_isolator,lockable main isolator,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_lockable_main_isolator,lockable_main_isolator,lockable main isolator,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_lockable_main_isolator,lockable_main_isolator,lockable main isolator,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_lockable_main_isolator,lockable_main_isolator,lockable main isolator,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_lockable_main_isolator,lockable_main_isolator,lockable main isolator,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_rcbo_breaker_bank,rcbo_breaker_bank,RCBO breaker bank,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_rcbo_breaker_bank,rcbo_breaker_bank,RCBO breaker bank,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_rcbo_breaker_bank,rcbo_breaker_bank,RCBO breaker bank,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_rcbo_breaker_bank,rcbo_breaker_bank,RCBO breaker bank,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_rcbo_breaker_bank,rcbo_breaker_bank,RCBO breaker bank,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_protective_earth_bar,protective_earth_bar,protective earth bar,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_protective_earth_bar,protective_earth_bar,protective earth bar,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_protective_earth_bar,protective_earth_bar,protective earth bar,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_protective_earth_bar,protective_earth_bar,protective earth bar,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_protective_earth_bar,protective_earth_bar,protective earth bar,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_surge_protection_device,surge_protection_device,surge protection device,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_surge_protection_device,surge_protection_device,surge protection device,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_surge_protection_device,surge_protection_device,surge protection device,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_surge_protection_device,surge_protection_device,surge protection device,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_mains_panel_surge_protection_device,surge_protection_device,surge protection device,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_lighting_bus_trunk,lighting_bus_trunk,lighting bus trunk,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_lighting_bus_trunk,lighting_bus_trunk,lighting bus trunk,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_lighting_bus_trunk,lighting_bus_trunk,lighting bus trunk,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_lighting_bus_trunk,lighting_bus_trunk,lighting bus trunk,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_lighting_bus_trunk,lighting_bus_trunk,lighting bus trunk,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_ip65_cable_gland_set,ip65_cable_gland_set,IP65 cable gland set,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_ip65_cable_gland_set,ip65_cable_gland_set,IP65 cable gland set,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_ip65_cable_gland_set,ip65_cable_gland_set,IP65 cable gland set,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_ip65_cable_gland_set,ip65_cable_gland_set,IP65 cable gland set,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_ip65_cable_gland_set,ip65_cable_gland_set,IP65 cable gland set,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_driver_mounting_rail,driver_mounting_rail,driver mounting rail,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_driver_mounting_rail,driver_mounting_rail,driver mounting rail,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_driver_mounting_rail,driver_mounting_rail,driver mounting rail,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_driver_mounting_rail,driver_mounting_rail,driver mounting rail,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_driver_mounting_rail,driver_mounting_rail,driver mounting rail,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_fused_spur_module,fused_spur_module,fused spur module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_fused_spur_module,fused_spur_module,fused spur module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_fused_spur_module,fused_spur_module,fused spur module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_fused_spur_module,fused_spur_module,fused spur module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_lighting_power_fused_spur_module,fused_spur_module,fused spur module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_24_v_dc_power_supply,24_v_dc_power_supply,24 V DC power supply,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_24_v_dc_power_supply,24_v_dc_power_supply,24 V DC power supply,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_24_v_dc_power_supply,24_v_dc_power_supply,24 V DC power supply,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_24_v_dc_power_supply,24_v_dc_power_supply,24 V DC power supply,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_24_v_dc_power_supply,24_v_dc_power_supply,24 V DC power supply,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_dc_distribution_terminal,dc_distribution_terminal,DC distribution terminal,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_dc_distribution_terminal,dc_distribution_terminal,DC distribution terminal,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_dc_distribution_terminal,dc_distribution_terminal,DC distribution terminal,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_dc_distribution_terminal,dc_distribution_terminal,DC distribution terminal,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_dc_distribution_terminal,dc_distribution_terminal,DC distribution terminal,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_ups_buffer_module,ups_buffer_module,UPS buffer module,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_ups_buffer_module,ups_buffer_module,UPS buffer module,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_ups_buffer_module,ups_buffer_module,UPS buffer module,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_ups_buffer_module,ups_buffer_module,UPS buffer module,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_ups_buffer_module,ups_buffer_module,UPS buffer module,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_control_cabinet_heater,control_cabinet_heater,control cabinet heater,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_control_cabinet_heater,control_cabinet_heater,control cabinet heater,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_control_cabinet_heater,control_cabinet_heater,control cabinet heater,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_control_cabinet_heater,control_cabinet_heater,control cabinet heater,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+power_distribution_low_voltage_power_control_cabinet_heater,control_cabinet_heater,control cabinet heater,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_leak_detection_rope,leak_detection_rope,leak detection rope,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_leak_detection_rope,leak_detection_rope,leak detection rope,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_leak_detection_rope,leak_detection_rope,leak detection rope,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_leak_detection_rope,leak_detection_rope,leak detection rope,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_leak_detection_rope,leak_detection_rope,leak detection rope,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_bunded_base_tray,bunded_base_tray,bunded base tray,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_bunded_base_tray,bunded_base_tray,bunded base tray,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_bunded_base_tray,bunded_base_tray,bunded base tray,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_bunded_base_tray,bunded_base_tray,bunded base tray,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_bunded_base_tray,bunded_base_tray,bunded base tray,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_overflow_standpipe,overflow_standpipe,overflow standpipe,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_overflow_standpipe,overflow_standpipe,overflow standpipe,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_overflow_standpipe,overflow_standpipe,overflow standpipe,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_overflow_standpipe,overflow_standpipe,overflow standpipe,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_overflow_standpipe,overflow_standpipe,overflow standpipe,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_floor_drain_adapter,floor_drain_adapter,floor drain adapter,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_floor_drain_adapter,floor_drain_adapter,floor drain adapter,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_floor_drain_adapter,floor_drain_adapter,floor drain adapter,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_floor_drain_adapter,floor_drain_adapter,floor drain adapter,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_leak_containment_floor_drain_adapter,floor_drain_adapter,floor drain adapter,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_door_interlock_switch,door_interlock_switch,door interlock switch,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_door_interlock_switch,door_interlock_switch,door interlock switch,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_door_interlock_switch,door_interlock_switch,door interlock switch,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_door_interlock_switch,door_interlock_switch,door interlock switch,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_door_interlock_switch,door_interlock_switch,door interlock switch,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_lighting_inhibit_relay,lighting_inhibit_relay,lighting inhibit relay,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_lighting_inhibit_relay,lighting_inhibit_relay,lighting inhibit relay,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_lighting_inhibit_relay,lighting_inhibit_relay,lighting inhibit relay,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_lighting_inhibit_relay,lighting_inhibit_relay,lighting inhibit relay,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_lighting_inhibit_relay,lighting_inhibit_relay,lighting inhibit relay,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_chemical_storage_latch,chemical_storage_latch,chemical storage latch,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_chemical_storage_latch,chemical_storage_latch,chemical storage latch,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_chemical_storage_latch,chemical_storage_latch,chemical storage latch,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_chemical_storage_latch,chemical_storage_latch,chemical storage latch,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_chemical_storage_latch,chemical_storage_latch,chemical storage latch,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_emergency_stop_button,emergency_stop_button,emergency stop button,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_emergency_stop_button,emergency_stop_button,emergency stop button,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_emergency_stop_button,emergency_stop_button,emergency stop button,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_emergency_stop_button,emergency_stop_button,emergency stop button,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_operator_interlocks_emergency_stop_button,emergency_stop_button,emergency stop button,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_food_grade_tubing_set,food_grade_tubing_set,food-grade tubing set,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_food_grade_tubing_set,food_grade_tubing_set,food-grade tubing set,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_food_grade_tubing_set,food_grade_tubing_set,food-grade tubing set,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_food_grade_tubing_set,food_grade_tubing_set,food-grade tubing set,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_food_grade_tubing_set,food_grade_tubing_set,food-grade tubing set,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_cleaning_validation_swab_kit,cleaning_validation_swab_kit,cleaning validation swab kit,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_cleaning_validation_swab_kit,cleaning_validation_swab_kit,cleaning validation swab kit,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_cleaning_validation_swab_kit,cleaning_validation_swab_kit,cleaning validation swab kit,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_cleaning_validation_swab_kit,cleaning_validation_swab_kit,cleaning validation swab kit,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_cleaning_validation_swab_kit,cleaning_validation_swab_kit,cleaning validation swab kit,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_material_traceability_label,material_traceability_label,material traceability label,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_material_traceability_label,material_traceability_label,material traceability label,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_material_traceability_label,material_traceability_label,material traceability label,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_material_traceability_label,material_traceability_label,material traceability label,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_material_traceability_label,material_traceability_label,material traceability label,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_washdown_sop_placard,washdown_sop_placard,washdown SOP placard,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_washdown_sop_placard,washdown_sop_placard,washdown SOP placard,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_washdown_sop_placard,washdown_sop_placard,washdown SOP placard,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_washdown_sop_placard,washdown_sop_placard,washdown SOP placard,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+safety_protection_food_contact_controls_washdown_sop_placard,washdown_sop_placard,washdown SOP placard,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_slide_out_tray_handle,slide_out_tray_handle,slide-out tray handle,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_slide_out_tray_handle,slide_out_tray_handle,slide-out tray handle,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_slide_out_tray_handle,slide_out_tray_handle,slide-out tray handle,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_slide_out_tray_handle,slide_out_tray_handle,slide-out tray handle,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_slide_out_tray_handle,slide_out_tray_handle,slide-out tray handle,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_shelf_stop_latch,shelf_stop_latch,shelf stop latch,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_shelf_stop_latch,shelf_stop_latch,shelf stop latch,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_shelf_stop_latch,shelf_stop_latch,shelf stop latch,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_shelf_stop_latch,shelf_stop_latch,shelf stop latch,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_shelf_stop_latch,shelf_stop_latch,shelf stop latch,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_harvest_work_ledge,harvest_work_ledge,harvest work ledge,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_harvest_work_ledge,harvest_work_ledge,harvest work ledge,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_harvest_work_ledge,harvest_work_ledge,harvest work ledge,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_harvest_work_ledge,harvest_work_ledge,harvest work ledge,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_harvest_work_ledge,harvest_work_ledge,harvest work ledge,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_removable_seedling_cassette,removable_seedling_cassette,removable seedling cassette,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_removable_seedling_cassette,removable_seedling_cassette,removable seedling cassette,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_removable_seedling_cassette,removable_seedling_cassette,removable seedling cassette,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_removable_seedling_cassette,removable_seedling_cassette,removable seedling cassette,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_harvest_access_removable_seedling_cassette,removable_seedling_cassette,removable seedling cassette,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_quick_release_manifold_union,quick_release_manifold_union,quick-release manifold union,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_quick_release_manifold_union,quick_release_manifold_union,quick-release manifold union,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_quick_release_manifold_union,quick_release_manifold_union,quick-release manifold union,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_quick_release_manifold_union,quick_release_manifold_union,quick-release manifold union,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_quick_release_manifold_union,quick_release_manifold_union,quick-release manifold union,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_removable_sump_screen,removable_sump_screen,removable sump screen,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_removable_sump_screen,removable_sump_screen,removable sump screen,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_removable_sump_screen,removable_sump_screen,removable sump screen,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_removable_sump_screen,removable_sump_screen,removable sump screen,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_removable_sump_screen,removable_sump_screen,removable sump screen,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_washdown_hose_connection,washdown_hose_connection,washdown hose connection,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_washdown_hose_connection,washdown_hose_connection,washdown hose connection,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_washdown_hose_connection,washdown_hose_connection,washdown hose connection,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_washdown_hose_connection,washdown_hose_connection,washdown hose connection,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_washdown_hose_connection,washdown_hose_connection,washdown hose connection,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_drying_fan_mode_switch,drying_fan_mode_switch,drying fan mode switch,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_drying_fan_mode_switch,drying_fan_mode_switch,drying fan mode switch,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_drying_fan_mode_switch,drying_fan_mode_switch,drying fan mode switch,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_drying_fan_mode_switch,drying_fan_mode_switch,drying fan mode switch,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_cleaning_access_drying_fan_mode_switch,drying_fan_mode_switch,drying fan mode switch,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_filter_service_hatch,filter_service_hatch,filter service hatch,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_filter_service_hatch,filter_service_hatch,filter service hatch,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_filter_service_hatch,filter_service_hatch,filter service hatch,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_filter_service_hatch,filter_service_hatch,filter service hatch,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_filter_service_hatch,filter_service_hatch,filter service hatch,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_probe_calibration_cup,probe_calibration_cup,probe calibration cup,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_probe_calibration_cup,probe_calibration_cup,probe calibration cup,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_probe_calibration_cup,probe_calibration_cup,probe calibration cup,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_probe_calibration_cup,probe_calibration_cup,probe calibration cup,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_probe_calibration_cup,probe_calibration_cup,probe calibration cup,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_dosing_bottle_tray,dosing_bottle_tray,dosing bottle tray,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_dosing_bottle_tray,dosing_bottle_tray,dosing bottle tray,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_dosing_bottle_tray,dosing_bottle_tray,dosing bottle tray,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_dosing_bottle_tray,dosing_bottle_tray,dosing bottle tray,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_dosing_bottle_tray,dosing_bottle_tray,dosing bottle tray,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_spare_gasket_kit,spare_gasket_kit,spare gasket kit,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_spare_gasket_kit,spare_gasket_kit,spare gasket kit,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_spare_gasket_kit,spare_gasket_kit,spare gasket kit,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_spare_gasket_kit,spare_gasket_kit,spare gasket kit,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+maintenance_serviceability_consumable_service_spare_gasket_kit,spare_gasket_kit,spare gasket kit,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_touchscreen_hmi,touchscreen_hmi,touchscreen HMI,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_touchscreen_hmi,touchscreen_hmi,touchscreen HMI,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_touchscreen_hmi,touchscreen_hmi,touchscreen HMI,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_touchscreen_hmi,touchscreen_hmi,touchscreen HMI,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_touchscreen_hmi,touchscreen_hmi,touchscreen HMI,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_recipe_selector_control,recipe_selector_control,recipe selector control,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_recipe_selector_control,recipe_selector_control,recipe selector control,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_recipe_selector_control,recipe_selector_control,recipe selector control,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_recipe_selector_control,recipe_selector_control,recipe selector control,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_recipe_selector_control,recipe_selector_control,recipe selector control,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_alarm_buzzer_beacon,alarm_buzzer_beacon,alarm buzzer beacon,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_alarm_buzzer_beacon,alarm_buzzer_beacon,alarm buzzer beacon,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_alarm_buzzer_beacon,alarm_buzzer_beacon,alarm buzzer beacon,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_alarm_buzzer_beacon,alarm_buzzer_beacon,alarm buzzer beacon,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_alarm_buzzer_beacon,alarm_buzzer_beacon,alarm buzzer beacon,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_usb_data_export_port,usb_data_export_port,USB data export port,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_usb_data_export_port,usb_data_export_port,USB data export port,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_usb_data_export_port,usb_data_export_port,USB data export port,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_usb_data_export_port,usb_data_export_port,USB data export port,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_local_hmi_usb_data_export_port,usb_data_export_port,USB data export port,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_crop_lot_label_holder,crop_lot_label_holder,crop lot label holder,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_crop_lot_label_holder,crop_lot_label_holder,crop lot label holder,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_crop_lot_label_holder,crop_lot_label_holder,crop lot label holder,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_crop_lot_label_holder,crop_lot_label_holder,crop lot label holder,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_crop_lot_label_holder,crop_lot_label_holder,crop lot label holder,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_chemical_hazard_label_set,chemical_hazard_label_set,chemical hazard label set,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_chemical_hazard_label_set,chemical_hazard_label_set,chemical hazard label set,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_chemical_hazard_label_set,chemical_hazard_label_set,chemical hazard label set,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_chemical_hazard_label_set,chemical_hazard_label_set,chemical hazard label set,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_chemical_hazard_label_set,chemical_hazard_label_set,chemical hazard label set,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_cleaning_checklist_card,cleaning_checklist_card,cleaning checklist card,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_cleaning_checklist_card,cleaning_checklist_card,cleaning checklist card,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_cleaning_checklist_card,cleaning_checklist_card,cleaning checklist card,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_cleaning_checklist_card,cleaning_checklist_card,cleaning checklist card,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_cleaning_checklist_card,cleaning_checklist_card,cleaning checklist card,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_electrical_isolation_placard,electrical_isolation_placard,electrical isolation placard,false,supplier,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_electrical_isolation_placard,electrical_isolation_placard,electrical isolation placard,false,manufacturer,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_electrical_isolation_placard,electrical_isolation_placard,electrical isolation placard,false,mpn,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_electrical_isolation_placard,electrical_isolation_placard,electrical isolation placard,false,unit_cost_gbp,,not_claimed,,,,No claim is made for this field yet.
+hmi_ergonomics_labelling_workflows_electrical_isolation_placard,electrical_isolation_placard,electrical isolation placard,false,lead_time_weeks,,not_claimed,,,,No claim is made for this field yet.

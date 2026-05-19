@@ -1,0 +1,244 @@
+{
+  "verdict": "interface_review_ready",
+  "summary": {
+    "rows": 6,
+    "acceptedRows": 0,
+    "reviewReadyRows": 6,
+    "pendingEvidenceRows": 0,
+    "deferredRows": 0,
+    "blockedRows": 0,
+    "presentContracts": 6,
+    "missingContracts": 0,
+    "carrierCompleteRows": 6,
+    "verificationActivityRows": 6,
+    "acceptedEvidenceRatio": 0,
+    "structuralPassRatio": 1
+  },
+  "rows": [
+    {
+      "id": "required:power_distribution:energy_conversion_transduction:ac_input_bus",
+      "interfaceId": "ac_input_bus",
+      "fromModuleId": "power_distribution",
+      "fromModuleName": "AC Input And DC Output Distribution",
+      "toModuleId": "energy_conversion_transduction",
+      "toModuleName": "Power Conversion Stack",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "ac_input_switchgear"
+      ],
+      "toCarrierSubModules": [
+        "rectifier_power_modules"
+      ],
+      "componentWordIds": [
+        "ac_input_breaker_and_spd",
+        "lockable_ac_isolator",
+        "surge_arrestor_cartridge",
+        "input_terminal_shroud",
+        "power_module_stack",
+        "power_module_backplane",
+        "module_locking_rail",
+        "dc_link_capacitor_bank"
+      ],
+      "verificationActivityId": "interface_review:power_distribution:energy_conversion_transduction:ac_input_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:energy_conversion_transduction:charging_connector_interface:dc_output_bus",
+      "interfaceId": "dc_output_bus",
+      "fromModuleId": "energy_conversion_transduction",
+      "fromModuleName": "Power Conversion Stack",
+      "toModuleId": "charging_connector_interface",
+      "toModuleName": "Vehicle Charging Interface",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "rectifier_power_modules",
+        "output_filtering"
+      ],
+      "toCarrierSubModules": [
+        "ccs2_cable_connector"
+      ],
+      "componentWordIds": [
+        "power_module_stack",
+        "power_module_backplane",
+        "module_locking_rail",
+        "dc_link_capacitor_bank",
+        "dc_output_choke",
+        "emi_filter_assembly",
+        "snubber_network_board",
+        "thermal_interface_pad_set",
+        "ccs2_liquid_cooled_cable_and_connector",
+        "connector_temperature_sensor_pair",
+        "proximity_pilot_resistor_set",
+        "cable_strain_relief_boot"
+      ],
+      "verificationActivityId": "interface_review:energy_conversion_transduction:charging_connector_interface:dc_output_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:control_compute_communication:charging_connector_interface:iso15118_plc",
+      "interfaceId": "iso15118_plc",
+      "fromModuleId": "control_compute_communication",
+      "fromModuleName": "Control Compute Communication",
+      "toModuleId": "charging_connector_interface",
+      "toModuleName": "Vehicle Charging Interface",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "protocol_stack"
+      ],
+      "toCarrierSubModules": [
+        "vehicle_communication_frontend"
+      ],
+      "componentWordIds": [
+        "iso_15118_plc_modem",
+        "plug_and_charge_certificate_store",
+        "charging_session_firmware_image",
+        "protocol_debug_header",
+        "control_pilot_interface_board",
+        "proximity_detection_input",
+        "vehicle_comms_isolation_transformer"
+      ],
+      "verificationActivityId": "interface_review:control_compute_communication:charging_connector_interface:iso15118_plc",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:control_compute_communication:energy_conversion_transduction:control_bus",
+      "interfaceId": "control_bus",
+      "fromModuleId": "control_compute_communication",
+      "fromModuleName": "Control Compute Communication",
+      "toModuleId": "energy_conversion_transduction",
+      "toModuleName": "Power Conversion Stack",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "charge_controller",
+        "protocol_stack"
+      ],
+      "toCarrierSubModules": [
+        "rectifier_power_modules",
+        "converter_supervision"
+      ],
+      "componentWordIds": [
+        "charge_controller_pcb",
+        "safety_io_terminal_block",
+        "real_time_clock_module",
+        "nonvolatile_event_log_memory",
+        "iso_15118_plc_modem",
+        "plug_and_charge_certificate_store",
+        "charging_session_firmware_image",
+        "protocol_debug_header",
+        "power_module_stack",
+        "power_module_backplane",
+        "module_locking_rail",
+        "dc_link_capacitor_bank",
+        "module_health_monitor_board",
+        "heatsink_temperature_probe",
+        "fan_coolant_derating_table",
+        "firmware_recovery_jumper"
+      ],
+      "verificationActivityId": "interface_review:control_compute_communication:energy_conversion_transduction:control_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:metering_bus",
+      "interfaceId": "metering_bus",
+      "fromModuleId": "sensing_instrumentation",
+      "fromModuleName": "Metering And Electrical Sensing",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Control Compute Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "energy_metering"
+      ],
+      "toCarrierSubModules": [
+        "charge_controller",
+        "protocol_stack"
+      ],
+      "componentWordIds": [
+        "mid_energy_meter",
+        "dc_voltage_transducer",
+        "dc_current_shunt",
+        "meter_pulse_output_isolator",
+        "charge_controller_pcb",
+        "safety_io_terminal_block",
+        "real_time_clock_module",
+        "nonvolatile_event_log_memory",
+        "iso_15118_plc_modem",
+        "plug_and_charge_certificate_store",
+        "charging_session_firmware_image",
+        "protocol_debug_header"
+      ],
+      "verificationActivityId": "interface_review:sensing_instrumentation:control_compute_communication:metering_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:environmental_interface:energy_conversion_transduction:coolant_loop",
+      "interfaceId": "coolant_loop",
+      "fromModuleId": "environmental_interface",
+      "fromModuleName": "Thermal And Environmental Interface",
+      "toModuleId": "energy_conversion_transduction",
+      "toModuleName": "Power Conversion Stack",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "liquid_cooling_loop",
+        "thermal_air_path"
+      ],
+      "toCarrierSubModules": [
+        "rectifier_power_modules",
+        "converter_supervision"
+      ],
+      "componentWordIds": [
+        "cooling_loop_assembly",
+        "coolant_pump",
+        "plate_radiator",
+        "coolant_reservoir",
+        "cabinet_fan_tray",
+        "inlet_filter_mat",
+        "exhaust_louvre_assembly",
+        "airflow_proving_switch",
+        "power_module_stack",
+        "power_module_backplane",
+        "module_locking_rail",
+        "dc_link_capacitor_bank",
+        "module_health_monitor_board",
+        "heatsink_temperature_probe",
+        "fan_coolant_derating_table",
+        "firmware_recovery_jumper"
+      ],
+      "verificationActivityId": "interface_review:environmental_interface:energy_conversion_transduction:coolant_loop",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Collect named interface-review evidence through verification intake."
+  ]
+}

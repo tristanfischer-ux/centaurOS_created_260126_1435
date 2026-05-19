@@ -1,0 +1,769 @@
+{
+  "summary": {
+    "requiredContracts": 8,
+    "presentContracts": 8,
+    "missingContracts": 0,
+    "sharedInterfaces": 17,
+    "localOnlyInterfaces": 1
+  },
+  "requiredContracts": [
+    {
+      "id": "required:energy_harvesting:power_distribution:solar_dc_bus",
+      "interfaceId": "solar_dc_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "energy_harvesting",
+        "moduleName": "Solar Energy Harvesting",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "solar_skin_array",
+            "subModuleName": "Solar skin array",
+            "componentWordIds": [
+              "solar_cell_array",
+              "cell_interconnect_ribbon",
+              "transparent_encapsulation_film",
+              "solar_string_bypass_diode"
+            ]
+          },
+          {
+            "subModuleId": "mppt_conversion",
+            "subModuleName": "MPPT conversion",
+            "componentWordIds": [
+              "mppt_power_tracker",
+              "solar_input_current_sensor",
+              "solar_voltage_tap_loom",
+              "mppt_heat_spreader"
+            ]
+          },
+          {
+            "subModuleId": "solar_health_monitoring",
+            "subModuleName": "Solar health monitoring",
+            "componentWordIds": [
+              "solar_string_monitor_board",
+              "uv_exposure_witness_coupon",
+              "wing_surface_temperature_sensor",
+              "solar_inspection_connector"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "power_distribution",
+        "moduleName": "Flight Power Distribution",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "solar_battery_power_management",
+            "subModuleName": "Solar and battery power management",
+            "componentWordIds": [
+              "solar_battery_charge_controller",
+              "main_dc_bus_board",
+              "payload_power_switch",
+              "propulsion_bus_fuse_set"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Solar array output must feed power management over a declared DC bus.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:energy_storage_source:power_distribution:battery_dc_bus",
+      "interfaceId": "battery_dc_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "energy_storage_source",
+        "moduleName": "Night-Cycle Energy Storage",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "stratospheric_battery_pack",
+            "subModuleName": "Stratospheric battery pack",
+            "componentWordIds": [
+              "stratospheric_battery_pack",
+              "battery_management_board",
+              "lightweight_battery_enclosure",
+              "cell_heater_film"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "power_distribution",
+        "moduleName": "Flight Power Distribution",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "solar_battery_power_management",
+            "subModuleName": "Solar and battery power management",
+            "componentWordIds": [
+              "solar_battery_charge_controller",
+              "main_dc_bus_board",
+              "payload_power_switch",
+              "propulsion_bus_fuse_set"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Night-cycle battery energy must connect into load distribution.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:power_distribution:actuation_kinematics:propulsion_power_bus",
+      "interfaceId": "propulsion_power_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "power_distribution",
+        "moduleName": "Flight Power Distribution",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "solar_battery_power_management",
+            "subModuleName": "Solar and battery power management",
+            "componentWordIds": [
+              "solar_battery_charge_controller",
+              "main_dc_bus_board",
+              "payload_power_switch",
+              "propulsion_bus_fuse_set"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "actuation_kinematics",
+        "moduleName": "Propulsion And Control Surfaces",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "electric_propulsion_pods",
+            "subModuleName": "Electric propulsion pods",
+            "componentWordIds": [
+              "electric_propulsion_pod",
+              "high_altitude_propeller_set",
+              "motor_controller_module",
+              "propulsion_pod_fairing"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Propulsion loads must receive protected high-current power.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:control_compute_communication:actuation_kinematics:flight_control_bus",
+      "interfaceId": "flight_control_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Autonomy Control Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "flight_control_computer",
+            "subModuleName": "Flight control computer",
+            "componentWordIds": [
+              "flight_control_computer",
+              "autopilot_io_board",
+              "flight_software_image",
+              "watchdog_supervisor"
+            ]
+          },
+          {
+            "subModuleId": "energy_aware_autonomy",
+            "subModuleName": "Energy-aware autonomy",
+            "componentWordIds": [
+              "solar_forecast_model",
+              "wind_field_route_planner",
+              "payload_duty_cycle_controller",
+              "return_corridor_manager"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "actuation_kinematics",
+        "moduleName": "Propulsion And Control Surfaces",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "electric_propulsion_pods",
+            "subModuleName": "Electric propulsion pods",
+            "componentWordIds": [
+              "electric_propulsion_pod",
+              "high_altitude_propeller_set",
+              "motor_controller_module",
+              "propulsion_pod_fairing"
+            ]
+          },
+          {
+            "subModuleId": "control_surface_actuation",
+            "subModuleName": "Control surface actuation",
+            "componentWordIds": [
+              "low_temperature_servo_actuator",
+              "control_linkage_rod_set",
+              "surface_position_sensor",
+              "servo_heater_trace"
+            ]
+          },
+          {
+            "subModuleId": "station_keeping_trim",
+            "subModuleName": "Station-keeping trim",
+            "componentWordIds": [
+              "trim_schedule_table",
+              "gust_load_estimator",
+              "airspeed_setpoint_manager",
+              "propulsion_calibration_record"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Flight controller must command propulsion and trim actuators.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Navigation And Airdata Sensing",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "navigation_suite",
+            "subModuleName": "Navigation suite",
+            "componentWordIds": [
+              "gnss_ins_navigation_unit",
+              "barometric_altitude_sensor",
+              "sun_sensor_pair",
+              "precision_timebase_module"
+            ]
+          },
+          {
+            "subModuleId": "airdata_weather_sensors",
+            "subModuleName": "Airdata and weather sensors",
+            "componentWordIds": [
+              "pitot_static_probe",
+              "outside_air_temperature_probe",
+              "wind_estimation_filter",
+              "humidity_frost_sensor"
+            ]
+          },
+          {
+            "subModuleId": "structural_health_sensing",
+            "subModuleName": "Structural health sensing",
+            "componentWordIds": [
+              "wing_strain_gauge_strip",
+              "spar_temperature_sensor",
+              "vibration_accelerometer",
+              "structural_health_recorder"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Autonomy Control Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "flight_control_computer",
+            "subModuleName": "Flight control computer",
+            "componentWordIds": [
+              "flight_control_computer",
+              "autopilot_io_board",
+              "flight_software_image",
+              "watchdog_supervisor"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Navigation, airdata and structural state must feed autonomy decisions.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:payload_communication:control_compute_communication:payload_data_link",
+      "interfaceId": "payload_data_link",
+      "status": "present",
+      "from": {
+        "moduleId": "payload_communication",
+        "moduleName": "Communications Payload",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "payload_radio",
+            "subModuleName": "Payload radio",
+            "componentWordIds": [
+              "stratospheric_communications_payload",
+              "payload_modem_board",
+              "payload_rf_power_amplifier",
+              "payload_processor_module"
+            ]
+          },
+          {
+            "subModuleId": "antenna_aperture",
+            "subModuleName": "Antenna aperture",
+            "componentWordIds": [
+              "payload_antenna_array",
+              "antenna_ground_plane_film",
+              "antenna_feed_harness",
+              "beam_pointing_calibration_target"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Autonomy Control Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "ground_command_link",
+            "subModuleName": "Ground command link",
+            "componentWordIds": [
+              "ground_control_link",
+              "telemetry_transceiver",
+              "command_authentication_module",
+              "mission_log_recorder"
+            ]
+          },
+          {
+            "subModuleId": "energy_aware_autonomy",
+            "subModuleName": "Energy-aware autonomy",
+            "componentWordIds": [
+              "solar_forecast_model",
+              "wind_field_route_planner",
+              "payload_duty_cycle_controller",
+              "return_corridor_manager"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Payload state must be visible to vehicle autonomy and telemetry.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:environmental_interface:energy_storage_source:thermal_path",
+      "interfaceId": "thermal_path",
+      "status": "present",
+      "from": {
+        "moduleId": "environmental_interface",
+        "moduleName": "Stratospheric Environmental Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "thermal_protection",
+            "subModuleName": "Thermal protection",
+            "componentWordIds": [
+              "thermal_insulation_blanket",
+              "multi_layer_insulation_patch",
+              "lightweight_thermal_strap",
+              "thermal_witness_label"
+            ]
+          },
+          {
+            "subModuleId": "low_pressure_management",
+            "subModuleName": "Low-pressure electronics management",
+            "componentWordIds": [
+              "low_pressure_vent_path",
+              "conformal_coating_set",
+              "high_altitude_creepage_spacer",
+              "desiccant_cartridge"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "energy_storage_source",
+        "moduleName": "Night-Cycle Energy Storage",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "stratospheric_battery_pack",
+            "subModuleName": "Stratospheric battery pack",
+            "componentWordIds": [
+              "stratospheric_battery_pack",
+              "battery_management_board",
+              "lightweight_battery_enclosure",
+              "cell_heater_film"
+            ]
+          },
+          {
+            "subModuleId": "battery_thermal_zone",
+            "subModuleName": "Battery thermal zone",
+            "componentWordIds": [
+              "battery_insulation_sleeve",
+              "phase_change_thermal_buffer",
+              "battery_temperature_sensor_harness",
+              "battery_vent_path"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Battery survival and night-cycle capacity depend on a declared thermal path.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:safety_protection:control_compute_communication:telemetry_link",
+      "interfaceId": "telemetry_link",
+      "status": "present",
+      "from": {
+        "moduleId": "safety_protection",
+        "moduleName": "Flight Safety And Recovery",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "abort_recovery",
+            "subModuleName": "Abort and recovery",
+            "componentWordIds": [
+              "recovery_parachute_system",
+              "parachute_deployment_controller",
+              "recovery_beacon",
+              "safe_descent_mode_logic"
+            ]
+          },
+          {
+            "subModuleId": "airspace_safety",
+            "subModuleName": "Airspace safety",
+            "componentWordIds": [
+              "geofence_database",
+              "lost_link_failsafe",
+              "flight_termination_relay",
+              "airspace_transponder_module"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Autonomy Control Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "ground_command_link",
+            "subModuleName": "Ground command link",
+            "componentWordIds": [
+              "ground_control_link",
+              "telemetry_transceiver",
+              "command_authentication_module",
+              "mission_log_recorder"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Abort, descent and recovery state must remain visible to ground operators.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    }
+  ],
+  "sharedInterfaces": [
+    {
+      "interfaceId": "payload_mount",
+      "status": "local_only",
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "moduleNames": [
+        "Ultra-Light Wing Structure"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "aero_load_path",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "actuation_kinematics",
+        "sensing_instrumentation",
+        "payload_communication",
+        "environmental_interface",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Ultra-Light Wing Structure",
+        "Propulsion And Control Surfaces",
+        "Navigation And Airdata Sensing",
+        "Communications Payload",
+        "Stratospheric Environmental Interface",
+        "Flight Safety And Recovery",
+        "Ground Handling Serviceability"
+      ],
+      "carrierSubModuleCount": 11
+    },
+    {
+      "interfaceId": "battery_dc_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Night-Cycle Energy Storage",
+        "Flight Power Distribution"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "battery_monitor_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "power_distribution",
+        "control_compute_communication",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Night-Cycle Energy Storage",
+        "Flight Power Distribution",
+        "Autonomy Control Communication",
+        "Flight Safety And Recovery"
+      ],
+      "carrierSubModuleCount": 7
+    },
+    {
+      "interfaceId": "flight_control_bus",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "actuation_kinematics",
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Ultra-Light Wing Structure",
+        "Propulsion And Control Surfaces",
+        "Autonomy Control Communication",
+        "Navigation And Airdata Sensing",
+        "Flight Safety And Recovery"
+      ],
+      "carrierSubModuleCount": 10
+    },
+    {
+      "interfaceId": "hardwired_trip",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "control_compute_communication",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Flight Power Distribution",
+        "Autonomy Control Communication",
+        "Flight Safety And Recovery"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "low_voltage_rail",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "actuation_kinematics"
+      ],
+      "moduleNames": [
+        "Flight Power Distribution",
+        "Propulsion And Control Surfaces"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "payload_data_link",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "payload_communication",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Autonomy Control Communication",
+        "Communications Payload",
+        "Ground Handling Serviceability"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "payload_power_bus",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "payload_communication",
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Flight Power Distribution",
+        "Communications Payload",
+        "Stratospheric Environmental Interface"
+      ],
+      "carrierSubModuleCount": 6
+    },
+    {
+      "interfaceId": "propulsion_mounts",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "actuation_kinematics"
+      ],
+      "moduleNames": [
+        "Ultra-Light Wing Structure",
+        "Propulsion And Control Surfaces"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "propulsion_power_bus",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "actuation_kinematics"
+      ],
+      "moduleNames": [
+        "Flight Power Distribution",
+        "Propulsion And Control Surfaces"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "rf_aperture",
+      "status": "shared",
+      "moduleIds": [
+        "payload_communication",
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Communications Payload",
+        "Stratospheric Environmental Interface"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "sensor_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_harvesting",
+        "energy_storage_source",
+        "actuation_kinematics",
+        "control_compute_communication",
+        "sensing_instrumentation"
+      ],
+      "moduleNames": [
+        "Solar Energy Harvesting",
+        "Night-Cycle Energy Storage",
+        "Propulsion And Control Surfaces",
+        "Autonomy Control Communication",
+        "Navigation And Airdata Sensing"
+      ],
+      "carrierSubModuleCount": 9
+    },
+    {
+      "interfaceId": "service_access",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "energy_harvesting",
+        "energy_storage_source",
+        "power_distribution",
+        "control_compute_communication",
+        "payload_communication",
+        "environmental_interface",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Ultra-Light Wing Structure",
+        "Solar Energy Harvesting",
+        "Night-Cycle Energy Storage",
+        "Flight Power Distribution",
+        "Autonomy Control Communication",
+        "Communications Payload",
+        "Stratospheric Environmental Interface",
+        "Flight Safety And Recovery",
+        "Ground Handling Serviceability"
+      ],
+      "carrierSubModuleCount": 14
+    },
+    {
+      "interfaceId": "solar_dc_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_harvesting",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Solar Energy Harvesting",
+        "Flight Power Distribution"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "solar_mount",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "energy_harvesting",
+        "environmental_interface",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Ultra-Light Wing Structure",
+        "Solar Energy Harvesting",
+        "Stratospheric Environmental Interface",
+        "Ground Handling Serviceability"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "telemetry_link",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Night-Cycle Energy Storage",
+        "Autonomy Control Communication",
+        "Navigation And Airdata Sensing",
+        "Flight Safety And Recovery",
+        "Ground Handling Serviceability"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "thermal_path",
+      "status": "shared",
+      "moduleIds": [
+        "energy_harvesting",
+        "energy_storage_source",
+        "payload_communication",
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Solar Energy Harvesting",
+        "Night-Cycle Energy Storage",
+        "Communications Payload",
+        "Stratospheric Environmental Interface"
+      ],
+      "carrierSubModuleCount": 7
+    }
+  ]
+}

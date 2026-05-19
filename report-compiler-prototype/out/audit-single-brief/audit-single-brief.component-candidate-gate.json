@@ -1,0 +1,88 @@
+{
+  "verdict": "component_candidates_review_required",
+  "summary": {
+    "rows": 7,
+    "passRows": 6,
+    "reviewRows": 1,
+    "blockedRows": 0,
+    "passRatio": 0.86,
+    "bomLines": 120,
+    "componentWordIds": 117,
+    "criticalBomLines": 13,
+    "requiredCriticalParts": 10,
+    "allocatedCriticalParts": 10,
+    "positiveQuantityLines": 120,
+    "candidateWorklistRows": 120,
+    "duplicateComponentGroups": 3,
+    "provenanceViolations": 0,
+    "sourceEvidenceRows": 0,
+    "readyForSourcing": false,
+    "nextAction": "Resolve whether duplicate component IDs are shared physical items or separate install locations before pricing."
+  },
+  "rows": [
+    {
+      "area": "candidate_presence",
+      "verdict": "pass",
+      "signal": "120 candidate BoM line(s), 117 distinct component identity key(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Component candidates exist for downstream sourcing review."
+    },
+    {
+      "area": "candidate_identity",
+      "verdict": "pass",
+      "signal": "120/120 candidate line(s) have non-generic identity, description and role context.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Candidate identities are specific enough for first-pass sourcing worklists."
+    },
+    {
+      "area": "quantity_basis",
+      "verdict": "pass",
+      "signal": "120/120 candidate line(s) have positive quantity and unit.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Candidate quantities have positive values and explicit units."
+    },
+    {
+      "area": "critical_candidate_coverage",
+      "verdict": "pass",
+      "signal": "10/10 class-critical part(s) are represented by candidate lines; 13 critical BoM line(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Class-critical parts have candidate lines before sourcing begins."
+    },
+    {
+      "area": "duplicate_identity_review",
+      "verdict": "review",
+      "signal": "3 duplicate component identity group(s), 3 involving critical lines.",
+      "passRatio": 0.5,
+      "blockers": [
+        "insulation_monitoring_device: 2 allocations need shared-vs-separate review.",
+        "iso_15118_plc_modem: 2 allocations need shared-vs-separate review.",
+        "mid_energy_meter: 2 allocations need shared-vs-separate review."
+      ],
+      "requiredAction": "Resolve whether duplicate component IDs are shared physical items or separate install locations before pricing."
+    },
+    {
+      "area": "sourcing_worklist_alignment",
+      "verdict": "pass",
+      "signal": "120/120 unpriced candidate line(s) appear in the sourcing worklist.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Every unpriced candidate line is visible in the sourcing worklist."
+    },
+    {
+      "area": "provenance_boundary",
+      "verdict": "pass",
+      "signal": "0 source evidence row(s), 0 source-backed claim(s), 0 provenance violation(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Candidate sourcing fields remain clean unless admitted evidence supplies them."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Resolve whether duplicate component IDs are shared physical items or separate install locations before pricing."
+  ]
+}

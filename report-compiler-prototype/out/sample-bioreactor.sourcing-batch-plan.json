@@ -1,0 +1,3221 @@
+{
+  "summary": {
+    "closureRows": 108,
+    "batches": 2,
+    "activeBatches": 1,
+    "waitingBatches": 0,
+    "deferredBatches": 1,
+    "activeRows": 11,
+    "waitingRows": 0,
+    "deferredRows": 97,
+    "procurementBlockingRows": 11,
+    "criticalSourceRows": 11,
+    "repairRows": 0,
+    "protocolReplacementRows": 0,
+    "identityRows": 0,
+    "candidateDeferredRows": 97,
+    "nextBatchId": "sourcing-batch:2:critical_source_collection",
+    "nextItemId": "critical_source_collection:1:agitation_drive",
+    "canUseForProcurement": false
+  },
+  "batches": [
+    {
+      "id": "sourcing-batch:2:critical_source_collection",
+      "sequence": 2,
+      "kind": "critical_source_collection",
+      "title": "Collect Critical Source Evidence",
+      "status": "active",
+      "rowCount": 11,
+      "readyRows": 11,
+      "blockedRows": 0,
+      "deferredRows": 0,
+      "procurementBlockingRows": 11,
+      "entryCriteria": [
+        "Architecture has identified critical BoM lines that are not source-backed."
+      ],
+      "exitCriteria": [
+        "Every critical line has admitted supplier/manufacturer/MPN/unit-cost evidence."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "critical_source_collection:1:agitation_drive",
+          "closureRowId": "bom-close:actuation_kinematics_agitation_drive_train_agitation_drive",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "agitation_drive",
+          "description": "Agitation drive",
+          "searchTerms": [
+            "Agitation drive",
+            "Agitation drive manufacturer part number",
+            "Agitation drive catalogue price GBP",
+            "Agitation drive datasheet",
+            "Agitation drive single-use bioreactor",
+            "Agitation drive GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:2:bioreactor_controller",
+          "closureRowId": "bom-close:control_compute_communication_process_controller_bioreactor_controller",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "bioreactor_controller",
+          "description": "Bioreactor controller",
+          "searchTerms": [
+            "Bioreactor controller",
+            "Bioreactor controller manufacturer part number",
+            "Bioreactor controller catalogue price GBP",
+            "Bioreactor controller datasheet",
+            "Bioreactor controller single-use bioreactor",
+            "Bioreactor controller GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:3:exhaust_filter_and_pressure_relief_set",
+          "closureRowId": "bom-close:environmental_interface_exhaust_filter_train_exhaust_filter_and_pressure_relief_set",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "exhaust_filter_and_pressure_relief_set",
+          "description": "Exhaust filter and pressure relief set",
+          "searchTerms": [
+            "Exhaust filter and pressure relief set",
+            "Exhaust filter and pressure relief set manufacturer part number",
+            "Exhaust filter and pressure relief set catalogue price GBP",
+            "Exhaust filter and pressure relief set datasheet",
+            "Exhaust filter and pressure relief set single-use bioreactor",
+            "Exhaust filter and pressure relief set GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:4:temperature_control_loop",
+          "closureRowId": "bom-close:environmental_interface_temperature_control_loop_temperature_control_loop",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "temperature_control_loop",
+          "description": "Temperature control loop",
+          "searchTerms": [
+            "Temperature control loop",
+            "Temperature control loop manufacturer part number",
+            "Temperature control loop catalogue price GBP",
+            "Temperature control loop datasheet",
+            "Temperature control loop single-use bioreactor",
+            "Temperature control loop GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:5:peristaltic_feed_pump",
+          "closureRowId": "bom-close:mass_fluid_transport_process_feed_pump_manifold_peristaltic_feed_pump",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "peristaltic_feed_pump",
+          "description": "Peristaltic feed pump",
+          "searchTerms": [
+            "Peristaltic feed pump",
+            "Peristaltic feed pump manufacturer part number",
+            "Peristaltic feed pump catalogue price GBP",
+            "Peristaltic feed pump datasheet",
+            "Peristaltic feed pump single-use bioreactor",
+            "Peristaltic feed pump GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:6:sparger_and_gas_mix_manifold",
+          "closureRowId": "bom-close:mass_fluid_transport_process_sparger_gas_mixing_sparger_and_gas_mix_manifold",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "sparger_and_gas_mix_manifold",
+          "description": "Sparger and gas-mix manifold",
+          "searchTerms": [
+            "Sparger and gas-mix manifold",
+            "Sparger and gas-mix manifold manufacturer part number",
+            "Sparger and gas-mix manifold catalogue price GBP",
+            "Sparger and gas-mix manifold datasheet",
+            "Sparger and gas-mix manifold single-use bioreactor",
+            "Sparger and gas-mix manifold GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:7:dissolved_oxygen_optical_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_do_ph_sensing_dissolved_oxygen_optical_sensor",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "dissolved_oxygen_optical_sensor",
+          "description": "Dissolved oxygen optical sensor",
+          "searchTerms": [
+            "Dissolved oxygen optical sensor",
+            "Dissolved oxygen optical sensor manufacturer part number",
+            "Dissolved oxygen optical sensor catalogue price GBP",
+            "Dissolved oxygen optical sensor datasheet",
+            "Dissolved oxygen optical sensor single-use bioreactor",
+            "Dissolved oxygen optical sensor GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:8:single_use_ph_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_do_ph_sensing_single_use_ph_sensor",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "single_use_ph_sensor",
+          "description": "Single-use pH sensor",
+          "searchTerms": [
+            "Single-use pH sensor",
+            "Single-use pH sensor manufacturer part number",
+            "Single-use pH sensor catalogue price GBP",
+            "Single-use pH sensor datasheet",
+            "Single-use pH sensor single-use bioreactor",
+            "Single-use pH sensor GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:9:load_cell_set",
+          "closureRowId": "bom-close:sensing_instrumentation_pressure_mass_temperature_sensing_load_cell_set",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "load_cell_set",
+          "description": "Load cell set",
+          "searchTerms": [
+            "Load cell set",
+            "Load cell set manufacturer part number",
+            "Load cell set catalogue price GBP",
+            "Load cell set datasheet",
+            "Load cell set single-use bioreactor",
+            "Load cell set GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:10:single_use_bioreactor_bag",
+          "closureRowId": "bom-close:structure_containment_single_use_bag_chamber_single_use_bioreactor_bag",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "single_use_bioreactor_bag",
+          "description": "Single-use bioreactor bag",
+          "searchTerms": [
+            "Single-use bioreactor bag",
+            "Single-use bioreactor bag manufacturer part number",
+            "Single-use bioreactor bag catalogue price GBP",
+            "Single-use bioreactor bag datasheet",
+            "Single-use bioreactor bag single-use bioreactor",
+            "Single-use bioreactor bag GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:11:sterile_tubing_and_connector_set",
+          "closureRowId": "bom-close:structure_containment_sterile_connector_panel_sterile_tubing_and_connector_set",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "sterile_tubing_and_connector_set",
+          "description": "Sterile tubing and connector set",
+          "searchTerms": [
+            "Sterile tubing and connector set",
+            "Sterile tubing and connector set manufacturer part number",
+            "Sterile tubing and connector set catalogue price GBP",
+            "Sterile tubing and connector set datasheet",
+            "Sterile tubing and connector set single-use bioreactor",
+            "Sterile tubing and connector set GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        }
+      ]
+    },
+    {
+      "id": "sourcing-batch:6:candidate_sourcing_deferred",
+      "sequence": 6,
+      "kind": "candidate_sourcing_deferred",
+      "title": "Defer Candidate-Only Sourcing",
+      "status": "deferred",
+      "rowCount": 97,
+      "readyRows": 0,
+      "blockedRows": 0,
+      "deferredRows": 97,
+      "procurementBlockingRows": 0,
+      "entryCriteria": [
+        "Candidate lines remain outside immediate procurement scope."
+      ],
+      "exitCriteria": [
+        "Candidate lines are either still explicitly deferred or promoted to critical sourcing scope."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "candidate_sourcing_deferred:1:drive_encoder",
+          "closureRowId": "bom-close:actuation_kinematics_agitation_drive_train_drive_encoder",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "drive_encoder",
+          "description": "drive encoder",
+          "searchTerms": [
+            "drive encoder",
+            "drive encoder manufacturer part number",
+            "drive encoder catalogue price GBP",
+            "drive encoder datasheet",
+            "drive encoder single-use bioreactor",
+            "drive encoder GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:2:magnetic_coupling_hub",
+          "closureRowId": "bom-close:actuation_kinematics_agitation_drive_train_magnetic_coupling_hub",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "magnetic_coupling_hub",
+          "description": "magnetic coupling hub",
+          "searchTerms": [
+            "magnetic coupling hub",
+            "magnetic coupling hub manufacturer part number",
+            "magnetic coupling hub catalogue price GBP",
+            "magnetic coupling hub datasheet",
+            "magnetic coupling hub single-use bioreactor",
+            "magnetic coupling hub GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:3:motor_mounting_plate",
+          "closureRowId": "bom-close:actuation_kinematics_agitation_drive_train_motor_mounting_plate",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "motor_mounting_plate",
+          "description": "motor mounting plate",
+          "searchTerms": [
+            "motor mounting plate",
+            "motor mounting plate manufacturer part number",
+            "motor mounting plate catalogue price GBP",
+            "motor mounting plate datasheet",
+            "motor mounting plate single-use bioreactor",
+            "motor mounting plate GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:4:drive_fault_relay",
+          "closureRowId": "bom-close:actuation_kinematics_agitation_safety_feedback_drive_fault_relay",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "drive_fault_relay",
+          "description": "drive fault relay",
+          "searchTerms": [
+            "drive fault relay",
+            "drive fault relay manufacturer part number",
+            "drive fault relay catalogue price GBP",
+            "drive fault relay datasheet",
+            "drive fault relay single-use bioreactor",
+            "drive fault relay GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:5:emergency_drive_stop_contactor",
+          "closureRowId": "bom-close:actuation_kinematics_agitation_safety_feedback_emergency_drive_stop_contactor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "emergency_drive_stop_contactor",
+          "description": "emergency drive stop contactor",
+          "searchTerms": [
+            "emergency drive stop contactor",
+            "emergency drive stop contactor manufacturer part number",
+            "emergency drive stop contactor catalogue price GBP",
+            "emergency drive stop contactor datasheet",
+            "emergency drive stop contactor single-use bioreactor",
+            "emergency drive stop contactor GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:6:motor_current_sensor",
+          "closureRowId": "bom-close:actuation_kinematics_agitation_safety_feedback_motor_current_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "motor_current_sensor",
+          "description": "motor current sensor",
+          "searchTerms": [
+            "motor current sensor",
+            "motor current sensor manufacturer part number",
+            "motor current sensor catalogue price GBP",
+            "motor current sensor datasheet",
+            "motor current sensor single-use bioreactor",
+            "motor current sensor GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:7:overspeed_interlock_input",
+          "closureRowId": "bom-close:actuation_kinematics_agitation_safety_feedback_overspeed_interlock_input",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "overspeed_interlock_input",
+          "description": "overspeed interlock input",
+          "searchTerms": [
+            "overspeed interlock input",
+            "overspeed interlock input manufacturer part number",
+            "overspeed interlock input catalogue price GBP",
+            "overspeed interlock input datasheet",
+            "overspeed interlock input single-use bioreactor",
+            "overspeed interlock input GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:8:impeller_guard_insert",
+          "closureRowId": "bom-close:actuation_kinematics_mixing_impeller_interface_impeller_guard_insert",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "impeller_guard_insert",
+          "description": "impeller guard insert",
+          "searchTerms": [
+            "impeller guard insert",
+            "impeller guard insert manufacturer part number",
+            "impeller guard insert catalogue price GBP",
+            "impeller guard insert datasheet",
+            "impeller guard insert single-use bioreactor",
+            "impeller guard insert GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:9:mixing_validation_coupon",
+          "closureRowId": "bom-close:actuation_kinematics_mixing_impeller_interface_mixing_validation_coupon",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "mixing_validation_coupon",
+          "description": "mixing validation coupon",
+          "searchTerms": [
+            "mixing validation coupon",
+            "mixing validation coupon manufacturer part number",
+            "mixing validation coupon catalogue price GBP",
+            "mixing validation coupon datasheet",
+            "mixing validation coupon single-use bioreactor",
+            "mixing validation coupon GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:10:rocker_angle_stop",
+          "closureRowId": "bom-close:actuation_kinematics_mixing_impeller_interface_rocker_angle_stop",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "rocker_angle_stop",
+          "description": "rocker angle stop",
+          "searchTerms": [
+            "rocker angle stop",
+            "rocker angle stop manufacturer part number",
+            "rocker angle stop catalogue price GBP",
+            "rocker angle stop datasheet",
+            "rocker angle stop single-use bioreactor",
+            "rocker angle stop GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:11:single_use_impeller_coupling",
+          "closureRowId": "bom-close:actuation_kinematics_mixing_impeller_interface_single_use_impeller_coupling",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "single_use_impeller_coupling",
+          "description": "single-use impeller coupling",
+          "searchTerms": [
+            "single-use impeller coupling",
+            "single-use impeller coupling manufacturer part number",
+            "single-use impeller coupling catalogue price GBP",
+            "single-use impeller coupling datasheet",
+            "single-use impeller coupling single-use bioreactor",
+            "single-use impeller coupling GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:12:audit_trail_storage",
+          "closureRowId": "bom-close:control_compute_communication_batch_record_gateway_audit_trail_storage",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "audit_trail_storage",
+          "description": "audit trail storage",
+          "searchTerms": [
+            "audit trail storage",
+            "audit trail storage manufacturer part number",
+            "audit trail storage catalogue price GBP",
+            "audit trail storage datasheet",
+            "audit trail storage single-use bioreactor",
+            "audit trail storage GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:13:batch_historian_module",
+          "closureRowId": "bom-close:control_compute_communication_batch_record_gateway_batch_historian_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "batch_historian_module",
+          "description": "batch historian module",
+          "searchTerms": [
+            "batch historian module",
+            "batch historian module manufacturer part number",
+            "batch historian module catalogue price GBP",
+            "batch historian module datasheet",
+            "batch historian module single-use bioreactor",
+            "batch historian module GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:14:ethernet_switch",
+          "closureRowId": "bom-close:control_compute_communication_batch_record_gateway_ethernet_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ethernet_switch",
+          "description": "ethernet switch",
+          "searchTerms": [
+            "ethernet switch",
+            "ethernet switch manufacturer part number",
+            "ethernet switch catalogue price GBP",
+            "ethernet switch datasheet",
+            "ethernet switch single-use bioreactor",
+            "ethernet switch GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:15:secure_time_source",
+          "closureRowId": "bom-close:control_compute_communication_batch_record_gateway_secure_time_source",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "secure_time_source",
+          "description": "secure time source",
+          "searchTerms": [
+            "secure time source",
+            "secure time source manufacturer part number",
+            "secure time source catalogue price GBP",
+            "secure time source datasheet",
+            "secure time source single-use bioreactor",
+            "secure time source GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:16:alarm_annunciator",
+          "closureRowId": "bom-close:control_compute_communication_operator_alarm_logic_alarm_annunciator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "alarm_annunciator",
+          "description": "alarm annunciator",
+          "searchTerms": [
+            "alarm annunciator",
+            "alarm annunciator manufacturer part number",
+            "alarm annunciator catalogue price GBP",
+            "alarm annunciator datasheet",
+            "alarm annunciator single-use bioreactor",
+            "alarm annunciator GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:17:batch_acknowledge_button",
+          "closureRowId": "bom-close:control_compute_communication_operator_alarm_logic_batch_acknowledge_button",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "batch_acknowledge_button",
+          "description": "batch acknowledge button",
+          "searchTerms": [
+            "batch acknowledge button",
+            "batch acknowledge button manufacturer part number",
+            "batch acknowledge button catalogue price GBP",
+            "batch acknowledge button datasheet",
+            "batch acknowledge button single-use bioreactor",
+            "batch acknowledge button GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:18:operator_hmi_panel",
+          "closureRowId": "bom-close:control_compute_communication_operator_alarm_logic_operator_hmi_panel",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "operator_hmi_panel",
+          "description": "operator HMI panel",
+          "searchTerms": [
+            "operator HMI panel",
+            "operator HMI panel manufacturer part number",
+            "operator HMI panel catalogue price GBP",
+            "operator HMI panel datasheet",
+            "operator HMI panel single-use bioreactor",
+            "operator HMI panel GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:19:role_access_key_switch",
+          "closureRowId": "bom-close:control_compute_communication_operator_alarm_logic_role_access_key_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "role_access_key_switch",
+          "description": "role access key switch",
+          "searchTerms": [
+            "role access key switch",
+            "role access key switch manufacturer part number",
+            "role access key switch catalogue price GBP",
+            "role access key switch datasheet",
+            "role access key switch single-use bioreactor",
+            "role access key switch GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:20:control_enclosure",
+          "closureRowId": "bom-close:control_compute_communication_process_controller_control_enclosure",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "control_enclosure",
+          "description": "control enclosure",
+          "searchTerms": [
+            "control enclosure",
+            "control enclosure manufacturer part number",
+            "control enclosure catalogue price GBP",
+            "control enclosure datasheet",
+            "control enclosure single-use bioreactor",
+            "control enclosure GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:21:i_o_terminal_slice_set",
+          "closureRowId": "bom-close:control_compute_communication_process_controller_i_o_terminal_slice_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "i_o_terminal_slice_set",
+          "description": "I/O terminal slice set",
+          "searchTerms": [
+            "I/O terminal slice set",
+            "I/O terminal slice set manufacturer part number",
+            "I/O terminal slice set catalogue price GBP",
+            "I/O terminal slice set datasheet",
+            "I/O terminal slice set single-use bioreactor",
+            "I/O terminal slice set GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:22:recipe_execution_firmware",
+          "closureRowId": "bom-close:control_compute_communication_process_controller_recipe_execution_firmware",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "recipe_execution_firmware",
+          "description": "recipe execution firmware",
+          "searchTerms": [
+            "recipe execution firmware",
+            "recipe execution firmware manufacturer part number",
+            "recipe execution firmware catalogue price GBP",
+            "recipe execution firmware datasheet",
+            "recipe execution firmware single-use bioreactor",
+            "recipe execution firmware GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:23:ambient_temperature_probe",
+          "closureRowId": "bom-close:environmental_interface_ambient_enclosure_conditions_ambient_temperature_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ambient_temperature_probe",
+          "description": "ambient temperature probe",
+          "searchTerms": [
+            "ambient temperature probe",
+            "ambient temperature probe manufacturer part number",
+            "ambient temperature probe catalogue price GBP",
+            "ambient temperature probe datasheet",
+            "ambient temperature probe single-use bioreactor",
+            "ambient temperature probe GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:24:clean_zone_status_beacon",
+          "closureRowId": "bom-close:environmental_interface_ambient_enclosure_conditions_clean_zone_status_beacon",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "clean_zone_status_beacon",
+          "description": "clean-zone status beacon",
+          "searchTerms": [
+            "clean-zone status beacon",
+            "clean-zone status beacon manufacturer part number",
+            "clean-zone status beacon catalogue price GBP",
+            "clean-zone status beacon datasheet",
+            "clean-zone status beacon single-use bioreactor",
+            "clean-zone status beacon GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:25:splash_guard_panel",
+          "closureRowId": "bom-close:environmental_interface_ambient_enclosure_conditions_splash_guard_panel",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "splash_guard_panel",
+          "description": "splash guard panel",
+          "searchTerms": [
+            "splash guard panel",
+            "splash guard panel manufacturer part number",
+            "splash guard panel catalogue price GBP",
+            "splash guard panel datasheet",
+            "splash guard panel single-use bioreactor",
+            "splash guard panel GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:26:wipe_down_surface_kit",
+          "closureRowId": "bom-close:environmental_interface_ambient_enclosure_conditions_wipe_down_surface_kit",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "wipe_down_surface_kit",
+          "description": "wipe-down surface kit",
+          "searchTerms": [
+            "wipe-down surface kit",
+            "wipe-down surface kit manufacturer part number",
+            "wipe-down surface kit catalogue price GBP",
+            "wipe-down surface kit datasheet",
+            "wipe-down surface kit single-use bioreactor",
+            "wipe-down surface kit GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:27:condensate_knock_out_bottle",
+          "closureRowId": "bom-close:environmental_interface_exhaust_filter_train_condensate_knock_out_bottle",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "condensate_knock_out_bottle",
+          "description": "condensate knock-out bottle",
+          "searchTerms": [
+            "condensate knock-out bottle",
+            "condensate knock-out bottle manufacturer part number",
+            "condensate knock-out bottle catalogue price GBP",
+            "condensate knock-out bottle datasheet",
+            "condensate knock-out bottle single-use bioreactor",
+            "condensate knock-out bottle GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:28:exhaust_heater_sleeve",
+          "closureRowId": "bom-close:environmental_interface_exhaust_filter_train_exhaust_heater_sleeve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "exhaust_heater_sleeve",
+          "description": "exhaust heater sleeve",
+          "searchTerms": [
+            "exhaust heater sleeve",
+            "exhaust heater sleeve manufacturer part number",
+            "exhaust heater sleeve catalogue price GBP",
+            "exhaust heater sleeve datasheet",
+            "exhaust heater sleeve single-use bioreactor",
+            "exhaust heater sleeve GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:29:pressure_relief_indicator",
+          "closureRowId": "bom-close:environmental_interface_exhaust_filter_train_pressure_relief_indicator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pressure_relief_indicator",
+          "description": "pressure relief indicator",
+          "searchTerms": [
+            "pressure relief indicator",
+            "pressure relief indicator manufacturer part number",
+            "pressure relief indicator catalogue price GBP",
+            "pressure relief indicator datasheet",
+            "pressure relief indicator single-use bioreactor",
+            "pressure relief indicator GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:30:cooling_plate",
+          "closureRowId": "bom-close:environmental_interface_temperature_control_loop_cooling_plate",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "cooling_plate",
+          "description": "cooling plate",
+          "searchTerms": [
+            "cooling plate",
+            "cooling plate manufacturer part number",
+            "cooling plate catalogue price GBP",
+            "cooling plate datasheet",
+            "cooling plate single-use bioreactor",
+            "cooling plate GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:31:heater_blanket",
+          "closureRowId": "bom-close:environmental_interface_temperature_control_loop_heater_blanket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "heater_blanket",
+          "description": "heater blanket",
+          "searchTerms": [
+            "heater blanket",
+            "heater blanket manufacturer part number",
+            "heater blanket catalogue price GBP",
+            "heater blanket datasheet",
+            "heater blanket single-use bioreactor",
+            "heater blanket GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:32:thermal_interface_mat",
+          "closureRowId": "bom-close:environmental_interface_temperature_control_loop_thermal_interface_mat",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "thermal_interface_mat",
+          "description": "thermal interface mat",
+          "searchTerms": [
+            "thermal interface mat",
+            "thermal interface mat manufacturer part number",
+            "thermal interface mat catalogue price GBP",
+            "thermal interface mat datasheet",
+            "thermal interface mat single-use bioreactor",
+            "thermal interface mat GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:33:spent_bag_removal_cart_interface",
+          "closureRowId": "bom-close:maintenance_serviceability_cleaning_turnaround_spent_bag_removal_cart_interface",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "spent_bag_removal_cart_interface",
+          "description": "spent bag removal cart interface",
+          "searchTerms": [
+            "spent bag removal cart interface",
+            "spent bag removal cart interface manufacturer part number",
+            "spent bag removal cart interface catalogue price GBP",
+            "spent bag removal cart interface datasheet",
+            "spent bag removal cart interface single-use bioreactor",
+            "spent bag removal cart interface GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:34:spill_tray_liner",
+          "closureRowId": "bom-close:maintenance_serviceability_cleaning_turnaround_spill_tray_liner",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "spill_tray_liner",
+          "description": "spill tray liner",
+          "searchTerms": [
+            "spill tray liner",
+            "spill tray liner manufacturer part number",
+            "spill tray liner catalogue price GBP",
+            "spill tray liner datasheet",
+            "spill tray liner single-use bioreactor",
+            "spill tray liner GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:35:turnaround_checklist_card",
+          "closureRowId": "bom-close:maintenance_serviceability_cleaning_turnaround_turnaround_checklist_card",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "turnaround_checklist_card",
+          "description": "turnaround checklist card",
+          "searchTerms": [
+            "turnaround checklist card",
+            "turnaround checklist card manufacturer part number",
+            "turnaround checklist card catalogue price GBP",
+            "turnaround checklist card datasheet",
+            "turnaround checklist card single-use bioreactor",
+            "turnaround checklist card GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:36:wipe_down_kit_holder",
+          "closureRowId": "bom-close:maintenance_serviceability_cleaning_turnaround_wipe_down_kit_holder",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "wipe_down_kit_holder",
+          "description": "wipe-down kit holder",
+          "searchTerms": [
+            "wipe-down kit holder",
+            "wipe-down kit holder manufacturer part number",
+            "wipe-down kit holder catalogue price GBP",
+            "wipe-down kit holder datasheet",
+            "wipe-down kit holder single-use bioreactor",
+            "wipe-down kit holder GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:37:calibration_data_entry_hmi_page",
+          "closureRowId": "bom-close:maintenance_serviceability_sensor_calibration_access_calibration_data_entry_hmi_page",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "calibration_data_entry_hmi_page",
+          "description": "calibration data entry HMI page",
+          "searchTerms": [
+            "calibration data entry HMI page",
+            "calibration data entry HMI page manufacturer part number",
+            "calibration data entry HMI page catalogue price GBP",
+            "calibration data entry HMI page datasheet",
+            "calibration data entry HMI page single-use bioreactor",
+            "calibration data entry HMI page GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:38:do_zero_span_adapter",
+          "closureRowId": "bom-close:maintenance_serviceability_sensor_calibration_access_do_zero_span_adapter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "do_zero_span_adapter",
+          "description": "DO zero span adapter",
+          "searchTerms": [
+            "DO zero span adapter",
+            "DO zero span adapter manufacturer part number",
+            "DO zero span adapter catalogue price GBP",
+            "DO zero span adapter datasheet",
+            "DO zero span adapter single-use bioreactor",
+            "DO zero span adapter GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:39:ph_calibration_buffer_holder",
+          "closureRowId": "bom-close:maintenance_serviceability_sensor_calibration_access_ph_calibration_buffer_holder",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ph_calibration_buffer_holder",
+          "description": "pH calibration buffer holder",
+          "searchTerms": [
+            "pH calibration buffer holder",
+            "pH calibration buffer holder manufacturer part number",
+            "pH calibration buffer holder catalogue price GBP",
+            "pH calibration buffer holder datasheet",
+            "pH calibration buffer holder single-use bioreactor",
+            "pH calibration buffer holder GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:40:sensor_replacement_guide_label",
+          "closureRowId": "bom-close:maintenance_serviceability_sensor_calibration_access_sensor_replacement_guide_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sensor_replacement_guide_label",
+          "description": "sensor replacement guide label",
+          "searchTerms": [
+            "sensor replacement guide label",
+            "sensor replacement guide label manufacturer part number",
+            "sensor replacement guide label catalogue price GBP",
+            "sensor replacement guide label datasheet",
+            "sensor replacement guide label single-use bioreactor",
+            "sensor replacement guide label GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:41:bag_loading_fixture",
+          "closureRowId": "bom-close:maintenance_serviceability_single_use_setup_bag_loading_fixture",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "bag_loading_fixture",
+          "description": "bag loading fixture",
+          "searchTerms": [
+            "bag loading fixture",
+            "bag loading fixture manufacturer part number",
+            "bag loading fixture catalogue price GBP",
+            "bag loading fixture datasheet",
+            "bag loading fixture single-use bioreactor",
+            "bag loading fixture GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:42:connector_cap_organiser",
+          "closureRowId": "bom-close:maintenance_serviceability_single_use_setup_connector_cap_organiser",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "connector_cap_organiser",
+          "description": "connector cap organiser",
+          "searchTerms": [
+            "connector cap organiser",
+            "connector cap organiser manufacturer part number",
+            "connector cap organiser catalogue price GBP",
+            "connector cap organiser datasheet",
+            "connector cap organiser single-use bioreactor",
+            "connector cap organiser GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:43:setup_verification_barcode_sheet",
+          "closureRowId": "bom-close:maintenance_serviceability_single_use_setup_setup_verification_barcode_sheet",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "setup_verification_barcode_sheet",
+          "description": "setup verification barcode sheet",
+          "searchTerms": [
+            "setup verification barcode sheet",
+            "setup verification barcode sheet manufacturer part number",
+            "setup verification barcode sheet catalogue price GBP",
+            "setup verification barcode sheet datasheet",
+            "setup verification barcode sheet single-use bioreactor",
+            "setup verification barcode sheet GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:44:tube_routing_template",
+          "closureRowId": "bom-close:maintenance_serviceability_single_use_setup_tube_routing_template",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "tube_routing_template",
+          "description": "tube routing template",
+          "searchTerms": [
+            "tube routing template",
+            "tube routing template manufacturer part number",
+            "tube routing template catalogue price GBP",
+            "tube routing template datasheet",
+            "tube routing template single-use bioreactor",
+            "tube routing template GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:45:feed_line_pinch_clamp",
+          "closureRowId": "bom-close:mass_fluid_transport_process_feed_pump_manifold_feed_line_pinch_clamp",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "feed_line_pinch_clamp",
+          "description": "feed line pinch clamp",
+          "searchTerms": [
+            "feed line pinch clamp",
+            "feed line pinch clamp manufacturer part number",
+            "feed line pinch clamp catalogue price GBP",
+            "feed line pinch clamp datasheet",
+            "feed line pinch clamp single-use bioreactor",
+            "feed line pinch clamp GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:46:media_bag_hanger",
+          "closureRowId": "bom-close:mass_fluid_transport_process_feed_pump_manifold_media_bag_hanger",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "media_bag_hanger",
+          "description": "media bag hanger",
+          "searchTerms": [
+            "media bag hanger",
+            "media bag hanger manufacturer part number",
+            "media bag hanger catalogue price GBP",
+            "media bag hanger datasheet",
+            "media bag hanger single-use bioreactor",
+            "media bag hanger GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:47:pump_tubing_cassette_set",
+          "closureRowId": "bom-close:mass_fluid_transport_process_feed_pump_manifold_pump_tubing_cassette_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pump_tubing_cassette_set",
+          "description": "pump tubing cassette set",
+          "searchTerms": [
+            "pump tubing cassette set",
+            "pump tubing cassette set manufacturer part number",
+            "pump tubing cassette set catalogue price GBP",
+            "pump tubing cassette set datasheet",
+            "pump tubing cassette set single-use bioreactor",
+            "pump tubing cassette set GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:48:harvest_transfer_tubing_set",
+          "closureRowId": "bom-close:mass_fluid_transport_process_harvest_sampling_path_harvest_transfer_tubing_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "harvest_transfer_tubing_set",
+          "description": "harvest transfer tubing set",
+          "searchTerms": [
+            "harvest transfer tubing set",
+            "harvest transfer tubing set manufacturer part number",
+            "harvest transfer tubing set catalogue price GBP",
+            "harvest transfer tubing set datasheet",
+            "harvest transfer tubing set single-use bioreactor",
+            "harvest transfer tubing set GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:49:low_hold_up_connector",
+          "closureRowId": "bom-close:mass_fluid_transport_process_harvest_sampling_path_low_hold_up_connector",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "low_hold_up_connector",
+          "description": "low-hold-up connector",
+          "searchTerms": [
+            "low-hold-up connector",
+            "low-hold-up connector manufacturer part number",
+            "low-hold-up connector catalogue price GBP",
+            "low-hold-up connector datasheet",
+            "low-hold-up connector single-use bioreactor",
+            "low-hold-up connector GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:50:single_use_sample_valve",
+          "closureRowId": "bom-close:mass_fluid_transport_process_harvest_sampling_path_single_use_sample_valve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "single_use_sample_valve",
+          "description": "single-use sample valve",
+          "searchTerms": [
+            "single-use sample valve",
+            "single-use sample valve manufacturer part number",
+            "single-use sample valve catalogue price GBP",
+            "single-use sample valve datasheet",
+            "single-use sample valve single-use bioreactor",
+            "single-use sample valve GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:51:waste_collection_bag",
+          "closureRowId": "bom-close:mass_fluid_transport_process_harvest_sampling_path_waste_collection_bag",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "waste_collection_bag",
+          "description": "waste collection bag",
+          "searchTerms": [
+            "waste collection bag",
+            "waste collection bag manufacturer part number",
+            "waste collection bag catalogue price GBP",
+            "waste collection bag datasheet",
+            "waste collection bag single-use bioreactor",
+            "waste collection bag GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:52:mass_flow_controller_bank",
+          "closureRowId": "bom-close:mass_fluid_transport_process_sparger_gas_mixing_mass_flow_controller_bank",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "mass_flow_controller_bank",
+          "description": "mass-flow controller bank",
+          "searchTerms": [
+            "mass-flow controller bank",
+            "mass-flow controller bank manufacturer part number",
+            "mass-flow controller bank catalogue price GBP",
+            "mass-flow controller bank datasheet",
+            "mass-flow controller bank single-use bioreactor",
+            "mass-flow controller bank GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:53:sparger_check_valve",
+          "closureRowId": "bom-close:mass_fluid_transport_process_sparger_gas_mixing_sparger_check_valve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sparger_check_valve",
+          "description": "sparger check valve",
+          "searchTerms": [
+            "sparger check valve",
+            "sparger check valve manufacturer part number",
+            "sparger check valve catalogue price GBP",
+            "sparger check valve datasheet",
+            "sparger check valve single-use bioreactor",
+            "sparger check valve GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:54:sterile_gas_filter_capsule",
+          "closureRowId": "bom-close:mass_fluid_transport_process_sparger_gas_mixing_sterile_gas_filter_capsule",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sterile_gas_filter_capsule",
+          "description": "sterile gas filter capsule",
+          "searchTerms": [
+            "sterile gas filter capsule",
+            "sterile gas filter capsule manufacturer part number",
+            "sterile gas filter capsule catalogue price GBP",
+            "sterile gas filter capsule datasheet",
+            "sterile gas filter capsule single-use bioreactor",
+            "sterile gas filter capsule GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:55:agitation_drive_breaker",
+          "closureRowId": "bom-close:power_distribution_actuator_power_feeds_agitation_drive_breaker",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "agitation_drive_breaker",
+          "description": "agitation drive breaker",
+          "searchTerms": [
+            "agitation drive breaker",
+            "agitation drive breaker manufacturer part number",
+            "agitation drive breaker catalogue price GBP",
+            "agitation drive breaker datasheet",
+            "agitation drive breaker single-use bioreactor",
+            "agitation drive breaker GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:56:cable_gland_plate",
+          "closureRowId": "bom-close:power_distribution_actuator_power_feeds_cable_gland_plate",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "cable_gland_plate",
+          "description": "cable gland plate",
+          "searchTerms": [
+            "cable gland plate",
+            "cable gland plate manufacturer part number",
+            "cable gland plate catalogue price GBP",
+            "cable gland plate datasheet",
+            "cable gland plate single-use bioreactor",
+            "cable gland plate GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:57:heater_output_relay",
+          "closureRowId": "bom-close:power_distribution_actuator_power_feeds_heater_output_relay",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "heater_output_relay",
+          "description": "heater output relay",
+          "searchTerms": [
+            "heater output relay",
+            "heater output relay manufacturer part number",
+            "heater output relay catalogue price GBP",
+            "heater output relay datasheet",
+            "heater output relay single-use bioreactor",
+            "heater output relay GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:58:pump_power_distribution_loom",
+          "closureRowId": "bom-close:power_distribution_actuator_power_feeds_pump_power_distribution_loom",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pump_power_distribution_loom",
+          "description": "pump power distribution loom",
+          "searchTerms": [
+            "pump power distribution loom",
+            "pump power distribution loom manufacturer part number",
+            "pump power distribution loom catalogue price GBP",
+            "pump power distribution loom datasheet",
+            "pump power distribution loom single-use bioreactor",
+            "pump power distribution loom GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:59:power_fail_input_module",
+          "closureRowId": "bom-close:power_distribution_backup_power_and_shutdown_power_fail_input_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "power_fail_input_module",
+          "description": "power-fail input module",
+          "searchTerms": [
+            "power-fail input module",
+            "power-fail input module manufacturer part number",
+            "power-fail input module catalogue price GBP",
+            "power-fail input module datasheet",
+            "power-fail input module single-use bioreactor",
+            "power-fail input module GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:60:safe_shutdown_relay",
+          "closureRowId": "bom-close:power_distribution_backup_power_and_shutdown_safe_shutdown_relay",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "safe_shutdown_relay",
+          "description": "safe shutdown relay",
+          "searchTerms": [
+            "safe shutdown relay",
+            "safe shutdown relay manufacturer part number",
+            "safe shutdown relay catalogue price GBP",
+            "safe shutdown relay datasheet",
+            "safe shutdown relay single-use bioreactor",
+            "safe shutdown relay GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:61:shutdown_status_lamp",
+          "closureRowId": "bom-close:power_distribution_backup_power_and_shutdown_shutdown_status_lamp",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "shutdown_status_lamp",
+          "description": "shutdown status lamp",
+          "searchTerms": [
+            "shutdown status lamp",
+            "shutdown status lamp manufacturer part number",
+            "shutdown status lamp catalogue price GBP",
+            "shutdown status lamp datasheet",
+            "shutdown status lamp single-use bioreactor",
+            "shutdown status lamp GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:62:ups_buffer_module",
+          "closureRowId": "bom-close:power_distribution_backup_power_and_shutdown_ups_buffer_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ups_buffer_module",
+          "description": "UPS buffer module",
+          "searchTerms": [
+            "UPS buffer module",
+            "UPS buffer module manufacturer part number",
+            "UPS buffer module catalogue price GBP",
+            "UPS buffer module datasheet",
+            "UPS buffer module single-use bioreactor",
+            "UPS buffer module GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:63:24_v_dc_power_supply",
+          "closureRowId": "bom-close:power_distribution_control_power_panel_24_v_dc_power_supply",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "24_v_dc_power_supply",
+          "description": "24 V DC power supply",
+          "searchTerms": [
+            "24 V DC power supply",
+            "24 V DC power supply manufacturer part number",
+            "24 V DC power supply catalogue price GBP",
+            "24 V DC power supply datasheet",
+            "24 V DC power supply single-use bioreactor",
+            "24 V DC power supply GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:64:panel_earth_bar",
+          "closureRowId": "bom-close:power_distribution_control_power_panel_panel_earth_bar",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "panel_earth_bar",
+          "description": "panel earth bar",
+          "searchTerms": [
+            "panel earth bar",
+            "panel earth bar manufacturer part number",
+            "panel earth bar catalogue price GBP",
+            "panel earth bar datasheet",
+            "panel earth bar single-use bioreactor",
+            "panel earth bar GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:65:rcd_mains_isolator",
+          "closureRowId": "bom-close:power_distribution_control_power_panel_rcd_mains_isolator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "rcd_mains_isolator",
+          "description": "RCD mains isolator",
+          "searchTerms": [
+            "RCD mains isolator",
+            "RCD mains isolator manufacturer part number",
+            "RCD mains isolator catalogue price GBP",
+            "RCD mains isolator datasheet",
+            "RCD mains isolator single-use bioreactor",
+            "RCD mains isolator GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:66:terminal_block_rail",
+          "closureRowId": "bom-close:power_distribution_control_power_panel_terminal_block_rail",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "terminal_block_rail",
+          "description": "terminal block rail",
+          "searchTerms": [
+            "terminal block rail",
+            "terminal block rail manufacturer part number",
+            "terminal block rail catalogue price GBP",
+            "terminal block rail datasheet",
+            "terminal block rail single-use bioreactor",
+            "terminal block rail GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:67:connector_tamper_seal_set",
+          "closureRowId": "bom-close:safety_protection_aseptic_setup_controls_connector_tamper_seal_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "connector_tamper_seal_set",
+          "description": "connector tamper seal set",
+          "searchTerms": [
+            "connector tamper seal set",
+            "connector tamper seal set manufacturer part number",
+            "connector tamper seal set catalogue price GBP",
+            "connector tamper seal set datasheet",
+            "connector tamper seal set single-use bioreactor",
+            "connector tamper seal set GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:68:operator_gowning_placard",
+          "closureRowId": "bom-close:safety_protection_aseptic_setup_controls_operator_gowning_placard",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "operator_gowning_placard",
+          "description": "operator gowning placard",
+          "searchTerms": [
+            "operator gowning placard",
+            "operator gowning placard manufacturer part number",
+            "operator gowning placard catalogue price GBP",
+            "operator gowning placard datasheet",
+            "operator gowning placard single-use bioreactor",
+            "operator gowning placard GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:69:pre_use_integrity_test_kit",
+          "closureRowId": "bom-close:safety_protection_aseptic_setup_controls_pre_use_integrity_test_kit",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pre_use_integrity_test_kit",
+          "description": "pre-use integrity test kit",
+          "searchTerms": [
+            "pre-use integrity test kit",
+            "pre-use integrity test kit manufacturer part number",
+            "pre-use integrity test kit catalogue price GBP",
+            "pre-use integrity test kit datasheet",
+            "pre-use integrity test kit single-use bioreactor",
+            "pre-use integrity test kit GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:70:sterile_connection_checklist_card",
+          "closureRowId": "bom-close:safety_protection_aseptic_setup_controls_sterile_connection_checklist_card",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sterile_connection_checklist_card",
+          "description": "sterile connection checklist card",
+          "searchTerms": [
+            "sterile connection checklist card",
+            "sterile connection checklist card manufacturer part number",
+            "sterile connection checklist card catalogue price GBP",
+            "sterile connection checklist card datasheet",
+            "sterile connection checklist card single-use bioreactor",
+            "sterile connection checklist card GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:71:door_interlock_switch",
+          "closureRowId": "bom-close:safety_protection_operator_electrical_safety_door_interlock_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "door_interlock_switch",
+          "description": "door interlock switch",
+          "searchTerms": [
+            "door interlock switch",
+            "door interlock switch manufacturer part number",
+            "door interlock switch catalogue price GBP",
+            "door interlock switch datasheet",
+            "door interlock switch single-use bioreactor",
+            "door interlock switch GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:72:emergency_stop_button",
+          "closureRowId": "bom-close:safety_protection_operator_electrical_safety_emergency_stop_button",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "emergency_stop_button",
+          "description": "emergency stop button",
+          "searchTerms": [
+            "emergency stop button",
+            "emergency stop button manufacturer part number",
+            "emergency stop button catalogue price GBP",
+            "emergency stop button datasheet",
+            "emergency stop button single-use bioreactor",
+            "emergency stop button GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:73:leak_tray_float_switch",
+          "closureRowId": "bom-close:safety_protection_operator_electrical_safety_leak_tray_float_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "leak_tray_float_switch",
+          "description": "leak tray float switch",
+          "searchTerms": [
+            "leak tray float switch",
+            "leak tray float switch manufacturer part number",
+            "leak tray float switch catalogue price GBP",
+            "leak tray float switch datasheet",
+            "leak tray float switch single-use bioreactor",
+            "leak tray float switch GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:74:protective_earth_test_point",
+          "closureRowId": "bom-close:safety_protection_operator_electrical_safety_protective_earth_test_point",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "protective_earth_test_point",
+          "description": "protective earth test point",
+          "searchTerms": [
+            "protective earth test point",
+            "protective earth test point manufacturer part number",
+            "protective earth test point catalogue price GBP",
+            "protective earth test point datasheet",
+            "protective earth test point single-use bioreactor",
+            "protective earth test point GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:75:bag_burst_shield",
+          "closureRowId": "bom-close:safety_protection_sterile_pressure_safety_bag_burst_shield",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "bag_burst_shield",
+          "description": "bag burst shield",
+          "searchTerms": [
+            "bag burst shield",
+            "bag burst shield manufacturer part number",
+            "bag burst shield catalogue price GBP",
+            "bag burst shield datasheet",
+            "bag burst shield single-use bioreactor",
+            "bag burst shield GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:76:pressure_alarm_relay",
+          "closureRowId": "bom-close:safety_protection_sterile_pressure_safety_pressure_alarm_relay",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pressure_alarm_relay",
+          "description": "pressure alarm relay",
+          "searchTerms": [
+            "pressure alarm relay",
+            "pressure alarm relay manufacturer part number",
+            "pressure alarm relay catalogue price GBP",
+            "pressure alarm relay datasheet",
+            "pressure alarm relay single-use bioreactor",
+            "pressure alarm relay GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:77:single_use_pressure_relief_valve",
+          "closureRowId": "bom-close:safety_protection_sterile_pressure_safety_single_use_pressure_relief_valve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "single_use_pressure_relief_valve",
+          "description": "single-use pressure relief valve",
+          "searchTerms": [
+            "single-use pressure relief valve",
+            "single-use pressure relief valve manufacturer part number",
+            "single-use pressure relief valve catalogue price GBP",
+            "single-use pressure relief valve datasheet",
+            "single-use pressure relief valve single-use bioreactor",
+            "single-use pressure relief valve GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:78:vent_filter_integrity_tag",
+          "closureRowId": "bom-close:safety_protection_sterile_pressure_safety_vent_filter_integrity_tag",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "vent_filter_integrity_tag",
+          "description": "vent filter integrity tag",
+          "searchTerms": [
+            "vent filter integrity tag",
+            "vent filter integrity tag manufacturer part number",
+            "vent filter integrity tag catalogue price GBP",
+            "vent filter integrity tag datasheet",
+            "vent filter integrity tag single-use bioreactor",
+            "vent filter integrity tag GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:79:sensor_calibration_record_card",
+          "closureRowId": "bom-close:sensing_instrumentation_do_ph_sensing_sensor_calibration_record_card",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sensor_calibration_record_card",
+          "description": "sensor calibration record card",
+          "searchTerms": [
+            "sensor calibration record card",
+            "sensor calibration record card manufacturer part number",
+            "sensor calibration record card catalogue price GBP",
+            "sensor calibration record card datasheet",
+            "sensor calibration record card single-use bioreactor",
+            "sensor calibration record card GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:80:sensor_patch_reader",
+          "closureRowId": "bom-close:sensing_instrumentation_do_ph_sensing_sensor_patch_reader",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sensor_patch_reader",
+          "description": "sensor patch reader",
+          "searchTerms": [
+            "sensor patch reader",
+            "sensor patch reader manufacturer part number",
+            "sensor patch reader catalogue price GBP",
+            "sensor patch reader datasheet",
+            "sensor patch reader single-use bioreactor",
+            "sensor patch reader GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:81:co2_analyser_cell",
+          "closureRowId": "bom-close:sensing_instrumentation_gas_flow_sensing_co2_analyser_cell",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "co2_analyser_cell",
+          "description": "CO2 analyser cell",
+          "searchTerms": [
+            "CO2 analyser cell",
+            "CO2 analyser cell manufacturer part number",
+            "CO2 analyser cell catalogue price GBP",
+            "CO2 analyser cell datasheet",
+            "CO2 analyser cell single-use bioreactor",
+            "CO2 analyser cell GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:82:exhaust_pressure_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_gas_flow_sensing_exhaust_pressure_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "exhaust_pressure_sensor",
+          "description": "exhaust pressure sensor",
+          "searchTerms": [
+            "exhaust pressure sensor",
+            "exhaust pressure sensor manufacturer part number",
+            "exhaust pressure sensor catalogue price GBP",
+            "exhaust pressure sensor datasheet",
+            "exhaust pressure sensor single-use bioreactor",
+            "exhaust pressure sensor GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:83:gas_flow_sensor_set",
+          "closureRowId": "bom-close:sensing_instrumentation_gas_flow_sensing_gas_flow_sensor_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "gas_flow_sensor_set",
+          "description": "gas flow sensor set",
+          "searchTerms": [
+            "gas flow sensor set",
+            "gas flow sensor set manufacturer part number",
+            "gas flow sensor set catalogue price GBP",
+            "gas flow sensor set datasheet",
+            "gas flow sensor set single-use bioreactor",
+            "gas flow sensor set GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:84:oxygen_analyser_cell",
+          "closureRowId": "bom-close:sensing_instrumentation_gas_flow_sensing_oxygen_analyser_cell",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "oxygen_analyser_cell",
+          "description": "oxygen analyser cell",
+          "searchTerms": [
+            "oxygen analyser cell",
+            "oxygen analyser cell manufacturer part number",
+            "oxygen analyser cell catalogue price GBP",
+            "oxygen analyser cell datasheet",
+            "oxygen analyser cell single-use bioreactor",
+            "oxygen analyser cell GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:85:bag_pressure_transducer",
+          "closureRowId": "bom-close:sensing_instrumentation_pressure_mass_temperature_sensing_bag_pressure_transducer",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "bag_pressure_transducer",
+          "description": "bag pressure transducer",
+          "searchTerms": [
+            "bag pressure transducer",
+            "bag pressure transducer manufacturer part number",
+            "bag pressure transducer catalogue price GBP",
+            "bag pressure transducer datasheet",
+            "bag pressure transducer single-use bioreactor",
+            "bag pressure transducer GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:86:culture_temperature_probe",
+          "closureRowId": "bom-close:sensing_instrumentation_pressure_mass_temperature_sensing_culture_temperature_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "culture_temperature_probe",
+          "description": "culture temperature probe",
+          "searchTerms": [
+            "culture temperature probe",
+            "culture temperature probe manufacturer part number",
+            "culture temperature probe catalogue price GBP",
+            "culture temperature probe datasheet",
+            "culture temperature probe single-use bioreactor",
+            "culture temperature probe GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:87:foam_detection_probe",
+          "closureRowId": "bom-close:sensing_instrumentation_pressure_mass_temperature_sensing_foam_detection_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "foam_detection_probe",
+          "description": "foam detection probe",
+          "searchTerms": [
+            "foam detection probe",
+            "foam detection probe manufacturer part number",
+            "foam detection probe catalogue price GBP",
+            "foam detection probe datasheet",
+            "foam detection probe single-use bioreactor",
+            "foam detection probe GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:88:bag_integrity_test_label",
+          "closureRowId": "bom-close:structure_containment_single_use_bag_chamber_bag_integrity_test_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "bag_integrity_test_label",
+          "description": "bag integrity test label",
+          "searchTerms": [
+            "bag integrity test label",
+            "bag integrity test label manufacturer part number",
+            "bag integrity test label catalogue price GBP",
+            "bag integrity test label datasheet",
+            "bag integrity test label single-use bioreactor",
+            "bag integrity test label GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:89:bag_support_tray",
+          "closureRowId": "bom-close:structure_containment_single_use_bag_chamber_bag_support_tray",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "bag_support_tray",
+          "description": "bag support tray",
+          "searchTerms": [
+            "bag support tray",
+            "bag support tray manufacturer part number",
+            "bag support tray catalogue price GBP",
+            "bag support tray datasheet",
+            "bag support tray single-use bioreactor",
+            "bag support tray GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:90:port_clamp_set",
+          "closureRowId": "bom-close:structure_containment_single_use_bag_chamber_port_clamp_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "port_clamp_set",
+          "description": "port clamp set",
+          "searchTerms": [
+            "port clamp set",
+            "port clamp set manufacturer part number",
+            "port clamp set catalogue price GBP",
+            "port clamp set datasheet",
+            "port clamp set single-use bioreactor",
+            "port clamp set GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:91:aseptic_sampling_port",
+          "closureRowId": "bom-close:structure_containment_sterile_connector_panel_aseptic_sampling_port",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "aseptic_sampling_port",
+          "description": "aseptic sampling port",
+          "searchTerms": [
+            "aseptic sampling port",
+            "aseptic sampling port manufacturer part number",
+            "aseptic sampling port catalogue price GBP",
+            "aseptic sampling port datasheet",
+            "aseptic sampling port single-use bioreactor",
+            "aseptic sampling port GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:92:clamp_rail",
+          "closureRowId": "bom-close:structure_containment_sterile_connector_panel_clamp_rail",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "clamp_rail",
+          "description": "clamp rail",
+          "searchTerms": [
+            "clamp rail",
+            "clamp rail manufacturer part number",
+            "clamp rail catalogue price GBP",
+            "clamp rail datasheet",
+            "clamp rail single-use bioreactor",
+            "clamp rail GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:93:connector_parking_bracket",
+          "closureRowId": "bom-close:structure_containment_sterile_connector_panel_connector_parking_bracket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "connector_parking_bracket",
+          "description": "connector parking bracket",
+          "searchTerms": [
+            "connector parking bracket",
+            "connector parking bracket manufacturer part number",
+            "connector parking bracket catalogue price GBP",
+            "connector parking bracket datasheet",
+            "connector parking bracket single-use bioreactor",
+            "connector parking bracket GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:94:levelling_foot_set",
+          "closureRowId": "bom-close:structure_containment_support_frame_load_path_levelling_foot_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "levelling_foot_set",
+          "description": "levelling foot set",
+          "searchTerms": [
+            "levelling foot set",
+            "levelling foot set manufacturer part number",
+            "levelling foot set catalogue price GBP",
+            "levelling foot set datasheet",
+            "levelling foot set single-use bioreactor",
+            "levelling foot set GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:95:lifting_eye_kit",
+          "closureRowId": "bom-close:structure_containment_support_frame_load_path_lifting_eye_kit",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lifting_eye_kit",
+          "description": "lifting eye kit",
+          "searchTerms": [
+            "lifting eye kit",
+            "lifting eye kit manufacturer part number",
+            "lifting eye kit catalogue price GBP",
+            "lifting eye kit datasheet",
+            "lifting eye kit single-use bioreactor",
+            "lifting eye kit GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:96:load_cell_mounting_bracket_set",
+          "closureRowId": "bom-close:structure_containment_support_frame_load_path_load_cell_mounting_bracket_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "load_cell_mounting_bracket_set",
+          "description": "load cell mounting bracket set",
+          "searchTerms": [
+            "load cell mounting bracket set",
+            "load cell mounting bracket set manufacturer part number",
+            "load cell mounting bracket set catalogue price GBP",
+            "load cell mounting bracket set datasheet",
+            "load cell mounting bracket set single-use bioreactor",
+            "load cell mounting bracket set GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:97:stainless_support_frame",
+          "closureRowId": "bom-close:structure_containment_support_frame_load_path_stainless_support_frame",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "stainless_support_frame",
+          "description": "stainless support frame",
+          "searchTerms": [
+            "stainless support frame",
+            "stainless support frame manufacturer part number",
+            "stainless support frame catalogue price GBP",
+            "stainless support frame datasheet",
+            "stainless support frame single-use bioreactor",
+            "stainless support frame GMP sterile bioprocess"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        }
+      ]
+    }
+  ]
+}

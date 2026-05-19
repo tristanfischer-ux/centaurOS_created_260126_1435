@@ -1,0 +1,4848 @@
+{
+  "summary": {
+    "rows": 203,
+    "briefSupplied": 3,
+    "accepted": 0,
+    "sourceBacked": 0,
+    "calculatedNeedsReview": 3,
+    "generatedNeedsReview": 155,
+    "sourceRequired": 42,
+    "blocked": 0,
+    "blocksBom": 42,
+    "blocksPublish": 199
+  },
+  "rows": [
+    {
+      "id": "bom_source_field:control_compute_communication_environmental_controller_environmental_controller:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Environmental controller / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "environmental_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_environmental_controller_environmental_controller:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Environmental controller / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "environmental_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_environmental_controller_environmental_controller:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Environmental controller / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "environmental_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_environmental_controller_environmental_controller:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Environmental controller / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "environmental_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_canopy_air_mixing_air_circulation_fans:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Air circulation fans / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "air_circulation_fans"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_canopy_air_mixing_air_circulation_fans:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Air circulation fans / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "air_circulation_fans"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_canopy_air_mixing_air_circulation_fans:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Air circulation fans / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "air_circulation_fans"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_canopy_air_mixing_air_circulation_fans:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Air circulation fans / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "air_circulation_fans"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_co2_enrichment_co2_sensor_or_dosing:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "CO2 sensor or dosing / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "co2_sensor_or_dosing"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_co2_enrichment_co2_sensor_or_dosing:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "CO2 sensor or dosing / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "co2_sensor_or_dosing"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_co2_enrichment_co2_sensor_or_dosing:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "CO2 sensor or dosing / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "co2_sensor_or_dosing"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_co2_enrichment_co2_sensor_or_dosing:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "CO2 sensor or dosing / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "co2_sensor_or_dosing"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_horticultural_lighting_led_grow_lights:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "LED grow lights / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "led_grow_lights"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_horticultural_lighting_led_grow_lights:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "LED grow lights / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "led_grow_lights"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_horticultural_lighting_led_grow_lights:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "LED grow lights / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "led_grow_lights"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_horticultural_lighting_led_grow_lights:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "LED grow lights / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "led_grow_lights"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_fertigation_pumping_nutrient_pump:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Nutrient pump / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "nutrient_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_fertigation_pumping_nutrient_pump:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Nutrient pump / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "nutrient_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_fertigation_pumping_nutrient_pump:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Nutrient pump / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "nutrient_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_fertigation_pumping_nutrient_pump:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Nutrient pump / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "nutrient_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Reservoir and plumbing set / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "reservoir_and_plumbing_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Reservoir and plumbing set / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "reservoir_and_plumbing_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Reservoir and plumbing set / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "reservoir_and_plumbing_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Reservoir and plumbing set / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "reservoir_and_plumbing_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_mains_panel_rcd_isolator_panel:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "RCD isolator panel / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_isolator_panel"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_mains_panel_rcd_isolator_panel:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "RCD isolator panel / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_isolator_panel"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_mains_panel_rcd_isolator_panel:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "RCD isolator panel / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_isolator_panel"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:power_distribution_mains_panel_rcd_isolator_panel:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "RCD isolator panel / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_isolator_panel"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_growing_rack_stack_growing_rack_structure:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Growing rack structure / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_growing_rack_stack_growing_rack_structure:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Growing rack structure / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_growing_rack_stack_growing_rack_structure:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Growing rack structure / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:structure_containment_growing_rack_stack_growing_rack_structure:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Growing rack structure / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_environmental_controller_environmental_controller",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Environmental controller",
+      "claim": "Environmental controller is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "environmental_controller"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:environmental_interface_canopy_air_mixing_air_circulation_fans",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Air circulation fans",
+      "claim": "Air circulation fans is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "air_circulation_fans"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:environmental_interface_co2_enrichment_co2_sensor_or_dosing",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "CO2 sensor or dosing",
+      "claim": "CO2 sensor or dosing is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "co2_sensor_or_dosing"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:environmental_interface_horticultural_lighting_led_grow_lights",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "LED grow lights",
+      "claim": "LED grow lights is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "led_grow_lights"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_fertigation_pumping_nutrient_pump",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Nutrient pump",
+      "claim": "Nutrient pump is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "nutrient_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_reservoir_plumbing_reservoir_and_plumbing_set",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Reservoir and plumbing set",
+      "claim": "Reservoir and plumbing set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "reservoir_and_plumbing_set"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:power_distribution_mains_panel_rcd_isolator_panel",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "RCD isolator panel",
+      "claim": "RCD isolator panel is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_isolator_panel"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:structure_containment_growing_rack_stack_growing_rack_structure",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Growing rack structure",
+      "claim": "Growing rack structure is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "headline_metric:capex_gbp",
+      "kind": "headline_metric",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Estimated CAPEX",
+      "claim": "Estimated CAPEX = 0 GBP.",
+      "provenanceRefs": [
+        "formula:capex=sum(bom.totalCostGbp)",
+        "class_pack:vertical_farm.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed BoM costs before treating this cost metric as a claim."
+    },
+    {
+      "id": "headline_metric:opex_annual_gbp",
+      "kind": "headline_metric",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Estimated annual OPEX",
+      "claim": "Estimated annual OPEX = 0 GBP/year.",
+      "provenanceRefs": [
+        "formula:opex=capex*0.04"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed BoM costs before treating this cost metric as a claim."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_environmental_controller_analog_input_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "analog input module",
+      "claim": "analog input module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "analog_input_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_environmental_controller_din_rail_plc",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "DIN-rail PLC",
+      "claim": "DIN-rail PLC is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "din_rail_plc"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_environmental_controller_real_time_clock_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "real-time clock module",
+      "claim": "real-time clock module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "real_time_clock_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_environmental_controller_relay_output_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "relay output module",
+      "claim": "relay output module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "relay_output_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_recipe_management_alarm_historian",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "alarm historian",
+      "claim": "alarm historian is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "alarm_historian"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_recipe_management_data_export_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "data export module",
+      "claim": "data export module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "data_export_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_recipe_management_recipe_database",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "recipe database",
+      "claim": "recipe database is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "recipe_database"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_recipe_management_set_point_scheduler",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "set-point scheduler",
+      "claim": "set-point scheduler is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "set_point_scheduler"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_remote_monitoring_industrial_ethernet_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "industrial Ethernet switch",
+      "claim": "industrial Ethernet switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "industrial_ethernet_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_remote_monitoring_mqtt_telemetry_bridge",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "MQTT telemetry bridge",
+      "claim": "MQTT telemetry bridge is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "mqtt_telemetry_bridge"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_remote_monitoring_sms_alarm_modem",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "SMS alarm modem",
+      "claim": "SMS alarm modem is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "sms_alarm_modem"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_remote_monitoring_wi_fi_gateway",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Wi-Fi gateway",
+      "claim": "Wi-Fi gateway is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "wi_fi_gateway"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_canopy_air_mixing_airflow_baffle_plate",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "airflow baffle plate",
+      "claim": "airflow baffle plate is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "airflow_baffle_plate"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_canopy_air_mixing_fan_guard_grille",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fan guard grille",
+      "claim": "fan guard grille is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "fan_guard_grille"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_canopy_air_mixing_replaceable_intake_filter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "replaceable intake filter",
+      "claim": "replaceable intake filter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "replaceable_intake_filter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_co2_enrichment_co2_distribution_tube",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "CO2 distribution tube",
+      "claim": "CO2 distribution tube is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "co2_distribution_tube"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_co2_enrichment_co2_solenoid_valve",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "CO2 solenoid valve",
+      "claim": "CO2 solenoid valve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "co2_solenoid_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_co2_enrichment_gas_regulator",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "gas regulator",
+      "claim": "gas regulator is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "gas_regulator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_co2_enrichment_ndir_co2_sensor_head",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "NDIR CO2 sensor head",
+      "claim": "NDIR CO2 sensor head is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "ndir_co2_sensor_head"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_horticultural_lighting_dimmable_led_driver",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "dimmable LED driver",
+      "claim": "dimmable LED driver is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "dimmable_led_driver"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_horticultural_lighting_glare_shield",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "glare shield",
+      "claim": "glare shield is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "glare_shield"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_horticultural_lighting_lighting_suspension_bracket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "lighting suspension bracket",
+      "claim": "lighting suspension bracket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "lighting_suspension_bracket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_horticultural_lighting_ppfd_calibration_target",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "PPFD calibration target",
+      "claim": "PPFD calibration target is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "ppfd_calibration_target"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_humidity_temperature_control_condensate_pump",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "condensate pump",
+      "claim": "condensate pump is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "condensate_pump"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_humidity_temperature_control_dehumidifier_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "dehumidifier module",
+      "claim": "dehumidifier module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "dehumidifier_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_humidity_temperature_control_heat_exchanger_coil",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "heat exchanger coil",
+      "claim": "heat exchanger coil is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "heat_exchanger_coil"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_humidity_temperature_control_humidity_control_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "humidity control relay",
+      "claim": "humidity control relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "humidity_control_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_humidity_temperature_control_supply_air_temperature_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "supply air temperature probe",
+      "claim": "supply air temperature probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "supply_air_temperature_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_labelling_workflows_chemical_hazard_label_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "chemical hazard label set",
+      "claim": "chemical hazard label set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "chemical_hazard_label_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_labelling_workflows_cleaning_checklist_card",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "cleaning checklist card",
+      "claim": "cleaning checklist card is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "cleaning_checklist_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_labelling_workflows_crop_lot_label_holder",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "crop lot label holder",
+      "claim": "crop lot label holder is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "crop_lot_label_holder"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_labelling_workflows_electrical_isolation_placard",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "electrical isolation placard",
+      "claim": "electrical isolation placard is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "electrical_isolation_placard"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_local_hmi_alarm_buzzer_beacon",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "alarm buzzer beacon",
+      "claim": "alarm buzzer beacon is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "alarm_buzzer_beacon"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_local_hmi_recipe_selector_control",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "recipe selector control",
+      "claim": "recipe selector control is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "recipe_selector_control"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_local_hmi_touchscreen_hmi",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "touchscreen HMI",
+      "claim": "touchscreen HMI is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "touchscreen_hmi"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_local_hmi_usb_data_export_port",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "USB data export port",
+      "claim": "USB data export port is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "usb_data_export_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_cleaning_access_drying_fan_mode_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "drying fan mode switch",
+      "claim": "drying fan mode switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "drying_fan_mode_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_cleaning_access_quick_release_manifold_union",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "quick-release manifold union",
+      "claim": "quick-release manifold union is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "quick_release_manifold_union"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_cleaning_access_removable_sump_screen",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "removable sump screen",
+      "claim": "removable sump screen is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "removable_sump_screen"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_cleaning_access_washdown_hose_connection",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "washdown hose connection",
+      "claim": "washdown hose connection is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "washdown_hose_connection"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_consumable_service_dosing_bottle_tray",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "dosing bottle tray",
+      "claim": "dosing bottle tray is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "dosing_bottle_tray"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_consumable_service_filter_service_hatch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "filter service hatch",
+      "claim": "filter service hatch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "filter_service_hatch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_consumable_service_probe_calibration_cup",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "probe calibration cup",
+      "claim": "probe calibration cup is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "probe_calibration_cup"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_consumable_service_spare_gasket_kit",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "spare gasket kit",
+      "claim": "spare gasket kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "spare_gasket_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_harvest_access_harvest_work_ledge",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "harvest work ledge",
+      "claim": "harvest work ledge is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "harvest_work_ledge"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_harvest_access_removable_seedling_cassette",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "removable seedling cassette",
+      "claim": "removable seedling cassette is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "removable_seedling_cassette"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_harvest_access_shelf_stop_latch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "shelf stop latch",
+      "claim": "shelf stop latch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "shelf_stop_latch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_harvest_access_slide_out_tray_handle",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "slide-out tray handle",
+      "claim": "slide-out tray handle is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "slide_out_tray_handle"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_fertigation_pumping_check_valve",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "check valve",
+      "claim": "check valve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "check_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_fertigation_pumping_flow_meter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "flow meter",
+      "claim": "flow meter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "flow_meter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_fertigation_pumping_pump_isolation_valve",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pump isolation valve",
+      "claim": "pump isolation valve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "pump_isolation_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_fertigation_pumping_pump_vibration_mount",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pump vibration mount",
+      "claim": "pump vibration mount is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "pump_vibration_mount"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_filtration_sanitation_drain_valve",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "drain valve",
+      "claim": "drain valve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "drain_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_filtration_sanitation_inline_mesh_filter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "inline mesh filter",
+      "claim": "inline mesh filter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "inline_mesh_filter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_filtration_sanitation_sample_port",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "sample port",
+      "claim": "sample port is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "sample_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_filtration_sanitation_uv_steriliser",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "UV steriliser",
+      "claim": "UV steriliser is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "uv_steriliser"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_nutrient_dosing_anti_siphon_valve",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "anti-siphon valve",
+      "claim": "anti-siphon valve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "anti_siphon_valve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_nutrient_dosing_chemical_suction_lance",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "chemical suction lance",
+      "claim": "chemical suction lance is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "chemical_suction_lance"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_nutrient_dosing_mixing_eductor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "mixing eductor",
+      "claim": "mixing eductor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "mixing_eductor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_nutrient_dosing_peristaltic_dosing_pump",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "peristaltic dosing pump",
+      "claim": "peristaltic dosing pump is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_dosing_pump"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_nutrient_dosing_ph_dosing_pump",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pH dosing pump",
+      "claim": "pH dosing pump is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "ph_dosing_pump"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_reservoir_plumbing_bulkhead_fitting_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "bulkhead fitting set",
+      "claim": "bulkhead fitting set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "bulkhead_fitting_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_reservoir_plumbing_opaque_nutrient_reservoir",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "opaque nutrient reservoir",
+      "claim": "opaque nutrient reservoir is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "opaque_nutrient_reservoir"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_reservoir_plumbing_pvc_u_manifold",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "PVC-U manifold",
+      "claim": "PVC-U manifold is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "pvc_u_manifold"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_reservoir_plumbing_return_drain_header",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "return drain header",
+      "claim": "return drain header is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "return_drain_header"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_lighting_power_driver_mounting_rail",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "driver mounting rail",
+      "claim": "driver mounting rail is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "driver_mounting_rail"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_lighting_power_fused_spur_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fused spur module",
+      "claim": "fused spur module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "fused_spur_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_lighting_power_ip65_cable_gland_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "IP65 cable gland set",
+      "claim": "IP65 cable gland set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "ip65_cable_gland_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_lighting_power_lighting_bus_trunk",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "lighting bus trunk",
+      "claim": "lighting bus trunk is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "lighting_bus_trunk"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_low_voltage_power_24_v_dc_power_supply",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "24 V DC power supply",
+      "claim": "24 V DC power supply is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "24_v_dc_power_supply"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_low_voltage_power_control_cabinet_heater",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "control cabinet heater",
+      "claim": "control cabinet heater is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "control_cabinet_heater"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_low_voltage_power_dc_distribution_terminal",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "DC distribution terminal",
+      "claim": "DC distribution terminal is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "dc_distribution_terminal"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_low_voltage_power_ups_buffer_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "UPS buffer module",
+      "claim": "UPS buffer module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "ups_buffer_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_mains_panel_lockable_main_isolator",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "lockable main isolator",
+      "claim": "lockable main isolator is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "lockable_main_isolator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_mains_panel_protective_earth_bar",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "protective earth bar",
+      "claim": "protective earth bar is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "protective_earth_bar"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_mains_panel_rcbo_breaker_bank",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "RCBO breaker bank",
+      "claim": "RCBO breaker bank is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcbo_breaker_bank"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_mains_panel_surge_protection_device",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "surge protection device",
+      "claim": "surge protection device is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "surge_protection_device"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_food_contact_controls_cleaning_validation_swab_kit",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "cleaning validation swab kit",
+      "claim": "cleaning validation swab kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "cleaning_validation_swab_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_food_contact_controls_food_grade_tubing_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "food-grade tubing set",
+      "claim": "food-grade tubing set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "food_grade_tubing_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_food_contact_controls_material_traceability_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "material traceability label",
+      "claim": "material traceability label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "material_traceability_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_food_contact_controls_washdown_sop_placard",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "washdown SOP placard",
+      "claim": "washdown SOP placard is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "washdown_sop_placard"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_leak_containment_bunded_base_tray",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "bunded base tray",
+      "claim": "bunded base tray is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "bunded_base_tray"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_leak_containment_floor_drain_adapter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "floor drain adapter",
+      "claim": "floor drain adapter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "floor_drain_adapter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_leak_containment_leak_detection_rope",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "leak detection rope",
+      "claim": "leak detection rope is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_rope"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_leak_containment_overflow_standpipe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "overflow standpipe",
+      "claim": "overflow standpipe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "overflow_standpipe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_operator_interlocks_chemical_storage_latch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "chemical storage latch",
+      "claim": "chemical storage latch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "chemical_storage_latch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_operator_interlocks_door_interlock_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "door interlock switch",
+      "claim": "door interlock switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "door_interlock_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_operator_interlocks_emergency_stop_button",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "emergency stop button",
+      "claim": "emergency stop button is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "emergency_stop_button"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_operator_interlocks_lighting_inhibit_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "lighting inhibit relay",
+      "claim": "lighting inhibit relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "lighting_inhibit_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_climate_sensors_differential_pressure_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "differential pressure switch",
+      "claim": "differential pressure switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "differential_pressure_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_climate_sensors_leaf_temperature_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "leaf temperature sensor",
+      "claim": "leaf temperature sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "leaf_temperature_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_climate_sensors_par_light_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "PAR light sensor",
+      "claim": "PAR light sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "par_light_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_climate_sensors_temperature_humidity_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "temperature humidity probe",
+      "claim": "temperature humidity probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_humidity_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_crop_observation_calibration_colour_card",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "calibration colour card",
+      "claim": "calibration colour card is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "calibration_colour_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_crop_observation_camera_light_shield",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "camera light shield",
+      "claim": "camera light shield is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "camera_light_shield"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_crop_observation_rgb_crop_camera",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "RGB crop camera",
+      "claim": "RGB crop camera is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "rgb_crop_camera"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_crop_observation_time_lapse_controller",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "time-lapse controller",
+      "claim": "time-lapse controller is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "time_lapse_controller"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_nutrient_sensors_ec_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "EC probe",
+      "claim": "EC probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "ec_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_nutrient_sensors_ph_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pH probe",
+      "claim": "pH probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "ph_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_nutrient_sensors_reservoir_level_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "reservoir level sensor",
+      "claim": "reservoir level sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "reservoir_level_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_nutrient_sensors_solution_temperature_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "solution temperature probe",
+      "claim": "solution temperature probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "solution_temperature_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_crop_tray_carriers_food_safe_grow_tray",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "food-safe grow tray",
+      "claim": "food-safe grow tray is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "food_safe_grow_tray"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_crop_tray_carriers_nft_channel_insert",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "NFT channel insert",
+      "claim": "NFT channel insert is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "nft_channel_insert"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_crop_tray_carriers_root_zone_cover",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "root-zone cover",
+      "claim": "root-zone cover is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "root_zone_cover"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_crop_tray_carriers_seedling_raft",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "seedling raft",
+      "claim": "seedling raft is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "seedling_raft"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_crop_tray_carriers_tray_drain_fitting",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "tray drain fitting",
+      "claim": "tray drain fitting is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "tray_drain_fitting"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_enclosure_panels_clear_inspection_door",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "clear inspection door",
+      "claim": "clear inspection door is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "clear_inspection_door"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_enclosure_panels_condensate_drip_channel",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "condensate drip channel",
+      "claim": "condensate drip channel is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "condensate_drip_channel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_enclosure_panels_epdm_door_gasket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "EPDM door gasket",
+      "claim": "EPDM door gasket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "epdm_door_gasket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_enclosure_panels_washdown_side_panel",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "washdown side panel",
+      "claim": "washdown side panel is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "washdown_side_panel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_growing_rack_stack_adjustable_levelling_foot",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "adjustable levelling foot",
+      "claim": "adjustable levelling foot is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "adjustable_levelling_foot"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_growing_rack_stack_aluminium_extrusion_upright",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "aluminium extrusion upright",
+      "claim": "aluminium extrusion upright is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "aluminium_extrusion_upright"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_growing_rack_stack_cross_brace_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "cross brace set",
+      "claim": "cross brace set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "cross_brace_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_growing_rack_stack_tray_slide_rail",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "tray slide rail",
+      "claim": "tray slide rail is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.vertical_farm"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "tray_slide_rail"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Recipe Control And Communications",
+      "claim": "Recipe Control And Communications is a top-level functional module: Runs crop recipes, controls actuators and records operating history.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module",
+        "recipe_database",
+        "set_point_scheduler",
+        "alarm_historian",
+        "data_export_module",
+        "industrial_ethernet_switch",
+        "wi_fi_gateway",
+        "mqtt_telemetry_bridge",
+        "sms_alarm_modem"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Light Climate And Gas Environment",
+      "claim": "Light Climate And Gas Environment is a top-level functional module: Controls photons, airflow, humidity and CO2 around the crop canopy.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "led_grow_lights",
+        "dimmable_led_driver",
+        "lighting_suspension_bracket",
+        "ppfd_calibration_target",
+        "glare_shield",
+        "air_circulation_fans",
+        "fan_guard_grille",
+        "airflow_baffle_plate",
+        "replaceable_intake_filter",
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay",
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:hmi_ergonomics",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Operator HMI And Labelling",
+      "claim": "Operator HMI And Labelling is a top-level functional module: Shows grow state, alarms, recipes and safe operating instructions.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "touchscreen_hmi",
+        "recipe_selector_control",
+        "alarm_buzzer_beacon",
+        "usb_data_export_port",
+        "crop_lot_label_holder",
+        "chemical_hazard_label_set",
+        "cleaning_checklist_card",
+        "electrical_isolation_placard"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Harvest Cleaning And Serviceability",
+      "claim": "Harvest Cleaning And Serviceability is a top-level functional module: Supports tray removal, cleaning, filter changes and routine crop operations.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "slide_out_tray_handle",
+        "shelf_stop_latch",
+        "harvest_work_ledge",
+        "removable_seedling_cassette",
+        "quick_release_manifold_union",
+        "removable_sump_screen",
+        "washdown_hose_connection",
+        "drying_fan_mode_switch",
+        "filter_service_hatch",
+        "probe_calibration_cup",
+        "dosing_bottle_tray",
+        "spare_gasket_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:mass_fluid_transport_process",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Nutrient And Water Transport Process",
+      "claim": "Nutrient And Water Transport Process is a top-level functional module: Stores, doses, filters and circulates nutrient solution through crop trays.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "reservoir_and_plumbing_set",
+        "opaque_nutrient_reservoir",
+        "bulkhead_fitting_set",
+        "pvc_u_manifold",
+        "return_drain_header",
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount",
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor",
+        "inline_mesh_filter",
+        "uv_steriliser",
+        "drain_valve",
+        "sample_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Wet-Zone Power Distribution",
+      "claim": "Wet-Zone Power Distribution is a top-level functional module: Distributes mains and low-voltage power to lighting, pumps, controls and safety devices.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_isolator_panel",
+        "lockable_main_isolator",
+        "rcbo_breaker_bank",
+        "protective_earth_bar",
+        "surge_protection_device",
+        "lighting_bus_trunk",
+        "ip65_cable_gland_set",
+        "driver_mounting_rail",
+        "fused_spur_module",
+        "24_v_dc_power_supply",
+        "dc_distribution_terminal",
+        "ups_buffer_module",
+        "control_cabinet_heater"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Food-Safe Safety And Protection",
+      "claim": "Food-Safe Safety And Protection is a top-level functional module: Controls electrical, water, chemical and operator risks in a humid cultivation unit.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_rope",
+        "bunded_base_tray",
+        "overflow_standpipe",
+        "floor_drain_adapter",
+        "door_interlock_switch",
+        "lighting_inhibit_relay",
+        "chemical_storage_latch",
+        "emergency_stop_button",
+        "food_grade_tubing_set",
+        "cleaning_validation_swab_kit",
+        "material_traceability_label",
+        "washdown_sop_placard"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Crop And Process Instrumentation",
+      "claim": "Crop And Process Instrumentation is a top-level functional module: Measures climate, nutrient chemistry and crop state for control and review.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_humidity_probe",
+        "par_light_sensor",
+        "leaf_temperature_sensor",
+        "differential_pressure_switch",
+        "ph_probe",
+        "ec_probe",
+        "reservoir_level_sensor",
+        "solution_temperature_probe",
+        "rgb_crop_camera",
+        "camera_light_shield",
+        "time_lapse_controller",
+        "calibration_colour_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Growing Structure And Containment",
+      "claim": "Growing Structure And Containment is a top-level functional module: Carries stacked crop trays, lighting and service access within a compact 3.36 m2 footprint.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure",
+        "aluminium_extrusion_upright",
+        "cross_brace_set",
+        "adjustable_levelling_foot",
+        "tray_slide_rail",
+        "food_safe_grow_tray",
+        "nft_channel_insert",
+        "seedling_raft",
+        "root_zone_cover",
+        "tray_drain_fitting",
+        "washdown_side_panel",
+        "clear_inspection_door",
+        "epdm_door_gasket",
+        "condensate_drip_channel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "regulatory_standard:CE-UKCA",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "CE-UKCA",
+      "claim": "CE-UKCA: Electrical safety and UKCA/CE file is relevant in UK/EU.",
+      "provenanceRefs": [
+        "class_pack:vertical_farm.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Technical file, electrical risk assessment and declarations."
+    },
+    {
+      "id": "regulatory_standard:WRAS",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "WRAS",
+      "claim": "WRAS: Water fittings compliance is relevant in UK.",
+      "provenanceRefs": [
+        "class_pack:vertical_farm.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Approved fittings or evidence for water-contact components."
+    },
+    {
+      "id": "risk_hazard:1",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Crop loss from pump failure",
+      "claim": "Crop loss from pump failure has provisional RPN 112 with mitigation: Dual pumps, flow monitoring and low-level alarms.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "risk_hazard:2",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Electrical fault in humid grow area",
+      "claim": "Electrical fault in humid grow area has provisional RPN 96 with mitigation: Ingress-rated drivers, RCD protection and cable separation.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:environmental_controller",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Recipe Control And Communications / Environmental controller",
+      "claim": "Environmental controller is allocated under Recipe Control And Communications: Coordinates lighting, fertigation, climate and alarms.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:recipe_management",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Recipe Control And Communications / Recipe management",
+      "claim": "Recipe management is allocated under Recipe Control And Communications: Stores crop recipes and set-point schedules.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "recipe_database",
+        "set_point_scheduler",
+        "alarm_historian",
+        "data_export_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:remote_monitoring",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Recipe Control And Communications / Remote monitoring",
+      "claim": "Remote monitoring is allocated under Recipe Control And Communications: Provides operator status and alerts outside the unit.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "industrial_ethernet_switch",
+        "wi_fi_gateway",
+        "mqtt_telemetry_bridge",
+        "sms_alarm_modem"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:canopy_air_mixing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Light Climate And Gas Environment / Canopy air mixing",
+      "claim": "Canopy air mixing is allocated under Light Climate And Gas Environment: Moves air across leaves to reduce stagnant humidity pockets.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "air_circulation_fans",
+        "fan_guard_grille",
+        "airflow_baffle_plate",
+        "replaceable_intake_filter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:co2_enrichment",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Light Climate And Gas Environment / CO2 enrichment",
+      "claim": "CO2 enrichment is allocated under Light Climate And Gas Environment: Measures and doses CO2 when the growing chamber is closed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:horticultural_lighting",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Light Climate And Gas Environment / Horticultural lighting",
+      "claim": "Horticultural lighting is allocated under Light Climate And Gas Environment: Delivers crop-specific photosynthetic photon flux to each shelf.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "led_grow_lights",
+        "dimmable_led_driver",
+        "lighting_suspension_bracket",
+        "ppfd_calibration_target",
+        "glare_shield"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:humidity_temperature_control",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Light Climate And Gas Environment / Humidity and temperature control",
+      "claim": "Humidity and temperature control is allocated under Light Climate And Gas Environment: Maintains crop vapor-pressure deficit and sensible heat balance.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:labelling_workflows",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Operator HMI And Labelling / Labelling and workflows",
+      "claim": "Labelling and workflows is allocated under Operator HMI And Labelling: Communicates hazards, cleaning steps and crop lot identity.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "crop_lot_label_holder",
+        "chemical_hazard_label_set",
+        "cleaning_checklist_card",
+        "electrical_isolation_placard"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:local_hmi",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Operator HMI And Labelling / Local HMI",
+      "claim": "Local HMI is allocated under Operator HMI And Labelling: Provides local status, recipe selection and alarm acknowledgement.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "touchscreen_hmi",
+        "recipe_selector_control",
+        "alarm_buzzer_beacon",
+        "usb_data_export_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:cleaning_access",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Harvest Cleaning And Serviceability / Cleaning access",
+      "claim": "Cleaning access is allocated under Harvest Cleaning And Serviceability: Allows sanitation of wet and crop-contact areas.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "quick_release_manifold_union",
+        "removable_sump_screen",
+        "washdown_hose_connection",
+        "drying_fan_mode_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:consumable_service",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Harvest Cleaning And Serviceability / Consumable service",
+      "claim": "Consumable service is allocated under Harvest Cleaning And Serviceability: Makes filters, probes and dosing consumables replaceable.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "filter_service_hatch",
+        "probe_calibration_cup",
+        "dosing_bottle_tray",
+        "spare_gasket_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:harvest_access",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Harvest Cleaning And Serviceability / Harvest access",
+      "claim": "Harvest access is allocated under Harvest Cleaning And Serviceability: Allows ergonomic crop removal and replanting.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "slide_out_tray_handle",
+        "shelf_stop_latch",
+        "harvest_work_ledge",
+        "removable_seedling_cassette"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:fertigation_pumping",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Nutrient And Water Transport Process / Fertigation pumping",
+      "claim": "Fertigation pumping is allocated under Nutrient And Water Transport Process: Moves nutrient solution at controlled flow rate.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:filtration_sanitation",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Nutrient And Water Transport Process / Filtration and sanitation",
+      "claim": "Filtration and sanitation is allocated under Nutrient And Water Transport Process: Keeps the nutrient loop clean and serviceable.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "inline_mesh_filter",
+        "uv_steriliser",
+        "drain_valve",
+        "sample_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:nutrient_dosing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Nutrient And Water Transport Process / Nutrient dosing",
+      "claim": "Nutrient dosing is allocated under Nutrient And Water Transport Process: Adds nutrient concentrates and pH correction to the reservoir.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:reservoir_plumbing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Nutrient And Water Transport Process / Reservoir and plumbing",
+      "claim": "Reservoir and plumbing is allocated under Nutrient And Water Transport Process: Contains nutrient solution and routes it to shelves.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "reservoir_and_plumbing_set",
+        "opaque_nutrient_reservoir",
+        "bulkhead_fitting_set",
+        "pvc_u_manifold",
+        "return_drain_header"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:lighting_power",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Wet-Zone Power Distribution / Lighting power distribution",
+      "claim": "Lighting power distribution is allocated under Wet-Zone Power Distribution: Feeds and switches LED drivers by shelf.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "lighting_bus_trunk",
+        "ip65_cable_gland_set",
+        "driver_mounting_rail",
+        "fused_spur_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:low_voltage_power",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Wet-Zone Power Distribution / Low-voltage control power",
+      "claim": "Low-voltage control power is allocated under Wet-Zone Power Distribution: Feeds sensors, controller and communication devices.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "24_v_dc_power_supply",
+        "dc_distribution_terminal",
+        "ups_buffer_module",
+        "control_cabinet_heater"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:mains_panel",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Wet-Zone Power Distribution / Mains isolation panel",
+      "claim": "Mains isolation panel is allocated under Wet-Zone Power Distribution: Provides incoming isolation and branch protection.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_isolator_panel",
+        "lockable_main_isolator",
+        "rcbo_breaker_bank",
+        "protective_earth_bar",
+        "surge_protection_device"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:food_contact_controls",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Food-Safe Safety And Protection / Food contact controls",
+      "claim": "Food contact controls is allocated under Food-Safe Safety And Protection: Keeps crop-facing components cleanable and traceable.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "food_grade_tubing_set",
+        "cleaning_validation_swab_kit",
+        "material_traceability_label",
+        "washdown_sop_placard"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:leak_containment",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Food-Safe Safety And Protection / Leak containment",
+      "claim": "Leak containment is allocated under Food-Safe Safety And Protection: Detects and contains nutrient leaks before they reach electrical zones.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_rope",
+        "bunded_base_tray",
+        "overflow_standpipe",
+        "floor_drain_adapter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:operator_interlocks",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Food-Safe Safety And Protection / Operator interlocks",
+      "claim": "Operator interlocks is allocated under Food-Safe Safety And Protection: Reduces exposure to bright light, moving fans and chemicals during service.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "door_interlock_switch",
+        "lighting_inhibit_relay",
+        "chemical_storage_latch",
+        "emergency_stop_button"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:climate_sensors",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Crop And Process Instrumentation / Climate sensors",
+      "claim": "Climate sensors is allocated under Crop And Process Instrumentation: Measures canopy temperature, humidity and light level.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_humidity_probe",
+        "par_light_sensor",
+        "leaf_temperature_sensor",
+        "differential_pressure_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:crop_observation",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Crop And Process Instrumentation / Crop observation",
+      "claim": "Crop observation is allocated under Crop And Process Instrumentation: Captures visual crop evidence and growth state.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "rgb_crop_camera",
+        "camera_light_shield",
+        "time_lapse_controller",
+        "calibration_colour_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:nutrient_sensors",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Crop And Process Instrumentation / Nutrient sensors",
+      "claim": "Nutrient sensors is allocated under Crop And Process Instrumentation: Measures solution chemistry and reservoir level.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "ph_probe",
+        "ec_probe",
+        "reservoir_level_sensor",
+        "solution_temperature_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:crop_tray_carriers",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Growing Structure And Containment / Crop tray carriers",
+      "claim": "Crop tray carriers is allocated under Growing Structure And Containment: Holds channels, mats and seedlings at controlled spacing.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "food_safe_grow_tray",
+        "nft_channel_insert",
+        "seedling_raft",
+        "root_zone_cover",
+        "tray_drain_fitting"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:enclosure_panels",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Growing Structure And Containment / Enclosure panels",
+      "claim": "Enclosure panels is allocated under Growing Structure And Containment: Separates humid grow volume from room air and service zones.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "washdown_side_panel",
+        "clear_inspection_door",
+        "epdm_door_gasket",
+        "condensate_drip_channel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:growing_rack_stack",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Growing Structure And Containment / Growing rack stack",
+      "claim": "Growing rack stack is allocated under Growing Structure And Containment: Supports stacked trays, lighting bars and plant mass.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure",
+        "aluminium_extrusion_upright",
+        "cross_brace_set",
+        "adjustable_levelling_foot",
+        "tray_slide_rail"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "engineering_calculation:farm_footprint_check_m2",
+      "kind": "engineering_calculation",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Vertical farm footprint check",
+      "claim": "Vertical farm footprint check: 3.36 m2 using envelope_length_m * envelope_width_m.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure",
+        "slide_out_tray_handle",
+        "led_grow_lights"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm whether the envelope includes aisle, service clearance, reservoir and electrical cabinet space."
+    },
+    {
+      "id": "engineering_calculation:farm_service_clearance_area_m2",
+      "kind": "engineering_calculation",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Indicative service-clearance footprint",
+      "claim": "Indicative service-clearance footprint: 4.2 m2 using footprint_m2 * 1.25.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure",
+        "slide_out_tray_handle",
+        "led_grow_lights"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review maintenance access, nutrient tank access, airflow paths and electrical service clearances."
+    },
+    {
+      "id": "headline_metric:headline_output",
+      "kind": "headline_metric",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Annual leafy-green yield",
+      "claim": "Annual leafy-green yield = 1800 kg/year.",
+      "provenanceRefs": [
+        "class_pack:vertical_farm.class_pack",
+        "formula:class_pack_default"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review the formula, input values and operating envelope before treating this metric as accepted."
+    },
+    {
+      "id": "brief_requirement:envelope_length_m",
+      "kind": "brief_requirement",
+      "status": "brief_supplied",
+      "basis": "brief",
+      "scope": "Envelope length",
+      "claim": "Envelope length = 2.4 m.",
+      "provenanceRefs": [
+        "brief:input.brief"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_length_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure",
+        "slide_out_tray_handle",
+        "led_grow_lights"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm requirement value, tolerance and acceptance condition with the project owner."
+    },
+    {
+      "id": "brief_requirement:envelope_width_m",
+      "kind": "brief_requirement",
+      "status": "brief_supplied",
+      "basis": "brief",
+      "scope": "Envelope width",
+      "claim": "Envelope width = 1.4 m.",
+      "provenanceRefs": [
+        "brief:input.brief"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "envelope_width_m"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure",
+        "slide_out_tray_handle",
+        "led_grow_lights"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm requirement value, tolerance and acceptance condition with the project owner."
+    },
+    {
+      "id": "brief_requirement:footprint_m2",
+      "kind": "brief_requirement",
+      "status": "brief_supplied",
+      "basis": "brief",
+      "scope": "Footprint",
+      "claim": "Footprint = 3.36 m2.",
+      "provenanceRefs": [
+        "formula:length_m * width_m"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "footprint_m2"
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability",
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "growing_rack_structure",
+        "slide_out_tray_handle",
+        "led_grow_lights"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm requirement value, tolerance and acceptance condition with the project owner."
+    }
+  ]
+}

@@ -1,0 +1,542 @@
+{
+  "summary": {
+    "phases": 4,
+    "rows": 43,
+    "blockers": 12,
+    "majors": 31,
+    "minors": 0,
+    "architectureRevisionRows": 0,
+    "sourcingIntakeRows": 9,
+    "engineeringReviewRows": 8,
+    "verificationIntakeRows": 25,
+    "scoreRepairRows": 1,
+    "nextPhase": "sourcing_intake"
+  },
+  "phases": [
+    {
+      "id": "sourcing_intake",
+      "title": "Admit Source-Backed BoM Evidence",
+      "sequence": 2,
+      "rowCount": 9,
+      "blockerCount": 9,
+      "majorCount": 0,
+      "minorCount": 0,
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "entryCriteria": [
+        "Architecture is reviewable enough to identify critical component candidates."
+      ],
+      "exitCriteria": [
+        "Every critical BoM line has admitted supplier, manufacturer, MPN, unit cost and source reference.",
+        "BoM provenance manifest has zero critical missing-source claims."
+      ],
+      "rationale": "Critical BoM costs, suppliers, manufacturers and MPNs must be source-backed before cost claims are credible.",
+      "topRows": [
+        {
+          "id": "assumption:metric:capex_gbp",
+          "kind": "assumption_review",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Estimated CAPEX",
+          "issue": "Estimated CAPEX uses an implicit model with low confidence.",
+          "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:metric:opex_annual_gbp",
+          "kind": "assumption_review",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Estimated annual OPEX",
+          "issue": "Estimated annual OPEX uses an implicit model with low confidence.",
+          "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+          "linkedIds": []
+        },
+        {
+          "id": "readiness:2",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "6 critical BoM line(s) lack source-backed cost evidence.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        },
+        {
+          "id": "sourcing:bms_master_controller",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "BMS master controller",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "bms_master_controller"
+          ]
+        },
+        {
+          "id": "sourcing:dc_contactor_or_breaker",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "DC contactor or breaker",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "dc_contactor_or_breaker"
+          ]
+        },
+        {
+          "id": "sourcing:fire_detection_suppression",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Fire detection/suppression",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "fire_detection_suppression"
+          ]
+        },
+        {
+          "id": "sourcing:lfp_prismatic_cells",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "LFP prismatic cells",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "lfp_prismatic_cells"
+          ]
+        },
+        {
+          "id": "sourcing:pcs_inverter",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "PCS inverter",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "pcs_inverter"
+          ]
+        },
+        {
+          "id": "sourcing:thermal_management_loop",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Thermal management loop",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "thermal_management_loop"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "engineering_review",
+      "title": "Complete Engineering Review",
+      "sequence": 3,
+      "rowCount": 8,
+      "blockerCount": 0,
+      "majorCount": 8,
+      "minorCount": 0,
+      "blocks": [
+        "publishable"
+      ],
+      "entryCriteria": [
+        "Calculations and assumptions have named scope, formula or model basis."
+      ],
+      "exitCriteria": [
+        "All calculation and assumption review rows are accepted, revised or explicitly deferred with reviewer rationale."
+      ],
+      "rationale": "Deterministic arithmetic can expose claims, but engineering judgment must review envelopes, assumptions and operating cases.",
+      "topRows": [
+        {
+          "id": "assumption:compliance:G99",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "G99",
+          "issue": "UK grid connection requirements is relevant to this product class in UK.",
+          "requiredEvidence": "Protection settings, relay test certificates and commissioning records.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:compliance:IEC-62619",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "IEC-62619",
+          "issue": "Industrial lithium battery safety is relevant to this product class in Global / UK-adopted.",
+          "requiredEvidence": "Cell certificates and pack-level safety validation.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:compliance:UL-9540A",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "UL-9540A",
+          "issue": "Thermal runaway fire propagation test is relevant to this product class in US / investor diligence.",
+          "requiredEvidence": "Cell, module and unit-level propagation evidence.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:metric:headline_output",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "Annual MWh delivered",
+          "issue": "Annual MWh delivered uses capacity_mwh * cycles_per_year * efficiency with medium confidence.",
+          "requiredEvidence": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:sanity:bess_c_rate",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "BESS C-Rate",
+          "issue": "BESS C-Rate currently evaluates as pass against 0.1C to 1.0C for typical grid-storage duration systems.",
+          "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+          "linkedIds": [
+            "capacity_mwh",
+            "power_mw"
+          ]
+        },
+        {
+          "id": "assumption:sanity:bess_container_energy_density",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "Container-Level Energy Density",
+          "issue": "Container-Level Energy Density currently evaluates as pass against 50 to 200 Wh/kg at container/system level before detailed structural mass review.",
+          "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+          "linkedIds": [
+            "capacity_mwh",
+            "mass_kg"
+          ]
+        },
+        {
+          "id": "assumption:sanity:bess_duration",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "Rated Duration",
+          "issue": "Rated Duration currently evaluates as pass against 1 to 6 hours for common containerised BESS applications.",
+          "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+          "linkedIds": [
+            "capacity_mwh",
+            "power_mw"
+          ]
+        },
+        {
+          "id": "calculation:bess_nameplate_annual_throughput_mwh",
+          "kind": "calculation_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "BESS annual nameplate throughput",
+          "issue": "1277.5 MWh/year assumes one full equivalent cycle per day.",
+          "requiredEvidence": "Confirm cycles per year, usable depth of discharge, round-trip efficiency and degradation assumptions.",
+          "linkedIds": [
+            "capacity_mwh"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "verification_intake",
+      "title": "Accept Reviewer Evidence",
+      "sequence": 4,
+      "rowCount": 25,
+      "blockerCount": 2,
+      "majorCount": 23,
+      "minorCount": 0,
+      "blocks": [
+        "publishable"
+      ],
+      "entryCriteria": [
+        "Verification intake template has non-source activities ready for reviewer evidence."
+      ],
+      "exitCriteria": [
+        "Every non-source verification activity is accepted, or explicitly deferred and removed from publication criteria."
+      ],
+      "rationale": "Reviewer acceptance is tracked separately from deterministic scoring and must close before publication.",
+      "topRows": [
+        {
+          "id": "readiness:3",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "5 verification activity/activities remain blocked.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        },
+        {
+          "id": "readiness:4",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "0/23 non-sourcing verification activity/activities have accepted reviewer evidence.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        },
+        {
+          "id": "verification:calculation:control_compute_communication",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Control Compute And Communication",
+          "issue": "Verify Control Compute And Communication requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:control_compute_communication"
+          ]
+        },
+        {
+          "id": "verification:calculation:energy_conversion_transduction",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Power Conversion System",
+          "issue": "Verify Power Conversion System requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:energy_conversion_transduction"
+          ]
+        },
+        {
+          "id": "verification:calculation:energy_storage_source",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Energy Storage Source",
+          "issue": "Verify Energy Storage Source requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:energy_storage_source"
+          ]
+        },
+        {
+          "id": "verification:calculation:maintenance_serviceability",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Maintenance And Serviceability",
+          "issue": "Verify Maintenance And Serviceability requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:maintenance_serviceability"
+          ]
+        },
+        {
+          "id": "verification:calculation:power_distribution",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "DC And AC Power Distribution",
+          "issue": "Verify DC And AC Power Distribution requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:power_distribution"
+          ]
+        },
+        {
+          "id": "verification:calculation:structure_containment",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Container Structure And Fit-Out",
+          "issue": "Verify Container Structure And Fit-Out requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:structure_containment"
+          ]
+        },
+        {
+          "id": "verification:compliance_review:G99",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "System Compliance",
+          "issue": "Plan evidence for G99",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "compliance_review:G99"
+          ]
+        },
+        {
+          "id": "verification:compliance_review:IEC-62619",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "System Compliance",
+          "issue": "Plan evidence for IEC-62619",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "compliance_review:IEC-62619"
+          ]
+        },
+        {
+          "id": "verification:compliance_review:UL-9540A",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "System Compliance",
+          "issue": "Plan evidence for UL-9540A",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "compliance_review:UL-9540A"
+          ]
+        },
+        {
+          "id": "verification:design_review:control_compute_communication",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Control Compute And Communication",
+          "issue": "Review Control Compute And Communication architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:control_compute_communication"
+          ]
+        },
+        {
+          "id": "verification:design_review:energy_conversion_transduction",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Power Conversion System",
+          "issue": "Review Power Conversion System architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:energy_conversion_transduction"
+          ]
+        },
+        {
+          "id": "verification:design_review:energy_storage_source",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Energy Storage Source",
+          "issue": "Review Energy Storage Source architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:energy_storage_source"
+          ]
+        },
+        {
+          "id": "verification:design_review:environmental_interface",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Environmental Interface",
+          "issue": "Review Environmental Interface architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:environmental_interface"
+          ]
+        },
+        {
+          "id": "verification:design_review:hmi_ergonomics",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Operator HMI And Labelling",
+          "issue": "Review Operator HMI And Labelling architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:hmi_ergonomics"
+          ]
+        },
+        {
+          "id": "verification:design_review:maintenance_serviceability",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Maintenance And Serviceability",
+          "issue": "Review Maintenance And Serviceability architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:maintenance_serviceability"
+          ]
+        },
+        {
+          "id": "verification:design_review:mass_fluid_transport_process",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Coolant Circulation Process",
+          "issue": "Review Coolant Circulation Process architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:mass_fluid_transport_process"
+          ]
+        },
+        {
+          "id": "verification:design_review:power_distribution",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "DC And AC Power Distribution",
+          "issue": "Review DC And AC Power Distribution architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:power_distribution"
+          ]
+        },
+        {
+          "id": "verification:design_review:safety_protection",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Safety Protection And Interlocks",
+          "issue": "Review Safety Protection And Interlocks architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:safety_protection"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "score_repair",
+      "title": "Repair Remaining Section Scores",
+      "sequence": 5,
+      "rowCount": 1,
+      "blockerCount": 1,
+      "majorCount": 0,
+      "minorCount": 0,
+      "blocks": [
+        "publishable"
+      ],
+      "entryCriteria": [
+        "All directly closable evidence rows have been processed, but deterministic section score gaps remain."
+      ],
+      "exitCriteria": [
+        "Every scored report section is at or above target and readiness verdict is publishable."
+      ],
+      "rationale": "After evidence intake, rerun scoring to remove residual deterministic section blockers.",
+      "topRows": [
+        {
+          "id": "readiness:1",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "bom score 1 is below 8.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        }
+      ]
+    }
+  ]
+}

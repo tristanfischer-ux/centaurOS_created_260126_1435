@@ -29,6 +29,15 @@ import {
   type MaterialProperty,
   type ProcessCapability,
 } from '../db-queries'
+import {
+  resolvePriceBand,
+  type PriceBand,
+} from '../class-price-bands'
+import {
+  resolveCostStack,
+  computeCostStack,
+  type CostStack,
+} from '../class-cost-structure'
 import type {
   Module,
   Part,
@@ -69,6 +78,7 @@ import {
   isReverseIndexAvailable,
 } from '../lib/reverse-indexes'
 import type { ProductSpecs } from '../lib/spec-extraction'
+import { getActionLogger, shortHash } from '../lib/action-logger'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -1906,4 +1916,700 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       durationMs: Date.now() - startTime,
     }
   }
+}
+
+// ───────────────────────────────────────────────────────────────────────────
+// Engine A — write-time cost-reality gate with corrective re-emit loop.
+//
+// Per PLAN-2026-05-18 cost-correctness-engine-v2 § Engine A. Today the
+// price-reality check fires only at RENDER time (badge on the cover). That's
+// too late — by the time the founder is reading the PDF, an out-of-band BoM
+// has already wasted Phase 4/5/6 enrichment. Engine A moves the check into
+// the pipeline so out-of-band totals trigger a re-emit BEFORE downstream
+// stages consume the bad numbers.
+//
+// Flow (per the spec):
+//   1. Resolve PriceBand (£/kWh, £/L, £/kW, ...) and Engine D cost-stack.
+//   2. Compute installed_asp_gbp from the raw-materials BoM total via the
+//      class's COST_STACK ratios.
+//   3. Compute the £/natural-metric ratio. Compare to band_low / band_high.
+//   4. If |pct_deviation| > 50%, build a corrective re-emit prompt naming
+//      the top-3 outlier lines, call Flash-Lite, replace the BoM, re-validate.
+//   5. Max 2 retries. After that, mark state with
+//      cost_reality_status: 'manual_review_required' and continue.
+//
+// All work is additive — the existing render-time badge continues to fire on
+// the final result. ───────────────────────────────────────────────────────
+
+/** One BoM row, normalised across the legacy IntegratedBomLine shape and
+ *  the radical-hierarchy `radicalCostSummary.radicalHierarchy.sentences[]
+ *  .words[].characters[].leaves[]` shape that the production pipeline emits. */
+export interface PartRow {
+  name: string
+  /** Stable identifier so the re-emit prompt can reference the row precisely. */
+  id: string
+  quantity: number
+  unit_price_gbp: number
+  line_total_gbp: number
+  /** Free-text source so the diagnostic can quote provenance. */
+  source: string
+}
+
+export interface BomValidationResult {
+  in_band: boolean
+  /** Negative when under band-low, positive when over band-high, 0 when in band. */
+  pct_deviation: number
+  /** Whichever side of the band was breached; null when in band. */
+  direction: 'low' | 'high' | null
+  /** The £/natural-metric figure compared against the band. */
+  metric_value: number
+  /** Human-readable metric label, e.g. "£/kWh installed". */
+  metric_label: string
+  band_low: number
+  band_high: number
+  /** Top-3 BoM lines sorted by line_total_gbp descending. The re-emit prompt
+   *  asks the LLM to revisit specifically these three (per the spec — the
+   *  largest cost drivers are where mis-pricing matters most). */
+  top_outliers: PartRow[]
+  /** Resolved installed_asp_gbp from Engine D (what we compared to the band). */
+  installed_asp_gbp: number
+  /** Resolved raw BoM total used as the cost-stack input. */
+  raw_bom_gbp: number
+  /** Computed cost stack for full transparency in the result. */
+  cost_stack: CostStack
+  /** Class key that resolveCostStack/resolvePriceBand matched (for logging). */
+  class_key: string
+  /** Verdict string used by callers without inspecting in_band/direction. */
+  verdict: 'in_band' | 'low' | 'high' | 'unavailable'
+  /** Reason string suitable for putting in a structured log. */
+  diagnostic: string
+}
+
+/** Pulls priced BoM rows from a pipeline state. Supports two shapes:
+ *
+ *  (a) Radical pipeline — `state.radicalCostSummary.radicalHierarchy
+ *      .sentences[].words[].characters[].leaves[]` with `{ archetypeId,
+ *      label, qty, unitPriceGbp, lineTotal }`. This is what the
+ *      production iter runs (Tesla / heatpump / CGM iter-S1+) emit.
+ *
+ *  (b) Legacy v2 IntegratedBomLine list — `state.bomLines` (or
+ *      `state.integratedBomLines`) with `{ name, quantity, unitCostGbp }`.
+ *
+ *  Returns an empty list when neither shape is present. Engine A treats an
+ *  empty BoM as "unavailable" — no validation possible. */
+export function extractBomLinesFromState(state: any): PartRow[] {
+  const out: PartRow[] = []
+
+  // Shape (a) — radical hierarchy. Walk to leaves.
+  const sentences: any[] = state?.radicalCostSummary?.radicalHierarchy?.sentences ?? []
+  if (Array.isArray(sentences) && sentences.length > 0) {
+    for (const s of sentences) {
+      for (const w of (s.words ?? [])) {
+        for (const ch of (w.characters ?? [])) {
+          for (const lf of (ch.leaves ?? [])) {
+            const qty = typeof lf.qty === 'number' && lf.qty > 0 ? lf.qty : 1
+            const unit = typeof lf.unitPriceGbp === 'number' && lf.unitPriceGbp > 0 ? lf.unitPriceGbp : 0
+            const line = typeof lf.lineTotal === 'number' && lf.lineTotal > 0
+              ? lf.lineTotal
+              : unit * qty
+            if (line <= 0) continue
+            out.push({
+              name: String(lf.label || lf.archetypeId || ch.label || w.label || 'unnamed'),
+              id: String(lf.archetypeId || `${s.sentenceId}/${w.wordId}/${ch.characterId}`),
+              quantity: qty,
+              unit_price_gbp: unit,
+              line_total_gbp: line,
+              source: String(lf.source || lf.verificationGrade || 'unknown'),
+            })
+          }
+        }
+      }
+    }
+    if (out.length > 0) return out
+  }
+
+  // Shape (b) — legacy v2 IntegratedBomLine.
+  const bomLines: any[] = state?.bomLines ?? state?.integratedBomLines ?? []
+  if (Array.isArray(bomLines) && bomLines.length > 0) {
+    for (const l of bomLines) {
+      const qty = typeof l.quantity === 'number' && l.quantity > 0 ? l.quantity : 1
+      const unit = typeof l.unitCostGbp === 'number' && l.unitCostGbp > 0 ? l.unitCostGbp : 0
+      const line = unit * qty
+      if (line <= 0) continue
+      out.push({
+        name: String(l.name || l.partNumber || 'unnamed'),
+        id: String(l.partNumber || l.id || l.name || 'unknown'),
+        quantity: qty,
+        unit_price_gbp: unit,
+        line_total_gbp: line,
+        source: String(l.costSource || l.priceSource || 'unknown'),
+      })
+    }
+  }
+
+  return out
+}
+
+/** Default per-class metric_input fallbacks for states that lack keyMetrics
+ *  but encode the headline number in the projectId / radicalCostSummary.
+ *  Only used when band.metric_compute returns null. */
+function fallbackMetricInputFromProjectId(projectId: string, classKey: string): number | null {
+  const pid = (projectId || '').toLowerCase()
+  // Pull "3_5_mwh" / "3.5 MWh" / "3.5MWh" → 3.5 → 3500 kWh.
+  if (classKey === 'bess' || classKey === 'bess-utility-scale' || classKey === 'energy_storage') {
+    const m1 = pid.match(/(\d+)[_\.](\d+)[_ ]?mwh/)
+    if (m1) return parseFloat(`${m1[1]}.${m1[2]}`) * 1000
+    const m2 = pid.match(/(\d+)[_ ]?mwh/)
+    if (m2) return parseInt(m2[1], 10) * 1000
+    const m3 = pid.match(/(\d+)[_ ]?kwh/)
+    if (m3) return parseInt(m3[1], 10)
+  }
+  if (classKey === 'heatpump' || classKey === 'heat-pump-residential' || classKey === 'thermal_system') {
+    const m = pid.match(/(\d+)[_ ]?kw/)
+    if (m) return parseInt(m[1], 10)
+  }
+  if (classKey === 'ev-charger' || classKey === 'dc_fast_ev_charger' || classKey === 'ev_charger') {
+    const m = pid.match(/(\d+)[_ ]?kw/)
+    if (m) return parseInt(m[1], 10)
+  }
+  return null
+}
+
+/** Engine A core validator.
+ *
+ *  `bomTotals` carries the raw-materials BoM grand total in GBP. (The renderer
+ *  uses a richer `BomTotals` type but only the grand total enters the band
+ *  check — see PLAN-2026-05-18 Engine A.) The state is consulted for the
+ *  product_class / projectId / brief constraints used to resolve the band.
+ *
+ *  Output is the structured result the caller (or the re-emit prompt builder)
+ *  needs. `top_outliers` is always populated when raw BoM rows are present so
+ *  downstream code can quote line names even in the in-band branch. */
+export function validateBomAgainstBand(
+  state: any,
+  bomTotals: { grandTotal_gbp: number } | number,
+  options: { slugHint?: string } = {},
+): BomValidationResult {
+  const slugHint = options.slugHint
+    ?? state?.moduleDecomposition?.normalised_class
+    ?? state?.moduleDecomposition?.product_class
+    ?? undefined
+
+  const grandTotal = typeof bomTotals === 'number' ? bomTotals : bomTotals.grandTotal_gbp
+  const raw = Number.isFinite(grandTotal) && grandTotal > 0 ? grandTotal : 0
+
+  // Resolve the band first — without a band we cannot judge anything.
+  const band = resolvePriceBand(state, slugHint)
+  const { ratios, class_key } = resolveCostStack(state, slugHint)
+  const cost_stack = computeCostStack(raw, ratios, class_key)
+
+  // Pull top-3 outliers from the BoM rows (largest line totals). Always
+  // populated — useful for diagnostic logs even on in-band runs.
+  const rows = extractBomLinesFromState(state)
+    .sort((a, b) => b.line_total_gbp - a.line_total_gbp)
+  const top_outliers = rows.slice(0, 3)
+
+  if (!band || raw <= 0) {
+    return {
+      in_band: false,
+      pct_deviation: 0,
+      direction: null,
+      metric_value: 0,
+      metric_label: band?.natural_metric ?? 'unknown',
+      band_low: band?.market_band_low ?? 0,
+      band_high: band?.market_band_high ?? 0,
+      top_outliers,
+      installed_asp_gbp: cost_stack.installed_asp_gbp,
+      raw_bom_gbp: raw,
+      cost_stack,
+      class_key,
+      verdict: 'unavailable',
+      diagnostic: !band
+        ? `No price band resolved for class "${class_key}" — Engine A skipped.`
+        : `Raw BoM total is zero — Engine A skipped.`,
+    }
+  }
+
+  // metric_input is the divisor for the £/metric ratio. Try the band's
+  // built-in `metric_compute` first, fall back to a projectId pattern.
+  let metric_input: number | null = null
+  try {
+    metric_input = band.metric_compute(state)
+  } catch {
+    metric_input = null
+  }
+  if (metric_input == null || !Number.isFinite(metric_input) || metric_input <= 0) {
+    const projectId: string = state?.projectId || ''
+    metric_input = fallbackMetricInputFromProjectId(projectId, class_key)
+  }
+  if (metric_input == null || !Number.isFinite(metric_input) || metric_input <= 0) {
+    return {
+      in_band: false,
+      pct_deviation: 0,
+      direction: null,
+      metric_value: 0,
+      metric_label: band.natural_metric,
+      band_low: band.market_band_low,
+      band_high: band.market_band_high,
+      top_outliers,
+      installed_asp_gbp: cost_stack.installed_asp_gbp,
+      raw_bom_gbp: raw,
+      cost_stack,
+      class_key,
+      verdict: 'unavailable',
+      diagnostic: `Cannot compute ${band.natural_metric} — divisor not derivable from state.`,
+    }
+  }
+
+  // Compare installed_asp ÷ metric_input to the band.
+  const metric_value = cost_stack.installed_asp_gbp / metric_input
+  const lo = band.market_band_low
+  const hi = band.market_band_high
+  let verdict: BomValidationResult['verdict']
+  let direction: BomValidationResult['direction'] = null
+  let pct_deviation = 0
+  if (metric_value >= lo && metric_value <= hi) {
+    verdict = 'in_band'
+  } else if (metric_value < lo) {
+    verdict = 'low'
+    direction = 'low'
+    pct_deviation = ((metric_value - lo) / lo) * 100
+  } else {
+    verdict = 'high'
+    direction = 'high'
+    pct_deviation = ((metric_value - hi) / hi) * 100
+  }
+
+  const diagnostic = verdict === 'in_band'
+    ? `Within band — £${metric_value.toFixed(2)} ${band.natural_metric} (band £${lo}-${hi}).`
+    : `${verdict === 'low' ? 'Under' : 'Over'} band — £${metric_value.toFixed(2)} ${band.natural_metric} vs band £${lo}-${hi} (${pct_deviation.toFixed(1)}%).`
+
+  return {
+    in_band: verdict === 'in_band',
+    pct_deviation,
+    direction,
+    metric_value,
+    metric_label: band.natural_metric,
+    band_low: lo,
+    band_high: hi,
+    top_outliers,
+    installed_asp_gbp: cost_stack.installed_asp_gbp,
+    raw_bom_gbp: raw,
+    cost_stack,
+    class_key,
+    verdict,
+    diagnostic,
+  }
+}
+
+/** Build the corrective re-emit prompt. Mirrors the PLAN-2026-05-18 spec:
+ *
+ *    "Current BoM lands at £X/metric, band £Y-Z. Top 3 lines >2× over: [N1,
+ *    N2, N3]. Re-emit BoM correcting these lines."
+ *
+ *  In practice the spec covers both directions (under-band as well as over-
+ *  band) so the wording branches on `direction`. */
+export function buildEngineAReEmitPrompt(result: BomValidationResult): string {
+  const direction = result.direction === 'low' ? 'UNDER' : 'OVER'
+  const linesBlock = result.top_outliers.map((p, i) =>
+    `  ${i + 1}. ${p.name} — qty ${p.quantity} × £${p.unit_price_gbp.toFixed(2)} = £${p.line_total_gbp.toFixed(2)} (source: ${p.source})`
+  ).join('\n')
+
+  const guidance = result.direction === 'low'
+    ? 'The BoM is missing or under-priced major subsystems. Re-emit with the missing/under-priced lines added or uplifted so the per-metric figure lands within band. Common omissions: power-conversion system (PCS), enclosure / container, controller / EMS, BoP wiring + busbars, fire-suppression, civils / installation kit.'
+    : 'The BoM is double-counted or over-priced on at least one line. Re-emit with the over-priced lines corrected (verify unit-of-measure, batch size and distributor pricing). Common faults: per-cell price paid as per-pack, decimal slip on capacity (Ah vs mAh), distributor 1-off pricing on a high-volume commodity.'
+
+  return [
+    `# Engine A corrective re-emit`,
+    ``,
+    `The current BoM is ${direction} the market band for this product class.`,
+    ``,
+    `  metric:             ${result.metric_label}`,
+    `  computed value:     £${result.metric_value.toFixed(2)}`,
+    `  market band:        £${result.band_low}-${result.band_high}`,
+    `  deviation:          ${result.pct_deviation.toFixed(1)}%`,
+    `  raw BoM total:      £${result.raw_bom_gbp.toFixed(2)}`,
+    `  installed ASP:      £${result.installed_asp_gbp.toFixed(2)} (Engine D cost-stack class "${result.class_key}")`,
+    ``,
+    `## Top 3 lines by extended cost`,
+    linesBlock || '  (no priced rows extracted)',
+    ``,
+    `## Guidance`,
+    guidance,
+    ``,
+    `## INVARIANTS (council 2026-05-18 BLOCKER-4 + 3-seat micro-council follow-up)`,
+    `The re-emitted BoM MUST preserve the same functional decomposition as the original. You may NOT substitute a cheaper part for a different functional class. NO new top-level functional categories may be introduced — silent additions ("forgot a fire-suppression line", "forgot install kit") are the same gameability path as substitution. You may NOT silently drop components to bring cost into band: if a line cannot be reconciled, name it explicitly in the source/diagnostic field. Allowed corrections: (a) wrong-component-class assignment within the same functional category, (b) wrong-volume-band assumption justified by the source PDF (not by the band target), (c) wrong-grade-tier (industrial → consumer or vice versa), (d) corrected quantity / unit-multiplier misreads (per-cell vs per-pack, mAh vs Ah). NOT allowed: replacing a [function X] component with a [function Y] component, adding a previously-absent functional class, or omitting a line that existed in the original. The same function, same performance envelope and same safety class must persist across the retry. Engine A independently recomputes cost from the price-band registry; do not invent numbers that bring the metric inside the band without changing real lines.`,
+    ``,
+    `## Task`,
+    `Re-emit the BoM as a JSON object with shape:`,
+    ``,
+    `{"bomLines":[{"name":"<part name>","quantity":<int>,"unit_price_gbp":<number>,"source":"<short provenance>","functional_category":"<short category, e.g. cell, pcs, enclosure, controller, bms>"}]}`,
+    ``,
+    `Constraints:`,
+    `- Sum(quantity × unit_price_gbp) MUST yield an installed-ASP figure (after the Engine D cost-stack is applied) inside band £${result.band_low}-${result.band_high} ${result.metric_label}.`,
+    `- Specifically revisit the three lines listed above — either correct, replace, or supplement them.`,
+    `- Each line MUST carry a "functional_category" string. Re-use the original categories where possible; new categories must be functionally additive (e.g. adding a missing "fire_suppression" line), never a substitution that drops an existing function.`,
+    `- Do not invent line items that have no plausible bill-of-materials grounding.`,
+    `- Return ONLY the JSON. No commentary.`,
+  ].join('\n')
+}
+
+// ── B4: post-re-emit functional-category Jaccard check ──────────────────────
+//
+// Council 2026-05-18 BLOCKER-4 post-check. After a re-emit returns, compute
+// the Jaccard similarity between the ORIGINAL BoM's functional categories
+// and the RE-EMITTED BoM's functional categories. If >20 % of original
+// categories have disappeared, the LLM has substituted across functional
+// classes (not just corrected within them) — reject the re-emit and force
+// manual review.
+
+/**
+ * Normalise a part name or explicit functional_category to a coarse functional
+ * bucket. The buckets are deliberately broad (cell vs structural vs control)
+ * so legitimate within-class corrections (e.g. 280Ah LFP cell → 314Ah LFP
+ * cell) do not trip the Jaccard threshold.
+ */
+function deriveFunctionalCategory(nameOrCategory: string): string {
+  const t = (nameOrCategory || '').toLowerCase()
+  if (/\b(cell|module|pack|lfp|nmc|battery)\b/.test(t)) return 'cell'
+  if (/\b(pcs|inverter|converter|power conversion|charge controller)\b/.test(t)) return 'pcs'
+  if (/\b(bms|battery management|controller|ems|energy management)\b/.test(t)) return 'control'
+  if (/\b(thermal|cooling|hvac|chiller|heat exchanger|liquid cool)\b/.test(t)) return 'thermal'
+  if (/\b(enclosure|cabinet|container|rack|frame|chassis)\b/.test(t)) return 'enclosure'
+  if (/\b(busbar|wiring|cable|interconnect|harness|bop)\b/.test(t)) return 'interconnect'
+  if (/\b(fire|suppression|extinguisher|aerosol)\b/.test(t)) return 'safety'
+  if (/\b(install|civil|foundation|concrete|trenching)\b/.test(t)) return 'install'
+  if (/\b(meter|metering|smm|mid|measurement)\b/.test(t)) return 'metering'
+  if (/\b(refrigerant|compressor|evaporator|condenser)\b/.test(t)) return 'refrigeration'
+  if (/\b(sensor|probe|transducer|adc)\b/.test(t)) return 'sensing'
+  return 'other'
+}
+
+/**
+ * Returns true iff the re-emit preserved the original BoM's functional
+ * decomposition: more than 80 % of the original categories must still appear
+ * in the re-emitted set. Loss of categories means functional-class
+ * substitution — a gameability path. Council 2026-05-18 BLOCKER-4 threshold.
+ */
+export function checkFunctionalContinuity(
+  originalParts: ReadonlyArray<{ name?: string; functional_category?: string | null }>,
+  newLines: ReadonlyArray<{ name?: string; functional_category?: string | null }>,
+): { preserved: boolean; original_categories: string[]; new_categories: string[]; missing: string[]; jaccard: number } {
+  const origCats = new Set(
+    originalParts.map(p => deriveFunctionalCategory(p.functional_category || p.name || '')),
+  )
+  const newCats = new Set(
+    newLines.map(l => deriveFunctionalCategory(l.functional_category || l.name || '')),
+  )
+  origCats.delete('other')
+  newCats.delete('other')
+  const missing: string[] = []
+  for (const c of origCats) {
+    if (!newCats.has(c)) missing.push(c)
+  }
+  // Jaccard similarity of the two sets.
+  const unionArr: string[] = []
+  const seenU = new Set<string>()
+  for (const c of origCats) if (!seenU.has(c)) { seenU.add(c); unionArr.push(c) }
+  for (const c of newCats) if (!seenU.has(c)) { seenU.add(c); unionArr.push(c) }
+  const intersectionArr: string[] = []
+  for (const c of origCats) if (newCats.has(c)) intersectionArr.push(c)
+  const jaccard = unionArr.length === 0 ? 1 : intersectionArr.length / unionArr.length
+  // Council thresholds (BLOCKER-4 + 3-seat micro-council follow-up):
+  //   (i)  > 20 % of original categories disappearing → reject (substitution path);
+  //   (ii) Jaccard < 0.8 → reject (catches new-category-addition path as well,
+  //        e.g. LLM adds 3 cheap padding lines to dilute £/kWh without dropping
+  //        an original line — Jaccard drops because the new set's union grew).
+  const missingRatio = origCats.size === 0 ? 0 : missing.length / origCats.size
+  const preserved = missingRatio <= 0.2 && jaccard >= 0.8
+  return {
+    preserved,
+    original_categories: Array.from(origCats),
+    new_categories: Array.from(newCats),
+    missing,
+    jaccard,
+  }
+}
+
+/** Calls Gemini Flash-Lite via OpenRouter with the Engine A corrective
+ *  prompt. Returns the parsed BoM lines or null on failure. Used by the
+ *  corrective loop; broken out so the validator can be tested in isolation. */
+export async function callFlashLiteForReEmit(prompt: string): Promise<Array<{
+  name: string
+  quantity: number
+  unit_price_gbp: number
+  source: string
+}> | null> {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 60_000)
+  const t0 = Date.now()
+  const MODEL = 'google/gemini-3.1-flash-lite'
+  try {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        temperature: 0.2,
+        max_tokens: 16_384,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'You are a senior cost engineer. Re-emit bills of materials as strict JSON. No prose, no commentary, JSON only.' },
+          { role: 'user', content: prompt },
+        ],
+      }),
+      signal: controller.signal,
+    })
+    clearTimeout(timeout)
+    if (!response.ok) {
+      console.warn(`[engine-a] Flash-Lite returned ${response.status}`)
+      getActionLogger().logLlm({
+        step_name: 'engine_a_re_emit',
+        model: MODEL,
+        latency_ms: Date.now() - t0,
+        ok: false,
+        error: `OpenRouter ${response.status}`,
+      })
+      return null
+    }
+    const json = await response.json()
+    getActionLogger().logLlm({
+      step_name: 'engine_a_re_emit',
+      model: MODEL,
+      prompt_tokens: json?.usage?.prompt_tokens,
+      completion_tokens: json?.usage?.completion_tokens,
+      latency_ms: Date.now() - t0,
+      finish_reason: json?.choices?.[0]?.finish_reason,
+      ok: true,
+    })
+    const msg = json.choices?.[0]?.message
+    const raw: string = msg?.content || msg?.reasoning || ''
+    if (!raw) return null
+    let parsed: any
+    try {
+      parsed = JSON.parse(raw)
+    } catch {
+      // Tolerate a fenced JSON block.
+      const m = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
+      if (m) {
+        try { parsed = JSON.parse(m[1]) } catch { return null }
+      } else {
+        return null
+      }
+    }
+    const arr = Array.isArray(parsed?.bomLines) ? parsed.bomLines
+      : Array.isArray(parsed?.bom_lines) ? parsed.bom_lines
+      : Array.isArray(parsed) ? parsed
+      : null
+    if (!arr) return null
+    return arr
+      .filter((l: any) => typeof l?.name === 'string' && typeof l?.unit_price_gbp === 'number')
+      .map((l: any) => ({
+        name: String(l.name),
+        quantity: typeof l.quantity === 'number' && l.quantity > 0 ? l.quantity : 1,
+        unit_price_gbp: Math.max(0, Number(l.unit_price_gbp)),
+        source: String(l.source || 're-emit'),
+      }))
+  } catch (err) {
+    clearTimeout(timeout)
+    console.warn(`[engine-a] Flash-Lite call failed: ${(err as Error).message}`)
+    getActionLogger().logLlm({
+      step_name: 'engine_a_re_emit',
+      model: MODEL,
+      latency_ms: Date.now() - t0,
+      ok: false,
+      error: (err as Error).message,
+    })
+    return null
+  }
+}
+
+/** Engine A corrective re-emit loop.
+ *
+ *  Validates the BoM total against the price band. If out-of-band by >50%,
+ *  calls Flash-Lite to produce a corrected BoM, replaces it in `state` via
+ *  the caller-supplied `applyReEmittedBom`, and re-validates. Up to 2 retries.
+ *
+ *  After 2 retries with the band still breached, sets
+ *  `state.cost_reality_status = 'manual_review_required'` and returns the
+ *  last validation result. The pipeline keeps running — the renderer's
+ *  existing badge will flag the report visibly.
+ *
+ *  `applyReEmittedBom` is a callback because the BoM lives in different
+ *  places depending on which pipeline path emitted it (radical hierarchy vs.
+ *  legacy IntegratedBomLine[]). The caller knows where to write the new
+ *  totals; Engine A only knows how to ask. */
+export async function runEngineACorrectiveLoop(
+  state: any,
+  getCurrentBomTotal: () => number,
+  applyReEmittedBom: (newLines: Array<{ name: string; quantity: number; unit_price_gbp: number; source: string }>, newTotalGbp: number) => Promise<void> | void,
+  options: { maxRetries?: number; deviationGate?: number; slugHint?: string } = {},
+): Promise<BomValidationResult> {
+  const maxRetries = options.maxRetries ?? 2
+  const gate = options.deviationGate ?? 50
+
+  const _logger = getActionLogger()
+  _logger.logStage({ step_name: 'engine_a_corrective_loop', action_type: 'stage_start', max_retries: maxRetries, deviation_gate_pct: gate })
+
+  let result = validateBomAgainstBand(state, getCurrentBomTotal(), { slugHint: options.slugHint })
+  console.log(`[engine-a] Initial verdict: ${result.verdict} (${result.diagnostic})`)
+
+  _logger.logGate({
+    step_name: 'engine_a_corrective_loop',
+    gate_name: 'bom_cost_band',
+    verdict: result.in_band ? 'PASS' : (result.verdict === 'unavailable' ? 'UNAVAILABLE' : 'OUT_OF_BAND'),
+    score: result.pct_deviation,
+    reasons: [result.diagnostic],
+    metric_value: result.metric_value,
+    band_low: result.band_low,
+    band_high: result.band_high,
+    iteration: 0,
+  })
+
+  // No-op when verdict is unavailable, in-band, or below the gate threshold.
+  if (result.verdict === 'unavailable' || result.in_band || Math.abs(result.pct_deviation) <= gate) {
+    state.cost_reality_status = result.in_band ? 'in_band' : (result.verdict === 'unavailable' ? 'unavailable' : 'within_tolerance')
+    state.cost_reality = result
+    _logger.logStage({ step_name: 'engine_a_corrective_loop', action_type: 'stage_end', outcome: 'ok', no_op: true, final_verdict: result.verdict })
+    return result
+  }
+
+  // B4: capture the ORIGINAL functional categories before any re-emit replaces
+  // them so we can compare retained categories against the post-re-emit set.
+  const originalPartsForJaccard = extractBomLinesFromState(state).map(p => ({
+    name: p.name,
+    functional_category: null,
+  }))
+
+  let attempt = 0
+  while (attempt < maxRetries) {
+    attempt += 1
+    console.log(`[engine-a] Re-emit attempt ${attempt}/${maxRetries} — current £${result.metric_value.toFixed(2)} ${result.metric_label}, band £${result.band_low}-${result.band_high}.`)
+    // Snapshot state BEFORE the re-emit for state_repair attribution (audit
+    // Gap #3 — this is exactly the iter-12A cell_count 4900→3500 use case).
+    const beforeBomLines = extractBomLinesFromState(state).map(p => ({
+      name: p.name,
+      quantity: p.quantity ?? null,
+      unit_price_gbp: p.unit_price_gbp ?? null,
+    }))
+    const beforeTotal = result.metric_value
+    const beforeHash = shortHash(beforeBomLines)
+    const beforeCellCount = beforeBomLines.find(l => /cell/i.test(l.name))?.quantity ?? null
+
+    const prompt = buildEngineAReEmitPrompt(result)
+    const newLines = await callFlashLiteForReEmit(prompt)
+    if (!newLines || newLines.length === 0) {
+      console.warn(`[engine-a] Re-emit attempt ${attempt} produced no usable BoM; aborting.`)
+      _logger.logRepair({
+        step_name: `engine_a_retry_${attempt}`,
+        target_field: 'state.bomLines',
+        before_hash: beforeHash,
+        key_changes: 're-emit returned 0 lines; aborting loop',
+      })
+      break
+    }
+    const newTotal = newLines.reduce((s, l) => s + l.quantity * l.unit_price_gbp, 0)
+    if (newTotal <= 0) {
+      console.warn(`[engine-a] Re-emit attempt ${attempt} returned zero total; aborting.`)
+      _logger.logRepair({
+        step_name: `engine_a_retry_${attempt}`,
+        target_field: 'state.bomLines',
+        before_hash: beforeHash,
+        key_changes: 're-emit total = 0; aborting loop',
+      })
+      break
+    }
+
+    // ── Council 2026-05-18 BLOCKER-4: gameability guard ──────────────────
+    // Compare original functional categories against re-emitted set. If
+    // >20 % of original categories disappear, the LLM has substituted
+    // across functional classes (e.g. dropped "cell" and added "structural")
+    // to game the band check. REJECT the re-emit and force manual review.
+    const continuity = checkFunctionalContinuity(originalPartsForJaccard, newLines)
+    if (!continuity.preserved) {
+      console.warn(
+        `[engine-a] Re-emit attempt ${attempt} REJECTED — functional categories not preserved ` +
+        `(jaccard=${continuity.jaccard.toFixed(2)}, missing: ${continuity.missing.join(', ')}). ` +
+        `Forcing manual-review.`,
+      )
+      state.cost_reality_status = 'manual_review_required'
+      state.cost_reality = result
+      state.cost_reality_attempts = attempt
+      ;(state as any).cost_reality_rejection = {
+        reason: 'functional_category_substitution',
+        original_categories: continuity.original_categories,
+        new_categories: continuity.new_categories,
+        missing_categories: continuity.missing,
+        jaccard: continuity.jaccard,
+      }
+      _logger.logRepair({
+        step_name: `engine_a_retry_${attempt}`,
+        target_field: 'state.bomLines',
+        before_hash: beforeHash,
+        key_changes: `REJECTED — functional substitution (jaccard=${continuity.jaccard.toFixed(2)}, missing=${continuity.missing.join(',')}); forcing manual review`,
+        attempt,
+        rejection_reason: 'functional_category_substitution',
+      })
+      _logger.logStage({ step_name: 'engine_a_corrective_loop', action_type: 'stage_end', outcome: 'ok', final_verdict: 'manual_review_required', attempts: attempt, rejection: 'functional_substitution' })
+      return result
+    }
+
+    await applyReEmittedBom(newLines, newTotal)
+
+    // State_repair record (audit Gap #3 — answers "R2 changed cell_count
+    // at step X: 4900 → 3500" question CLAUDE.md singles out).
+    const afterBomLines = extractBomLinesFromState(state).map(p => ({
+      name: p.name,
+      quantity: p.quantity ?? null,
+      unit_price_gbp: p.unit_price_gbp ?? null,
+    }))
+    const afterHash = shortHash(afterBomLines)
+    const afterCellCount = afterBomLines.find(l => /cell/i.test(l.name))?.quantity ?? null
+    const keyChanges =
+      `total: £${beforeTotal.toFixed(0)} → £${newTotal.toFixed(0)}` +
+      (beforeCellCount !== null && afterCellCount !== null
+        ? `; cell_count: ${beforeCellCount} → ${afterCellCount}`
+        : '') +
+      `; line_count: ${beforeBomLines.length} → ${afterBomLines.length}`
+    _logger.logRepair({
+      step_name: `engine_a_retry_${attempt}`,
+      target_field: 'state.bomLines',
+      before_value: { total_gbp: beforeTotal, line_count: beforeBomLines.length, cell_count: beforeCellCount },
+      after_value:  { total_gbp: newTotal, line_count: afterBomLines.length, cell_count: afterCellCount },
+      before_hash: beforeHash,
+      after_hash: afterHash,
+      key_changes: keyChanges,
+      attempt,
+      max_retries: maxRetries,
+    })
+
+    result = validateBomAgainstBand(state, getCurrentBomTotal(), { slugHint: options.slugHint })
+    console.log(`[engine-a] Post-attempt-${attempt} verdict: ${result.verdict} (${result.diagnostic})`)
+    _logger.logGate({
+      step_name: 'engine_a_corrective_loop',
+      gate_name: 'bom_cost_band',
+      verdict: result.in_band ? 'PASS' : (result.verdict === 'unavailable' ? 'UNAVAILABLE' : 'OUT_OF_BAND'),
+      score: result.pct_deviation,
+      reasons: [result.diagnostic],
+      iteration: attempt,
+    })
+    if (result.in_band || Math.abs(result.pct_deviation) <= gate) {
+      state.cost_reality_status = result.in_band ? 'in_band' : 'within_tolerance'
+      state.cost_reality = result
+      state.cost_reality_attempts = attempt
+      _logger.logStage({ step_name: 'engine_a_corrective_loop', action_type: 'stage_end', outcome: 'ok', final_verdict: result.verdict, attempts: attempt })
+      return result
+    }
+  }
+
+  // Exhausted retries — flag for human review, keep the pipeline running.
+  state.cost_reality_status = 'manual_review_required'
+  state.cost_reality = result
+  state.cost_reality_attempts = attempt
+  console.warn(`[engine-a] Manual review required after ${attempt} re-emit attempt(s).`)
+  _logger.logStage({ step_name: 'engine_a_corrective_loop', action_type: 'stage_end', outcome: 'ok', final_verdict: 'manual_review_required', attempts: attempt })
+  return result
 }

@@ -1,0 +1,82 @@
+{
+  "verdict": "component_candidates_ready_for_sourcing",
+  "summary": {
+    "rows": 7,
+    "passRows": 7,
+    "reviewRows": 0,
+    "blockedRows": 0,
+    "passRatio": 1,
+    "bomLines": 122,
+    "componentWordIds": 122,
+    "criticalBomLines": 8,
+    "requiredCriticalParts": 8,
+    "allocatedCriticalParts": 8,
+    "positiveQuantityLines": 122,
+    "candidateWorklistRows": 122,
+    "duplicateComponentGroups": 0,
+    "provenanceViolations": 0,
+    "sourceEvidenceRows": 0,
+    "readyForSourcing": true,
+    "nextAction": null
+  },
+  "rows": [
+    {
+      "area": "candidate_presence",
+      "verdict": "pass",
+      "signal": "122 candidate BoM line(s), 122 distinct component identity key(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Component candidates exist for downstream sourcing review."
+    },
+    {
+      "area": "candidate_identity",
+      "verdict": "pass",
+      "signal": "122/122 candidate line(s) have non-generic identity, description and role context.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Candidate identities are specific enough for first-pass sourcing worklists."
+    },
+    {
+      "area": "quantity_basis",
+      "verdict": "pass",
+      "signal": "122/122 candidate line(s) have positive quantity and unit.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Candidate quantities have positive values and explicit units."
+    },
+    {
+      "area": "critical_candidate_coverage",
+      "verdict": "pass",
+      "signal": "8/8 class-critical part(s) are represented by candidate lines; 8 critical BoM line(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Class-critical parts have candidate lines before sourcing begins."
+    },
+    {
+      "area": "duplicate_identity_review",
+      "verdict": "pass",
+      "signal": "0 duplicate component identity group(s), 0 involving critical lines.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "No duplicate component identities need sourcing review."
+    },
+    {
+      "area": "sourcing_worklist_alignment",
+      "verdict": "pass",
+      "signal": "122/122 unpriced candidate line(s) appear in the sourcing worklist.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Every unpriced candidate line is visible in the sourcing worklist."
+    },
+    {
+      "area": "provenance_boundary",
+      "verdict": "pass",
+      "signal": "0 source evidence row(s), 0 source-backed claim(s), 0 provenance violation(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Candidate sourcing fields remain clean unless admitted evidence supplies them."
+    }
+  ],
+  "blockers": [],
+  "nextActions": []
+}

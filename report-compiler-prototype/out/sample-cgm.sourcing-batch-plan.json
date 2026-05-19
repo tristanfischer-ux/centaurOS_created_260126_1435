@@ -1,0 +1,3568 @@
+{
+  "summary": {
+    "closureRows": 120,
+    "batches": 2,
+    "activeBatches": 1,
+    "waitingBatches": 0,
+    "deferredBatches": 1,
+    "activeRows": 12,
+    "waitingRows": 0,
+    "deferredRows": 108,
+    "procurementBlockingRows": 12,
+    "criticalSourceRows": 12,
+    "repairRows": 0,
+    "protocolReplacementRows": 0,
+    "identityRows": 0,
+    "candidateDeferredRows": 108,
+    "nextBatchId": "sourcing-batch:2:critical_source_collection",
+    "nextItemId": "critical_source_collection:1:disposable_applicator",
+    "canUseForProcurement": false
+  },
+  "batches": [
+    {
+      "id": "sourcing-batch:2:critical_source_collection",
+      "sequence": 2,
+      "kind": "critical_source_collection",
+      "title": "Collect Critical Source Evidence",
+      "status": "active",
+      "rowCount": 12,
+      "readyRows": 12,
+      "blockedRows": 0,
+      "deferredRows": 0,
+      "procurementBlockingRows": 12,
+      "entryCriteria": [
+        "Architecture has identified critical BoM lines that are not source-backed."
+      ],
+      "exitCriteria": [
+        "Every critical line has admitted supplier/manufacturer/MPN/unit-cost evidence."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "critical_source_collection:1:disposable_applicator",
+          "closureRowId": "bom-close:actuation_kinematics_disposable_applicator_disposable_applicator",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "disposable_applicator",
+          "description": "Disposable applicator",
+          "searchTerms": [
+            "Disposable applicator",
+            "Disposable applicator manufacturer part number",
+            "Disposable applicator catalogue price GBP",
+            "Disposable applicator datasheet",
+            "Disposable applicator continuous glucose monitor",
+            "Disposable applicator wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:2:ble_radio_module",
+          "closureRowId": "bom-close:control_compute_communication_ble_telemetry_ble_radio_module",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "ble_radio_module",
+          "description": "BLE radio module",
+          "searchTerms": [
+            "BLE radio module",
+            "BLE radio module manufacturer part number",
+            "BLE radio module catalogue price GBP",
+            "BLE radio module datasheet",
+            "BLE radio module continuous glucose monitor",
+            "BLE radio module wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:3:low_power_microcontroller",
+          "closureRowId": "bom-close:control_compute_communication_mcu_firmware_low_power_microcontroller",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "low_power_microcontroller",
+          "description": "Low-power microcontroller",
+          "searchTerms": [
+            "Low-power microcontroller",
+            "Low-power microcontroller manufacturer part number",
+            "Low-power microcontroller catalogue price GBP",
+            "Low-power microcontroller datasheet",
+            "Low-power microcontroller continuous glucose monitor",
+            "Low-power microcontroller wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:4:thin_film_battery",
+          "closureRowId": "bom-close:energy_storage_source_battery_cell_thin_film_battery",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "thin_film_battery",
+          "description": "Thin-film battery",
+          "searchTerms": [
+            "Thin-film battery",
+            "Thin-film battery manufacturer part number",
+            "Thin-film battery catalogue price GBP",
+            "Thin-film battery datasheet",
+            "Thin-film battery continuous glucose monitor",
+            "Thin-film battery wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:5:temperature_sensor",
+          "closureRowId": "bom-close:environmental_interface_temperature_compensation_temperature_sensor",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "temperature_sensor",
+          "description": "Temperature sensor",
+          "searchTerms": [
+            "Temperature sensor",
+            "Temperature sensor manufacturer part number",
+            "Temperature sensor catalogue price GBP",
+            "Temperature sensor datasheet",
+            "Temperature sensor continuous glucose monitor",
+            "Temperature sensor wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:6:udi_label_set",
+          "closureRowId": "bom-close:maintenance_serviceability_lot_traceability_udi_label_set",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "udi_label_set",
+          "description": "UDI label set",
+          "searchTerms": [
+            "UDI label set",
+            "UDI label set manufacturer part number",
+            "UDI label set catalogue price GBP",
+            "UDI label set datasheet",
+            "UDI label set continuous glucose monitor",
+            "UDI label set wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:7:sterile_barrier_pouch",
+          "closureRowId": "bom-close:maintenance_serviceability_sterile_packaging_sterile_barrier_pouch",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "sterile_barrier_pouch",
+          "description": "Sterile barrier pouch",
+          "searchTerms": [
+            "Sterile barrier pouch",
+            "Sterile barrier pouch manufacturer part number",
+            "Sterile barrier pouch catalogue price GBP",
+            "Sterile barrier pouch datasheet",
+            "Sterile barrier pouch continuous glucose monitor",
+            "Sterile barrier pouch wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:8:enzyme_reagent_membrane",
+          "closureRowId": "bom-close:sensing_instrumentation_glucose_filament_stack_enzyme_reagent_membrane",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "enzyme_reagent_membrane",
+          "description": "Enzyme reagent membrane",
+          "searchTerms": [
+            "Enzyme reagent membrane",
+            "Enzyme reagent membrane manufacturer part number",
+            "Enzyme reagent membrane catalogue price GBP",
+            "Enzyme reagent membrane datasheet",
+            "Enzyme reagent membrane continuous glucose monitor",
+            "Enzyme reagent membrane wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:9:glucose_sensing_filament",
+          "closureRowId": "bom-close:sensing_instrumentation_glucose_filament_stack_glucose_sensing_filament",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "glucose_sensing_filament",
+          "description": "Glucose sensing filament",
+          "searchTerms": [
+            "Glucose sensing filament",
+            "Glucose sensing filament manufacturer part number",
+            "Glucose sensing filament catalogue price GBP",
+            "Glucose sensing filament datasheet",
+            "Glucose sensing filament continuous glucose monitor",
+            "Glucose sensing filament wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:10:reference_electrode",
+          "closureRowId": "bom-close:sensing_instrumentation_glucose_filament_stack_reference_electrode",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "reference_electrode",
+          "description": "Reference electrode",
+          "searchTerms": [
+            "Reference electrode",
+            "Reference electrode manufacturer part number",
+            "Reference electrode catalogue price GBP",
+            "Reference electrode datasheet",
+            "Reference electrode continuous glucose monitor",
+            "Reference electrode wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:11:adhesive_skin_patch",
+          "closureRowId": "bom-close:skin_patient_interface_adhesive_patch_stack_adhesive_skin_patch",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "adhesive_skin_patch",
+          "description": "Adhesive skin patch",
+          "searchTerms": [
+            "Adhesive skin patch",
+            "Adhesive skin patch manufacturer part number",
+            "Adhesive skin patch catalogue price GBP",
+            "Adhesive skin patch datasheet",
+            "Adhesive skin patch continuous glucose monitor",
+            "Adhesive skin patch wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:12:protective_transmitter_housing",
+          "closureRowId": "bom-close:structure_containment_transmitter_housing_protective_transmitter_housing",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "protective_transmitter_housing",
+          "description": "Protective transmitter housing",
+          "searchTerms": [
+            "Protective transmitter housing",
+            "Protective transmitter housing manufacturer part number",
+            "Protective transmitter housing catalogue price GBP",
+            "Protective transmitter housing datasheet",
+            "Protective transmitter housing continuous glucose monitor",
+            "Protective transmitter housing wearable medical device"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        }
+      ]
+    },
+    {
+      "id": "sourcing-batch:6:candidate_sourcing_deferred",
+      "sequence": 6,
+      "kind": "candidate_sourcing_deferred",
+      "title": "Defer Candidate-Only Sourcing",
+      "status": "deferred",
+      "rowCount": 108,
+      "readyRows": 0,
+      "blockedRows": 0,
+      "deferredRows": 108,
+      "procurementBlockingRows": 0,
+      "entryCriteria": [
+        "Candidate lines remain outside immediate procurement scope."
+      ],
+      "exitCriteria": [
+        "Candidate lines are either still explicitly deferred or promoted to critical sourcing scope."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "candidate_sourcing_deferred:1:safety_cap",
+          "closureRowId": "bom-close:actuation_kinematics_disposable_applicator_safety_cap",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "safety_cap",
+          "description": "safety cap",
+          "searchTerms": [
+            "safety cap",
+            "safety cap manufacturer part number",
+            "safety cap catalogue price GBP",
+            "safety cap datasheet",
+            "safety cap continuous glucose monitor",
+            "safety cap wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:2:spring_insertion_driver",
+          "closureRowId": "bom-close:actuation_kinematics_disposable_applicator_spring_insertion_driver",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "spring_insertion_driver",
+          "description": "spring insertion driver",
+          "searchTerms": [
+            "spring insertion driver",
+            "spring insertion driver manufacturer part number",
+            "spring insertion driver catalogue price GBP",
+            "spring insertion driver datasheet",
+            "spring insertion driver continuous glucose monitor",
+            "spring insertion driver wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:3:trigger_button",
+          "closureRowId": "bom-close:actuation_kinematics_disposable_applicator_trigger_button",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "trigger_button",
+          "description": "trigger button",
+          "searchTerms": [
+            "trigger button",
+            "trigger button manufacturer part number",
+            "trigger button catalogue price GBP",
+            "trigger button datasheet",
+            "trigger button continuous glucose monitor",
+            "trigger button wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:4:depth_stop_collar",
+          "closureRowId": "bom-close:actuation_kinematics_insertion_mechanism_depth_stop_collar",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "depth_stop_collar",
+          "description": "depth stop collar",
+          "searchTerms": [
+            "depth stop collar",
+            "depth stop collar manufacturer part number",
+            "depth stop collar catalogue price GBP",
+            "depth stop collar datasheet",
+            "depth stop collar continuous glucose monitor",
+            "depth stop collar wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:5:filament_deployment_shuttle",
+          "closureRowId": "bom-close:actuation_kinematics_insertion_mechanism_filament_deployment_shuttle",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "filament_deployment_shuttle",
+          "description": "filament deployment shuttle",
+          "searchTerms": [
+            "filament deployment shuttle",
+            "filament deployment shuttle manufacturer part number",
+            "filament deployment shuttle catalogue price GBP",
+            "filament deployment shuttle datasheet",
+            "filament deployment shuttle continuous glucose monitor",
+            "filament deployment shuttle wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:6:introducer_needle",
+          "closureRowId": "bom-close:actuation_kinematics_insertion_mechanism_introducer_needle",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "introducer_needle",
+          "description": "introducer needle",
+          "searchTerms": [
+            "introducer needle",
+            "introducer needle manufacturer part number",
+            "introducer needle catalogue price GBP",
+            "introducer needle datasheet",
+            "introducer needle continuous glucose monitor",
+            "introducer needle wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:7:retraction_latch",
+          "closureRowId": "bom-close:actuation_kinematics_insertion_mechanism_retraction_latch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "retraction_latch",
+          "description": "retraction latch",
+          "searchTerms": [
+            "retraction latch",
+            "retraction latch manufacturer part number",
+            "retraction latch catalogue price GBP",
+            "retraction latch datasheet",
+            "retraction latch continuous glucose monitor",
+            "retraction latch wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:8:applicator_status_window",
+          "closureRowId": "bom-close:actuation_kinematics_sharps_lockout_applicator_status_window",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "applicator_status_window",
+          "description": "applicator status window",
+          "searchTerms": [
+            "applicator status window",
+            "applicator status window manufacturer part number",
+            "applicator status window catalogue price GBP",
+            "applicator status window datasheet",
+            "applicator status window continuous glucose monitor",
+            "applicator status window wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:9:needle_shield",
+          "closureRowId": "bom-close:actuation_kinematics_sharps_lockout_needle_shield",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "needle_shield",
+          "description": "needle shield",
+          "searchTerms": [
+            "needle shield",
+            "needle shield manufacturer part number",
+            "needle shield catalogue price GBP",
+            "needle shield datasheet",
+            "needle shield continuous glucose monitor",
+            "needle shield wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:10:post_use_lock_tab",
+          "closureRowId": "bom-close:actuation_kinematics_sharps_lockout_post_use_lock_tab",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "post_use_lock_tab",
+          "description": "post-use lock tab",
+          "searchTerms": [
+            "post-use lock tab",
+            "post-use lock tab manufacturer part number",
+            "post-use lock tab catalogue price GBP",
+            "post-use lock tab datasheet",
+            "post-use lock tab continuous glucose monitor",
+            "post-use lock tab wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:11:trigger_interlock_spring",
+          "closureRowId": "bom-close:actuation_kinematics_sharps_lockout_trigger_interlock_spring",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "trigger_interlock_spring",
+          "description": "trigger interlock spring",
+          "searchTerms": [
+            "trigger interlock spring",
+            "trigger interlock spring manufacturer part number",
+            "trigger interlock spring catalogue price GBP",
+            "trigger interlock spring datasheet",
+            "trigger interlock spring continuous glucose monitor",
+            "trigger interlock spring wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:12:encrypted_session_counter",
+          "closureRowId": "bom-close:control_compute_communication_ble_telemetry_encrypted_session_counter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "encrypted_session_counter",
+          "description": "encrypted session counter",
+          "searchTerms": [
+            "encrypted session counter",
+            "encrypted session counter manufacturer part number",
+            "encrypted session counter catalogue price GBP",
+            "encrypted session counter datasheet",
+            "encrypted session counter continuous glucose monitor",
+            "encrypted session counter wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:13:pairing_button_pad",
+          "closureRowId": "bom-close:control_compute_communication_ble_telemetry_pairing_button_pad",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pairing_button_pad",
+          "description": "pairing button pad",
+          "searchTerms": [
+            "pairing button pad",
+            "pairing button pad manufacturer part number",
+            "pairing button pad catalogue price GBP",
+            "pairing button pad datasheet",
+            "pairing button pad continuous glucose monitor",
+            "pairing button pad wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:14:printed_antenna",
+          "closureRowId": "bom-close:control_compute_communication_ble_telemetry_printed_antenna",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "printed_antenna",
+          "description": "printed antenna",
+          "searchTerms": [
+            "printed antenna",
+            "printed antenna manufacturer part number",
+            "printed antenna catalogue price GBP",
+            "printed antenna datasheet",
+            "printed antenna continuous glucose monitor",
+            "printed antenna wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:15:calibration_data_bus_bridge",
+          "closureRowId": "bom-close:control_compute_communication_data_buffering_calibration_data_bus_bridge",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "calibration_data_bus_bridge",
+          "description": "calibration data bus bridge",
+          "searchTerms": [
+            "calibration data bus bridge",
+            "calibration data bus bridge manufacturer part number",
+            "calibration data bus bridge catalogue price GBP",
+            "calibration data bus bridge datasheet",
+            "calibration data bus bridge continuous glucose monitor",
+            "calibration data bus bridge wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:16:clock_drift_compensator",
+          "closureRowId": "bom-close:control_compute_communication_data_buffering_clock_drift_compensator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "clock_drift_compensator",
+          "description": "clock drift compensator",
+          "searchTerms": [
+            "clock drift compensator",
+            "clock drift compensator manufacturer part number",
+            "clock drift compensator catalogue price GBP",
+            "clock drift compensator datasheet",
+            "clock drift compensator continuous glucose monitor",
+            "clock drift compensator wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:17:event_log_memory",
+          "closureRowId": "bom-close:control_compute_communication_data_buffering_event_log_memory",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "event_log_memory",
+          "description": "event log memory",
+          "searchTerms": [
+            "event log memory",
+            "event log memory manufacturer part number",
+            "event log memory catalogue price GBP",
+            "event log memory datasheet",
+            "event log memory continuous glucose monitor",
+            "event log memory wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:18:glucose_trend_buffer_flash",
+          "closureRowId": "bom-close:control_compute_communication_data_buffering_glucose_trend_buffer_flash",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "glucose_trend_buffer_flash",
+          "description": "glucose trend buffer flash",
+          "searchTerms": [
+            "glucose trend buffer flash",
+            "glucose trend buffer flash manufacturer part number",
+            "glucose trend buffer flash catalogue price GBP",
+            "glucose trend buffer flash datasheet",
+            "glucose trend buffer flash continuous glucose monitor",
+            "glucose trend buffer flash wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:19:firmware_image",
+          "closureRowId": "bom-close:control_compute_communication_mcu_firmware_firmware_image",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "firmware_image",
+          "description": "firmware image",
+          "searchTerms": [
+            "firmware image",
+            "firmware image manufacturer part number",
+            "firmware image catalogue price GBP",
+            "firmware image datasheet",
+            "firmware image continuous glucose monitor",
+            "firmware image wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:20:real_time_clock",
+          "closureRowId": "bom-close:control_compute_communication_mcu_firmware_real_time_clock",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "real_time_clock",
+          "description": "real-time clock",
+          "searchTerms": [
+            "real-time clock",
+            "real-time clock manufacturer part number",
+            "real-time clock catalogue price GBP",
+            "real-time clock datasheet",
+            "real-time clock continuous glucose monitor",
+            "real-time clock wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:21:secure_boot_key_store",
+          "closureRowId": "bom-close:control_compute_communication_mcu_firmware_secure_boot_key_store",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "secure_boot_key_store",
+          "description": "secure boot key store",
+          "searchTerms": [
+            "secure boot key store",
+            "secure boot key store manufacturer part number",
+            "secure boot key store catalogue price GBP",
+            "secure boot key store datasheet",
+            "secure boot key store continuous glucose monitor",
+            "secure boot key store wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:22:battery_pouch_insulator",
+          "closureRowId": "bom-close:energy_storage_source_battery_cell_battery_pouch_insulator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_pouch_insulator",
+          "description": "battery pouch insulator",
+          "searchTerms": [
+            "battery pouch insulator",
+            "battery pouch insulator manufacturer part number",
+            "battery pouch insulator catalogue price GBP",
+            "battery pouch insulator datasheet",
+            "battery pouch insulator continuous glucose monitor",
+            "battery pouch insulator wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:23:battery_weld_tab",
+          "closureRowId": "bom-close:energy_storage_source_battery_cell_battery_weld_tab",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_weld_tab",
+          "description": "battery weld tab",
+          "searchTerms": [
+            "battery weld tab",
+            "battery weld tab manufacturer part number",
+            "battery weld tab catalogue price GBP",
+            "battery weld tab datasheet",
+            "battery weld tab continuous glucose monitor",
+            "battery weld tab wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:24:state_of_charge_witness_pad",
+          "closureRowId": "bom-close:energy_storage_source_battery_cell_state_of_charge_witness_pad",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "state_of_charge_witness_pad",
+          "description": "state-of-charge witness pad",
+          "searchTerms": [
+            "state-of-charge witness pad",
+            "state-of-charge witness pad manufacturer part number",
+            "state-of-charge witness pad catalogue price GBP",
+            "state-of-charge witness pad datasheet",
+            "state-of-charge witness pad continuous glucose monitor",
+            "state-of-charge witness pad wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:25:battery_lot_barcode",
+          "closureRowId": "bom-close:energy_storage_source_battery_safety_battery_lot_barcode",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_lot_barcode",
+          "description": "battery lot barcode",
+          "searchTerms": [
+            "battery lot barcode",
+            "battery lot barcode manufacturer part number",
+            "battery lot barcode catalogue price GBP",
+            "battery lot barcode datasheet",
+            "battery lot barcode continuous glucose monitor",
+            "battery lot barcode wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:26:battery_vent_clearance",
+          "closureRowId": "bom-close:energy_storage_source_battery_safety_battery_vent_clearance",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_vent_clearance",
+          "description": "battery vent clearance",
+          "searchTerms": [
+            "battery vent clearance",
+            "battery vent clearance manufacturer part number",
+            "battery vent clearance catalogue price GBP",
+            "battery vent clearance datasheet",
+            "battery vent clearance continuous glucose monitor",
+            "battery vent clearance wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:27:pack_temperature_dot",
+          "closureRowId": "bom-close:energy_storage_source_battery_safety_pack_temperature_dot",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pack_temperature_dot",
+          "description": "pack temperature dot",
+          "searchTerms": [
+            "pack temperature dot",
+            "pack temperature dot manufacturer part number",
+            "pack temperature dot catalogue price GBP",
+            "pack temperature dot datasheet",
+            "pack temperature dot continuous glucose monitor",
+            "pack temperature dot wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:28:reverse_polarity_fuse",
+          "closureRowId": "bom-close:energy_storage_source_battery_safety_reverse_polarity_fuse",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "reverse_polarity_fuse",
+          "description": "reverse polarity fuse",
+          "searchTerms": [
+            "reverse polarity fuse",
+            "reverse polarity fuse manufacturer part number",
+            "reverse polarity fuse catalogue price GBP",
+            "reverse polarity fuse datasheet",
+            "reverse polarity fuse continuous glucose monitor",
+            "reverse polarity fuse wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:29:activation_pull_strip",
+          "closureRowId": "bom-close:energy_storage_source_power_reserve_activation_pull_strip",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "activation_pull_strip",
+          "description": "activation pull strip",
+          "searchTerms": [
+            "activation pull strip",
+            "activation pull strip manufacturer part number",
+            "activation pull strip catalogue price GBP",
+            "activation pull strip datasheet",
+            "activation pull strip continuous glucose monitor",
+            "activation pull strip wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:30:battery_cut_off_tab",
+          "closureRowId": "bom-close:energy_storage_source_power_reserve_battery_cut_off_tab",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "battery_cut_off_tab",
+          "description": "battery cut-off tab",
+          "searchTerms": [
+            "battery cut-off tab",
+            "battery cut-off tab manufacturer part number",
+            "battery cut-off tab catalogue price GBP",
+            "battery cut-off tab datasheet",
+            "battery cut-off tab continuous glucose monitor",
+            "battery cut-off tab wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:31:brownout_hold_up_capacitor",
+          "closureRowId": "bom-close:energy_storage_source_power_reserve_brownout_hold_up_capacitor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "brownout_hold_up_capacitor",
+          "description": "brownout hold-up capacitor",
+          "searchTerms": [
+            "brownout hold-up capacitor",
+            "brownout hold-up capacitor manufacturer part number",
+            "brownout hold-up capacitor catalogue price GBP",
+            "brownout hold-up capacitor datasheet",
+            "brownout hold-up capacitor continuous glucose monitor",
+            "brownout hold-up capacitor wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:32:shelf_life_isolation_film",
+          "closureRowId": "bom-close:energy_storage_source_power_reserve_shelf_life_isolation_film",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "shelf_life_isolation_film",
+          "description": "shelf-life isolation film",
+          "searchTerms": [
+            "shelf-life isolation film",
+            "shelf-life isolation film manufacturer part number",
+            "shelf-life isolation film catalogue price GBP",
+            "shelf-life isolation film datasheet",
+            "shelf-life isolation film continuous glucose monitor",
+            "shelf-life isolation film wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:33:activity_context_accelerometer",
+          "closureRowId": "bom-close:environmental_interface_motion_pressure_activity_context_accelerometer",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "activity_context_accelerometer",
+          "description": "activity context accelerometer",
+          "searchTerms": [
+            "activity context accelerometer",
+            "activity context accelerometer manufacturer part number",
+            "activity context accelerometer catalogue price GBP",
+            "activity context accelerometer datasheet",
+            "activity context accelerometer continuous glucose monitor",
+            "activity context accelerometer wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:34:compression_warning_marker",
+          "closureRowId": "bom-close:environmental_interface_motion_pressure_compression_warning_marker",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "compression_warning_marker",
+          "description": "compression warning marker",
+          "searchTerms": [
+            "compression warning marker",
+            "compression warning marker manufacturer part number",
+            "compression warning marker catalogue price GBP",
+            "compression warning marker datasheet",
+            "compression warning marker continuous glucose monitor",
+            "compression warning marker wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:35:motion_artefact_filter_table",
+          "closureRowId": "bom-close:environmental_interface_motion_pressure_motion_artefact_filter_table",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "motion_artefact_filter_table",
+          "description": "motion artefact filter table",
+          "searchTerms": [
+            "motion artefact filter table",
+            "motion artefact filter table manufacturer part number",
+            "motion artefact filter table catalogue price GBP",
+            "motion artefact filter table datasheet",
+            "motion artefact filter table continuous glucose monitor",
+            "motion artefact filter table wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:36:patch_pressure_relief_slot",
+          "closureRowId": "bom-close:environmental_interface_motion_pressure_patch_pressure_relief_slot",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "patch_pressure_relief_slot",
+          "description": "patch pressure relief slot",
+          "searchTerms": [
+            "patch pressure relief slot",
+            "patch pressure relief slot manufacturer part number",
+            "patch pressure relief slot catalogue price GBP",
+            "patch pressure relief slot datasheet",
+            "patch pressure relief slot continuous glucose monitor",
+            "patch pressure relief slot wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:37:condensation_drain_groove",
+          "closureRowId": "bom-close:environmental_interface_sweat_water_boundary_condensation_drain_groove",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "condensation_drain_groove",
+          "description": "condensation drain groove",
+          "searchTerms": [
+            "condensation drain groove",
+            "condensation drain groove manufacturer part number",
+            "condensation drain groove catalogue price GBP",
+            "condensation drain groove datasheet",
+            "condensation drain groove continuous glucose monitor",
+            "condensation drain groove wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:38:humidity_indicator_dot",
+          "closureRowId": "bom-close:environmental_interface_sweat_water_boundary_humidity_indicator_dot",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "humidity_indicator_dot",
+          "description": "humidity indicator dot",
+          "searchTerms": [
+            "humidity indicator dot",
+            "humidity indicator dot manufacturer part number",
+            "humidity indicator dot catalogue price GBP",
+            "humidity indicator dot datasheet",
+            "humidity indicator dot continuous glucose monitor",
+            "humidity indicator dot wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:39:ingress_exposure_witness",
+          "closureRowId": "bom-close:environmental_interface_sweat_water_boundary_ingress_exposure_witness",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ingress_exposure_witness",
+          "description": "ingress exposure witness",
+          "searchTerms": [
+            "ingress exposure witness",
+            "ingress exposure witness manufacturer part number",
+            "ingress exposure witness catalogue price GBP",
+            "ingress exposure witness datasheet",
+            "ingress exposure witness continuous glucose monitor",
+            "ingress exposure witness wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:40:sweat_barrier_film",
+          "closureRowId": "bom-close:environmental_interface_sweat_water_boundary_sweat_barrier_film",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sweat_barrier_film",
+          "description": "sweat barrier film",
+          "searchTerms": [
+            "sweat barrier film",
+            "sweat barrier film manufacturer part number",
+            "sweat barrier film catalogue price GBP",
+            "sweat barrier film datasheet",
+            "sweat barrier film continuous glucose monitor",
+            "sweat barrier film wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:41:cold_start_delay_flag",
+          "closureRowId": "bom-close:environmental_interface_temperature_compensation_cold_start_delay_flag",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "cold_start_delay_flag",
+          "description": "cold-start delay flag",
+          "searchTerms": [
+            "cold-start delay flag",
+            "cold-start delay flag manufacturer part number",
+            "cold-start delay flag catalogue price GBP",
+            "cold-start delay flag datasheet",
+            "cold-start delay flag continuous glucose monitor",
+            "cold-start delay flag wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:42:skin_temperature_flex_tail",
+          "closureRowId": "bom-close:environmental_interface_temperature_compensation_skin_temperature_flex_tail",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "skin_temperature_flex_tail",
+          "description": "skin temperature flex tail",
+          "searchTerms": [
+            "skin temperature flex tail",
+            "skin temperature flex tail manufacturer part number",
+            "skin temperature flex tail catalogue price GBP",
+            "skin temperature flex tail datasheet",
+            "skin temperature flex tail continuous glucose monitor",
+            "skin temperature flex tail wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:43:thermal_model_table",
+          "closureRowId": "bom-close:environmental_interface_temperature_compensation_thermal_model_table",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "thermal_model_table",
+          "description": "thermal model table",
+          "searchTerms": [
+            "thermal model table",
+            "thermal model table manufacturer part number",
+            "thermal model table catalogue price GBP",
+            "thermal model table datasheet",
+            "thermal model table continuous glucose monitor",
+            "thermal model table wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:44:ifu_leaflet",
+          "closureRowId": "bom-close:maintenance_serviceability_lot_traceability_ifu_leaflet",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ifu_leaflet",
+          "description": "IFU leaflet",
+          "searchTerms": [
+            "IFU leaflet",
+            "IFU leaflet manufacturer part number",
+            "IFU leaflet catalogue price GBP",
+            "IFU leaflet datasheet",
+            "IFU leaflet continuous glucose monitor",
+            "IFU leaflet wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:45:lot_traceability_barcode",
+          "closureRowId": "bom-close:maintenance_serviceability_lot_traceability_lot_traceability_barcode",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lot_traceability_barcode",
+          "description": "lot traceability barcode",
+          "searchTerms": [
+            "lot traceability barcode",
+            "lot traceability barcode manufacturer part number",
+            "lot traceability barcode catalogue price GBP",
+            "lot traceability barcode datasheet",
+            "lot traceability barcode continuous glucose monitor",
+            "lot traceability barcode wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:46:release_inspection_stamp",
+          "closureRowId": "bom-close:maintenance_serviceability_lot_traceability_release_inspection_stamp",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "release_inspection_stamp",
+          "description": "release inspection stamp",
+          "searchTerms": [
+            "release inspection stamp",
+            "release inspection stamp manufacturer part number",
+            "release inspection stamp catalogue price GBP",
+            "release inspection stamp datasheet",
+            "release inspection stamp continuous glucose monitor",
+            "release inspection stamp wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:47:desiccant_sachet",
+          "closureRowId": "bom-close:maintenance_serviceability_sterile_packaging_desiccant_sachet",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "desiccant_sachet",
+          "description": "desiccant sachet",
+          "searchTerms": [
+            "desiccant sachet",
+            "desiccant sachet manufacturer part number",
+            "desiccant sachet catalogue price GBP",
+            "desiccant sachet datasheet",
+            "desiccant sachet continuous glucose monitor",
+            "desiccant sachet wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:48:expiry_date_label",
+          "closureRowId": "bom-close:maintenance_serviceability_sterile_packaging_expiry_date_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "expiry_date_label",
+          "description": "expiry date label",
+          "searchTerms": [
+            "expiry date label",
+            "expiry date label manufacturer part number",
+            "expiry date label catalogue price GBP",
+            "expiry date label datasheet",
+            "expiry date label continuous glucose monitor",
+            "expiry date label wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:49:pouch_seal_indicator",
+          "closureRowId": "bom-close:maintenance_serviceability_sterile_packaging_pouch_seal_indicator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pouch_seal_indicator",
+          "description": "pouch seal indicator",
+          "searchTerms": [
+            "pouch seal indicator",
+            "pouch seal indicator manufacturer part number",
+            "pouch seal indicator catalogue price GBP",
+            "pouch seal indicator datasheet",
+            "pouch seal indicator continuous glucose monitor",
+            "pouch seal indicator wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:50:adhesive_removal_wipe",
+          "closureRowId": "bom-close:maintenance_serviceability_user_setup_adhesive_removal_wipe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "adhesive_removal_wipe",
+          "description": "adhesive removal wipe",
+          "searchTerms": [
+            "adhesive removal wipe",
+            "adhesive removal wipe manufacturer part number",
+            "adhesive removal wipe catalogue price GBP",
+            "adhesive removal wipe datasheet",
+            "adhesive removal wipe continuous glucose monitor",
+            "adhesive removal wipe wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:51:applicator_instruction_card",
+          "closureRowId": "bom-close:maintenance_serviceability_user_setup_applicator_instruction_card",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "applicator_instruction_card",
+          "description": "applicator instruction card",
+          "searchTerms": [
+            "applicator instruction card",
+            "applicator instruction card manufacturer part number",
+            "applicator instruction card catalogue price GBP",
+            "applicator instruction card datasheet",
+            "applicator instruction card continuous glucose monitor",
+            "applicator instruction card wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:52:phone_pairing_qr_card",
+          "closureRowId": "bom-close:maintenance_serviceability_user_setup_phone_pairing_qr_card",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "phone_pairing_qr_card",
+          "description": "phone pairing QR card",
+          "searchTerms": [
+            "phone pairing QR card",
+            "phone pairing QR card manufacturer part number",
+            "phone pairing QR card catalogue price GBP",
+            "phone pairing QR card datasheet",
+            "phone pairing QR card continuous glucose monitor",
+            "phone pairing QR card wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:53:sensor_warm_up_timer_label",
+          "closureRowId": "bom-close:maintenance_serviceability_user_setup_sensor_warm_up_timer_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sensor_warm_up_timer_label",
+          "description": "sensor warm-up timer label",
+          "searchTerms": [
+            "sensor warm-up timer label",
+            "sensor warm-up timer label manufacturer part number",
+            "sensor warm-up timer label catalogue price GBP",
+            "sensor warm-up timer label datasheet",
+            "sensor warm-up timer label continuous glucose monitor",
+            "sensor warm-up timer label wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:54:afe_wake_timer",
+          "closureRowId": "bom-close:power_distribution_analog_excitation_afe_wake_timer",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "afe_wake_timer",
+          "description": "AFE wake timer",
+          "searchTerms": [
+            "AFE wake timer",
+            "AFE wake timer manufacturer part number",
+            "AFE wake timer catalogue price GBP",
+            "AFE wake timer datasheet",
+            "AFE wake timer continuous glucose monitor",
+            "AFE wake timer wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:55:analog_power_filter",
+          "closureRowId": "bom-close:power_distribution_analog_excitation_analog_power_filter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "analog_power_filter",
+          "description": "analog power filter",
+          "searchTerms": [
+            "analog power filter",
+            "analog power filter manufacturer part number",
+            "analog power filter catalogue price GBP",
+            "analog power filter datasheet",
+            "analog power filter continuous glucose monitor",
+            "analog power filter wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:56:electrode_guard_driver",
+          "closureRowId": "bom-close:power_distribution_analog_excitation_electrode_guard_driver",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "electrode_guard_driver",
+          "description": "electrode guard driver",
+          "searchTerms": [
+            "electrode guard driver",
+            "electrode guard driver manufacturer part number",
+            "electrode guard driver catalogue price GBP",
+            "electrode guard driver datasheet",
+            "electrode guard driver continuous glucose monitor",
+            "electrode guard driver wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:57:sensor_excitation_mux",
+          "closureRowId": "bom-close:power_distribution_analog_excitation_sensor_excitation_mux",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sensor_excitation_mux",
+          "description": "sensor excitation mux",
+          "searchTerms": [
+            "sensor excitation mux",
+            "sensor excitation mux manufacturer part number",
+            "sensor excitation mux catalogue price GBP",
+            "sensor excitation mux datasheet",
+            "sensor excitation mux continuous glucose monitor",
+            "sensor excitation mux wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:58:digital_buck_regulator",
+          "closureRowId": "bom-close:power_distribution_low_power_rails_digital_buck_regulator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "digital_buck_regulator",
+          "description": "digital buck regulator",
+          "searchTerms": [
+            "digital buck regulator",
+            "digital buck regulator manufacturer part number",
+            "digital buck regulator catalogue price GBP",
+            "digital buck regulator datasheet",
+            "digital buck regulator continuous glucose monitor",
+            "digital buck regulator wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:59:nanoamp_power_switch",
+          "closureRowId": "bom-close:power_distribution_low_power_rails_nanoamp_power_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "nanoamp_power_switch",
+          "description": "nanoamp power switch",
+          "searchTerms": [
+            "nanoamp power switch",
+            "nanoamp power switch manufacturer part number",
+            "nanoamp power switch catalogue price GBP",
+            "nanoamp power switch datasheet",
+            "nanoamp power switch continuous glucose monitor",
+            "nanoamp power switch wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:60:rail_measurement_divider",
+          "closureRowId": "bom-close:power_distribution_low_power_rails_rail_measurement_divider",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "rail_measurement_divider",
+          "description": "rail measurement divider",
+          "searchTerms": [
+            "rail measurement divider",
+            "rail measurement divider manufacturer part number",
+            "rail measurement divider catalogue price GBP",
+            "rail measurement divider datasheet",
+            "rail measurement divider continuous glucose monitor",
+            "rail measurement divider wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:61:wake_timer_oscillator",
+          "closureRowId": "bom-close:power_distribution_low_power_rails_wake_timer_oscillator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "wake_timer_oscillator",
+          "description": "wake timer oscillator",
+          "searchTerms": [
+            "wake timer oscillator",
+            "wake timer oscillator manufacturer part number",
+            "wake timer oscillator catalogue price GBP",
+            "wake timer oscillator datasheet",
+            "wake timer oscillator continuous glucose monitor",
+            "wake timer oscillator wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:62:fault_latch",
+          "closureRowId": "bom-close:power_distribution_power_fault_handling_fault_latch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fault_latch",
+          "description": "fault latch",
+          "searchTerms": [
+            "fault latch",
+            "fault latch manufacturer part number",
+            "fault latch catalogue price GBP",
+            "fault latch datasheet",
+            "fault latch continuous glucose monitor",
+            "fault latch wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:63:hardwired_reset_supervisor",
+          "closureRowId": "bom-close:power_distribution_power_fault_handling_hardwired_reset_supervisor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hardwired_reset_supervisor",
+          "description": "hardwired reset supervisor",
+          "searchTerms": [
+            "hardwired reset supervisor",
+            "hardwired reset supervisor manufacturer part number",
+            "hardwired reset supervisor catalogue price GBP",
+            "hardwired reset supervisor datasheet",
+            "hardwired reset supervisor continuous glucose monitor",
+            "hardwired reset supervisor wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:64:load_gate_transistor",
+          "closureRowId": "bom-close:power_distribution_power_fault_handling_load_gate_transistor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "load_gate_transistor",
+          "description": "load gate transistor",
+          "searchTerms": [
+            "load gate transistor",
+            "load gate transistor manufacturer part number",
+            "load gate transistor catalogue price GBP",
+            "load gate transistor datasheet",
+            "load gate transistor continuous glucose monitor",
+            "load gate transistor wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:65:overcurrent_limiter",
+          "closureRowId": "bom-close:power_distribution_power_fault_handling_overcurrent_limiter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "overcurrent_limiter",
+          "description": "overcurrent limiter",
+          "searchTerms": [
+            "overcurrent limiter",
+            "overcurrent limiter manufacturer part number",
+            "overcurrent limiter catalogue price GBP",
+            "overcurrent limiter datasheet",
+            "overcurrent limiter continuous glucose monitor",
+            "overcurrent limiter wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:66:adhesive_irritation_limit_tag",
+          "closureRowId": "bom-close:safety_protection_biocompatibility_controls_adhesive_irritation_limit_tag",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "adhesive_irritation_limit_tag",
+          "description": "adhesive irritation limit tag",
+          "searchTerms": [
+            "adhesive irritation limit tag",
+            "adhesive irritation limit tag manufacturer part number",
+            "adhesive irritation limit tag catalogue price GBP",
+            "adhesive irritation limit tag datasheet",
+            "adhesive irritation limit tag continuous glucose monitor",
+            "adhesive irritation limit tag wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:67:biocompatibility_material_record",
+          "closureRowId": "bom-close:safety_protection_biocompatibility_controls_biocompatibility_material_record",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "biocompatibility_material_record",
+          "description": "biocompatibility material record",
+          "searchTerms": [
+            "biocompatibility material record",
+            "biocompatibility material record manufacturer part number",
+            "biocompatibility material record catalogue price GBP",
+            "biocompatibility material record datasheet",
+            "biocompatibility material record continuous glucose monitor",
+            "biocompatibility material record wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:68:latex_free_label",
+          "closureRowId": "bom-close:safety_protection_biocompatibility_controls_latex_free_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "latex_free_label",
+          "description": "latex-free label",
+          "searchTerms": [
+            "latex-free label",
+            "latex-free label manufacturer part number",
+            "latex-free label catalogue price GBP",
+            "latex-free label datasheet",
+            "latex-free label continuous glucose monitor",
+            "latex-free label wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:69:skin_contact_change_log",
+          "closureRowId": "bom-close:safety_protection_biocompatibility_controls_skin_contact_change_log",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "skin_contact_change_log",
+          "description": "skin-contact change log",
+          "searchTerms": [
+            "skin-contact change log",
+            "skin-contact change log manufacturer part number",
+            "skin-contact change log catalogue price GBP",
+            "skin-contact change log datasheet",
+            "skin-contact change log continuous glucose monitor",
+            "skin-contact change log wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:70:hyperglycaemia_alarm_state",
+          "closureRowId": "bom-close:safety_protection_patient_alarm_logic_hyperglycaemia_alarm_state",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hyperglycaemia_alarm_state",
+          "description": "hyperglycaemia alarm state",
+          "searchTerms": [
+            "hyperglycaemia alarm state",
+            "hyperglycaemia alarm state manufacturer part number",
+            "hyperglycaemia alarm state catalogue price GBP",
+            "hyperglycaemia alarm state datasheet",
+            "hyperglycaemia alarm state continuous glucose monitor",
+            "hyperglycaemia alarm state wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:71:hypoglycaemia_alarm_state",
+          "closureRowId": "bom-close:safety_protection_patient_alarm_logic_hypoglycaemia_alarm_state",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hypoglycaemia_alarm_state",
+          "description": "hypoglycaemia alarm state",
+          "searchTerms": [
+            "hypoglycaemia alarm state",
+            "hypoglycaemia alarm state manufacturer part number",
+            "hypoglycaemia alarm state catalogue price GBP",
+            "hypoglycaemia alarm state datasheet",
+            "hypoglycaemia alarm state continuous glucose monitor",
+            "hypoglycaemia alarm state wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:72:sensor_fault_classifier",
+          "closureRowId": "bom-close:safety_protection_patient_alarm_logic_sensor_fault_classifier",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sensor_fault_classifier",
+          "description": "sensor fault classifier",
+          "searchTerms": [
+            "sensor fault classifier",
+            "sensor fault classifier manufacturer part number",
+            "sensor fault classifier catalogue price GBP",
+            "sensor fault classifier datasheet",
+            "sensor fault classifier continuous glucose monitor",
+            "sensor fault classifier wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:73:stale_data_lockout",
+          "closureRowId": "bom-close:safety_protection_patient_alarm_logic_stale_data_lockout",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "stale_data_lockout",
+          "description": "stale data lockout",
+          "searchTerms": [
+            "stale data lockout",
+            "stale data lockout manufacturer part number",
+            "stale data lockout catalogue price GBP",
+            "stale data lockout datasheet",
+            "stale data lockout continuous glucose monitor",
+            "stale data lockout wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:74:applicator_disposal_instruction",
+          "closureRowId": "bom-close:safety_protection_sterile_sharps_safety_applicator_disposal_instruction",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "applicator_disposal_instruction",
+          "description": "applicator disposal instruction",
+          "searchTerms": [
+            "applicator disposal instruction",
+            "applicator disposal instruction manufacturer part number",
+            "applicator disposal instruction catalogue price GBP",
+            "applicator disposal instruction datasheet",
+            "applicator disposal instruction continuous glucose monitor",
+            "applicator disposal instruction wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:75:sharps_injury_warning_label",
+          "closureRowId": "bom-close:safety_protection_sterile_sharps_safety_sharps_injury_warning_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sharps_injury_warning_label",
+          "description": "sharps injury warning label",
+          "searchTerms": [
+            "sharps injury warning label",
+            "sharps injury warning label manufacturer part number",
+            "sharps injury warning label catalogue price GBP",
+            "sharps injury warning label datasheet",
+            "sharps injury warning label continuous glucose monitor",
+            "sharps injury warning label wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:76:sterile_boundary_indicator",
+          "closureRowId": "bom-close:safety_protection_sterile_sharps_safety_sterile_boundary_indicator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sterile_boundary_indicator",
+          "description": "sterile boundary indicator",
+          "searchTerms": [
+            "sterile boundary indicator",
+            "sterile boundary indicator manufacturer part number",
+            "sterile boundary indicator catalogue price GBP",
+            "sterile boundary indicator datasheet",
+            "sterile boundary indicator continuous glucose monitor",
+            "sterile boundary indicator wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:77:tamper_evident_seal",
+          "closureRowId": "bom-close:safety_protection_sterile_sharps_safety_tamper_evident_seal",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "tamper_evident_seal",
+          "description": "tamper evident seal",
+          "searchTerms": [
+            "tamper evident seal",
+            "tamper evident seal manufacturer part number",
+            "tamper evident seal catalogue price GBP",
+            "tamper evident seal datasheet",
+            "tamper evident seal continuous glucose monitor",
+            "tamper evident seal wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:78:electrode_flex_tail",
+          "closureRowId": "bom-close:sensing_instrumentation_analog_front_end_electrode_flex_tail",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "electrode_flex_tail",
+          "description": "electrode flex tail",
+          "searchTerms": [
+            "electrode flex tail",
+            "electrode flex tail manufacturer part number",
+            "electrode flex tail catalogue price GBP",
+            "electrode flex tail datasheet",
+            "electrode flex tail continuous glucose monitor",
+            "electrode flex tail wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:79:low_leakage_input_guard",
+          "closureRowId": "bom-close:sensing_instrumentation_analog_front_end_low_leakage_input_guard",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "low_leakage_input_guard",
+          "description": "low-leakage input guard",
+          "searchTerms": [
+            "low-leakage input guard",
+            "low-leakage input guard manufacturer part number",
+            "low-leakage input guard catalogue price GBP",
+            "low-leakage input guard datasheet",
+            "low-leakage input guard continuous glucose monitor",
+            "low-leakage input guard wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:80:potentiostat_afe",
+          "closureRowId": "bom-close:sensing_instrumentation_analog_front_end_potentiostat_afe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "potentiostat_afe",
+          "description": "potentiostat AFE",
+          "searchTerms": [
+            "potentiostat AFE",
+            "potentiostat AFE manufacturer part number",
+            "potentiostat AFE catalogue price GBP",
+            "potentiostat AFE datasheet",
+            "potentiostat AFE continuous glucose monitor",
+            "potentiostat AFE wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:81:sensor_bias_resistor_network",
+          "closureRowId": "bom-close:sensing_instrumentation_analog_front_end_sensor_bias_resistor_network",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sensor_bias_resistor_network",
+          "description": "sensor bias resistor network",
+          "searchTerms": [
+            "sensor bias resistor network",
+            "sensor bias resistor network manufacturer part number",
+            "sensor bias resistor network catalogue price GBP",
+            "sensor bias resistor network datasheet",
+            "sensor bias resistor network continuous glucose monitor",
+            "sensor bias resistor network wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:82:calibration_data_eeprom",
+          "closureRowId": "bom-close:sensing_instrumentation_calibration_drift_monitoring_calibration_data_eeprom",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "calibration_data_eeprom",
+          "description": "calibration data EEPROM",
+          "searchTerms": [
+            "calibration data EEPROM",
+            "calibration data EEPROM manufacturer part number",
+            "calibration data EEPROM catalogue price GBP",
+            "calibration data EEPROM datasheet",
+            "calibration data EEPROM continuous glucose monitor",
+            "calibration data EEPROM wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:83:drift_estimator_firmware_table",
+          "closureRowId": "bom-close:sensing_instrumentation_calibration_drift_monitoring_drift_estimator_firmware_table",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "drift_estimator_firmware_table",
+          "description": "drift estimator firmware table",
+          "searchTerms": [
+            "drift estimator firmware table",
+            "drift estimator firmware table manufacturer part number",
+            "drift estimator firmware table catalogue price GBP",
+            "drift estimator firmware table datasheet",
+            "drift estimator firmware table continuous glucose monitor",
+            "drift estimator firmware table wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:84:factory_calibration_code",
+          "closureRowId": "bom-close:sensing_instrumentation_calibration_drift_monitoring_factory_calibration_code",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "factory_calibration_code",
+          "description": "factory calibration code",
+          "searchTerms": [
+            "factory calibration code",
+            "factory calibration code manufacturer part number",
+            "factory calibration code catalogue price GBP",
+            "factory calibration code datasheet",
+            "factory calibration code continuous glucose monitor",
+            "factory calibration code wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:85:signal_integrity_test_pad",
+          "closureRowId": "bom-close:sensing_instrumentation_calibration_drift_monitoring_signal_integrity_test_pad",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "signal_integrity_test_pad",
+          "description": "signal integrity test pad",
+          "searchTerms": [
+            "signal integrity test pad",
+            "signal integrity test pad manufacturer part number",
+            "signal integrity test pad catalogue price GBP",
+            "signal integrity test pad datasheet",
+            "signal integrity test pad continuous glucose monitor",
+            "signal integrity test pad wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:86:diffusion_limiting_membrane",
+          "closureRowId": "bom-close:sensing_instrumentation_glucose_filament_stack_diffusion_limiting_membrane",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "diffusion_limiting_membrane",
+          "description": "diffusion limiting membrane",
+          "searchTerms": [
+            "diffusion limiting membrane",
+            "diffusion limiting membrane manufacturer part number",
+            "diffusion limiting membrane catalogue price GBP",
+            "diffusion limiting membrane datasheet",
+            "diffusion limiting membrane continuous glucose monitor",
+            "diffusion limiting membrane wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:87:breathable_backing_film",
+          "closureRowId": "bom-close:skin_patient_interface_adhesive_patch_stack_breathable_backing_film",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "breathable_backing_film",
+          "description": "breathable backing film",
+          "searchTerms": [
+            "breathable backing film",
+            "breathable backing film manufacturer part number",
+            "breathable backing film catalogue price GBP",
+            "breathable backing film datasheet",
+            "breathable backing film continuous glucose monitor",
+            "breathable backing film wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:88:hydrocolloid_edge_seal",
+          "closureRowId": "bom-close:skin_patient_interface_adhesive_patch_stack_hydrocolloid_edge_seal",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hydrocolloid_edge_seal",
+          "description": "hydrocolloid edge seal",
+          "searchTerms": [
+            "hydrocolloid edge seal",
+            "hydrocolloid edge seal manufacturer part number",
+            "hydrocolloid edge seal catalogue price GBP",
+            "hydrocolloid edge seal datasheet",
+            "hydrocolloid edge seal continuous glucose monitor",
+            "hydrocolloid edge seal wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:89:pull_tab_liner",
+          "closureRowId": "bom-close:skin_patient_interface_adhesive_patch_stack_pull_tab_liner",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pull_tab_liner",
+          "description": "pull tab liner",
+          "searchTerms": [
+            "pull tab liner",
+            "pull tab liner manufacturer part number",
+            "pull tab liner catalogue price GBP",
+            "pull tab liner datasheet",
+            "pull tab liner continuous glucose monitor",
+            "pull tab liner wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:90:antimicrobial_contact_pad",
+          "closureRowId": "bom-close:skin_patient_interface_cannula_skin_contact_antimicrobial_contact_pad",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "antimicrobial_contact_pad",
+          "description": "antimicrobial contact pad",
+          "searchTerms": [
+            "antimicrobial contact pad",
+            "antimicrobial contact pad manufacturer part number",
+            "antimicrobial contact pad catalogue price GBP",
+            "antimicrobial contact pad datasheet",
+            "antimicrobial contact pad continuous glucose monitor",
+            "antimicrobial contact pad wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:91:filament_entry_seal",
+          "closureRowId": "bom-close:skin_patient_interface_cannula_skin_contact_filament_entry_seal",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "filament_entry_seal",
+          "description": "filament entry seal",
+          "searchTerms": [
+            "filament entry seal",
+            "filament entry seal manufacturer part number",
+            "filament entry seal catalogue price GBP",
+            "filament entry seal datasheet",
+            "filament entry seal continuous glucose monitor",
+            "filament entry seal wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:92:insertion_site_spacing_ring",
+          "closureRowId": "bom-close:skin_patient_interface_cannula_skin_contact_insertion_site_spacing_ring",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "insertion_site_spacing_ring",
+          "description": "insertion site spacing ring",
+          "searchTerms": [
+            "insertion site spacing ring",
+            "insertion site spacing ring manufacturer part number",
+            "insertion site spacing ring catalogue price GBP",
+            "insertion site spacing ring datasheet",
+            "insertion site spacing ring continuous glucose monitor",
+            "insertion site spacing ring wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:93:skin_contact_gasket",
+          "closureRowId": "bom-close:skin_patient_interface_cannula_skin_contact_skin_contact_gasket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "skin_contact_gasket",
+          "description": "skin contact gasket",
+          "searchTerms": [
+            "skin contact gasket",
+            "skin contact gasket manufacturer part number",
+            "skin contact gasket catalogue price GBP",
+            "skin contact gasket datasheet",
+            "skin contact gasket continuous glucose monitor",
+            "skin contact gasket wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:94:flex_relief_bridge",
+          "closureRowId": "bom-close:skin_patient_interface_wear_comfort_retention_flex_relief_bridge",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "flex_relief_bridge",
+          "description": "flex relief bridge",
+          "searchTerms": [
+            "flex relief bridge",
+            "flex relief bridge manufacturer part number",
+            "flex relief bridge catalogue price GBP",
+            "flex relief bridge datasheet",
+            "flex relief bridge continuous glucose monitor",
+            "flex relief bridge wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:95:patch_stretch_zone",
+          "closureRowId": "bom-close:skin_patient_interface_wear_comfort_retention_patch_stretch_zone",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "patch_stretch_zone",
+          "description": "patch stretch zone",
+          "searchTerms": [
+            "patch stretch zone",
+            "patch stretch zone manufacturer part number",
+            "patch stretch zone catalogue price GBP",
+            "patch stretch zone datasheet",
+            "patch stretch zone continuous glucose monitor",
+            "patch stretch zone wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:96:removal_aid_tab",
+          "closureRowId": "bom-close:skin_patient_interface_wear_comfort_retention_removal_aid_tab",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "removal_aid_tab",
+          "description": "removal aid tab",
+          "searchTerms": [
+            "removal aid tab",
+            "removal aid tab manufacturer part number",
+            "removal aid tab catalogue price GBP",
+            "removal aid tab datasheet",
+            "removal aid tab continuous glucose monitor",
+            "removal aid tab wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:97:sweat_channel_texture",
+          "closureRowId": "bom-close:skin_patient_interface_wear_comfort_retention_sweat_channel_texture",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sweat_channel_texture",
+          "description": "sweat channel texture",
+          "searchTerms": [
+            "sweat channel texture",
+            "sweat channel texture manufacturer part number",
+            "sweat channel texture catalogue price GBP",
+            "sweat channel texture datasheet",
+            "sweat channel texture continuous glucose monitor",
+            "sweat channel texture wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:98:housing_serial_marking",
+          "closureRowId": "bom-close:structure_containment_ingress_boundary_housing_serial_marking",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "housing_serial_marking",
+          "description": "housing serial marking",
+          "searchTerms": [
+            "housing serial marking",
+            "housing serial marking manufacturer part number",
+            "housing serial marking catalogue price GBP",
+            "housing serial marking datasheet",
+            "housing serial marking continuous glucose monitor",
+            "housing serial marking wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:99:hydrophobic_vent_membrane",
+          "closureRowId": "bom-close:structure_containment_ingress_boundary_hydrophobic_vent_membrane",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hydrophobic_vent_membrane",
+          "description": "hydrophobic vent membrane",
+          "searchTerms": [
+            "hydrophobic vent membrane",
+            "hydrophobic vent membrane manufacturer part number",
+            "hydrophobic vent membrane catalogue price GBP",
+            "hydrophobic vent membrane datasheet",
+            "hydrophobic vent membrane continuous glucose monitor",
+            "hydrophobic vent membrane wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:100:ip_ingress_seal",
+          "closureRowId": "bom-close:structure_containment_ingress_boundary_ip_ingress_seal",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ip_ingress_seal",
+          "description": "IP ingress seal",
+          "searchTerms": [
+            "IP ingress seal",
+            "IP ingress seal manufacturer part number",
+            "IP ingress seal catalogue price GBP",
+            "IP ingress seal datasheet",
+            "IP ingress seal continuous glucose monitor",
+            "IP ingress seal wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:101:splash_shield_lip",
+          "closureRowId": "bom-close:structure_containment_ingress_boundary_splash_shield_lip",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "splash_shield_lip",
+          "description": "splash shield lip",
+          "searchTerms": [
+            "splash shield lip",
+            "splash shield lip manufacturer part number",
+            "splash shield lip catalogue price GBP",
+            "splash shield lip datasheet",
+            "splash shield lip continuous glucose monitor",
+            "splash shield lip wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:102:flexible_patch_frame",
+          "closureRowId": "bom-close:structure_containment_patch_mechanical_frame_flexible_patch_frame",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "flexible_patch_frame",
+          "description": "flexible patch frame",
+          "searchTerms": [
+            "flexible patch frame",
+            "flexible patch frame manufacturer part number",
+            "flexible patch frame catalogue price GBP",
+            "flexible patch frame datasheet",
+            "flexible patch frame continuous glucose monitor",
+            "flexible patch frame wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:103:sensor_port_boss",
+          "closureRowId": "bom-close:structure_containment_patch_mechanical_frame_sensor_port_boss",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sensor_port_boss",
+          "description": "sensor port boss",
+          "searchTerms": [
+            "sensor port boss",
+            "sensor port boss manufacturer part number",
+            "sensor port boss catalogue price GBP",
+            "sensor port boss datasheet",
+            "sensor port boss continuous glucose monitor",
+            "sensor port boss wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:104:strain_relief_web",
+          "closureRowId": "bom-close:structure_containment_patch_mechanical_frame_strain_relief_web",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "strain_relief_web",
+          "description": "strain relief web",
+          "searchTerms": [
+            "strain relief web",
+            "strain relief web manufacturer part number",
+            "strain relief web catalogue price GBP",
+            "strain relief web datasheet",
+            "strain relief web continuous glucose monitor",
+            "strain relief web wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:105:transmitter_latch_rail",
+          "closureRowId": "bom-close:structure_containment_patch_mechanical_frame_transmitter_latch_rail",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "transmitter_latch_rail",
+          "description": "transmitter latch rail",
+          "searchTerms": [
+            "transmitter latch rail",
+            "transmitter latch rail manufacturer part number",
+            "transmitter latch rail catalogue price GBP",
+            "transmitter latch rail datasheet",
+            "transmitter latch rail continuous glucose monitor",
+            "transmitter latch rail wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:106:electronics_carrier_tray",
+          "closureRowId": "bom-close:structure_containment_transmitter_housing_electronics_carrier_tray",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "electronics_carrier_tray",
+          "description": "electronics carrier tray",
+          "searchTerms": [
+            "electronics carrier tray",
+            "electronics carrier tray manufacturer part number",
+            "electronics carrier tray catalogue price GBP",
+            "electronics carrier tray datasheet",
+            "electronics carrier tray continuous glucose monitor",
+            "electronics carrier tray wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:107:ingress_gasket",
+          "closureRowId": "bom-close:structure_containment_transmitter_housing_ingress_gasket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ingress_gasket",
+          "description": "ingress gasket",
+          "searchTerms": [
+            "ingress gasket",
+            "ingress gasket manufacturer part number",
+            "ingress gasket catalogue price GBP",
+            "ingress gasket datasheet",
+            "ingress gasket continuous glucose monitor",
+            "ingress gasket wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:108:ultrasonic_weld_seam",
+          "closureRowId": "bom-close:structure_containment_transmitter_housing_ultrasonic_weld_seam",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ultrasonic_weld_seam",
+          "description": "ultrasonic weld seam",
+          "searchTerms": [
+            "ultrasonic weld seam",
+            "ultrasonic weld seam manufacturer part number",
+            "ultrasonic weld seam catalogue price GBP",
+            "ultrasonic weld seam datasheet",
+            "ultrasonic weld seam continuous glucose monitor",
+            "ultrasonic weld seam wearable medical device"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        }
+      ]
+    }
+  ]
+}

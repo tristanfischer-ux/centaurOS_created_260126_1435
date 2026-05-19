@@ -1,0 +1,42 @@
+{
+  "verdict": "protocol_source_only",
+  "summary": {
+    "rows": 1,
+    "passRows": 0,
+    "reviewRows": 1,
+    "blockedRows": 0,
+    "passRatio": 0,
+    "candidateExternalUrlRows": 0,
+    "placeholderUrlRows": 0,
+    "protocolFixtureRows": 1,
+    "localOrInternalRows": 0,
+    "unknownReferenceRows": 0,
+    "httpsRows": 0,
+    "completeMetadataRows": 1,
+    "quoteAnchoredRows": 0,
+    "freshTimestampRows": 1
+  },
+  "rows": [
+    {
+      "id": "source-quality:1:lfp_prismatic_cells",
+      "componentWordId": "lfp_prismatic_cells",
+      "supplierName": "Protocol CSV Supplier",
+      "manufacturer": "Protocol CSV Manufacturer",
+      "mpn": "PROTOCOL-CSV-NOT-A-REAL-PART",
+      "ref": "test-fixture://csv-sourcing/lfp_prismatic_cells",
+      "referenceClass": "protocol_fixture",
+      "status": "review",
+      "hasHttps": false,
+      "hasCompleteMetadata": true,
+      "quoteAnchoredToManufacturerOrMpn": false,
+      "timestampFresh": true,
+      "sourceGrade": "priced",
+      "issues": [],
+      "requiredAction": "Replace protocol fixture with a retrievable supplier/catalogue URL before production costing."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Replace protocol fixture with a retrievable supplier/catalogue URL before production costing."
+  ]
+}

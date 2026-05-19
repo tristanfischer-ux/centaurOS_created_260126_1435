@@ -1,0 +1,47 @@
+{
+  "summary": {
+    "rows": 2,
+    "withinEnvelope": 1,
+    "needsReview": 1,
+    "outsideEnvelope": 0,
+    "blocked": 0
+  },
+  "rows": [
+    {
+      "id": "ev_charger_800v_current_a",
+      "status": "within_envelope",
+      "label": "EV charger current at 800 V",
+      "formula": "(dc_power_kw * 1,000) / 800",
+      "inputs": {
+        "dc_power_kw": 120,
+        "assumed_voltage_v": 800
+      },
+      "result": 150,
+      "unit": "A",
+      "envelope": "<=500 A is a broad liquid-cooled CCS concept envelope before connector and cable proof.",
+      "interpretation": "150 A at an assumed 800 V output point.",
+      "evidenceRequired": "Confirm output voltage range, cable thermal rating, connector current limit, contactor rating and derating.",
+      "linkedRequirements": [
+        "dc_power_kw"
+      ]
+    },
+    {
+      "id": "ev_charger_daily_full_power_energy_kwh",
+      "status": "needs_review",
+      "label": "EV charger daily full-power energy",
+      "formula": "dc_power_kw * 4",
+      "inputs": {
+        "dc_power_kw": 120,
+        "equivalent_full_power_hours_per_day": 4
+      },
+      "result": 480,
+      "unit": "kWh/day",
+      "envelope": "Utilisation assumption only; revenue and thermal duty need site-specific evidence.",
+      "interpretation": "480 kWh/day assumes 4 equivalent full-power hours.",
+      "evidenceRequired": "Confirm expected sessions per day, dwell time, grid capacity, charger derating and tariff assumptions.",
+      "linkedRequirements": [
+        "dc_power_kw"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,448 @@
+{
+  "summary": {
+    "rows": 28,
+    "briefSupported": 1,
+    "modelPresent": 6,
+    "reviewRequired": 8,
+    "sourceRequired": 13,
+    "blocked": 0,
+    "architectureBlockers": 0,
+    "bomBlockers": 13
+  },
+  "rows": [
+    {
+      "linkedRequirements": [
+        "working_volume_l"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:working_volume_l",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Working volume",
+      "assumption": "Working volume = 50 L is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "metric:headline_output",
+      "category": "derived_metric",
+      "status": "review_required",
+      "scope": "Annual culture volume",
+      "assumption": "Annual culture volume uses working_volume_l * batches_per_year with medium confidence.",
+      "basis": "class_pack:bioreactor.class_pack; formula:working_volume_l * batches_per_year",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:capex_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated CAPEX",
+      "assumption": "Estimated CAPEX uses an implicit model with low confidence.",
+      "basis": "formula:capex=sum(bom.totalCostGbp); class_pack:bioreactor.class_pack",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:opex_annual_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated annual OPEX",
+      "assumption": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "basis": "formula:opex=capex*0.04",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [
+        "working_volume_l"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:bioreactor_working_volume",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Single-Use Working Volume",
+      "assumption": "Single-Use Working Volume currently evaluates as pass against 1 to 2000 L for common single-use mammalian-cell systems; larger volumes need platform-specific bag and mixing evidence.",
+      "basis": "brief:input.brief; model:engineering_sanity.bioreactor; model:engineering_sanity.bioreactor",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "working_volume_l"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:bioreactor_process_closure",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Sterile Process Closure",
+      "assumption": "Sterile Process Closure currently evaluates as pass against sterile fluid path, gas path, sensor bus and pump control present.",
+      "basis": "model:engineering_sanity.bioreactor; model:engineering_sanity.bioreactor",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "working_volume_l"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:bioreactor_aseptic_pressure_safety",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Aseptic And Pressure Safety",
+      "assumption": "Aseptic And Pressure Safety currently evaluates as pass against sterile boundary, pressure relief, exhaust path, alarm bus and service access present.",
+      "basis": "model:engineering_sanity.bioreactor; model:engineering_sanity.bioreactor",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "sterile_fluid_path"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:structure_containment:mass_fluid_transport_process:sterile_fluid_path",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "structure_containment -> mass_fluid_transport_process",
+      "assumption": "sterile_fluid_path is named on both endpoint modules in the generated architecture.",
+      "basis": "The sterile bag must connect to feed, harvest and sampling fluid paths.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "sterile_boundary"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:actuation_kinematics:structure_containment:sterile_boundary",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "actuation_kinematics -> structure_containment",
+      "assumption": "sterile_boundary is named on both endpoint modules in the generated architecture.",
+      "basis": "Mixing drive must couple into the disposable culture boundary without breaking sterility.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "gas_path"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:mass_fluid_transport_process:environmental_interface:gas_path",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "mass_fluid_transport_process -> environmental_interface",
+      "assumption": "gas_path is named on both endpoint modules in the generated architecture.",
+      "basis": "Sparging and exhaust conditioning must share a declared gas path.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "sensor_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "assumption": "sensor_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "DO, pH, mass and temperature measurements must feed process control.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "pump_control"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:mass_fluid_transport_process:pump_control",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> mass_fluid_transport_process",
+      "assumption": "pump_control is named on both endpoint modules in the generated architecture.",
+      "basis": "Controller must command feed, harvest and gas-flow actuators.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "pressure_relief"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:safety_protection:structure_containment:pressure_relief",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "safety_protection -> structure_containment",
+      "assumption": "pressure_relief is named on both endpoint modules in the generated architecture.",
+      "basis": "Disposable culture containment must connect to pressure relief and sterile exhaust protection.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "single_use_bioreactor_bag"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:structure_containment_single_use_bag_chamber_single_use_bioreactor_bag",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Single-use bioreactor bag",
+      "assumption": "Single-use bioreactor bag is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.bioreactor",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "sterile_tubing_and_connector_set"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:structure_containment_sterile_connector_panel_sterile_tubing_and_connector_set",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Sterile tubing and connector set",
+      "assumption": "Sterile tubing and connector set is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.bioreactor",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "agitation_drive"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:actuation_kinematics_agitation_drive_train_agitation_drive",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Agitation drive",
+      "assumption": "Agitation drive is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.bioreactor",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "peristaltic_feed_pump"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:mass_fluid_transport_process_feed_pump_manifold_peristaltic_feed_pump",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Peristaltic feed pump",
+      "assumption": "Peristaltic feed pump is a critical architecture-derived component candidate with quantity 3 each.",
+      "basis": "model:scratch_universal_architecture.bioreactor",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "sparger_and_gas_mix_manifold"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:mass_fluid_transport_process_sparger_gas_mixing_sparger_and_gas_mix_manifold",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Sparger and gas-mix manifold",
+      "assumption": "Sparger and gas-mix manifold is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.bioreactor",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "temperature_control_loop"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_temperature_control_loop_temperature_control_loop",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Temperature control loop",
+      "assumption": "Temperature control loop is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.bioreactor",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "exhaust_filter_and_pressure_relief_set"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_exhaust_filter_train_exhaust_filter_and_pressure_relief_set",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Exhaust filter and pressure relief set",
+      "assumption": "Exhaust filter and pressure relief set is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.bioreactor",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "dissolved_oxygen_optical_sensor"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_do_ph_sensing_dissolved_oxygen_optical_sensor",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Dissolved oxygen optical sensor",
+      "assumption": "Dissolved oxygen optical sensor is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.bioreactor",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "single_use_ph_sensor"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_do_ph_sensing_single_use_ph_sensor",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Single-use pH sensor",
+      "assumption": "Single-use pH sensor is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.bioreactor",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "load_cell_set"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_pressure_mass_temperature_sensing_load_cell_set",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Load cell set",
+      "assumption": "Load cell set is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.bioreactor",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "bioreactor_controller"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_process_controller_bioreactor_controller",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Bioreactor controller",
+      "assumption": "Bioreactor controller is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.bioreactor",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:ISO-13485",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "ISO-13485",
+      "assumption": "Quality management for medical-device-adjacent manufacturing systems is relevant to this product class in Global / supplier quality.",
+      "basis": "class_pack:bioreactor.class_pack",
+      "evidenceRequired": "Supplier quality evidence, change control and traceability where applicable."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:USP-CLASS-VI",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "USP-CLASS-VI",
+      "assumption": "Biocompatibility for polymer contact materials is relevant to this product class in US / global supplier evidence.",
+      "basis": "class_pack:bioreactor.class_pack",
+      "evidenceRequired": "Material certificates for single-use bag and tubing contact surfaces."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:IEC-61010",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "IEC-61010",
+      "assumption": "Electrical safety for laboratory control equipment is relevant to this product class in UK/EU/global.",
+      "basis": "class_pack:bioreactor.class_pack",
+      "evidenceRequired": "Electrical safety design, protective earth and abnormal operation evidence."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:EU-GMP-ANNEX-11",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "EU-GMP-ANNEX-11",
+      "assumption": "Computerised systems for GMP records is relevant to this product class in EU / pharma operations.",
+      "basis": "class_pack:bioreactor.class_pack",
+      "evidenceRequired": "Batch record integrity, audit trail and access-control evidence."
+    }
+  ]
+}

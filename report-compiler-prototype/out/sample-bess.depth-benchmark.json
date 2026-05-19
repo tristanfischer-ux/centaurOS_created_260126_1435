@@ -1,0 +1,147 @@
+{
+  "benchmarkSource": "chain-v2-adapted numeric analysis only",
+  "contentUsePolicy": "Benchmark uses aggregate counts only. Chain-v2 component names, prose, design content, prices and part numbers are not imported into the scratch generator.",
+  "summary": {
+    "rows": 7,
+    "meets": 2,
+    "below": 5,
+    "notComparable": 0,
+    "averageComparableRatio": 0.83
+  },
+  "rows": [
+    {
+      "id": "module_count",
+      "label": "Functional modules",
+      "scratchValue": 11,
+      "benchmarkValue": 11,
+      "unit": "modules",
+      "ratio": 1,
+      "status": "meets",
+      "notes": "Core architecture breadth.",
+      "action": "Add missing functional modules only when the product class genuinely requires them."
+    },
+    {
+      "id": "submodule_count",
+      "label": "Submodules",
+      "scratchValue": 46,
+      "benchmarkValue": 48,
+      "unit": "submodules",
+      "ratio": 0.96,
+      "status": "below",
+      "notes": "Submodule count is a rough proxy for engineering decomposition depth.",
+      "action": "Expand thin modules with concrete sub-functions and carrier interfaces."
+    },
+    {
+      "id": "component_word_count",
+      "label": "Component candidates",
+      "scratchValue": 204,
+      "benchmarkValue": 241,
+      "unit": "components",
+      "ratio": 0.85,
+      "status": "below",
+      "notes": "Component-word count is a rough proxy for BoM review surface, not sourcing quality.",
+      "action": "Add justified component candidates where submodules still hide assemblies."
+    },
+    {
+      "id": "interface_link_volume",
+      "label": "Interface link volume",
+      "scratchValue": 50,
+      "benchmarkValue": 54,
+      "unit": "links",
+      "ratio": 0.93,
+      "status": "below",
+      "notes": "Compares link volume only; chain-v2 grammar links and scratch interface edges are not semantically identical.",
+      "action": "Add interface contracts only where they clarify a real energy, material, signal, load or service path."
+    },
+    {
+      "id": "priced_line_ratio",
+      "label": "Admitted priced-line ratio",
+      "scratchValue": 0,
+      "benchmarkValue": 0.86,
+      "unit": "ratio",
+      "ratio": 0,
+      "status": "below",
+      "notes": "Chain-v2 priced words are treated as benchmark coverage only; scratch admits prices only with explicit sourcing evidence.",
+      "action": "Use sourcing intake to admit source-backed price/manufacturer/MPN evidence; do not copy benchmark estimates."
+    },
+    {
+      "id": "sections_at_target",
+      "label": "Sections scoring >=8",
+      "scratchValue": 5,
+      "benchmarkValue": 6,
+      "unit": "sections",
+      "ratio": 0.83,
+      "status": "below",
+      "notes": "Readiness gate requires every scored section to reach the target.",
+      "action": "Clear section-specific readiness actions, especially BoM evidence."
+    },
+    {
+      "id": "verification_activities",
+      "label": "Verification activities",
+      "scratchValue": 30,
+      "benchmarkValue": 24,
+      "unit": "activities",
+      "ratio": 1.25,
+      "status": "meets",
+      "notes": "Scratch-only evidence workflow depth; not compared to chain-v2 content.",
+      "action": "Keep adding verification activities when new requirements, interfaces or standards are introduced."
+    }
+  ],
+  "gaps": [
+    {
+      "id": "submodule_count",
+      "label": "Submodules",
+      "scratchValue": 46,
+      "benchmarkValue": 48,
+      "unit": "submodules",
+      "ratio": 0.96,
+      "status": "below",
+      "notes": "Submodule count is a rough proxy for engineering decomposition depth.",
+      "action": "Expand thin modules with concrete sub-functions and carrier interfaces."
+    },
+    {
+      "id": "component_word_count",
+      "label": "Component candidates",
+      "scratchValue": 204,
+      "benchmarkValue": 241,
+      "unit": "components",
+      "ratio": 0.85,
+      "status": "below",
+      "notes": "Component-word count is a rough proxy for BoM review surface, not sourcing quality.",
+      "action": "Add justified component candidates where submodules still hide assemblies."
+    },
+    {
+      "id": "interface_link_volume",
+      "label": "Interface link volume",
+      "scratchValue": 50,
+      "benchmarkValue": 54,
+      "unit": "links",
+      "ratio": 0.93,
+      "status": "below",
+      "notes": "Compares link volume only; chain-v2 grammar links and scratch interface edges are not semantically identical.",
+      "action": "Add interface contracts only where they clarify a real energy, material, signal, load or service path."
+    },
+    {
+      "id": "priced_line_ratio",
+      "label": "Admitted priced-line ratio",
+      "scratchValue": 0,
+      "benchmarkValue": 0.86,
+      "unit": "ratio",
+      "ratio": 0,
+      "status": "below",
+      "notes": "Chain-v2 priced words are treated as benchmark coverage only; scratch admits prices only with explicit sourcing evidence.",
+      "action": "Use sourcing intake to admit source-backed price/manufacturer/MPN evidence; do not copy benchmark estimates."
+    },
+    {
+      "id": "sections_at_target",
+      "label": "Sections scoring >=8",
+      "scratchValue": 5,
+      "benchmarkValue": 6,
+      "unit": "sections",
+      "ratio": 0.83,
+      "status": "below",
+      "notes": "Readiness gate requires every scored section to reach the target.",
+      "action": "Clear section-specific readiness actions, especially BoM evidence."
+    }
+  ]
+}

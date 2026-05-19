@@ -47,8 +47,14 @@ function qty1Price(r: DistributorResult): number {
 /**
  * Look up a part's SKU across Mouser + Digi-Key + Farnell in parallel.
  * Returns null if no distributor has a match.
+ *
+ * @param mpn - Manufacturer part number to look up.
+ * @param manufacturer - Optional declared manufacturer. When provided, any
+ *   distributor result whose `manufacturer` field does NOT contain (or is not
+ *   contained by) this string (case-insensitive substring match) is rejected.
+ *   Null/undefined = no manufacturer filter (legacy behaviour).
  */
-export async function findSkuForPart(mpn: string): Promise<AggregateResult | null> {
+export async function findSkuForPart(mpn: string, manufacturer?: string | null): Promise<AggregateResult | null> {
   if (!mpn || mpn.length < 2) return null
 
   const [mouser, digikey, farnell, lcsc] = await Promise.all([
@@ -58,12 +64,32 @@ export async function findSkuForPart(mpn: string): Promise<AggregateResult | nul
     lookupSkuLcsc(mpn).catch(() => null),
   ])
 
+  // Manufacturer-strict filter: when the BoM line declares a manufacturer,
+  // reject any distributor row whose manufacturer field doesn't match.
+  // Case-insensitive substring match in either direction (e.g. "Murata" matches
+  // "Murata Manufacturing Co., Ltd." and vice-versa).
+  function manufacturerMatches(row: DistributorResult | null): boolean {
+    if (!row) return false
+    if (!manufacturer || !manufacturer.trim()) return true  // no filter declared
+    const declaredNorm = manufacturer.trim().toLowerCase()
+    const rowNorm = (row.manufacturer ?? '').toLowerCase()
+    if (!rowNorm) return true  // distributor returned no manufacturer — don't reject
+    const matches = rowNorm.includes(declaredNorm) || declaredNorm.includes(rowNorm)
+    if (!matches) {
+      console.warn('[findSkuForPart] manufacturer-strict reject', {
+        part: { mpn, manufacturer },
+        row: { source: row.source, manufacturer: row.manufacturer, mpn: row.mpn },
+      })
+    }
+    return matches
+  }
+
   const hits: DistributorResult[] = []
   const misses: string[] = []
-  if (mouser) hits.push(mouser); else misses.push('mouser')
-  if (digikey) hits.push(digikey); else misses.push('digikey')
-  if (farnell) hits.push(farnell); else misses.push('farnell')
-  if (lcsc) hits.push(lcsc); else misses.push('lcsc')
+  if (mouser && manufacturerMatches(mouser)) hits.push(mouser); else misses.push('mouser')
+  if (digikey && manufacturerMatches(digikey)) hits.push(digikey); else misses.push('digikey')
+  if (farnell && manufacturerMatches(farnell)) hits.push(farnell); else misses.push('farnell')
+  if (lcsc && manufacturerMatches(lcsc)) hits.push(lcsc); else misses.push('lcsc')
 
   if (hits.length === 0) return null
 

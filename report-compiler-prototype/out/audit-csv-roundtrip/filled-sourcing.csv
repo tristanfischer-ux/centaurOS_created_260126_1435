@@ -1,0 +1,7 @@
+componentWordId,description,priority,supplierName,manufacturer,mpn,unitCostGbp,leadTimeWeeks,sourceGrade,evidence.ref,evidence.quote,retrievedAt
+lfp_prismatic_cells,LFP prismatic cells,critical,Protocol CSV Supplier,Protocol CSV Manufacturer,PROTOCOL-CSV-NOT-A-REAL-PART,75,12,priced,test-fixture://csv-sourcing/lfp_prismatic_cells,Protocol-only CSV fixture proving source-backed intake. Not a real supplier quote.,2026-05-17T00:00:00.000+01:00
+dc_contactor_or_breaker,DC contactor or breaker,critical,,,,,,catalogue,,,
+pcs_inverter,PCS inverter,critical,,,,,,catalogue,,,
+bms_master_controller,BMS master controller,critical,,,,,,catalogue,,,
+fire_detection_suppression,Fire detection/suppression,critical,,,,,,catalogue,,,
+thermal_management_loop,Thermal management loop,critical,,,,,,catalogue,,,

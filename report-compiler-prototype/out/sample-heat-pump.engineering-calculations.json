@@ -1,0 +1,47 @@
+{
+  "summary": {
+    "rows": 2,
+    "withinEnvelope": 2,
+    "needsReview": 0,
+    "outsideEnvelope": 0,
+    "blocked": 0
+  },
+  "rows": [
+    {
+      "id": "heat_pump_electrical_input_kw",
+      "status": "within_envelope",
+      "label": "Heat pump electrical input",
+      "formula": "thermal_output_kw / cop",
+      "inputs": {
+        "thermal_output_kw": 8,
+        "cop": 3.5
+      },
+      "result": 2.29,
+      "unit": "kW",
+      "envelope": "Positive arithmetic check; electrical design still needs compressor map and ambient condition.",
+      "interpretation": "2.29 kW ideal electrical input before auxiliaries and defrost.",
+      "evidenceRequired": "Confirm COP rating condition, compressor input power, pump/fan auxiliaries and defrost allowance.",
+      "linkedRequirements": [
+        "thermal_output_kw",
+        "cop"
+      ]
+    },
+    {
+      "id": "heat_pump_cop_envelope",
+      "status": "within_envelope",
+      "label": "Heat pump COP envelope",
+      "formula": "cop",
+      "inputs": {
+        "cop": 3.5
+      },
+      "result": 3.5,
+      "unit": "COP",
+      "envelope": "2.5 to 5.5 COP is plausible before rating-condition proof.",
+      "interpretation": "3.5 COP target needs rating-condition evidence.",
+      "evidenceRequired": "Confirm EN 14511 or local rating point, flow temperature, refrigerant and ambient condition.",
+      "linkedRequirements": [
+        "cop"
+      ]
+    }
+  ]
+}

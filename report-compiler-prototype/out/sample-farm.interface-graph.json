@@ -1,0 +1,776 @@
+{
+  "nodes": [
+    {
+      "id": "structure_containment",
+      "label": "Growing Structure And Containment",
+      "kind": "module"
+    },
+    {
+      "id": "structure_containment.growing_rack_stack",
+      "label": "Growing rack stack",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.crop_tray_carriers",
+      "label": "Crop tray carriers",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.enclosure_panels",
+      "label": "Enclosure panels",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "environmental_interface",
+      "label": "Light Climate And Gas Environment",
+      "kind": "module"
+    },
+    {
+      "id": "environmental_interface.horticultural_lighting",
+      "label": "Horticultural lighting",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.canopy_air_mixing",
+      "label": "Canopy air mixing",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.humidity_temperature_control",
+      "label": "Humidity and temperature control",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.co2_enrichment",
+      "label": "CO2 enrichment",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "mass_fluid_transport_process",
+      "label": "Nutrient And Water Transport Process",
+      "kind": "module"
+    },
+    {
+      "id": "mass_fluid_transport_process.reservoir_plumbing",
+      "label": "Reservoir and plumbing",
+      "kind": "submodule",
+      "moduleId": "mass_fluid_transport_process"
+    },
+    {
+      "id": "mass_fluid_transport_process.fertigation_pumping",
+      "label": "Fertigation pumping",
+      "kind": "submodule",
+      "moduleId": "mass_fluid_transport_process"
+    },
+    {
+      "id": "mass_fluid_transport_process.nutrient_dosing",
+      "label": "Nutrient dosing",
+      "kind": "submodule",
+      "moduleId": "mass_fluid_transport_process"
+    },
+    {
+      "id": "mass_fluid_transport_process.filtration_sanitation",
+      "label": "Filtration and sanitation",
+      "kind": "submodule",
+      "moduleId": "mass_fluid_transport_process"
+    },
+    {
+      "id": "sensing_instrumentation",
+      "label": "Crop And Process Instrumentation",
+      "kind": "module"
+    },
+    {
+      "id": "sensing_instrumentation.climate_sensors",
+      "label": "Climate sensors",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.nutrient_sensors",
+      "label": "Nutrient sensors",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.crop_observation",
+      "label": "Crop observation",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "control_compute_communication",
+      "label": "Recipe Control And Communications",
+      "kind": "module"
+    },
+    {
+      "id": "control_compute_communication.environmental_controller",
+      "label": "Environmental controller",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.recipe_management",
+      "label": "Recipe management",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.remote_monitoring",
+      "label": "Remote monitoring",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "power_distribution",
+      "label": "Wet-Zone Power Distribution",
+      "kind": "module"
+    },
+    {
+      "id": "power_distribution.mains_panel",
+      "label": "Mains isolation panel",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.lighting_power",
+      "label": "Lighting power distribution",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.low_voltage_power",
+      "label": "Low-voltage control power",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "safety_protection",
+      "label": "Food-Safe Safety And Protection",
+      "kind": "module"
+    },
+    {
+      "id": "safety_protection.leak_containment",
+      "label": "Leak containment",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.operator_interlocks",
+      "label": "Operator interlocks",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.food_contact_controls",
+      "label": "Food contact controls",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "maintenance_serviceability",
+      "label": "Harvest Cleaning And Serviceability",
+      "kind": "module"
+    },
+    {
+      "id": "maintenance_serviceability.harvest_access",
+      "label": "Harvest access",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.cleaning_access",
+      "label": "Cleaning access",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.consumable_service",
+      "label": "Consumable service",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "hmi_ergonomics",
+      "label": "Operator HMI And Labelling",
+      "kind": "module"
+    },
+    {
+      "id": "hmi_ergonomics.local_hmi",
+      "label": "Local HMI",
+      "kind": "submodule",
+      "moduleId": "hmi_ergonomics"
+    },
+    {
+      "id": "hmi_ergonomics.labelling_workflows",
+      "label": "Labelling and workflows",
+      "kind": "submodule",
+      "moduleId": "hmi_ergonomics"
+    }
+  ],
+  "edges": [
+    {
+      "id": "contains:structure_containment:structure_containment.growing_rack_stack:growing_rack_stack",
+      "from": "structure_containment",
+      "to": "structure_containment.growing_rack_stack",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Growing rack stack is contained by Growing Structure And Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.crop_tray_carriers:crop_tray_carriers",
+      "from": "structure_containment",
+      "to": "structure_containment.crop_tray_carriers",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Crop tray carriers is contained by Growing Structure And Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.enclosure_panels:enclosure_panels",
+      "from": "structure_containment",
+      "to": "structure_containment.enclosure_panels",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Enclosure panels is contained by Growing Structure And Containment."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.horticultural_lighting:horticultural_lighting",
+      "from": "environmental_interface",
+      "to": "environmental_interface.horticultural_lighting",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Horticultural lighting is contained by Light Climate And Gas Environment."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.canopy_air_mixing:canopy_air_mixing",
+      "from": "environmental_interface",
+      "to": "environmental_interface.canopy_air_mixing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Canopy air mixing is contained by Light Climate And Gas Environment."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.humidity_temperature_control:humidity_temperature_control",
+      "from": "environmental_interface",
+      "to": "environmental_interface.humidity_temperature_control",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Humidity and temperature control is contained by Light Climate And Gas Environment."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.co2_enrichment:co2_enrichment",
+      "from": "environmental_interface",
+      "to": "environmental_interface.co2_enrichment",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "CO2 enrichment is contained by Light Climate And Gas Environment."
+    },
+    {
+      "id": "contains:mass_fluid_transport_process:mass_fluid_transport_process.reservoir_plumbing:reservoir_plumbing",
+      "from": "mass_fluid_transport_process",
+      "to": "mass_fluid_transport_process.reservoir_plumbing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Reservoir and plumbing is contained by Nutrient And Water Transport Process."
+    },
+    {
+      "id": "contains:mass_fluid_transport_process:mass_fluid_transport_process.fertigation_pumping:fertigation_pumping",
+      "from": "mass_fluid_transport_process",
+      "to": "mass_fluid_transport_process.fertigation_pumping",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Fertigation pumping is contained by Nutrient And Water Transport Process."
+    },
+    {
+      "id": "contains:mass_fluid_transport_process:mass_fluid_transport_process.nutrient_dosing:nutrient_dosing",
+      "from": "mass_fluid_transport_process",
+      "to": "mass_fluid_transport_process.nutrient_dosing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Nutrient dosing is contained by Nutrient And Water Transport Process."
+    },
+    {
+      "id": "contains:mass_fluid_transport_process:mass_fluid_transport_process.filtration_sanitation:filtration_sanitation",
+      "from": "mass_fluid_transport_process",
+      "to": "mass_fluid_transport_process.filtration_sanitation",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Filtration and sanitation is contained by Nutrient And Water Transport Process."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.climate_sensors:climate_sensors",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.climate_sensors",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Climate sensors is contained by Crop And Process Instrumentation."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.nutrient_sensors:nutrient_sensors",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.nutrient_sensors",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Nutrient sensors is contained by Crop And Process Instrumentation."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.crop_observation:crop_observation",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.crop_observation",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Crop observation is contained by Crop And Process Instrumentation."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.environmental_controller:environmental_controller",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.environmental_controller",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Environmental controller is contained by Recipe Control And Communications."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.recipe_management:recipe_management",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.recipe_management",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Recipe management is contained by Recipe Control And Communications."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.remote_monitoring:remote_monitoring",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.remote_monitoring",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Remote monitoring is contained by Recipe Control And Communications."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.mains_panel:mains_panel",
+      "from": "power_distribution",
+      "to": "power_distribution.mains_panel",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Mains isolation panel is contained by Wet-Zone Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.lighting_power:lighting_power",
+      "from": "power_distribution",
+      "to": "power_distribution.lighting_power",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Lighting power distribution is contained by Wet-Zone Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.low_voltage_power:low_voltage_power",
+      "from": "power_distribution",
+      "to": "power_distribution.low_voltage_power",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Low-voltage control power is contained by Wet-Zone Power Distribution."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.leak_containment:leak_containment",
+      "from": "safety_protection",
+      "to": "safety_protection.leak_containment",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Leak containment is contained by Food-Safe Safety And Protection."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.operator_interlocks:operator_interlocks",
+      "from": "safety_protection",
+      "to": "safety_protection.operator_interlocks",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Operator interlocks is contained by Food-Safe Safety And Protection."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.food_contact_controls:food_contact_controls",
+      "from": "safety_protection",
+      "to": "safety_protection.food_contact_controls",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Food contact controls is contained by Food-Safe Safety And Protection."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.harvest_access:harvest_access",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.harvest_access",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Harvest access is contained by Harvest Cleaning And Serviceability."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.cleaning_access:cleaning_access",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.cleaning_access",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Cleaning access is contained by Harvest Cleaning And Serviceability."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.consumable_service:consumable_service",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.consumable_service",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Consumable service is contained by Harvest Cleaning And Serviceability."
+    },
+    {
+      "id": "contains:hmi_ergonomics:hmi_ergonomics.local_hmi:local_hmi",
+      "from": "hmi_ergonomics",
+      "to": "hmi_ergonomics.local_hmi",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Local HMI is contained by Operator HMI And Labelling."
+    },
+    {
+      "id": "contains:hmi_ergonomics:hmi_ergonomics.labelling_workflows:labelling_workflows",
+      "from": "hmi_ergonomics",
+      "to": "hmi_ergonomics.labelling_workflows",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Labelling and workflows is contained by Operator HMI And Labelling."
+    },
+    {
+      "id": "shared_interface:structure_containment:environmental_interface:service_access",
+      "from": "structure_containment",
+      "to": "environmental_interface",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:environmental_interface:mass_fluid_transport_process:service_access",
+      "from": "environmental_interface",
+      "to": "mass_fluid_transport_process",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:power_distribution:service_access",
+      "from": "mass_fluid_transport_process",
+      "to": "power_distribution",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:service_access",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:service_access",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:maintenance_serviceability:hmi_ergonomics:service_access",
+      "from": "maintenance_serviceability",
+      "to": "hmi_ergonomics",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:structure_containment:maintenance_serviceability:tray_support",
+      "from": "structure_containment",
+      "to": "maintenance_serviceability",
+      "via": "tray_support",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare tray_support."
+    },
+    {
+      "id": "shared_interface:structure_containment:mass_fluid_transport_process:washdown_boundary",
+      "from": "structure_containment",
+      "to": "mass_fluid_transport_process",
+      "via": "washdown_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare washdown_boundary."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:safety_protection:washdown_boundary",
+      "from": "mass_fluid_transport_process",
+      "to": "safety_protection",
+      "via": "washdown_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare washdown_boundary."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:washdown_boundary",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "washdown_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare washdown_boundary."
+    },
+    {
+      "id": "shared_interface:structure_containment:environmental_interface:mains_supply",
+      "from": "structure_containment",
+      "to": "environmental_interface",
+      "via": "mains_supply",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare mains_supply."
+    },
+    {
+      "id": "shared_interface:environmental_interface:power_distribution:mains_supply",
+      "from": "environmental_interface",
+      "to": "power_distribution",
+      "via": "mains_supply",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare mains_supply."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:mains_supply",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "mains_supply",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare mains_supply."
+    },
+    {
+      "id": "shared_interface:environmental_interface:control_compute_communication:lighting_control",
+      "from": "environmental_interface",
+      "to": "control_compute_communication",
+      "via": "lighting_control",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare lighting_control."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:power_distribution:lighting_control",
+      "from": "control_compute_communication",
+      "to": "power_distribution",
+      "via": "lighting_control",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare lighting_control."
+    },
+    {
+      "id": "shared_interface:structure_containment:environmental_interface:airflow",
+      "from": "structure_containment",
+      "to": "environmental_interface",
+      "via": "airflow",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare airflow."
+    },
+    {
+      "id": "shared_interface:environmental_interface:sensing_instrumentation:airflow",
+      "from": "environmental_interface",
+      "to": "sensing_instrumentation",
+      "via": "airflow",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare airflow."
+    },
+    {
+      "id": "shared_interface:environmental_interface:mass_fluid_transport_process:sensor_bus",
+      "from": "environmental_interface",
+      "to": "mass_fluid_transport_process",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:sensing_instrumentation:sensor_bus",
+      "from": "mass_fluid_transport_process",
+      "to": "sensing_instrumentation",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:power_distribution:sensor_bus",
+      "from": "control_compute_communication",
+      "to": "power_distribution",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:environmental_interface:mass_fluid_transport_process:actuator_bus",
+      "from": "environmental_interface",
+      "to": "mass_fluid_transport_process",
+      "via": "actuator_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare actuator_bus."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:control_compute_communication:actuator_bus",
+      "from": "mass_fluid_transport_process",
+      "to": "control_compute_communication",
+      "via": "actuator_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare actuator_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:power_distribution:actuator_bus",
+      "from": "control_compute_communication",
+      "to": "power_distribution",
+      "via": "actuator_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare actuator_bus."
+    },
+    {
+      "id": "shared_interface:structure_containment:mass_fluid_transport_process:nutrient_loop",
+      "from": "structure_containment",
+      "to": "mass_fluid_transport_process",
+      "via": "nutrient_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare nutrient_loop."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:sensing_instrumentation:nutrient_loop",
+      "from": "mass_fluid_transport_process",
+      "to": "sensing_instrumentation",
+      "via": "nutrient_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare nutrient_loop."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:maintenance_serviceability:nutrient_loop",
+      "from": "sensing_instrumentation",
+      "to": "maintenance_serviceability",
+      "via": "nutrient_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare nutrient_loop."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:control_compute_communication:video_link",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "video_link",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare video_link."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:hmi_ergonomics:operator_network",
+      "from": "control_compute_communication",
+      "to": "hmi_ergonomics",
+      "via": "operator_network",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare operator_network."
+    },
+    {
+      "id": "shared_interface:safety_protection:hmi_ergonomics:alarm_bus",
+      "from": "safety_protection",
+      "to": "hmi_ergonomics",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "required_interface:control_compute_communication:environmental_interface:actuator_bus",
+      "from": "control_compute_communication",
+      "to": "environmental_interface",
+      "via": "actuator_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Farm controller must command lighting, CO2 dosing and airflow."
+    },
+    {
+      "id": "required_interface:control_compute_communication:mass_fluid_transport_process:actuator_bus",
+      "from": "control_compute_communication",
+      "to": "mass_fluid_transport_process",
+      "via": "actuator_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Farm controller must command fertigation pumps and nutrient circulation."
+    },
+    {
+      "id": "required_interface:environmental_interface:mass_fluid_transport_process:sensor_bus",
+      "from": "environmental_interface",
+      "to": "mass_fluid_transport_process",
+      "via": "sensor_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Climate and fertigation state must be observable by the same control layer."
+    }
+  ],
+  "summary": {
+    "moduleNodes": 9,
+    "subModuleNodes": 28,
+    "containsEdges": 28,
+    "sharedInterfaceEdges": 30,
+    "requiredInterfaceEdges": 3,
+    "missingRequiredInterfaceEdges": 0
+  }
+}

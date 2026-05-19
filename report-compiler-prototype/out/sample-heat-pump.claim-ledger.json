@@ -1,0 +1,5081 @@
+{
+  "summary": {
+    "rows": 214,
+    "briefSupplied": 2,
+    "accepted": 0,
+    "sourceBacked": 0,
+    "calculatedNeedsReview": 3,
+    "generatedNeedsReview": 162,
+    "sourceRequired": 47,
+    "blocked": 0,
+    "blocksBom": 47,
+    "blocksPublish": 210
+  },
+  "rows": [
+    {
+      "id": "bom_source_field:control_compute_communication_main_controller_heat_pump_controller_pcb:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Heat pump controller PCB / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "heat_pump_controller_pcb"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_main_controller_heat_pump_controller_pcb:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Heat pump controller PCB / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "heat_pump_controller_pcb"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_main_controller_heat_pump_controller_pcb:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Heat pump controller PCB / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "heat_pump_controller_pcb"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:control_compute_communication_main_controller_heat_pump_controller_pcb:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Heat pump controller PCB / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "heat_pump_controller_pcb"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_conversion_transduction_compressor_inverter_stage_inverter_scroll_compressor:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Inverter scroll compressor / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_conversion_transduction_compressor_inverter_stage_inverter_scroll_compressor:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Inverter scroll compressor / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_conversion_transduction_compressor_inverter_stage_inverter_scroll_compressor:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Inverter scroll compressor / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_conversion_transduction_compressor_inverter_stage_inverter_scroll_compressor:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Inverter scroll compressor / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_conversion_transduction_expansion_metering_stage_electronic_expansion_valve:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Electronic expansion valve / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "electronic_expansion_valve"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_conversion_transduction_expansion_metering_stage_electronic_expansion_valve:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Electronic expansion valve / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "electronic_expansion_valve"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_conversion_transduction_expansion_metering_stage_electronic_expansion_valve:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Electronic expansion valve / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "electronic_expansion_valve"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:energy_conversion_transduction_expansion_metering_stage_electronic_expansion_valve:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Electronic expansion valve / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "electronic_expansion_valve"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_fan_air_path_variable_speed_fan_assembly:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Variable-speed fan assembly / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "variable_speed_fan_assembly"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_fan_air_path_variable_speed_fan_assembly:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Variable-speed fan assembly / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "variable_speed_fan_assembly"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_fan_air_path_variable_speed_fan_assembly:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Variable-speed fan assembly / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "variable_speed_fan_assembly"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_fan_air_path_variable_speed_fan_assembly:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Variable-speed fan assembly / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "variable_speed_fan_assembly"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_outdoor_evaporator_outdoor_finned_evaporator_coil:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Outdoor finned evaporator coil / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "outdoor_finned_evaporator_coil"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_outdoor_evaporator_outdoor_finned_evaporator_coil:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Outdoor finned evaporator coil / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "outdoor_finned_evaporator_coil"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_outdoor_evaporator_outdoor_finned_evaporator_coil:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Outdoor finned evaporator coil / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "outdoor_finned_evaporator_coil"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:environmental_interface_outdoor_evaporator_outdoor_finned_evaporator_coil:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Outdoor finned evaporator coil / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "outdoor_finned_evaporator_coil"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_circulation_pump_group_hydronic_circulation_pump:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Hydronic circulation pump / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_circulation_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_circulation_pump_group_hydronic_circulation_pump:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Hydronic circulation pump / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_circulation_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_circulation_pump_group_hydronic_circulation_pump:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Hydronic circulation pump / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_circulation_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_circulation_pump_group_hydronic_circulation_pump:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Hydronic circulation pump / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_circulation_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_condenser_heat_exchanger_brazed_plate_heat_exchanger:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Brazed plate heat exchanger / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "brazed_plate_heat_exchanger"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_condenser_heat_exchanger_brazed_plate_heat_exchanger:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Brazed plate heat exchanger / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "brazed_plate_heat_exchanger"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_condenser_heat_exchanger_brazed_plate_heat_exchanger:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Brazed plate heat exchanger / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "brazed_plate_heat_exchanger"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_condenser_heat_exchanger_brazed_plate_heat_exchanger:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Brazed plate heat exchanger / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "brazed_plate_heat_exchanger"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_hydronic_safety_group_hydronic_safety_valve_kit:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Hydronic safety valve kit / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_safety_valve_kit"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_hydronic_safety_group_hydronic_safety_valve_kit:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Hydronic safety valve kit / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_safety_valve_kit"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_hydronic_safety_group_hydronic_safety_valve_kit:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Hydronic safety valve kit / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_safety_valve_kit"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:mass_fluid_transport_process_hydronic_safety_group_hydronic_safety_valve_kit:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Hydronic safety valve kit / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_safety_valve_kit"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_refrigerant_sensing_refrigerant_sensor_and_pressure_transducers:manufacturer",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Refrigerant sensor and pressure transducers / manufacturer",
+      "claim": "manufacturer is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_refrigerant_sensing_refrigerant_sensor_and_pressure_transducers:mpn",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Refrigerant sensor and pressure transducers / mpn",
+      "claim": "mpn is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_refrigerant_sensing_refrigerant_sensor_and_pressure_transducers:supplier",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Refrigerant sensor and pressure transducers / supplier",
+      "claim": "supplier is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "bom_source_field:sensing_instrumentation_refrigerant_sensing_refrigerant_sensor_and_pressure_transducers:unit_cost_gbp",
+      "kind": "bom_source_field",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Refrigerant sensor and pressure transducers / unit_cost_gbp",
+      "claim": "unit_cost_gbp is required but not source-backed.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_main_controller_heat_pump_controller_pcb",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Heat pump controller PCB",
+      "claim": "Heat pump controller PCB is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "heat_pump_controller_pcb"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_compressor_inverter_stage_inverter_scroll_compressor",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Inverter scroll compressor",
+      "claim": "Inverter scroll compressor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_expansion_metering_stage_electronic_expansion_valve",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Electronic expansion valve",
+      "claim": "Electronic expansion valve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "electronic_expansion_valve"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:environmental_interface_fan_air_path_variable_speed_fan_assembly",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Variable-speed fan assembly",
+      "claim": "Variable-speed fan assembly is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "variable_speed_fan_assembly"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:environmental_interface_outdoor_evaporator_outdoor_finned_evaporator_coil",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Outdoor finned evaporator coil",
+      "claim": "Outdoor finned evaporator coil is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "outdoor_finned_evaporator_coil"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_circulation_pump_group_hydronic_circulation_pump",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Hydronic circulation pump",
+      "claim": "Hydronic circulation pump is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_circulation_pump"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_condenser_heat_exchanger_brazed_plate_heat_exchanger",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Brazed plate heat exchanger",
+      "claim": "Brazed plate heat exchanger is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "brazed_plate_heat_exchanger"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_hydronic_safety_group_hydronic_safety_valve_kit",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Hydronic safety valve kit",
+      "claim": "Hydronic safety valve kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_safety_valve_kit"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_refrigerant_sensing_refrigerant_sensor_and_pressure_transducers",
+      "kind": "component_candidate",
+      "status": "source_required",
+      "basis": "generated_model",
+      "scope": "Refrigerant sensor and pressure transducers",
+      "claim": "Refrigerant sensor and pressure transducers is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed supplier, manufacturer, MPN, unit cost and lead-time evidence through sourcing intake."
+    },
+    {
+      "id": "headline_metric:capex_gbp",
+      "kind": "headline_metric",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Estimated CAPEX",
+      "claim": "Estimated CAPEX = 0 GBP.",
+      "provenanceRefs": [
+        "formula:capex=sum(bom.totalCostGbp)",
+        "class_pack:heat_pump.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed BoM costs before treating this cost metric as a claim."
+    },
+    {
+      "id": "headline_metric:opex_annual_gbp",
+      "kind": "headline_metric",
+      "status": "source_required",
+      "basis": "assumption",
+      "scope": "Estimated annual OPEX",
+      "claim": "Estimated annual OPEX = 0 GBP/year.",
+      "provenanceRefs": [
+        "formula:opex=capex*0.04"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "nextAction": "Admit source-backed BoM costs before treating this cost metric as a claim."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_main_controller_controller_enclosure",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "controller enclosure",
+      "claim": "controller enclosure is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "controller_enclosure"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_main_controller_non_volatile_fault_memory",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "non-volatile fault memory",
+      "claim": "non-volatile fault memory is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "non_volatile_fault_memory"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_main_controller_real_time_clock_module",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "real-time clock module",
+      "claim": "real-time clock module is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "real_time_clock_module"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_power_driver_io_compressor_contactor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "compressor contactor",
+      "claim": "compressor contactor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "compressor_contactor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_power_driver_io_fan_pwm_output_board",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fan PWM output board",
+      "claim": "fan PWM output board is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "fan_pwm_output_board"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_power_driver_io_pump_relay_output",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pump relay output",
+      "claim": "pump relay output is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "pump_relay_output"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_power_driver_io_safety_chain_input_terminal",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "safety chain input terminal",
+      "claim": "safety chain input terminal is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "safety_chain_input_terminal"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_service_communications_fault_led_stack",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fault LED stack",
+      "claim": "fault LED stack is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "fault_led_stack"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_service_communications_installer_qr_code_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "installer QR code label",
+      "claim": "installer QR code label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "installer_qr_code_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_service_communications_modbus_service_port",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Modbus service port",
+      "claim": "Modbus service port is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "modbus_service_port"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:control_compute_communication_service_communications_usb_commissioning_adapter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "USB commissioning adapter",
+      "claim": "USB commissioning adapter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "usb_commissioning_adapter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_compressor_inverter_stage_compressor_inverter_drive",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "compressor inverter drive",
+      "claim": "compressor inverter drive is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "compressor_inverter_drive"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_compressor_inverter_stage_compressor_mounting_grommet_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "compressor mounting grommet set",
+      "claim": "compressor mounting grommet set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "compressor_mounting_grommet_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_compressor_inverter_stage_crankcase_heater_band",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "crankcase heater band",
+      "claim": "crankcase heater band is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "crankcase_heater_band"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_condenser_coupling_boundary_condenser_insulation_sleeve",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "condenser insulation sleeve",
+      "claim": "condenser insulation sleeve is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "condenser_insulation_sleeve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_condenser_coupling_boundary_hydronic_stub_out_pair",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "hydronic stub-out pair",
+      "claim": "hydronic stub-out pair is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_stub_out_pair"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_condenser_coupling_boundary_plate_heat_exchanger_mounting_bracket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "plate heat exchanger mounting bracket",
+      "claim": "plate heat exchanger mounting bracket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "plate_heat_exchanger_mounting_bracket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_condenser_coupling_boundary_refrigerant_stub_out_pair",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "refrigerant stub-out pair",
+      "claim": "refrigerant stub-out pair is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_stub_out_pair"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_expansion_metering_stage_eev_stepper_harness",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "EEV stepper harness",
+      "claim": "EEV stepper harness is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "eev_stepper_harness"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_expansion_metering_stage_liquid_line_filter_drier",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "liquid-line filter drier",
+      "claim": "liquid-line filter drier is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "liquid_line_filter_drier"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_expansion_metering_stage_sight_glass_indicator",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "sight glass indicator",
+      "claim": "sight glass indicator is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "sight_glass_indicator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_refrigerant_manifold_brazed_joint_sleeve_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "brazed joint sleeve set",
+      "claim": "brazed joint sleeve set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "brazed_joint_sleeve_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_refrigerant_manifold_copper_refrigerant_tube_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "copper refrigerant tube set",
+      "claim": "copper refrigerant tube set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "copper_refrigerant_tube_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_refrigerant_manifold_refrigerant_charge_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "refrigerant charge label",
+      "claim": "refrigerant charge label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_charge_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:energy_conversion_transduction_refrigerant_manifold_service_valve_pair",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "service valve pair",
+      "claim": "service valve pair is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "service_valve_pair"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_defrost_condensate_condensate_drain_tray",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "condensate drain tray",
+      "claim": "condensate drain tray is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "condensate_drain_tray"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_defrost_condensate_defrost_temperature_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "defrost temperature probe",
+      "claim": "defrost temperature probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "defrost_temperature_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_defrost_condensate_drain_hose_barb",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "drain hose barb",
+      "claim": "drain hose barb is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "drain_hose_barb"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_defrost_condensate_trace_heater_cable",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "trace heater cable",
+      "claim": "trace heater cable is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "trace_heater_cable"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_fan_air_path_ec_fan_motor_controller",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "EC fan motor controller",
+      "claim": "EC fan motor controller is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "ec_fan_motor_controller"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_fan_air_path_fan_shroud",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fan shroud",
+      "claim": "fan shroud is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "fan_shroud"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_fan_air_path_inlet_debris_screen",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "inlet debris screen",
+      "claim": "inlet debris screen is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "inlet_debris_screen"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_outdoor_evaporator_coil_guard_grille",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "coil guard grille",
+      "claim": "coil guard grille is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "coil_guard_grille"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_outdoor_evaporator_coil_temperature_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "coil temperature sensor",
+      "claim": "coil temperature sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "coil_temperature_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:environmental_interface_outdoor_evaporator_hydrophilic_fin_coating",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "hydrophilic fin coating",
+      "claim": "hydrophilic fin coating is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "hydrophilic_fin_coating"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_alarm_and_user_guidance_alarm_relay_output",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "alarm relay output",
+      "claim": "alarm relay output is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "alarm_relay_output"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_alarm_and_user_guidance_fault_reset_button",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fault reset button",
+      "claim": "fault reset button is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "fault_reset_button"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_alarm_and_user_guidance_qr_service_documentation_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "QR service documentation label",
+      "claim": "QR service documentation label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "qr_service_documentation_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_alarm_and_user_guidance_user_quick_start_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "user quick-start label",
+      "claim": "user quick-start label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "user_quick_start_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_local_display_lcd_status_display",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "LCD status display",
+      "claim": "LCD status display is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "lcd_status_display"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_local_display_menu_button_membrane",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "menu button membrane",
+      "claim": "menu button membrane is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "menu_button_membrane"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_local_display_mode_indicator_led_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "mode indicator LED set",
+      "claim": "mode indicator LED set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "mode_indicator_led_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_local_display_weatherproof_display_window",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "weatherproof display window",
+      "claim": "weatherproof display window is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "weatherproof_display_window"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_remote_thermostat_interface_demand_signal_opto_isolator",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "demand signal opto-isolator",
+      "claim": "demand signal opto-isolator is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "demand_signal_opto_isolator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_remote_thermostat_interface_installer_wiring_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "installer wiring label",
+      "claim": "installer wiring label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "installer_wiring_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_remote_thermostat_interface_modbus_room_controller_link",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Modbus room controller link",
+      "claim": "Modbus room controller link is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "modbus_room_controller_link"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:hmi_ergonomics_remote_thermostat_interface_thermostat_input_terminal",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "thermostat input terminal",
+      "claim": "thermostat input terminal is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "thermostat_input_terminal"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_commissioning_ports_commissioning_checklist_card",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "commissioning checklist card",
+      "claim": "commissioning checklist card is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "commissioning_checklist_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_commissioning_ports_hydronic_drain_cock",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "hydronic drain cock",
+      "claim": "hydronic drain cock is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_drain_cock"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_commissioning_ports_pressure_gauge_pocket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pressure gauge pocket",
+      "claim": "pressure gauge pocket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_gauge_pocket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_commissioning_ports_refrigerant_service_port_cap_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "refrigerant service port cap set",
+      "claim": "refrigerant service port cap set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_service_port_cap_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_diagnostic_access_data_log_export_button",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "data log export button",
+      "claim": "data log export button is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "data_log_export_button"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_diagnostic_access_diagnostic_test_header",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "diagnostic test header",
+      "claim": "diagnostic test header is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "diagnostic_test_header"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_diagnostic_access_fault_code_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fault code label",
+      "claim": "fault code label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "fault_code_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_diagnostic_access_installer_handover_record",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "installer handover record",
+      "claim": "installer handover record is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "installer_handover_record"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_filter_service_cleanable_y_strainer_basket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "cleanable Y-strainer basket",
+      "claim": "cleanable Y-strainer basket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "cleanable_y_strainer_basket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_filter_service_coil_cleaning_access_cover",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "coil cleaning access cover",
+      "claim": "coil cleaning access cover is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "coil_cleaning_access_cover"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_filter_service_service_interval_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "service interval label",
+      "claim": "service interval label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "service_interval_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:maintenance_serviceability_filter_service_spare_gasket_kit",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "spare gasket kit",
+      "claim": "spare gasket kit is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "spare_gasket_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_circulation_pump_group_flow_proving_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "flow proving switch",
+      "claim": "flow proving switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "flow_proving_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_circulation_pump_group_pump_isolation_valve_pair",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "pump isolation valve pair",
+      "claim": "pump isolation valve pair is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "pump_isolation_valve_pair"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_circulation_pump_group_strainer_filter",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "strainer filter",
+      "claim": "strainer filter is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "strainer_filter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_condenser_heat_exchanger_plate_exchanger_insulation_jacket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "plate exchanger insulation jacket",
+      "claim": "plate exchanger insulation jacket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "plate_exchanger_insulation_jacket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_condenser_heat_exchanger_refrigerant_outlet_temperature_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "refrigerant outlet temperature sensor",
+      "claim": "refrigerant outlet temperature sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_outlet_temperature_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_condenser_heat_exchanger_water_outlet_temperature_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "water outlet temperature sensor",
+      "claim": "water outlet temperature sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "water_outlet_temperature_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_hydronic_safety_group_automatic_air_vent",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "automatic air vent",
+      "claim": "automatic air vent is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "automatic_air_vent"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_hydronic_safety_group_expansion_vessel",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "expansion vessel",
+      "claim": "expansion vessel is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "expansion_vessel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:mass_fluid_transport_process_hydronic_safety_group_fill_and_drain_valve_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fill and drain valve set",
+      "claim": "fill and drain valve set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "fill_and_drain_valve_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_cable_management_emc_ferrite_clamp_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "EMC ferrite clamp set",
+      "claim": "EMC ferrite clamp set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "emc_ferrite_clamp_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_cable_management_ip_rated_cable_gland_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "IP-rated cable gland set",
+      "claim": "IP-rated cable gland set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "ip_rated_cable_gland_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_cable_management_segregated_cable_duct",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "segregated cable duct",
+      "claim": "segregated cable duct is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "segregated_cable_duct"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_cable_management_wiring_diagram_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "wiring diagram label",
+      "claim": "wiring diagram label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "wiring_diagram_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_internal_power_rails_24_v_dc_power_supply",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "24 V DC power supply",
+      "claim": "24 V DC power supply is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "24_v_dc_power_supply"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_internal_power_rails_fused_auxiliary_terminal",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "fused auxiliary terminal",
+      "claim": "fused auxiliary terminal is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "fused_auxiliary_terminal"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_internal_power_rails_protective_earth_bar",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "protective earth bar",
+      "claim": "protective earth bar is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "protective_earth_bar"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_internal_power_rails_terminal_rail_assembly",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "terminal rail assembly",
+      "claim": "terminal rail assembly is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "terminal_rail_assembly"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_mains_input_protection_lockable_isolator_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "lockable isolator switch",
+      "claim": "lockable isolator switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "lockable_isolator_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_mains_input_protection_mcb_breaker_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "MCB breaker set",
+      "claim": "MCB breaker set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "mcb_breaker_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_mains_input_protection_rcd_protection_device",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "RCD protection device",
+      "claim": "RCD protection device is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "rcd_protection_device"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:power_distribution_mains_input_protection_surge_protection_device",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "surge protection device",
+      "claim": "surge protection device is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "surge_protection_device"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_electrical_safety_earth_continuity_test_point",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "earth continuity test point",
+      "claim": "earth continuity test point is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "earth_continuity_test_point"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_electrical_safety_over_temperature_cut_out",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "over-temperature cut-out",
+      "claim": "over-temperature cut-out is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "over_temperature_cut_out"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_electrical_safety_safety_compliance_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "safety compliance label",
+      "claim": "safety compliance label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "safety_compliance_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_electrical_safety_touch_safe_terminal_cover",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "touch-safe terminal cover",
+      "claim": "touch-safe terminal cover is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "touch_safe_terminal_cover"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_hydronic_freeze_protection_anti_freeze_thermostat",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "anti-freeze thermostat",
+      "claim": "anti-freeze thermostat is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "anti_freeze_thermostat"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_hydronic_freeze_protection_backup_immersion_heater_relay",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "backup immersion heater relay",
+      "claim": "backup immersion heater relay is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "backup_immersion_heater_relay"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_hydronic_freeze_protection_drain_down_instruction_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "drain-down instruction label",
+      "claim": "drain-down instruction label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "drain_down_instruction_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_hydronic_freeze_protection_glycol_compatibility_tag",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "glycol compatibility tag",
+      "claim": "glycol compatibility tag is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "glycol_compatibility_tag"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_refrigerant_safety_high_pressure_cut_out_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "high-pressure cut-out switch",
+      "claim": "high-pressure cut-out switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "high_pressure_cut_out_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_refrigerant_safety_low_pressure_cut_out_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "low-pressure cut-out switch",
+      "claim": "low-pressure cut-out switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "low_pressure_cut_out_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_refrigerant_safety_refrigerant_leak_alarm_output",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "refrigerant leak alarm output",
+      "claim": "refrigerant leak alarm output is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_leak_alarm_output"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:safety_protection_refrigerant_safety_refrigerant_warning_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "refrigerant warning label",
+      "claim": "refrigerant warning label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_warning_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_ambient_sensing_air_pressure_switch",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "air pressure switch",
+      "claim": "air pressure switch is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "air_pressure_switch"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_ambient_sensing_ambient_humidity_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "ambient humidity sensor",
+      "claim": "ambient humidity sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "ambient_humidity_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_ambient_sensing_ambient_temperature_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "ambient temperature sensor",
+      "claim": "ambient temperature sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "ambient_temperature_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_ambient_sensing_rain_ingress_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "rain ingress sensor",
+      "claim": "rain ingress sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "rain_ingress_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_refrigerant_sensing_discharge_temperature_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "discharge temperature probe",
+      "claim": "discharge temperature probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "discharge_temperature_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_refrigerant_sensing_refrigerant_leak_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "refrigerant leak sensor",
+      "claim": "refrigerant leak sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_leak_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_refrigerant_sensing_suction_temperature_probe",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "suction temperature probe",
+      "claim": "suction temperature probe is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "suction_temperature_probe"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_water_sensing_flow_meter_cartridge",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "flow meter cartridge",
+      "claim": "flow meter cartridge is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "flow_meter_cartridge"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_water_sensing_flow_temperature_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "flow temperature sensor",
+      "claim": "flow temperature sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "flow_temperature_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_water_sensing_return_temperature_sensor",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "return temperature sensor",
+      "claim": "return temperature sensor is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "return_temperature_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:sensing_instrumentation_water_sensing_water_pressure_transducer",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "water pressure transducer",
+      "claim": "water pressure transducer is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "water_pressure_transducer"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_mounting_base_anti_vibration_foot_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "anti-vibration foot set",
+      "claim": "anti-vibration foot set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "anti_vibration_foot_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_mounting_base_base_rail_pair",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "base rail pair",
+      "claim": "base rail pair is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "base_rail_pair"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_mounting_base_condensate_fall_spacer",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "condensate fall spacer",
+      "claim": "condensate fall spacer is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "condensate_fall_spacer"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_mounting_base_lifting_lug_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "lifting lug set",
+      "claim": "lifting lug set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "lifting_lug_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_service_access_panels_hinged_controller_cover",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "hinged controller cover",
+      "claim": "hinged controller cover is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "hinged_controller_cover"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_service_access_panels_quarter_turn_latch_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "quarter-turn latch set",
+      "claim": "quarter-turn latch set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "quarter_turn_latch_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_service_access_panels_removable_service_panel",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "removable service panel",
+      "claim": "removable service panel is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "removable_service_panel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_service_access_panels_service_clearance_label",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "service clearance label",
+      "claim": "service clearance label is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "service_clearance_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_weatherproof_cabinet_epdm_door_gasket",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "EPDM door gasket",
+      "claim": "EPDM door gasket is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "epdm_door_gasket"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_weatherproof_cabinet_galvanised_steel_cabinet",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "galvanised steel cabinet",
+      "claim": "galvanised steel cabinet is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "galvanised_steel_cabinet"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_weatherproof_cabinet_ip_rated_fastener_set",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "IP-rated fastener set",
+      "claim": "IP-rated fastener set is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "ip_rated_fastener_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "component_candidate:structure_containment_weatherproof_cabinet_powder_coated_access_panel",
+      "kind": "component_candidate",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "powder-coated access panel",
+      "claim": "powder-coated access panel is an architecture-derived component candidate with quantity 1 candidate.",
+      "provenanceRefs": [
+        "model:scratch_universal_architecture.heat_pump"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "powder_coated_access_panel"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review whether this is a unique physical item, shared component or separate installation instance."
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication",
+      "claim": "Control Compute Communication is a top-level functional module: Coordinates refrigerant, fan, pump, defrost and user-demand states.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "heat_pump_controller_pcb",
+        "controller_enclosure",
+        "real_time_clock_module",
+        "non_volatile_fault_memory",
+        "compressor_contactor",
+        "pump_relay_output",
+        "fan_pwm_output_board",
+        "safety_chain_input_terminal",
+        "modbus_service_port",
+        "usb_commissioning_adapter",
+        "fault_led_stack",
+        "installer_qr_code_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:energy_conversion_transduction",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Refrigerant Energy Conversion",
+      "claim": "Refrigerant Energy Conversion is a top-level functional module: Moves roughly 8 kW of useful heat with a target COP near 3.5.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor",
+        "compressor_inverter_drive",
+        "compressor_mounting_grommet_set",
+        "crankcase_heater_band",
+        "electronic_expansion_valve",
+        "eev_stepper_harness",
+        "liquid_line_filter_drier",
+        "sight_glass_indicator",
+        "copper_refrigerant_tube_set",
+        "service_valve_pair",
+        "brazed_joint_sleeve_set",
+        "refrigerant_charge_label",
+        "refrigerant_stub_out_pair",
+        "hydronic_stub_out_pair",
+        "plate_heat_exchanger_mounting_bracket",
+        "condenser_insulation_sleeve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Outdoor Air Interface",
+      "claim": "Outdoor Air Interface is a top-level functional module: Extracts ambient heat while managing airflow, frost and condensate.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "outdoor_finned_evaporator_coil",
+        "coil_temperature_sensor",
+        "coil_guard_grille",
+        "hydrophilic_fin_coating",
+        "variable_speed_fan_assembly",
+        "ec_fan_motor_controller",
+        "fan_shroud",
+        "inlet_debris_screen",
+        "condensate_drain_tray",
+        "trace_heater_cable",
+        "defrost_temperature_probe",
+        "drain_hose_barb"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:hmi_ergonomics",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "User And Installer Interface",
+      "claim": "User And Installer Interface is a top-level functional module: Presents operating mode, alarms and service instructions to users and installers.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "lcd_status_display",
+        "menu_button_membrane",
+        "weatherproof_display_window",
+        "mode_indicator_led_set",
+        "thermostat_input_terminal",
+        "modbus_room_controller_link",
+        "demand_signal_opto_isolator",
+        "installer_wiring_label",
+        "alarm_relay_output",
+        "user_quick_start_label",
+        "fault_reset_button",
+        "qr_service_documentation_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Maintenance And Commissioning",
+      "claim": "Maintenance And Commissioning is a top-level functional module: Supports installation, refrigerant service, hydronic flushing and periodic inspection.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_service_port_cap_set",
+        "hydronic_drain_cock",
+        "pressure_gauge_pocket",
+        "commissioning_checklist_card",
+        "cleanable_y_strainer_basket",
+        "coil_cleaning_access_cover",
+        "service_interval_label",
+        "spare_gasket_kit",
+        "diagnostic_test_header",
+        "fault_code_label",
+        "data_log_export_button",
+        "installer_handover_record"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:mass_fluid_transport_process",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Hydronic Heat Delivery",
+      "claim": "Hydronic Heat Delivery is a top-level functional module: Transfers condenser heat into the building water circuit with protected flow.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "brazed_plate_heat_exchanger",
+        "plate_exchanger_insulation_jacket",
+        "water_outlet_temperature_sensor",
+        "refrigerant_outlet_temperature_sensor",
+        "hydronic_circulation_pump",
+        "pump_isolation_valve_pair",
+        "flow_proving_switch",
+        "strainer_filter",
+        "hydronic_safety_valve_kit",
+        "expansion_vessel",
+        "automatic_air_vent",
+        "fill_and_drain_valve_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Electrical Power Distribution",
+      "claim": "Electrical Power Distribution is a top-level functional module: Distributes mains power to compressor, fan, pump, controller and auxiliaries.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "lockable_isolator_switch",
+        "mcb_breaker_set",
+        "rcd_protection_device",
+        "surge_protection_device",
+        "24_v_dc_power_supply",
+        "terminal_rail_assembly",
+        "fused_auxiliary_terminal",
+        "protective_earth_bar",
+        "segregated_cable_duct",
+        "ip_rated_cable_gland_set",
+        "emc_ferrite_clamp_set",
+        "wiring_diagram_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Safety Protection",
+      "claim": "Safety Protection is a top-level functional module: Protects against refrigerant, pressure, electrical and freeze hazards.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "high_pressure_cut_out_switch",
+        "low_pressure_cut_out_switch",
+        "refrigerant_leak_alarm_output",
+        "refrigerant_warning_label",
+        "anti_freeze_thermostat",
+        "backup_immersion_heater_relay",
+        "drain_down_instruction_label",
+        "glycol_compatibility_tag",
+        "earth_continuity_test_point",
+        "touch_safe_terminal_cover",
+        "over_temperature_cut_out",
+        "safety_compliance_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Sensing Instrumentation",
+      "claim": "Sensing Instrumentation is a top-level functional module: Measures refrigerant, water and ambient state for safety and efficiency.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers",
+        "suction_temperature_probe",
+        "discharge_temperature_probe",
+        "refrigerant_leak_sensor",
+        "flow_temperature_sensor",
+        "return_temperature_sensor",
+        "flow_meter_cartridge",
+        "water_pressure_transducer",
+        "ambient_temperature_sensor",
+        "ambient_humidity_sensor",
+        "air_pressure_switch",
+        "rain_ingress_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Monobloc Structure And Containment",
+      "claim": "Monobloc Structure And Containment is a top-level functional module: Contains the refrigeration system, controls airflow and supports outdoor mounting.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "galvanised_steel_cabinet",
+        "powder_coated_access_panel",
+        "epdm_door_gasket",
+        "ip_rated_fastener_set",
+        "anti_vibration_foot_set",
+        "base_rail_pair",
+        "condensate_fall_spacer",
+        "lifting_lug_set",
+        "removable_service_panel",
+        "hinged_controller_cover",
+        "quarter_turn_latch_set",
+        "service_clearance_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Accept, correct or reject the module allocation through engineering review."
+    },
+    {
+      "id": "regulatory_standard:EN-14511",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "EN-14511",
+      "claim": "EN-14511: Heat pump performance test conditions is relevant in UK/EU.",
+      "provenanceRefs": [
+        "class_pack:heat_pump.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Capacity, COP and operating-point test evidence."
+    },
+    {
+      "id": "regulatory_standard:EN-378",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "EN-378",
+      "claim": "EN-378: Refrigerating systems and heat pumps safety is relevant in UK/EU.",
+      "provenanceRefs": [
+        "class_pack:heat_pump.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Refrigerant charge, pressure protection and safety assessment."
+    },
+    {
+      "id": "regulatory_standard:EN-60335-2-40",
+      "kind": "regulatory_standard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "EN-60335-2-40",
+      "claim": "EN-60335-2-40: Electrical safety for heat pumps and air conditioners is relevant in UK/EU.",
+      "provenanceRefs": [
+        "class_pack:heat_pump.class_pack"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Electrical safety, leakage, temperature and abnormal-operation evidence."
+    },
+    {
+      "id": "risk_hazard:1",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Refrigerant leak or flammability hazard",
+      "claim": "Refrigerant leak or flammability hazard has provisional RPN 108 with mitigation: Charge limit review, leak detection, ventilation path and ignition-source control.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "risk_hazard:2",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Frozen outdoor coil reduces capacity",
+      "claim": "Frozen outdoor coil reduces capacity has provisional RPN 120 with mitigation: Defrost control, coil temperature sensing and condensate drainage.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "risk_hazard:3",
+      "kind": "risk_hazard",
+      "status": "generated_needs_review",
+      "basis": "class_pack",
+      "scope": "Hydronic overpressure or low flow",
+      "claim": "Hydronic overpressure or low flow has provisional RPN 84 with mitigation: Flow proving, safety valve, expansion volume and pump feedback.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review severity, occurrence, detection and mitigation with a domain reviewer before publication."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:main_controller",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication / Main controller",
+      "claim": "Main controller is allocated under Control Compute Communication: Runs heating, hot-water, anti-freeze and defrost state machines.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "heat_pump_controller_pcb",
+        "controller_enclosure",
+        "real_time_clock_module",
+        "non_volatile_fault_memory"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:power_driver_io",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication / Power driver IO",
+      "claim": "Power driver IO is allocated under Control Compute Communication: Switches controlled loads and reads discrete safety inputs.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "compressor_contactor",
+        "pump_relay_output",
+        "fan_pwm_output_board",
+        "safety_chain_input_terminal"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:service_communications",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Control Compute Communication / Service communications",
+      "claim": "Service communications is allocated under Control Compute Communication: Exposes commissioning and diagnostics to installers.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedComponentWordIds": [
+        "modbus_service_port",
+        "usb_commissioning_adapter",
+        "fault_led_stack",
+        "installer_qr_code_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:compressor_inverter_stage",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Refrigerant Energy Conversion / Compressor inverter stage",
+      "claim": "Compressor inverter stage is allocated under Refrigerant Energy Conversion: Raises refrigerant pressure while modulating thermal output.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor",
+        "compressor_inverter_drive",
+        "compressor_mounting_grommet_set",
+        "crankcase_heater_band"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:condenser_coupling_boundary",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Refrigerant Energy Conversion / Condenser coupling boundary",
+      "claim": "Condenser coupling boundary is allocated under Refrigerant Energy Conversion: Defines the refrigerant-to-water handoff into the hydronic heat-delivery module.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_stub_out_pair",
+        "hydronic_stub_out_pair",
+        "plate_heat_exchanger_mounting_bracket",
+        "condenser_insulation_sleeve"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:expansion_metering_stage",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Refrigerant Energy Conversion / Expansion metering stage",
+      "claim": "Expansion metering stage is allocated under Refrigerant Energy Conversion: Meters refrigerant into the outdoor coil across operating conditions.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "electronic_expansion_valve",
+        "eev_stepper_harness",
+        "liquid_line_filter_drier",
+        "sight_glass_indicator"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:refrigerant_manifold",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Refrigerant Energy Conversion / Refrigerant manifold",
+      "claim": "Refrigerant manifold is allocated under Refrigerant Energy Conversion: Routes refrigerant between compressor, evaporator, condenser and service points.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedComponentWordIds": [
+        "copper_refrigerant_tube_set",
+        "service_valve_pair",
+        "brazed_joint_sleeve_set",
+        "refrigerant_charge_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:defrost_condensate",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Outdoor Air Interface / Defrost and condensate path",
+      "claim": "Defrost and condensate path is allocated under Outdoor Air Interface: Controls frost meltwater and drainage away from the outdoor unit.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "condensate_drain_tray",
+        "trace_heater_cable",
+        "defrost_temperature_probe",
+        "drain_hose_barb"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:fan_air_path",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Outdoor Air Interface / Fan air path",
+      "claim": "Fan air path is allocated under Outdoor Air Interface: Drives controlled airflow through the coil face.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "variable_speed_fan_assembly",
+        "ec_fan_motor_controller",
+        "fan_shroud",
+        "inlet_debris_screen"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:outdoor_evaporator",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Outdoor Air Interface / Outdoor evaporator",
+      "claim": "Outdoor evaporator is allocated under Outdoor Air Interface: Transfers ambient heat into the refrigerant loop.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedComponentWordIds": [
+        "outdoor_finned_evaporator_coil",
+        "coil_temperature_sensor",
+        "coil_guard_grille",
+        "hydrophilic_fin_coating"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:alarm_and_user_guidance",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "User And Installer Interface / Alarm and user guidance",
+      "claim": "Alarm and user guidance is allocated under User And Installer Interface: Communicates faults and safe user actions.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "alarm_relay_output",
+        "user_quick_start_label",
+        "fault_reset_button",
+        "qr_service_documentation_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:local_display",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "User And Installer Interface / Local display",
+      "claim": "Local display is allocated under User And Installer Interface: Shows heat-pump status and permits basic configuration.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "lcd_status_display",
+        "menu_button_membrane",
+        "weatherproof_display_window",
+        "mode_indicator_led_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:remote_thermostat_interface",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "User And Installer Interface / Remote thermostat interface",
+      "claim": "Remote thermostat interface is allocated under User And Installer Interface: Connects building demand to heat pump control.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedComponentWordIds": [
+        "thermostat_input_terminal",
+        "modbus_room_controller_link",
+        "demand_signal_opto_isolator",
+        "installer_wiring_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:commissioning_ports",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Maintenance And Commissioning / Commissioning ports",
+      "claim": "Commissioning ports is allocated under Maintenance And Commissioning: Provides controlled access to refrigerant and water commissioning points.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_service_port_cap_set",
+        "hydronic_drain_cock",
+        "pressure_gauge_pocket",
+        "commissioning_checklist_card"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:diagnostic_access",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Maintenance And Commissioning / Diagnostic access",
+      "claim": "Diagnostic access is allocated under Maintenance And Commissioning: Lets technicians verify states without dismantling assemblies.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "diagnostic_test_header",
+        "fault_code_label",
+        "data_log_export_button",
+        "installer_handover_record"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:filter_service",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Maintenance And Commissioning / Filter service",
+      "claim": "Filter service is allocated under Maintenance And Commissioning: Keeps hydronic and air paths maintainable.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedComponentWordIds": [
+        "cleanable_y_strainer_basket",
+        "coil_cleaning_access_cover",
+        "service_interval_label",
+        "spare_gasket_kit"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:circulation_pump_group",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Hydronic Heat Delivery / Circulation pump group",
+      "claim": "Circulation pump group is allocated under Hydronic Heat Delivery: Maintains water flow through the condenser and heating circuit.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_circulation_pump",
+        "pump_isolation_valve_pair",
+        "flow_proving_switch",
+        "strainer_filter"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:condenser_heat_exchanger",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Hydronic Heat Delivery / Condenser heat exchanger",
+      "claim": "Condenser heat exchanger is allocated under Hydronic Heat Delivery: Transfers refrigerant heat to the water loop.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "brazed_plate_heat_exchanger",
+        "plate_exchanger_insulation_jacket",
+        "water_outlet_temperature_sensor",
+        "refrigerant_outlet_temperature_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:hydronic_safety_group",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Hydronic Heat Delivery / Hydronic safety group",
+      "claim": "Hydronic safety group is allocated under Hydronic Heat Delivery: Limits water pressure and allows commissioning service.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "hydronic_safety_valve_kit",
+        "expansion_vessel",
+        "automatic_air_vent",
+        "fill_and_drain_valve_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:cable_management",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Electrical Power Distribution / Cable management",
+      "claim": "Cable management is allocated under Electrical Power Distribution: Separates mains, sensor and refrigerant-adjacent wiring.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "segregated_cable_duct",
+        "ip_rated_cable_gland_set",
+        "emc_ferrite_clamp_set",
+        "wiring_diagram_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:internal_power_rails",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Electrical Power Distribution / Internal power rails",
+      "claim": "Internal power rails is allocated under Electrical Power Distribution: Creates protected rails for control and auxiliary loads.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "24_v_dc_power_supply",
+        "terminal_rail_assembly",
+        "fused_auxiliary_terminal",
+        "protective_earth_bar"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:power_distribution:mains_input_protection",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Electrical Power Distribution / Mains input protection",
+      "claim": "Mains input protection is allocated under Electrical Power Distribution: Provides isolation and over-current protection at the unit boundary.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "lockable_isolator_switch",
+        "mcb_breaker_set",
+        "rcd_protection_device",
+        "surge_protection_device"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:electrical_safety",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Safety Protection / Electrical safety",
+      "claim": "Electrical safety is allocated under Safety Protection: Maintains protection and earthing integrity.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "earth_continuity_test_point",
+        "touch_safe_terminal_cover",
+        "over_temperature_cut_out",
+        "safety_compliance_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:hydronic_freeze_protection",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Safety Protection / Hydronic freeze protection",
+      "claim": "Hydronic freeze protection is allocated under Safety Protection: Prevents water-loop freeze damage in low ambient conditions.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "anti_freeze_thermostat",
+        "backup_immersion_heater_relay",
+        "drain_down_instruction_label",
+        "glycol_compatibility_tag"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:safety_protection:refrigerant_safety",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Safety Protection / Refrigerant safety",
+      "claim": "Refrigerant safety is allocated under Safety Protection: Detects abnormal refrigerant conditions and defines response paths.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedComponentWordIds": [
+        "high_pressure_cut_out_switch",
+        "low_pressure_cut_out_switch",
+        "refrigerant_leak_alarm_output",
+        "refrigerant_warning_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:ambient_sensing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Sensing Instrumentation / Ambient sensing",
+      "claim": "Ambient sensing is allocated under Sensing Instrumentation: Measures external conditions that affect capacity and defrost.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "ambient_temperature_sensor",
+        "ambient_humidity_sensor",
+        "air_pressure_switch",
+        "rain_ingress_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:refrigerant_sensing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Sensing Instrumentation / Refrigerant sensing",
+      "claim": "Refrigerant sensing is allocated under Sensing Instrumentation: Measures pressure and temperature around the refrigerant circuit.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers",
+        "suction_temperature_probe",
+        "discharge_temperature_probe",
+        "refrigerant_leak_sensor"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:water_sensing",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Sensing Instrumentation / Water sensing",
+      "claim": "Water sensing is allocated under Sensing Instrumentation: Measures water-loop temperatures and flow evidence.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "flow_temperature_sensor",
+        "return_temperature_sensor",
+        "flow_meter_cartridge",
+        "water_pressure_transducer"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:mounting_base",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Monobloc Structure And Containment / Mounting base",
+      "claim": "Mounting base is allocated under Monobloc Structure And Containment: Carries compressor mass and isolates installation vibration.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "anti_vibration_foot_set",
+        "base_rail_pair",
+        "condensate_fall_spacer",
+        "lifting_lug_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:service_access_panels",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Monobloc Structure And Containment / Service access panels",
+      "claim": "Service access panels is allocated under Monobloc Structure And Containment: Creates access for commissioning and repair without dismantling the unit.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "removable_service_panel",
+        "hinged_controller_cover",
+        "quarter_turn_latch_set",
+        "service_clearance_label"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "submodule_allocation:structure_containment:weatherproof_cabinet",
+      "kind": "submodule_allocation",
+      "status": "generated_needs_review",
+      "basis": "generated_model",
+      "scope": "Monobloc Structure And Containment / Weatherproof cabinet",
+      "claim": "Weatherproof cabinet is allocated under Monobloc Structure And Containment: Protects refrigerant, electrical and hydronic assemblies outdoors.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedComponentWordIds": [
+        "galvanised_steel_cabinet",
+        "powder_coated_access_panel",
+        "epdm_door_gasket",
+        "ip_rated_fastener_set"
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review component candidates and interface carriers for this submodule."
+    },
+    {
+      "id": "engineering_calculation:heat_pump_cop_envelope",
+      "kind": "engineering_calculation",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Heat pump COP envelope",
+      "claim": "Heat pump COP envelope: 3.5 COP using cop.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction",
+        "control_compute_communication",
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor",
+        "heat_pump_controller_pcb",
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm EN 14511 or local rating point, flow temperature, refrigerant and ambient condition."
+    },
+    {
+      "id": "engineering_calculation:heat_pump_electrical_input_kw",
+      "kind": "engineering_calculation",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Heat pump electrical input",
+      "claim": "Heat pump electrical input: 2.29 kW using thermal_output_kw / cop.",
+      "provenanceRefs": [],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction",
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "control_compute_communication",
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor",
+        "outdoor_finned_evaporator_coil",
+        "brazed_plate_heat_exchanger",
+        "heat_pump_controller_pcb",
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm COP rating condition, compressor input power, pump/fan auxiliaries and defrost allowance."
+    },
+    {
+      "id": "headline_metric:headline_output",
+      "kind": "headline_metric",
+      "status": "calculated_needs_review",
+      "basis": "calculation",
+      "scope": "Annual useful heat output",
+      "claim": "Annual useful heat output = 16000 kWh/year.",
+      "provenanceRefs": [
+        "class_pack:heat_pump.class_pack",
+        "formula:thermal_output_kw * annual_full_load_hours"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedModuleIds": [],
+      "linkedComponentWordIds": [],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "nextAction": "Review the formula, input values and operating envelope before treating this metric as accepted."
+    },
+    {
+      "id": "brief_requirement:cop",
+      "kind": "brief_requirement",
+      "status": "brief_supplied",
+      "basis": "brief",
+      "scope": "Coefficient of performance",
+      "claim": "Coefficient of performance = 3.5 COP.",
+      "provenanceRefs": [
+        "brief:input.brief"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "cop"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction",
+        "control_compute_communication",
+        "sensing_instrumentation"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor",
+        "heat_pump_controller_pcb",
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm requirement value, tolerance and acceptance condition with the project owner."
+    },
+    {
+      "id": "brief_requirement:thermal_output_kw",
+      "kind": "brief_requirement",
+      "status": "brief_supplied",
+      "basis": "brief",
+      "scope": "Thermal output",
+      "claim": "Thermal output = 8 kW.",
+      "provenanceRefs": [
+        "brief:input.brief"
+      ],
+      "sourceRefs": [],
+      "reviewerEvidenceRefs": [],
+      "linkedRequirementIds": [
+        "thermal_output_kw"
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction",
+        "environmental_interface",
+        "mass_fluid_transport_process"
+      ],
+      "linkedComponentWordIds": [
+        "inverter_scroll_compressor",
+        "outdoor_finned_evaporator_coil",
+        "brazed_plate_heat_exchanger"
+      ],
+      "blocksBom": false,
+      "blocksPublish": false,
+      "nextAction": "Confirm requirement value, tolerance and acceptance condition with the project owner."
+    }
+  ]
+}

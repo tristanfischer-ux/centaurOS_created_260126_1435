@@ -1,0 +1,20 @@
+flowchart LR
+  structure_containment["Rack Structure Containment"]
+  compute_acceleration["Compute Acceleration"]
+  network_io["Network IO"]
+  data_storage["Data Storage"]
+  control_compute_communication["Control Compute Communication"]
+  power_distribution["Power Distribution"]
+  environmental_interface["Thermal Airflow Interface"]
+  sensing_instrumentation["Telemetry Instrumentation"]
+  safety_protection["Security And Safety Protection"]
+  maintenance_serviceability["Field Maintenance Serviceability"]
+  control_compute_communication -->|"pcie_fabric"| compute_acceleration
+  power_distribution -->|"gpu_power_bus"| compute_acceleration
+  network_io -->|"inference_network"| control_compute_communication
+  data_storage -->|"storage_bus"| control_compute_communication
+  environmental_interface -->|"thermal_path"| compute_acceleration
+  sensing_instrumentation -->|"sensor_bus"| control_compute_communication
+  safety_protection -->|"hardwired_trip"| power_distribution
+  structure_containment -->|"airflow_path"| environmental_interface
+  classDef missing stroke:#a32626,stroke-width:3px,color:#a32626;

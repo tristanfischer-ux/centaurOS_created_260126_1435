@@ -1,0 +1,386 @@
+{
+  "summary": {
+    "rows": 24,
+    "briefSupported": 2,
+    "modelPresent": 4,
+    "reviewRequired": 7,
+    "sourceRequired": 11,
+    "blocked": 0,
+    "architectureBlockers": 0,
+    "bomBlockers": 11
+  },
+  "rows": [
+    {
+      "linkedRequirements": [
+        "thermal_output_kw"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:thermal_output_kw",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Thermal output",
+      "assumption": "Thermal output = 8 kW is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "cop"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:cop",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Coefficient of performance",
+      "assumption": "Coefficient of performance = 3.5 COP is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "metric:headline_output",
+      "category": "derived_metric",
+      "status": "review_required",
+      "scope": "Annual useful heat output",
+      "assumption": "Annual useful heat output uses thermal_output_kw * annual_full_load_hours with medium confidence.",
+      "basis": "class_pack:heat_pump.class_pack; formula:thermal_output_kw * annual_full_load_hours",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:capex_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated CAPEX",
+      "assumption": "Estimated CAPEX uses an implicit model with low confidence.",
+      "basis": "formula:capex=sum(bom.totalCostGbp); class_pack:heat_pump.class_pack",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:opex_annual_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated annual OPEX",
+      "assumption": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "basis": "formula:opex=capex*0.04",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:heatpump_cop_input_power",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "COP And Input Power",
+      "assumption": "COP And Input Power currently evaluates as pass against COP 2.5 to 5.5 for plausible air-source heat-pump operating points.",
+      "basis": "brief:input.brief; formula:thermal_output_kw / cop; model:engineering_sanity.heat_pump; model:engineering_sanity.heat_pump",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:heatpump_refrigerant_hydronic_closure",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Refrigerant/Hydronic Closure",
+      "assumption": "Refrigerant/Hydronic Closure currently evaluates as pass against refrigerant loop, hydronic loop, control bus and sensor bus present.",
+      "basis": "model:engineering_sanity.heat_pump; model:engineering_sanity.heat_pump",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:heatpump_safety_serviceability",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Safety And Serviceability Interfaces",
+      "assumption": "Safety And Serviceability Interfaces currently evaluates as pass against pressure relief, protective earth, condensate drain and service access present.",
+      "basis": "model:engineering_sanity.heat_pump; model:engineering_sanity.heat_pump",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "refrigerant_loop"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:environmental_interface:energy_conversion_transduction:refrigerant_loop",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "environmental_interface -> energy_conversion_transduction",
+      "assumption": "refrigerant_loop is named on both endpoint modules in the generated architecture.",
+      "basis": "Outdoor evaporator must connect to compressor and expansion circuit over a closed refrigerant loop.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "hydronic_loop"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:energy_conversion_transduction:mass_fluid_transport_process:hydronic_loop",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "energy_conversion_transduction -> mass_fluid_transport_process",
+      "assumption": "hydronic_loop is named on both endpoint modules in the generated architecture.",
+      "basis": "Condenser heat must transfer into the hydronic delivery loop.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "control_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:energy_conversion_transduction:control_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> energy_conversion_transduction",
+      "assumption": "control_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Controller must command compressor and expansion valve operation.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "sensor_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "assumption": "sensor_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Controller must receive pressure and temperature feedback for protection and efficiency.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "inverter_scroll_compressor"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_conversion_transduction_compressor_inverter_stage_inverter_scroll_compressor",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Inverter scroll compressor",
+      "assumption": "Inverter scroll compressor is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.heat_pump",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "electronic_expansion_valve"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_conversion_transduction_expansion_metering_stage_electronic_expansion_valve",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Electronic expansion valve",
+      "assumption": "Electronic expansion valve is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.heat_pump",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "outdoor_finned_evaporator_coil"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_outdoor_evaporator_outdoor_finned_evaporator_coil",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Outdoor finned evaporator coil",
+      "assumption": "Outdoor finned evaporator coil is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.heat_pump",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "variable_speed_fan_assembly"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:environmental_interface_fan_air_path_variable_speed_fan_assembly",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Variable-speed fan assembly",
+      "assumption": "Variable-speed fan assembly is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.heat_pump",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "brazed_plate_heat_exchanger"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:mass_fluid_transport_process_condenser_heat_exchanger_brazed_plate_heat_exchanger",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Brazed plate heat exchanger",
+      "assumption": "Brazed plate heat exchanger is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.heat_pump",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "hydronic_circulation_pump"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:mass_fluid_transport_process_circulation_pump_group_hydronic_circulation_pump",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Hydronic circulation pump",
+      "assumption": "Hydronic circulation pump is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.heat_pump",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "hydronic_safety_valve_kit"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:mass_fluid_transport_process_hydronic_safety_group_hydronic_safety_valve_kit",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Hydronic safety valve kit",
+      "assumption": "Hydronic safety valve kit is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.heat_pump",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "heat_pump_controller_pcb"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_main_controller_heat_pump_controller_pcb",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Heat pump controller PCB",
+      "assumption": "Heat pump controller PCB is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.heat_pump",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_refrigerant_sensing_refrigerant_sensor_and_pressure_transducers",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Refrigerant sensor and pressure transducers",
+      "assumption": "Refrigerant sensor and pressure transducers is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.heat_pump",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:EN-14511",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "EN-14511",
+      "assumption": "Heat pump performance test conditions is relevant to this product class in UK/EU.",
+      "basis": "class_pack:heat_pump.class_pack",
+      "evidenceRequired": "Capacity, COP and operating-point test evidence."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:EN-378",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "EN-378",
+      "assumption": "Refrigerating systems and heat pumps safety is relevant to this product class in UK/EU.",
+      "basis": "class_pack:heat_pump.class_pack",
+      "evidenceRequired": "Refrigerant charge, pressure protection and safety assessment."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:EN-60335-2-40",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "EN-60335-2-40",
+      "assumption": "Electrical safety for heat pumps and air conditioners is relevant to this product class in UK/EU.",
+      "basis": "class_pack:heat_pump.class_pack",
+      "evidenceRequired": "Electrical safety, leakage, temperature and abnormal-operation evidence."
+    }
+  ]
+}

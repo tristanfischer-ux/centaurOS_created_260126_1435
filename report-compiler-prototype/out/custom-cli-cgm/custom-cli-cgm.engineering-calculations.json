@@ -1,0 +1,64 @@
+{
+  "summary": {
+    "rows": 3,
+    "withinEnvelope": 2,
+    "needsReview": 1,
+    "outsideEnvelope": 0,
+    "blocked": 0
+  },
+  "rows": [
+    {
+      "id": "cgm_readings_per_day",
+      "status": "within_envelope",
+      "label": "CGM readings per day",
+      "formula": "1,440 / reading_interval_minutes",
+      "inputs": {
+        "reading_interval_minutes": 5
+      },
+      "result": 288,
+      "unit": "readings/day",
+      "envelope": "96 to 1,440 readings/day covers 15 min to 1 min intervals before power and buffering proof.",
+      "interpretation": "288 readings/day implied by sample interval.",
+      "evidenceRequired": "Confirm sensor settling, BLE duty cycle, local buffering, timestamping and battery budget.",
+      "linkedRequirements": [
+        "reading_interval_minutes"
+      ]
+    },
+    {
+      "id": "cgm_total_wear_readings",
+      "status": "needs_review",
+      "label": "CGM total wear readings",
+      "formula": "wear_days * (1,440 / reading_interval_minutes)",
+      "inputs": {
+        "wear_days": 14,
+        "reading_interval_minutes": 5
+      },
+      "result": 4032,
+      "unit": "readings/wear",
+      "envelope": "Arithmetic only; storage, power and calibration drift need evidence.",
+      "interpretation": "4032 readings over the stated wear period.",
+      "evidenceRequired": "Confirm memory, telemetry retries, battery capacity, sensor drift and calibration strategy.",
+      "linkedRequirements": [
+        "wear_days",
+        "reading_interval_minutes"
+      ]
+    },
+    {
+      "id": "cgm_mard_margin_to_10_percent",
+      "status": "within_envelope",
+      "label": "CGM MARD margin to 10%",
+      "formula": "10 - mard_percent",
+      "inputs": {
+        "mard_percent": 9
+      },
+      "result": 1,
+      "unit": "percentage points",
+      "envelope": "Positive margin to 10% target before clinical validation.",
+      "interpretation": "1 percentage-point margin to a 10% MARD target.",
+      "evidenceRequired": "Confirm clinical protocol, comparator, calibration method, population mix and error-grid analysis.",
+      "linkedRequirements": [
+        "mard_percent"
+      ]
+    }
+  ]
+}

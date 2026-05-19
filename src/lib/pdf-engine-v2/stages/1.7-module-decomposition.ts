@@ -69,6 +69,31 @@ import {
   type JudgeVerdict,
 } from '../radical/council-synthesis'
 import { parseJsonFromLlm } from '../lib/llm-json'
+import { getActionLogger } from '../lib/action-logger'
+import {
+  ensureGraphsRegistered,
+  getClassReferenceGraph,
+  validateConnectionsAgainstGraph,
+  type ProductClassGraph,
+  type GraphValidationResult,
+} from '../class-reference-graph'
+import {
+  isRagAtEmissionEnabled,
+  retrieveReferences,
+  formatFewShotBlock,
+  type ReferenceRecord,
+} from '../retrieve-references'
+// 2026-05-18 — registry accumulation write-back + read-back. This mirrors the
+// supplier write-back pattern (scripts/supplier-enrichment/persist-web-fallback.ts):
+// every multi-emitter Stage 1.7 run feeds prior-confirmed sub-modules + cross-
+// module connections back into a SQLite accumulation table, and the next run
+// pulls those entries to inject into the emitter prompt as "emit these by
+// default". Fail-soft — every DB call try/catches so pipeline never breaks.
+import {
+  persistConsensusFromSynthesis,
+  buildAccumulatedPromptBlock,
+  type EmitterOutputLike,
+} from '../../../../scripts/registry-accumulation/persist-emitted-modules'
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -91,6 +116,492 @@ export function isPhase3PerModuleEnabled(): boolean {
 export function isMultiEmitterEnabled(): boolean {
   const raw = (process.env.RADICAL_MULTI_EMITTER ?? '').toLowerCase().trim()
   return raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on'
+}
+
+// ---------------------------------------------------------------------------
+// K10 shadow-mode validation — 2026-05-18 (dispatch: "Wire K10 into G4 in
+// shadow mode first").
+//
+// AFTER the G4 grammar gate completes (whether retries exhausted, council
+// PASS, fallback to priors, or otherwise), validate the emitted
+// `cross_module_grammar_links` against the K10 ProductClassGraph for the
+// resolved product_class. Attach the structured result to the
+// ModuleDecomposition object as `k10ShadowResult` (additive — accessed via
+// `as any` like the existing `g4ManualReview` badge).
+//
+// SHADOW MODE: this never blocks the pipeline. It collects diagnostic data
+// so the next dispatch can promote to enforcing mode once we know what the
+// failure pattern looks like across the 10 supported classes.
+//
+// Disable entirely (for performance testing) by setting
+// `PDF_ENGINE_K10_VALIDATE=false`.
+// ---------------------------------------------------------------------------
+
+/**
+ * Shadow-mode validation result attached to ModuleDecomposition (via `as any`).
+ *
+ * `verdict` semantics:
+ *  - `PASS_SHADOW`     — every required edge in the graph is present in
+ *                        the emission
+ *  - `FAIL_SHADOW`     — at least one required graph edge is missing from
+ *                        the emission (would have failed enforcing mode)
+ *  - `NO_GRAPH`        — no K10 graph registered for this product_class
+ *                        (shadow check intentionally skipped — not a fail)
+ *  - `SKIPPED`         — PDF_ENGINE_K10_VALIDATE=false, validation disabled
+ *  - `ERROR`           — validator threw (caught; pipeline continues)
+ */
+export interface K10ShadowResult {
+  /** Resolved K10 graph slug used for the lookup (may differ from product_class). */
+  class: string
+  /** Original product_class emitted on the decomposition. */
+  product_class: string
+  verdict: 'PASS_SHADOW' | 'FAIL_SHADOW' | 'NO_GRAPH' | 'SKIPPED' | 'ERROR'
+  /** Number of emitted edges that matched a graph edge (mutual or directional). */
+  matched_edges: number
+  /** Required graph edges with no matching emission — the "would-block" set. */
+  missing_required: Array<{
+    from_class: string
+    to_class: string
+    protocol?: string
+    mechanism?: string
+    notes?: string
+  }>
+  /** Emitted edges that found no graph match — informational only. */
+  extra_emitted: Array<{
+    from_module: string
+    to_module: string
+    mechanism?: string
+    protocol?: string
+    detail?: string
+  }>
+  /** Matched edges where mechanism/protocol disagreed with the graph entry. */
+  protocol_mismatches: Array<{
+    from_module: string
+    to_module: string
+    reason: string
+  }>
+  /** ISO-8601 timestamp the shadow check ran. */
+  ts: string
+  /** Always 'shadow' in this dispatch — sentinel for the future enforcing-mode flip. */
+  mode: 'shadow'
+  /** Why ERROR / NO_GRAPH / SKIPPED — surface to the renderer for the Appendix B note. */
+  reason?: string
+}
+
+/**
+ * Map from `state.moduleDecomposition.product_class` (the upstream
+ * classification string) to a registered K10 graph slug. The classifier
+ * emits short slugs (e.g. `energy_storage`, `heat_pump`) while the K10
+ * registry uses fuller class names (e.g. `bess-utility-scale`,
+ * `heat-pump-residential`). This table maps the former to the latter.
+ *
+ * Keys are matched case-insensitively after trimming. If a key is not in the
+ * table, we try a direct lookup against the K10 registry (which covers
+ * already-correct slugs like `dc_fast_ev_charger`, `insulin_pump`, etc.).
+ */
+const K10_CLASS_ALIASES: Readonly<Record<string, string>> = {
+  // BESS variants
+  'bess':                                 'bess-utility-scale',
+  'energy_storage':                       'bess-utility-scale',
+  'battery_energy_storage':               'bess-utility-scale',
+  'battery_energy_storage_system':        'bess-utility-scale',
+  // Heat pump
+  'heat_pump':                            'heat-pump-residential',
+  'heat-pump':                            'heat-pump-residential',
+  'thermal_system':                       'heat-pump-residential',
+  // VFD
+  'vfd':                                  'vfd-motor-drive',
+  'motor_drive':                          'vfd-motor-drive',
+  // EV charger
+  'ev_charger':                           'dc_fast_ev_charger',
+  // Solar inverter
+  'pv_inverter':                          'pv_string_inverter',
+  'solar_inverter':                       'pv_string_inverter',
+  'string_inverter':                      'pv_string_inverter',
+  // Robot arm
+  'robot_arm':                            'industrial_robot_arm',
+  'industrial_robot':                     'industrial_robot_arm',
+  // Insulin pump
+  'insulin':                              'insulin_pump',
+  // Fuel cell
+  'fuel_cell':                            'fuel_cell_power_module',
+  // 3D printer
+  '3d_printer':                           'industrial_3d_printer',
+  'metal_3d_printer':                     'industrial_3d_printer',
+  'sla_printer':                          'industrial_3d_printer',
+  // Hydrogen electrolyser
+  'electrolyser':                         'hydrogen_electrolyser',
+  'electrolyzer':                         'hydrogen_electrolyser',
+  // Commercial heat pump (added 2026-05-18 "10 → 15 coverage" dispatch)
+  'heat_pump_commercial':                 'heat-pump-commercial',
+  'commercial_heat_pump':                 'heat-pump-commercial',
+  'industrial_heat_pump':                 'heat-pump-commercial',
+  'large_heat_pump':                      'heat-pump-commercial',
+  // PV module residential
+  'pv_module':                            'pv_module_residential',
+  'solar_module':                         'pv_module_residential',
+  'solar_panel':                          'pv_module_residential',
+  'pv_panel':                             'pv_module_residential',
+  'photovoltaic_module':                  'pv_module_residential',
+  // Wind turbine small
+  'wind_turbine':                         'wind_turbine_small',
+  'small_wind':                           'wind_turbine_small',
+  'small_wind_turbine':                   'wind_turbine_small',
+  'distributed_wind':                     'wind_turbine_small',
+  // AUV subsea
+  'auv':                                  'auv-subsea',
+  'autonomous_underwater_vehicle':        'auv-subsea',
+  'subsea_auv':                           'auv-subsea',
+  'uuv':                                  'auv-subsea',
+  // Vehicle battery pack
+  'ev_battery':                           'vehicle_battery_pack',
+  'ev_battery_pack':                      'vehicle_battery_pack',
+  'traction_battery':                     'vehicle_battery_pack',
+  'traction_battery_pack':                'vehicle_battery_pack',
+  'vehicle_battery':                      'vehicle_battery_pack',
+}
+
+/**
+ * Resolve a product_class string to a K10 graph slug, or null if no K10
+ * graph is registered for that class. Tries: direct registry lookup → alias
+ * map → null.
+ */
+function resolveK10GraphSlug(productClass: string): string | null {
+  const trimmed = productClass.trim().toLowerCase()
+  if (trimmed.length === 0) return null
+  // Direct hit on the registry (covers exact slugs like `dc_fast_ev_charger`).
+  if (getClassReferenceGraph(trimmed)) return trimmed
+  // Alias map (covers classifier-shortened slugs like `heat_pump`).
+  const aliased = K10_CLASS_ALIASES[trimmed]
+  if (aliased && getClassReferenceGraph(aliased)) return aliased
+  return null
+}
+
+/**
+ * Run the K10 shadow-mode validation against an emitted ModuleDecomposition
+ * and return the structured shadow result. Pure function — does NOT mutate
+ * its inputs. Never throws (catches internally).
+ *
+ * Caller (the public `runModuleDecomposition`) attaches the result to the
+ * decomposition via `(data as any).k10ShadowResult = ...` so it round-trips
+ * through `state.moduleDecomposition` and reaches the PDF renderer.
+ */
+export async function runK10ShadowValidation(
+  data: ModuleDecomposition,
+): Promise<K10ShadowResult> {
+  const ts = new Date().toISOString()
+
+  // Opt-out switch — disable entirely for performance testing.
+  if (process.env.PDF_ENGINE_K10_VALIDATE === 'false') {
+    return {
+      class: '',
+      product_class: data.product_class,
+      verdict: 'SKIPPED',
+      matched_edges: 0,
+      missing_required: [],
+      extra_emitted: [],
+      protocol_mismatches: [],
+      ts,
+      mode: 'shadow',
+      reason: 'PDF_ENGINE_K10_VALIDATE=false',
+    }
+  }
+
+  try {
+    await ensureGraphsRegistered()
+  } catch (err) {
+    return {
+      class: '',
+      product_class: data.product_class,
+      verdict: 'ERROR',
+      matched_edges: 0,
+      missing_required: [],
+      extra_emitted: [],
+      protocol_mismatches: [],
+      ts,
+      mode: 'shadow',
+      reason: `ensureGraphsRegistered threw: ${(err as Error).message ?? String(err)}`,
+    }
+  }
+
+  const slug = resolveK10GraphSlug(data.product_class)
+  if (!slug) {
+    return {
+      class: '',
+      product_class: data.product_class,
+      verdict: 'NO_GRAPH',
+      matched_edges: 0,
+      missing_required: [],
+      extra_emitted: [],
+      protocol_mismatches: [],
+      ts,
+      mode: 'shadow',
+      reason: `no K10 graph registered for product_class="${data.product_class}"`,
+    }
+  }
+  const graph = getClassReferenceGraph(slug) as ProductClassGraph
+
+  try {
+    const emitted = (data.cross_module_grammar_links ?? []).map(l => ({
+      from_module: l.from_module,
+      to_module: l.to_module,
+      mechanism: l.mechanism,
+      detail: l.detail,
+    }))
+    const k10Result: GraphValidationResult = validateConnectionsAgainstGraph(emitted, graph)
+
+    return {
+      class: slug,
+      product_class: data.product_class,
+      verdict: k10Result.missing_required.length === 0 ? 'PASS_SHADOW' : 'FAIL_SHADOW',
+      matched_edges: k10Result.summary.matched_count,
+      missing_required: k10Result.missing_required.map(e => ({
+        from_class: String(e.from_class),
+        to_class: String(e.to_class),
+        protocol: e.protocol,
+        mechanism: e.mechanism,
+        notes: e.notes,
+      })),
+      extra_emitted: k10Result.extra.map(e => ({
+        from_module: e.from_module,
+        to_module: e.to_module,
+        mechanism: e.mechanism,
+        protocol: e.protocol,
+        detail: e.detail,
+      })),
+      protocol_mismatches: k10Result.protocol_mismatch.map(m => ({
+        from_module: m.emitted.from_module,
+        to_module: m.emitted.to_module,
+        reason: m.reason,
+      })),
+      ts,
+      mode: 'shadow',
+    }
+  } catch (err) {
+    return {
+      class: slug,
+      product_class: data.product_class,
+      verdict: 'ERROR',
+      matched_edges: 0,
+      missing_required: [],
+      extra_emitted: [],
+      protocol_mismatches: [],
+      ts,
+      mode: 'shadow',
+      reason: `validateConnectionsAgainstGraph threw: ${(err as Error).message ?? String(err)}`,
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Task #87 (2026-05-18) — Auto class-registry hook.
+//
+// When `runK10ShadowValidation` returns `NO_GRAPH` (unknown product class),
+// the pipeline previously degraded to a poor template. This hook trips
+// `provisional_class_registry: true` on the ModuleDecomposition so the
+// renderer can flag the output as auto-generated, and optionally invokes the
+// organic generator (scripts/generate-class-registry.ts) to fill priors /
+// connections / standards / hazards / cost-stack ratios.
+//
+// Gating:
+//   - The hook ALWAYS attaches `provisional_class_registry: true` and
+//     `provisional_class_reason: <reason>` when the K10 shadow result is
+//     NO_GRAPH. No LLM cost.
+//   - The hook ALWAYS consults the cached `auto_class_registry` SQLite table
+//     (~/.forge-truth/forge-truth.db) — if a row exists for the slug, the
+//     payload is attached and downstream stages can use it. No LLM cost.
+//   - The hook ONLY pays Grok (one ~£1-2 call) when
+//     `PDF_ENGINE_AUTO_CLASS_GEN=true` is set in the environment. Off by
+//     default so a runaway pipeline can't quietly burn cost.
+//
+// Wire-up touches the ModuleDecomposition object via `(data as any).*`
+// (same additive-field pattern used by k10ShadowResult). Renderer reads:
+//   state.moduleDecomposition.provisional_class_registry
+//   state.moduleDecomposition.auto_class_registry_payload
+//   state.moduleDecomposition.auto_class_registry_audit
+//
+// IMPORTANT: this hook must NEVER throw — class-registry generation is a
+// best-effort enhancement. Any failure leaves the pipeline at its pre-hook
+// behaviour (poor-template degradation) with the provisional flag set.
+//
+// Drawer cross-ref: task #87.
+// ---------------------------------------------------------------------------
+
+export interface AutoClassRegistryHookResult {
+  /** True if an auto-registry entry was attached (cached or freshly generated). */
+  attached: boolean
+  /** True if the hook called the Grok generator (incurred LLM cost). */
+  generated: boolean
+  /** Resolved slug used for cache lookup. */
+  slug: string
+  /** Free-form reason / outcome. */
+  reason: string
+}
+
+/**
+ * If the K10 shadow result indicates the class is unknown (NO_GRAPH), mark
+ * the decomposition as provisional and try to attach an auto-generated
+ * registry payload. Pure side-effect on the `data` argument via additive
+ * `as any` fields. Never throws.
+ *
+ * @param data - ModuleDecomposition mutated in place with provisional flags.
+ * @param k10 - The shadow validation result. Only NO_GRAPH triggers hook.
+ * @param briefExcerpt - Optional brief text to pass to the generator. Up to
+ *   the caller to truncate before passing.
+ */
+export async function triggerAutoClassRegistryIfUnknown(
+  data: ModuleDecomposition,
+  k10: K10ShadowResult,
+  briefExcerpt: string = '',
+): Promise<AutoClassRegistryHookResult> {
+  // Only fire on NO_GRAPH — all other verdicts mean a curated graph exists.
+  if (k10.verdict !== 'NO_GRAPH') {
+    return {
+      attached: false,
+      generated: false,
+      slug: data.product_class,
+      reason: `K10 verdict=${k10.verdict} (curated graph in place); auto-registry hook skipped`,
+    }
+  }
+
+  const slug = String(data.product_class ?? '').trim()
+  if (!slug) {
+    return {
+      attached: false,
+      generated: false,
+      slug: '',
+      reason: 'product_class is empty on the decomposition; auto-registry hook skipped',
+    }
+  }
+
+  // ALWAYS attach the provisional flag — even if cache misses + generator is
+  // gated off, downstream stages and the renderer should know the class
+  // registry was not curated.
+  ;(data as any).provisional_class_registry = true
+  ;(data as any).provisional_class_reason =
+    k10.reason ?? `no K10 reference graph registered for product_class="${slug}"`
+
+  // Cache-first — zero LLM cost when the slug has been generated before.
+  try {
+    const { openAutoClassRegistryDb, loadCachedPayload, generateClassRegistryEntry } =
+      // Dynamic import so the type-graph dependency on better-sqlite3 stays
+      // out of any environment that doesn't have it (e.g. browser tests).
+      await import('../../../../scripts/generate-class-registry.js' as string)
+    const db = openAutoClassRegistryDb()
+    try {
+      const norm = slug.toLowerCase().replace(/-/g, '_')
+      const cached = loadCachedPayload(db, norm)
+      if (cached) {
+        ;(data as any).auto_class_registry_payload = cached.payload
+        ;(data as any).auto_class_registry_audit = cached.audit
+        return {
+          attached: true,
+          generated: false,
+          slug: norm,
+          reason: `cache hit for slug="${norm}" (generated_at=${cached.audit.generated_at}, model=${cached.audit.generator_model})`,
+        }
+      }
+
+      // Cache miss. Pay Grok ONLY when explicitly opted in.
+      const optIn = (process.env.PDF_ENGINE_AUTO_CLASS_GEN ?? '').toLowerCase().trim()
+      if (optIn !== 'true' && optIn !== '1' && optIn !== 'yes') {
+        return {
+          attached: false,
+          generated: false,
+          slug: norm,
+          reason: `cache miss for slug="${norm}"; PDF_ENGINE_AUTO_CLASS_GEN not set so generator is gated off (set it to "true" to pay one Grok call ~£1-2)`,
+        }
+      }
+
+      const out = await generateClassRegistryEntry(norm, {
+        briefExcerpt,
+        db,
+      })
+      if (!out.ok) {
+        return {
+          attached: false,
+          generated: false,
+          slug: norm,
+          reason: `generator failed: ${out.error}`,
+        }
+      }
+      if (out.alias) {
+        // Alias resolution — caller may want to re-classify upstream, but for
+        // now record the resolution and skip the payload attach.
+        return {
+          attached: false,
+          generated: false,
+          slug: out.resolved_slug,
+          reason: `generator aliased "${norm}" to curated slug "${out.resolved_slug}": ${out.reason}`,
+        }
+      }
+      ;(data as any).auto_class_registry_payload = out.payload
+      ;(data as any).auto_class_registry_audit = out.audit
+      return {
+        attached: true,
+        generated: true,
+        slug: norm,
+        reason: `Grok 4.3 generated fresh payload (cost=£${out.audit.estimated_cost_gbp.toFixed(3)}, tokens in/out=${out.audit.input_tokens}/${out.audit.output_tokens})`,
+      }
+    } finally {
+      try {
+        db.close()
+      } catch {
+        // ignore close errors
+      }
+    }
+  } catch (err) {
+    return {
+      attached: false,
+      generated: false,
+      slug,
+      reason: `auto-registry hook threw — non-fatal: ${(err as Error).message ?? String(err)}`,
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// W1 2026-05-18 — RAG-at-emission helper. Builds a "brief text" from the
+// structured brief JSON suitable for embedding-based retrieval, runs the
+// Python retriever (`scripts/rag/retrieve_json.py`), and returns the
+// formatted few-shot block ready to concatenate into `baseUserContent`.
+// Returns an empty string when RAG is disabled or retrieval fails — callers
+// fall through to the pre-W1 prompt path unchanged.
+// ---------------------------------------------------------------------------
+
+function composeBriefForRetrieval(brief: StructuredBriefJSON, classification: string): string {
+  // The dominant signal is `product_description`. Append mission + a compact
+  // summary of any safety standards so the embedding picks up class signals
+  // even when the description is short.
+  const parts: string[] = []
+  if (brief.product_description) parts.push(brief.product_description.trim())
+  if (brief.mission_statement) parts.push(brief.mission_statement.trim())
+  const standards = (brief.constraints?.safety_standards ?? [])
+    .map(s => (s as { value?: string }).value)
+    .filter((v): v is string => Boolean(v))
+  if (standards.length > 0) parts.push(`Standards: ${standards.slice(0, 6).join(', ')}`)
+  parts.push(`Product class: ${classification}`)
+  return parts.join('\n\n').slice(0, 4000)
+}
+
+async function buildRagFewShotBlock(
+  brief: StructuredBriefJSON,
+  classification: string,
+): Promise<{ block: string; records: ReferenceRecord[] }> {
+  if (!isRagAtEmissionEnabled()) return { block: '', records: [] }
+  const startedAt = Date.now()
+  try {
+    const briefText = composeBriefForRetrieval(brief, classification)
+    const records = await retrieveReferences(briefText, classification, { k: 5 })
+    const block = formatFewShotBlock(records)
+    console.log(
+      `[module-decomposition][rag] retrieved ${records.length} reference records for class=${classification} in ${Date.now() - startedAt}ms`,
+    )
+    return { block, records }
+  } catch (err) {
+    console.warn(`[module-decomposition][rag] retrieval failed: ${(err as Error).message}`)
+    return { block: '', records: [] }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -161,6 +672,8 @@ async function callOpenRouterJson(
    * The repair path is far cheaper than another emitter call.
    */
   enableLlmRepair = false,
+  /** Optional caller-supplied step name for the action log (e.g. 'module_decomposition:emitter:grok') */
+  stepName = 'module_decomposition',
 ): Promise<LlmCallResult> {
   const startedAt = Date.now()
   let lastErr: unknown
@@ -168,6 +681,7 @@ async function callOpenRouterJson(
   for (const model of models) {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 300_000)
+    const modelStartAt = Date.now()
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -188,6 +702,13 @@ async function callOpenRouterJson(
       })
       clearTimeout(timeout)
       if (!response.ok) {
+        getActionLogger().logLlm({
+          step_name: stepName,
+          model,
+          latency_ms: Date.now() - modelStartAt,
+          ok: false,
+          error: `OpenRouter ${response.status}`,
+        })
         throw new Error(`OpenRouter API status ${response.status} from ${model}`)
       }
       const json = await response.json() as {
@@ -199,6 +720,17 @@ async function callOpenRouterJson(
       if (finishReason && finishReason !== 'stop' && finishReason !== 'tool_calls') {
         console.error(`[module-decomposition] TRUNCATION DETECTED: finish_reason='${finishReason}' (raised max_tokens?) — model: ${model}`)
       }
+      // Per-emitter LLM record (audit Gap #2 — Stage 1.7 was the highest-
+      // priority blind spot: 6 emitters + 2 judges + tiebreak, all silent).
+      getActionLogger().logLlm({
+        step_name: stepName,
+        model,
+        prompt_tokens: json.usage?.prompt_tokens,
+        completion_tokens: json.usage?.completion_tokens,
+        latency_ms: Date.now() - modelStartAt,
+        finish_reason: finishReason,
+        ok: true,
+      })
       const msg = json.choices?.[0]?.message
       let raw = msg?.content || msg?.reasoning || ''
       if (!raw && msg?.reasoning_details?.length) {
@@ -297,6 +829,20 @@ function validateModuleSpecShape(
     return null
   }
 
+  // overview_paragraph_en — unified-prose addition (Tristan 2026-05-13).
+  // Backward-compat: warn (not error) when missing, so legacy snapshots without
+  // the field still parse. New emissions under the updated prompt will set it.
+  const overviewRaw = typeof r.overview_paragraph_en === 'string' ? r.overview_paragraph_en.trim() : ''
+  let overviewParagraphEn: string | undefined
+  if (overviewRaw.length === 0) {
+    paramWarnings.push(`modules[${index}].overview_paragraph_en is missing — will fall back to downstream Piece 1F (drift risk)`)
+  } else if (overviewRaw.length < 200) {
+    paramWarnings.push(`modules[${index}].overview_paragraph_en is only ${overviewRaw.length} chars — target 400-1200 (4-6 sentences); accepted but flag`)
+    overviewParagraphEn = overviewRaw
+  } else {
+    overviewParagraphEn = overviewRaw
+  }
+
   // derived_parameters
   const derivedRaw = r.derived_parameters
   const derived: DerivedParameters = {}
@@ -362,14 +908,23 @@ function validateModuleSpecShape(
   // Genuinely empty output remains a hard error since it's structurally unusable
   // downstream (Stage 2 needs at least one sub_module_id to tag leaves against).
   // Piece 1B.1: each sub_module now carries words[] instead of primary_character_id.
+  //
+  // S1 2026-05-18 — corpus-calibrated rebalance: the Phase 4 corpus shows real
+  // engineering manuals decompose products at far lower density than the previous
+  // 4-8-sub-module floor. Median active sub-modules per doc across 49 classes is
+  // 3-25 TOTAL across the whole product, NOT per-module. Per-module typical is
+  // 2-4. Floor warnings demoted; ceiling warning tightened to >6.
   const subModulesRaw = Array.isArray(r.sub_modules) ? r.sub_modules : []
   if (subModulesRaw.length === 0) {
-    errors.push(`modules[${index}].sub_modules is missing or empty — at least 1 sub-module is required (4–8 strongly preferred, up to 10 permitted)`)
-  } else if (subModulesRaw.length > 10) {
-    paramWarnings.push(`modules[${index}].sub_modules has ${subModulesRaw.length} entries (max 10); extras will still be accepted but review`)
-  } else if (subModulesRaw.length < 3) {
-    paramWarnings.push(`modules[${index}].sub_modules has only ${subModulesRaw.length} entries (4–8 strongly preferred, up to 10 permitted); accepted but flag for review — module_brief should justify the sparse decomposition`)
+    errors.push(`modules[${index}].sub_modules is missing or empty — at least 1 sub-module is required (typical 2-4 for most modules; up to 6 for the flagship module of a complex product)`)
+  } else if (subModulesRaw.length > 6) {
+    paramWarnings.push(`modules[${index}].sub_modules has ${subModulesRaw.length} entries (S1 corpus-calibrated typical 2-4; >6 flagged for over-decomposition review — does a real installer manual list this many sub-systems within this module?)`)
   }
+  // S1 2026-05-18: removed `<3 sub_modules` warning. 1-2 sub-modules is realistic
+  // and common across the Phase 4 corpus (CGM patches, insulin pumps, small drones,
+  // edge-AI inference appliances). The prompt's REFERENCE DECOMPOSITION DENSITY
+  // table gives class-specific targets — many classes have median ≤2 sub-mods per
+  // active module.
   const subModules: SubModuleSpec[] = []
   const seenSubIds = new Set<string>()
   for (let si = 0; si < subModulesRaw.length; si++) {
@@ -395,20 +950,21 @@ function validateModuleSpecShape(
     }
 
     // ── words[] validation (Piece 1B.1) ──────────────────────────────────
-    // Fix B (Tristan, 2026-05-13): the previous cap of 4 was based on a
-    // misreading of the worked-example §4 cards (which abbreviated to 2 words
-    // per sub-module for visual compression). §6 of the worked example shows
-    // each sub-module actually emits 5-9 distinct BoM rows — one per WordSpec
-    // (each WordSpec contributes exactly one content_character → one BoM
-    // line). Binding-spec target is ~300-540 BoM lines for a 3.5 MWh BESS;
-    // engine emitting 101 was the symptom of this cap. Raised to >9 so the
-    // BMS_MASTER worst-case (9 words) doesn't trip the warning while still
-    // flagging genuine over-decomposition.
+    // Fix B (Tristan, 2026-05-13): raised from 4-word cap to 9-word cap to
+    // align with BESS worked example.
+    //
+    // S1 2026-05-18 — corpus-calibrated rebalance: the 5-9-word band was a
+    // misread. Phase 4 corpus across 49 classes shows real installer/service
+    // manuals decompose sub-modules at median 1.0-3.0 parts. The BESS worked
+    // example's 5-9 words are the high-end exemplar for the densest module of
+    // the densest product, NOT a target for typical sub-modules. Variants of
+    // the same physical part (M6 vs M8 bolt, 100A vs 125A breaker) belong as
+    // modifier_characters on ONE word, not as separate words.
     const wordsRaw = Array.isArray(smr.words) ? smr.words : []
     if (wordsRaw.length === 0) {
       errors.push(`modules[${index}].sub_modules[${si}] ("${smId}").words is missing or empty — at least 1 word is required`)
-    } else if (wordsRaw.length > 9) {
-      paramWarnings.push(`modules[${index}].sub_modules[${si}] ("${smId}").words has ${wordsRaw.length} entries (>9 — prompt HARD CONSTRAINT caps at 9, with BMS_MASTER worst-case being 9 words); accepted but flag for review`)
+    } else if (wordsRaw.length > 6) {
+      paramWarnings.push(`modules[${index}].sub_modules[${si}] ("${smId}").words has ${wordsRaw.length} entries (S1 corpus-calibrated typical 1-3, max 6; >6 flagged for over-decomposition review — are any of these the same physical part with different sizes/grades? Collapse to modifier_characters if so.)`)
     }
     const words: WordSpec[] = []
     const seenWordIds = new Set<string>()
@@ -590,6 +1146,7 @@ function validateModuleSpecShape(
   return {
     module: moduleKey as UniversalModule,
     module_brief: moduleBrief,
+    overview_paragraph_en: overviewParagraphEn,
     derived_parameters: derived,
     allowed_radicals: allowedRadicals,
     applicability_confidence: conf,
@@ -1063,7 +1620,246 @@ const STAGE_1_7_MAX_TOKENS = 250_000
  *        council notes appended; on second NEEDS_MAJOR, fall back to ClassModulePriors.
  *   5. Return the ModuleDecomposition with telemetry.
  */
+/**
+ * K10 enforcing-mode result. Same shape as `K10ShadowResult` plus a
+ * `mode: 'enforcing'` discriminator and (optionally) the bounded-retry
+ * outcome — `g4_retry_fired` / `g4_retries_used` / `manual_review_attached`.
+ *
+ * Attached as `(data as any).k10EnforcingResult` ALONGSIDE
+ * `k10ShadowResult` (which always remains, in shadow mode, for forward-compat
+ * with existing consumers). Default behaviour (no env flag) writes only
+ * `k10ShadowResult` and leaves `k10EnforcingResult` undefined.
+ */
+export interface K10EnforcingResult extends Omit<K10ShadowResult, 'mode'> {
+  mode: 'enforcing'
+  /** Did the K10 enforcing verdict cause a G4 re-emit cycle in this run? */
+  g4_retry_fired: boolean
+  /** Number of K10-triggered G4 retries actually consumed (0, 1, or 2). */
+  g4_retries_used: number
+  /** Was the manual-review badge attached (i.e. 2 K10 retries exhausted)? */
+  manual_review_attached: boolean
+}
+
+/** Threshold above which K10 enforcing mode treats a FAIL_SHADOW as a G4 fail. */
+const K10_ENFORCING_MISSING_THRESHOLD = 1
+/** Cap on K10-triggered G4 retries. Matches the existing G4_MAX_RETRIES inside
+ * the multi-emitter loop. */
+const K10_ENFORCING_MAX_RETRIES = 2
+
+/** Read-and-validate helper for `PDF_ENGINE_K10_ENFORCING`. Defaults to OFF. */
+function isK10EnforcingEnabled(): boolean {
+  const raw = (process.env.PDF_ENGINE_K10_ENFORCING ?? '').toLowerCase().trim()
+  return raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on'
+}
+
+/**
+ * Public Stage 1.5 / 1.7 entry. Dispatches to the legacy single-emitter or
+ * the WS-A multi-emitter path depending on the RADICAL_MULTI_EMITTER flag,
+ * then runs the K10 reference-graph check.
+ *
+ * Two modes, switched by `PDF_ENGINE_K10_ENFORCING` (default false):
+ *
+ *   SHADOW (default):
+ *     - K10 validates the emitted decomposition AFTER `runModuleDecompositionInner`
+ *       returns and attaches the structured result to
+ *       `(data as any).k10ShadowResult`.
+ *     - G4 outcome / StageResult `ok` flag UNCHANGED. Pure observability.
+ *     - To disable entirely set `PDF_ENGINE_K10_VALIDATE=false`.
+ *
+ *   ENFORCING (opt-in via `PDF_ENGINE_K10_ENFORCING=true`):
+ *     - Runs the inner pipeline once.
+ *     - Computes K10 shadow result and attaches to `(data as any).k10ShadowResult`
+ *       (preserves forward-compat with existing shadow-mode consumers).
+ *     - If `k10ShadowResult.verdict === 'FAIL_SHADOW' && missing_required.length > 1`
+ *       (the K10_ENFORCING_MISSING_THRESHOLD), re-runs the inner pipeline up
+ *       to `K10_ENFORCING_MAX_RETRIES` times. Mirrors the existing G4 judge-retry
+ *       cadence (the BLOCKER-1 fix's bounded retry pattern).
+ *     - On 2nd K10-fail-after-retry: attaches
+ *       `(data as any).k10ManualReview = true` + the missing-required edge
+ *       list on `(data as any).k10ManualReviewEdges` (so the renderer can
+ *       surface a `K10 reference graph` badge in Appendix B alongside the
+ *       g4/g3/g5/cost-reality/g1b/physicsLedger badges).
+ *     - In both pass-and-fail paths, also writes
+ *       `(data as any).k10EnforcingResult` so downstream consumers can
+ *       distinguish enforcing-mode telemetry from shadow-mode telemetry.
+ *     - G4 outcome (verdict / `ok` flag) on the StageResult is UNCHANGED —
+ *       the existing G4 retry loop already exhausted its budget; K10
+ *       enforcing piggy-backs on the run-the-pipeline-again primitive. If
+ *       the LAST attempt still missed required edges, we surface manual-review
+ *       rather than fail the stage (matches G4 BLOCKER-1 behaviour).
+ */
 export async function runModuleDecomposition(
+  parsedBrief: StructuredBriefJSON,
+  classification: string,
+  regulatoryExtraction?: RegulatoryExtraction,
+): Promise<StageResult<ModuleDecomposition>> {
+  const enforcing = isK10EnforcingEnabled()
+  const _logger = getActionLogger()
+  _logger.logStage({
+    step_name: 'module_decomposition',
+    action_type: 'stage_start',
+    classification,
+    multi_emitter: isMultiEmitterEnabled(),
+    k10_enforcing: enforcing,
+  })
+  const _stageStart = Date.now()
+
+  // Helper — one full inner attempt + K10 shadow attachment. Always returns
+  // a result (never throws); K10 errors are non-fatal.
+  const runOneAttempt = async (): Promise<{
+    result: StageResult<ModuleDecomposition>
+    k10: K10ShadowResult | null
+  }> => {
+    const result = await runModuleDecompositionInner(parsedBrief, classification, regulatoryExtraction)
+    let k10: K10ShadowResult | null = null
+    if (result.ok && result.data) {
+      try {
+        k10 = await runK10ShadowValidation(result.data)
+        ;(result.data as any).k10ShadowResult = k10
+        const v = k10.verdict
+        console.log(
+          `[module-decomposition][k10-shadow] verdict=${v}` +
+            (v === 'FAIL_SHADOW'
+              ? ` missing_required=${k10.missing_required.length}/${k10.missing_required.length + k10.matched_edges} extras=${k10.extra_emitted.length}`
+              : v === 'PASS_SHADOW'
+                ? ` matched=${k10.matched_edges} extras=${k10.extra_emitted.length}`
+                : ` reason=${k10.reason ?? '(none)'}`),
+        )
+
+        // Task #87 (2026-05-18) — auto class-registry hook.
+        // When K10 verdict=NO_GRAPH the class is unknown to the curated
+        // registry. Mark the decomposition provisional + try the cache /
+        // generator. Never throws. Idempotent — safe to call again on retry.
+        if (k10.verdict === 'NO_GRAPH') {
+          const briefExcerpt = (parsedBrief.product_description ?? '').toString().slice(0, 4000)
+          try {
+            const hookResult = await triggerAutoClassRegistryIfUnknown(
+              result.data,
+              k10,
+              briefExcerpt,
+            )
+            console.log(
+              `[module-decomposition][auto-class-registry] slug=${hookResult.slug} attached=${hookResult.attached} generated=${hookResult.generated} — ${hookResult.reason}`,
+            )
+          } catch (err) {
+            console.warn(
+              `[module-decomposition][auto-class-registry] hook threw — non-fatal: ${(err as Error).message ?? String(err)}`,
+            )
+          }
+        }
+      } catch (err) {
+        // Belt-and-braces: K10 must NEVER break the pipeline. Leave `k10 = null`
+        // — the enforcing loop below treats null/non-FAIL the same as PASS.
+        console.warn(
+          `[module-decomposition][k10-shadow] threw — non-fatal: ${(err as Error).message ?? String(err)}`,
+        )
+      }
+    }
+    return { result, k10 }
+  }
+
+  // --- Default (shadow-only) path — preserved unchanged for safety. ----------
+  if (!enforcing) {
+    const { result } = await runOneAttempt()
+    _logger.logStage({
+      step_name: 'module_decomposition',
+      action_type: 'stage_end',
+      outcome: result.ok ? 'ok' : 'fail',
+      duration_ms: Date.now() - _stageStart,
+      error: result.error,
+      enforcing: false,
+    })
+    return result
+  }
+
+  // --- Enforcing path — opt-in via PDF_ENGINE_K10_ENFORCING=true. ------------
+  // First attempt + K10 evaluation. If the verdict is PASS_SHADOW / NO_GRAPH /
+  // SKIPPED / ERROR, OR FAIL_SHADOW with missing <= threshold, we DO NOT retry.
+  // Only `FAIL_SHADOW && missing > threshold` triggers the bounded retry.
+  let attempt = 0
+  let lastResult: StageResult<ModuleDecomposition>
+  let lastK10: K10ShadowResult | null
+  let g4RetriesUsed = 0
+  do {
+    attempt += 1
+    const { result, k10 } = await runOneAttempt()
+    lastResult = result
+    lastK10 = k10
+    // No retry if the inner pipeline failed outright — there's no data to
+    // re-validate, and re-running would just repeat the same error class.
+    if (!result.ok || !result.data) break
+    // No retry if K10 didn't produce a FAIL_SHADOW worth re-emitting on.
+    if (!k10 || k10.verdict !== 'FAIL_SHADOW') break
+    if (k10.missing_required.length <= K10_ENFORCING_MISSING_THRESHOLD) break
+    // FAIL_SHADOW above threshold AND we still have retries left → retry.
+    if (attempt >= 1 + K10_ENFORCING_MAX_RETRIES) break
+    g4RetriesUsed += 1
+    console.warn(
+      `[module-decomposition][k10-enforcing] G4 retry ${g4RetriesUsed}/${K10_ENFORCING_MAX_RETRIES} — K10 FAIL_SHADOW with ${k10.missing_required.length} missing-required edges (threshold ${K10_ENFORCING_MISSING_THRESHOLD}); re-running inner pipeline.`,
+    )
+  } while (true)
+
+  // Attach enforcing result + manual-review badge as appropriate.
+  if (lastResult.ok && lastResult.data) {
+    const baseK10 = lastK10
+    const failedAfterRetries =
+      !!baseK10 &&
+      baseK10.verdict === 'FAIL_SHADOW' &&
+      baseK10.missing_required.length > K10_ENFORCING_MISSING_THRESHOLD &&
+      g4RetriesUsed >= K10_ENFORCING_MAX_RETRIES
+    const enforcingResult: K10EnforcingResult = baseK10
+      ? {
+          ...baseK10,
+          mode: 'enforcing',
+          g4_retry_fired: g4RetriesUsed > 0,
+          g4_retries_used: g4RetriesUsed,
+          manual_review_attached: failedAfterRetries,
+        }
+      : {
+          class: '',
+          product_class: lastResult.data.product_class,
+          verdict: 'ERROR',
+          matched_edges: 0,
+          missing_required: [],
+          extra_emitted: [],
+          protocol_mismatches: [],
+          ts: new Date().toISOString(),
+          mode: 'enforcing',
+          reason: 'shadow validator returned null (validator threw); enforcing mode falling through to manual review',
+          g4_retry_fired: false,
+          g4_retries_used: 0,
+          manual_review_attached: false,
+        }
+    ;(lastResult.data as any).k10EnforcingResult = enforcingResult
+    if (failedAfterRetries) {
+      ;(lastResult.data as any).k10ManualReview = true
+      ;(lastResult.data as any).k10ManualReviewEdges = baseK10!.missing_required
+      console.warn(
+        `[module-decomposition][k10-enforcing] manual-review badge attached after ${g4RetriesUsed} retries — ${baseK10!.missing_required.length} required edges still missing.`,
+      )
+    }
+    console.log(
+      `[module-decomposition][k10-enforcing] verdict=${baseK10?.verdict ?? 'NULL'} g4_retries_used=${g4RetriesUsed} manual_review=${failedAfterRetries}`,
+    )
+  }
+  _logger.logStage({
+    step_name: 'module_decomposition',
+    action_type: 'stage_end',
+    outcome: lastResult.ok ? 'ok' : 'fail',
+    duration_ms: Date.now() - _stageStart,
+    error: lastResult.error,
+    enforcing: true,
+    g4_retries_used: g4RetriesUsed,
+  })
+  return lastResult
+}
+
+/**
+ * Private inner entry — branches between legacy and multi-emitter paths.
+ * Kept private so the K10 shadow attachment in the public wrapper above is
+ * unavoidable on every successful return.
+ */
+async function runModuleDecompositionInner(
   parsedBrief: StructuredBriefJSON,
   classification: string,
   regulatoryExtraction?: RegulatoryExtraction,
@@ -1091,10 +1887,14 @@ export async function runModuleDecomposition(
       allEntries.slice(0, 20).map(e => `- ${e.standard_name} (${e.jurisdiction}): ${e.engineering_impact}`).join('\n')
     : ''
 
+  // W1 2026-05-18 — RAG few-shot block (empty string when RAG_AT_EMISSION is off).
+  const { block: ragBlock } = await buildRagFewShotBlock(parsedBrief, classification)
+
   const baseUserContent =
     `[Structured brief JSON from Stage 1]\n${JSON.stringify(parsedBrief, null, 2)}\n\n` +
     `[Product classification]\n${classification}` +
-    regSummary
+    regSummary +
+    ragBlock
 
   // ── First LLM attempt + validation ────────────────────────────────────────
   let attempt1: LlmCallResult
@@ -1427,10 +2227,37 @@ export async function runMultiEmitterModuleDecomposition(
       allEntries.slice(0, 20).map(e => `- ${e.standard_name} (${e.jurisdiction}): ${e.engineering_impact}`).join('\n')
     : ''
 
+  // W1 2026-05-18 — RAG few-shot block. Empty string when RAG_AT_EMISSION
+  // is off (default). Computed ONCE here so all 6 emitters see the same block.
+  const { block: ragBlock, records: ragRecords } = await buildRagFewShotBlock(parsedBrief, classification)
+  if (ragRecords.length > 0) {
+    console.log(`[multi-emitter][rag] injecting ${ragRecords.length} records into all ${MULTI_EMITTER_MODELS.length} emitter prompts`)
+  }
+
+  // 2026-05-18 — DB-aware lookup. Inject prior-confirmed sub-modules +
+  // cross-module connections accumulated from past runs into the user content.
+  // Threshold: ≥5 prior briefs (MIN_INJECTION_SEEN_COUNT). The accumulated
+  // block sits BETWEEN the brief + classification and the regulatory/RAG
+  // blocks so the LLM sees it as engine context rather than user instruction.
+  // Fail-soft — wrapped in try/catch; an empty block is the safe default.
+  let accumulatedBlock = ''
+  try {
+    accumulatedBlock = buildAccumulatedPromptBlock(classification)
+    if (accumulatedBlock.length > 0) {
+      const moduleLines = (accumulatedBlock.match(/^  - /gm) ?? []).length
+      console.log(`[multi-emitter][registry-accumulation] injecting ${moduleLines} prior-confirmed entries for class="${classification}"`)
+    }
+  } catch (err) {
+    console.warn(`[multi-emitter][registry-accumulation] buildAccumulatedPromptBlock failed: ${(err as Error).message}`)
+    accumulatedBlock = ''
+  }
+
   const baseUserContent =
     `[Structured brief JSON from Stage 1]\n${JSON.stringify(parsedBrief, null, 2)}\n\n` +
     `[Product classification]\n${classification}` +
-    regSummary
+    accumulatedBlock +
+    regSummary +
+    ragBlock
 
   // Wrapper to call ONE emitter and collect parsed payload + diagnostics.
   // Iter-09 (2026-05-13): on JSON-parse failure (200 OK but unparseable), retry
@@ -1612,7 +2439,7 @@ export async function runMultiEmitterModuleDecomposition(
   }
 
   // First synthesis pass (no judges yet)
-  let synth = synthesiseMultiEmitterDecomposition(emitterOutputs, [])
+  let synth = synthesiseMultiEmitterDecomposition(emitterOutputs, [], normaliseProductClass(classification))
 
   // Dispatch judges over the synthesised output
   const judgePrompt = buildMultiEmitterJudgePrompt()
@@ -1661,55 +2488,83 @@ export async function runMultiEmitterModuleDecomposition(
   }))
 
   // Re-synthesise with judges populated (so verdict is computed correctly)
-  synth = synthesiseMultiEmitterDecomposition(emitterOutputs, judges)
+  synth = synthesiseMultiEmitterDecomposition(emitterOutputs, judges, normaliseProductClass(classification))
   let retried = false
+  let g4ManualReview = false
 
-  // Tiebreak: BOTH judges NEEDS_MAJOR on quality → retry ONCE with judge notes
-  // appended to each emitter prompt. Schema-violation flagged → no retry (the
-  // synthesiser already dropped offending fields when it could; downstream
-  // validateModuleDecompositionPayload will strip anything that doesn't pass).
-  if (synth.shouldRetry) {
-    const judgeNotes = judges.flatMap(j => j.notes ?? [])
-    const reminder =
-      `\n\nCRITICAL JUDGE FEEDBACK ON THE PREVIOUS SYNTHESIS (BOTH judges voted NEEDS_MAJOR on quality):\n` +
-      judgeNotes.map(n => `- ${n}`).join('\n') +
-      `\n\nReturn a fully corrected JSON catalog addressing every point above. Re-emit with §4.5 fidelity (english_sentence + rad_syntax + grammar per sub-module).`
+  // ── G4 grammar/synthesis gate: bounded retry loop ──────────────────────
+  // Council 2026-05-18 BLOCKER-1: previously a single retry then silent
+  // fallback to priors. Now a bounded loop (max 2 retries) before tagging
+  // state with a `g4_manual_review` badge and proceeding. Mirrors Engine
+  // A's maxRetries=2 pattern from stages/4-bom-cost-suppliers.ts.
+  //
+  // Tristan 2026-05-13: in MINIMAL_BRIEF_MODULES_ONLY mode the synthesis picker
+  // is anchor-emitter (single-winning-emitter authoritative) — judges are no
+  // longer the gate. Skip the retry loop entirely; it just doubles wall-clock
+  // without changing the anchor's pick (the anchor scores arithmetic +
+  // sub-module count, not the judges' verdict).
+  const G4_MAX_RETRIES = 2
+  if (synth.shouldRetry && process.env.MINIMAL_BRIEF_MODULES_ONLY === 'true') {
+    console.log('[module-decomposition][multi-emitter] BOTH judges NEEDS_MAJOR but MINIMAL_BRIEF_MODULES_ONLY=true — anchor-mode picker bypasses judge gate, shipping first-pass synthesis')
+  } else {
+    let g4Attempt = 0
+    while (synth.shouldRetry && g4Attempt < G4_MAX_RETRIES) {
+      g4Attempt += 1
+      const judgeNotes = judges.flatMap(j => j.notes ?? [])
+      const reminder =
+        `\n\nCRITICAL JUDGE FEEDBACK ON THE PREVIOUS SYNTHESIS (attempt ${g4Attempt}/${G4_MAX_RETRIES}; BOTH judges voted NEEDS_MAJOR on quality):\n` +
+        judgeNotes.map(n => `- ${n}`).join('\n') +
+        `\n\nReturn a fully corrected JSON catalog addressing every point above. Re-emit with §4.5 fidelity (english_sentence + rad_syntax + grammar per sub-module).`
 
-    console.warn('[module-decomposition][multi-emitter] BOTH judges NEEDS_MAJOR — retrying all 6 emitters with judge notes appended...')
-    const retryStartedAt = Date.now()
-    const retryResults = await Promise.allSettled(
-      MULTI_EMITTER_MODELS.map(m => callEmitter(m, baseUserContent + reminder)),
-    )
-    emitterWallMs += Date.now() - retryStartedAt
-    retried = true
+      console.warn(`[module-decomposition][multi-emitter] G4 retry ${g4Attempt}/${G4_MAX_RETRIES} — re-dispatching all 6 emitters with judge notes appended...`)
+      const retryStartedAt = Date.now()
+      const retryResults = await Promise.allSettled(
+        MULTI_EMITTER_MODELS.map(m => callEmitter(m, baseUserContent + reminder)),
+      )
+      emitterWallMs += Date.now() - retryStartedAt
+      retried = true
 
-    const retryOutputs: MultiEmitterOutput[] = []
-    for (let i = 0; i < retryResults.length; i++) {
-      const r = retryResults[i]
-      const model = MULTI_EMITTER_MODELS[i]
-      if (r.status === 'fulfilled') {
-        totalInput += r.value.inputTokens
-        totalOutput += r.value.outputTokens
-        retryOutputs.push({
-          ok: r.value.ok,
-          data: r.value.data,
-          model: r.value.model,
-          schemaViolations: r.value.schemaViolations,
-        })
+      const retryOutputs: MultiEmitterOutput[] = []
+      for (let i = 0; i < retryResults.length; i++) {
+        const r = retryResults[i]
+        const model = MULTI_EMITTER_MODELS[i]
+        if (r.status === 'fulfilled') {
+          totalInput += r.value.inputTokens
+          totalOutput += r.value.outputTokens
+          retryOutputs.push({
+            ok: r.value.ok,
+            data: r.value.data,
+            model: r.value.model,
+            schemaViolations: r.value.schemaViolations,
+          })
+        } else {
+          retryOutputs.push({ ok: false, model, schemaViolations: [`promise: ${String(r.reason)}`] })
+        }
+      }
+
+      const retrySpeaking = retryOutputs.filter(e => e.ok).length
+      if (retrySpeaking >= MULTI_EMITTER_MIN_SPEAKING) {
+        // Re-synthesise with retry outputs + same judges (per spec — judges
+        // do not re-vote; the synthesis is authoritative each round).
+        synth = synthesiseMultiEmitterDecomposition(retryOutputs, judges, normaliseProductClass(classification))
       } else {
-        retryOutputs.push({ ok: false, model, schemaViolations: [`promise: ${String(r.reason)}`] })
+        synth.notes.push(
+          `[multi-emitter] G4 retry ${g4Attempt} produced only ${retrySpeaking}/${MULTI_EMITTER_MODELS.length} speaking emitters; kept prior synthesis`,
+        )
+        // No quorum — further retries unlikely to help. Bail out and let the
+        // manual-review badge below catch this.
+        break
       }
     }
-
-    const retrySpeaking = retryOutputs.filter(e => e.ok).length
-    if (retrySpeaking >= MULTI_EMITTER_MIN_SPEAKING) {
-      // Re-synthesise with retry outputs + same judges (judges don't re-vote
-      // per spec — single retry chance; final synthesis is authoritative).
-      synth = synthesiseMultiEmitterDecomposition(retryOutputs, judges)
-    } else {
+    if (synth.shouldRetry) {
+      // Exhausted retries with judges still NEEDS_MAJOR. Attach manual-review
+      // badge to synthesis notes; the caller annotates state.g4ManualReview
+      // so the renderer can surface it on the cover.
+      g4ManualReview = true
       synth.notes.push(
-        `[multi-emitter] retry produced only ${retrySpeaking}/${MULTI_EMITTER_MODELS.length} speaking emitters; kept first-pass synthesis`,
+        `[multi-emitter] G4 manual-review: exhausted ${G4_MAX_RETRIES} retries with judges NEEDS_MAJOR — proceeding with last synthesis but flagging the run.`,
       )
+      console.warn(`[module-decomposition][multi-emitter] G4 manual-review badge attached after ${G4_MAX_RETRIES} bounded retries.`)
     }
   }
 
@@ -1774,6 +2629,55 @@ export async function runMultiEmitterModuleDecomposition(
     council_seats: synth.seats,
     council_notes: allNotes,
     telemetry,
+  }
+  // Council 2026-05-18 BLOCKER-1: manual-review badge after bounded G4 retry
+  // exhaustion. Attached via `as any` rather than extending ModuleDecomposition
+  // — additive, read by the renderer's cover-page logic; downstream type-strict
+  // consumers continue to ignore unknown properties.
+  if (g4ManualReview) {
+    ;(data as any).g4ManualReview = true
+  }
+
+  // 2026-05-18 — registry accumulation write-back. Persist consensus
+  // sub-modules + cross-module connections that ≥4 of 6 emitters agreed on.
+  // Only fires when:
+  //   - the final validation passed (we reached this point, so it has)
+  //   - the G4 grammar gate exited successfully (NOT in manual-review mode)
+  // Skipping manual-review runs is conservative — by definition those runs
+  // produced something the judges flagged as broken, so we don't want to
+  // learn from them.
+  // Fail-soft — try/catch around the whole batch so a bad SQLite file never
+  // breaks the pipeline.
+  if (!g4ManualReview) {
+    try {
+      const briefExcerpt =
+        (parsedBrief as any)?.product_description?.slice?.(0, 240)
+        ?? (parsedBrief as any)?.brief?.slice?.(0, 240)
+        ?? ''
+      const emitterLike: EmitterOutputLike[] = emitterOutputs.map(e => ({
+        ok: e.ok,
+        model: e.model,
+        data: e.data as any,
+      }))
+      const persistCounts = persistConsensusFromSynthesis(
+        classification,
+        emitterLike,
+        briefExcerpt,
+      )
+      const mc = persistCounts.modules
+      const cc = persistCounts.connections
+      if (mc.inserted + mc.updated + cc.inserted + cc.updated > 0) {
+        console.log(
+          `[multi-emitter][registry-accumulation] persisted: ` +
+          `sub-modules ins=${mc.inserted} upd=${mc.updated} skip=${mc.skipped}; ` +
+          `connections ins=${cc.inserted} upd=${cc.updated} skip=${cc.skipped}`,
+        )
+      }
+    } catch (err) {
+      console.warn(`[multi-emitter][registry-accumulation] persist batch failed: ${(err as Error).message}`)
+    }
+  } else {
+    console.log('[multi-emitter][registry-accumulation] skipping persist — G4 manual-review badge attached')
   }
 
   console.log(

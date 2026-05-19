@@ -1,0 +1,553 @@
+{
+  "summary": {
+    "phases": 4,
+    "rows": 40,
+    "blockers": 14,
+    "majors": 26,
+    "minors": 0,
+    "architectureRevisionRows": 0,
+    "sourcingIntakeRows": 11,
+    "engineeringReviewRows": 7,
+    "verificationIntakeRows": 21,
+    "scoreRepairRows": 1,
+    "nextPhase": "sourcing_intake"
+  },
+  "phases": [
+    {
+      "id": "sourcing_intake",
+      "title": "Admit Source-Backed BoM Evidence",
+      "sequence": 2,
+      "rowCount": 11,
+      "blockerCount": 11,
+      "majorCount": 0,
+      "minorCount": 0,
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "entryCriteria": [
+        "Architecture is reviewable enough to identify critical component candidates."
+      ],
+      "exitCriteria": [
+        "Every critical BoM line has admitted supplier, manufacturer, MPN, unit cost and source reference.",
+        "BoM provenance manifest has zero critical missing-source claims."
+      ],
+      "rationale": "Critical BoM costs, suppliers, manufacturers and MPNs must be source-backed before cost claims are credible.",
+      "topRows": [
+        {
+          "id": "assumption:metric:capex_gbp",
+          "kind": "assumption_review",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Estimated CAPEX",
+          "issue": "Estimated CAPEX uses an implicit model with low confidence.",
+          "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:metric:opex_annual_gbp",
+          "kind": "assumption_review",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Estimated annual OPEX",
+          "issue": "Estimated annual OPEX uses an implicit model with low confidence.",
+          "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+          "linkedIds": []
+        },
+        {
+          "id": "readiness:2",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "8 critical BoM line(s) lack source-backed cost evidence.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        },
+        {
+          "id": "sourcing:4k_camera_payload",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "4K camera payload",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "4k_camera_payload"
+          ]
+        },
+        {
+          "id": "sourcing:brushless_motors",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Brushless motors",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "brushless_motors"
+          ]
+        },
+        {
+          "id": "sourcing:carbon_airframe",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Carbon airframe",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "carbon_airframe"
+          ]
+        },
+        {
+          "id": "sourcing:esc",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "ESC",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "esc"
+          ]
+        },
+        {
+          "id": "sourcing:flight_battery_pack",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Flight battery pack",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "flight_battery_pack"
+          ]
+        },
+        {
+          "id": "sourcing:flight_controller",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Flight controller",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "flight_controller"
+          ]
+        },
+        {
+          "id": "sourcing:propeller_set",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Propeller set",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "propeller_set"
+          ]
+        },
+        {
+          "id": "sourcing:radio_and_gnss_link",
+          "kind": "sourcing_evidence",
+          "priority": "blocker",
+          "status": "ready_for_intake",
+          "scope": "Radio and GNSS link",
+          "issue": "Required class-critical line must be sourced before BoM can pass.",
+          "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+          "linkedIds": [
+            "radio_and_gnss_link"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "engineering_review",
+      "title": "Complete Engineering Review",
+      "sequence": 3,
+      "rowCount": 7,
+      "blockerCount": 0,
+      "majorCount": 7,
+      "minorCount": 0,
+      "blocks": [
+        "publishable"
+      ],
+      "entryCriteria": [
+        "Calculations and assumptions have named scope, formula or model basis."
+      ],
+      "exitCriteria": [
+        "All calculation and assumption review rows are accepted, revised or explicitly deferred with reviewer rationale."
+      ],
+      "rationale": "Deterministic arithmetic can expose claims, but engineering judgment must review envelopes, assumptions and operating cases.",
+      "topRows": [
+        {
+          "id": "assumption:compliance:CE-EMC",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "CE-EMC",
+          "issue": "CE electromagnetic compatibility is relevant to this product class in UK/EU.",
+          "requiredEvidence": "EMC test plan and declarations.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:compliance:UK-UAS",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "UK-UAS",
+          "issue": "UK unmanned aircraft operating rules is relevant to this product class in UK.",
+          "requiredEvidence": "Mass, geofencing and operating-category evidence.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:metric:headline_output",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "Flight endurance",
+          "issue": "Flight endurance uses duration_minutes with medium confidence.",
+          "requiredEvidence": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+          "linkedIds": []
+        },
+        {
+          "id": "assumption:sanity:drone_control_power_chain",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "Control/Power/Actuation Chain",
+          "issue": "Control/Power/Actuation Chain currently evaluates as pass against power bus, motor drive, sensor bus and radio link all present.",
+          "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+          "linkedIds": [
+            "duration_minutes"
+          ]
+        },
+        {
+          "id": "assumption:sanity:drone_endurance_target",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "Endurance Target",
+          "issue": "Endurance Target currently evaluates as warn against <=30 min typical, 30-45 min aggressive, >45 min high-risk without mass/power budget.",
+          "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+          "linkedIds": [
+            "duration_minutes"
+          ]
+        },
+        {
+          "id": "assumption:sanity:drone_propulsion_quads",
+          "kind": "assumption_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "Quad Propulsion Allocation",
+          "issue": "Quad Propulsion Allocation currently evaluates as pass against four motors and four ESCs allocated for quadcopter layout.",
+          "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+          "linkedIds": [
+            "duration_minutes"
+          ]
+        },
+        {
+          "id": "calculation:drone_reserve_time_minutes",
+          "kind": "calculation_review",
+          "priority": "major",
+          "status": "needs_review",
+          "scope": "Drone 20% reserve time",
+          "issue": "8 minutes reserved at 20% of stated endurance.",
+          "requiredEvidence": "Confirm return-to-home reserve, hover reserve, battery ageing, wind case and payload power.",
+          "linkedIds": [
+            "duration_minutes"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "verification_intake",
+      "title": "Accept Reviewer Evidence",
+      "sequence": 4,
+      "rowCount": 21,
+      "blockerCount": 2,
+      "majorCount": 19,
+      "minorCount": 0,
+      "blocks": [
+        "publishable"
+      ],
+      "entryCriteria": [
+        "Verification intake template has non-source activities ready for reviewer evidence."
+      ],
+      "exitCriteria": [
+        "Every non-source verification activity is accepted, or explicitly deferred and removed from publication criteria."
+      ],
+      "rationale": "Reviewer acceptance is tracked separately from deterministic scoring and must close before publication.",
+      "topRows": [
+        {
+          "id": "readiness:3",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "5 verification activity/activities remain blocked.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        },
+        {
+          "id": "readiness:4",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "0/19 non-sourcing verification activity/activities have accepted reviewer evidence.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        },
+        {
+          "id": "verification:calculation:actuation_kinematics",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Propulsion And Flight Actuation",
+          "issue": "Verify Propulsion And Flight Actuation requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:actuation_kinematics"
+          ]
+        },
+        {
+          "id": "verification:calculation:control_compute_communication",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Flight Control Compute And Communications",
+          "issue": "Verify Flight Control Compute And Communications requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:control_compute_communication"
+          ]
+        },
+        {
+          "id": "verification:calculation:energy_storage_source",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Flight Energy Storage",
+          "issue": "Verify Flight Energy Storage requirement calculations",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "calculation:energy_storage_source"
+          ]
+        },
+        {
+          "id": "verification:compliance_review:CE-EMC",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "System Compliance",
+          "issue": "Plan evidence for CE-EMC",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "compliance_review:CE-EMC"
+          ]
+        },
+        {
+          "id": "verification:compliance_review:UK-UAS",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "System Compliance",
+          "issue": "Plan evidence for UK-UAS",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "compliance_review:UK-UAS"
+          ]
+        },
+        {
+          "id": "verification:design_review:actuation_kinematics",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Propulsion And Flight Actuation",
+          "issue": "Review Propulsion And Flight Actuation architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:actuation_kinematics"
+          ]
+        },
+        {
+          "id": "verification:design_review:control_compute_communication",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Flight Control Compute And Communications",
+          "issue": "Review Flight Control Compute And Communications architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:control_compute_communication"
+          ]
+        },
+        {
+          "id": "verification:design_review:energy_storage_source",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Flight Energy Storage",
+          "issue": "Review Flight Energy Storage architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:energy_storage_source"
+          ]
+        },
+        {
+          "id": "verification:design_review:hmi_ergonomics",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Ground Operator Interface",
+          "issue": "Review Ground Operator Interface architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:hmi_ergonomics"
+          ]
+        },
+        {
+          "id": "verification:design_review:maintenance_serviceability",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Field Maintenance And Serviceability",
+          "issue": "Review Field Maintenance And Serviceability architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:maintenance_serviceability"
+          ]
+        },
+        {
+          "id": "verification:design_review:power_distribution",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Aircraft Power Distribution",
+          "issue": "Review Aircraft Power Distribution architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:power_distribution"
+          ]
+        },
+        {
+          "id": "verification:design_review:safety_protection",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Flight Safety And Containment",
+          "issue": "Review Flight Safety And Containment architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:safety_protection"
+          ]
+        },
+        {
+          "id": "verification:design_review:sensing_instrumentation",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Navigation And Cinematography Sensing",
+          "issue": "Review Navigation And Cinematography Sensing architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:sensing_instrumentation"
+          ]
+        },
+        {
+          "id": "verification:design_review:structure_containment",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Airframe Structure And Payload Mounting",
+          "issue": "Review Airframe Structure And Payload Mounting architecture allocation",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "design_review:structure_containment"
+          ]
+        },
+        {
+          "id": "verification:interface_review:control_compute_communication:actuation_kinematics:motor_drive",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Flight Control Compute And Communications -> Propulsion And Flight Actuation",
+          "issue": "Verify motor_drive interface contract",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "interface_review:control_compute_communication:actuation_kinematics:motor_drive"
+          ]
+        },
+        {
+          "id": "verification:interface_review:control_compute_communication:sensing_instrumentation:sensor_bus",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Flight Control Compute And Communications -> Navigation And Cinematography Sensing",
+          "issue": "Verify sensor_bus interface contract",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "interface_review:control_compute_communication:sensing_instrumentation:sensor_bus"
+          ]
+        },
+        {
+          "id": "verification:interface_review:energy_storage_source:actuation_kinematics:power_bus",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "Flight Energy Storage -> Propulsion And Flight Actuation",
+          "issue": "Verify power_bus interface contract",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "interface_review:energy_storage_source:actuation_kinematics:power_bus"
+          ]
+        },
+        {
+          "id": "verification:risk_review:1",
+          "kind": "verification_evidence",
+          "priority": "major",
+          "status": "ready_for_intake",
+          "scope": "System Risk Register",
+          "issue": "Review risk control for Loss of propulsion",
+          "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+          "linkedIds": [
+            "risk_review:1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "score_repair",
+      "title": "Repair Remaining Section Scores",
+      "sequence": 5,
+      "rowCount": 1,
+      "blockerCount": 1,
+      "majorCount": 0,
+      "minorCount": 0,
+      "blocks": [
+        "publishable"
+      ],
+      "entryCriteria": [
+        "All directly closable evidence rows have been processed, but deterministic section score gaps remain."
+      ],
+      "exitCriteria": [
+        "Every scored report section is at or above target and readiness verdict is publishable."
+      ],
+      "rationale": "After evidence intake, rerun scoring to remove residual deterministic section blockers.",
+      "topRows": [
+        {
+          "id": "readiness:1",
+          "kind": "readiness_blocker",
+          "priority": "blocker",
+          "status": "open",
+          "scope": "Report readiness gate",
+          "issue": "bom score 1 is below 8.",
+          "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+          "linkedIds": []
+        }
+      ]
+    }
+  ]
+}

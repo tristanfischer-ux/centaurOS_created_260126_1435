@@ -1,0 +1,16 @@
+flowchart LR
+  energy_storage_source["Energy Storage Source"]
+  energy_conversion_transduction["Power Conversion System"]
+  structure_containment["Container Structure And Fit-Out"]
+  sensing_instrumentation["Sensing And Instrumentation"]
+  control_compute_communication["Control Compute And Communication"]
+  safety_protection["Safety Protection And Interlocks"]
+  environmental_interface["Environmental Interface"]
+  power_distribution["DC And AC Power Distribution"]
+  maintenance_serviceability["Maintenance And Serviceability"]
+  mass_fluid_transport_process["Coolant Circulation Process"]
+  hmi_ergonomics["Operator HMI And Labelling"]
+  energy_storage_source -->|"dc_bus"| energy_conversion_transduction
+  energy_storage_source -->|"thermal_loop"| environmental_interface
+  energy_storage_source -->|"bms_network"| control_compute_communication
+  classDef missing stroke:#a32626,stroke-width:3px,color:#a32626;

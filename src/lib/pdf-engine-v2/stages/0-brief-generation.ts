@@ -19,6 +19,7 @@
  */
 
 import type { StageResult, StructuredBriefJSON } from '../types'
+import { getActionLogger } from '../lib/action-logger'
 
 export interface GeneratedBrief {
   /** The structured 5-section Brief text (rendered in PDF) */
@@ -285,9 +286,13 @@ export async function runBriefParsing(
   rawBriefText: string,
 ): Promise<StageResult<StructuredBriefJSON>> {
   const startTime = Date.now()
+  const logger = getActionLogger()
+  logger.logStage({ step_name: 'brief_parsing', action_type: 'stage_start', brief_chars: rawBriefText.length })
   console.log('[brief-parse] PA Stage 1: parsing brief...')
   console.log(`[brief-parse] Input: ${rawBriefText.length} chars`)
 
+  const MODEL = 'google/gemini-3.1-pro-preview'
+  const t0 = Date.now()
   try {
     const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
@@ -296,7 +301,7 @@ export async function runBriefParsing(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3.1-pro-preview',
+        model: MODEL,
         // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
         max_tokens: 150_000,
         temperature: 0.1,
@@ -308,10 +313,20 @@ export async function runBriefParsing(
     }, 120000)
 
     if (!response.ok) {
+      logger.logLlm({ step_name: 'brief_parsing', model: MODEL, latency_ms: Date.now() - t0, ok: false, error: `OpenRouter ${response.status}` })
       throw new Error(`OpenRouter API ${response.status}: ${await response.text()}`)
     }
 
     const json = await response.json()
+    logger.logLlm({
+      step_name: 'brief_parsing',
+      model: MODEL,
+      prompt_tokens: json?.usage?.prompt_tokens,
+      completion_tokens: json?.usage?.completion_tokens,
+      latency_ms: Date.now() - t0,
+      finish_reason: json?.choices?.[0]?.finish_reason,
+      ok: true,
+    })
     const raw = json.choices?.[0]?.message?.content || ''
 
     if (!raw) {
@@ -367,6 +382,14 @@ export async function runBriefParsing(
 
     console.log(`[brief-parse] OK — confidence=${parsed.confidence}, missing=${parsed.missing_mandatory_fields.length} fields`)
 
+    logger.logStage({
+      step_name: 'brief_parsing',
+      action_type: 'stage_end',
+      outcome: 'ok',
+      duration_ms: Date.now() - startTime,
+      confidence: parsed.confidence,
+      missing_count: parsed.missing_mandatory_fields.length,
+    })
     return {
       ok: true,
       data: parsed,
@@ -375,6 +398,13 @@ export async function runBriefParsing(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     console.error(`[brief-parse] Failed: ${message}`)
+    logger.logStage({
+      step_name: 'brief_parsing',
+      action_type: 'stage_end',
+      outcome: 'fail',
+      duration_ms: Date.now() - startTime,
+      error: message,
+    })
     return {
       ok: false,
       error: message,

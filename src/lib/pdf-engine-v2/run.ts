@@ -48,6 +48,7 @@ for (const envPath of envFilesToLoad) {
 
 import { runPipeline } from './index'
 import { getSupabase } from './supabase-client'
+import { runBriefAugmentation } from './stages/-1-brief-augmenter'
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 
@@ -119,11 +120,40 @@ async function main() {
   if (domain) console.error(`[run] Domain: ${domain}`)
   if (trainingDataDossier) console.error(`[run] Training data: ${trainingDataDossier.length} chars`)
 
+  // P0a — Brief augmentation. Runs BEFORE Stage 0 brief-generation so sparse
+  // founder briefs ("I want a heat pump", "BESS") arrive at Stage 0 carrying
+  // class-typical defaults. Never throws — pipeline always continues even
+  // if class inference fails. Design: stages/-1-brief-augmenter.ts.
+  const augmentation = await runBriefAugmentation(briefText)
+  console.error(`[run] P0a brief-augmenter: class=${augmentation.inferredClass}, filled=${augmentation.filled.length} fields, cost=£${augmentation.costGbp.toFixed(4)}, ok=${augmentation.ok}`)
+  briefText = augmentation.augmentedBrief
+
+  // Action-log dir (Tristan 2026-05-18, CLAUDE.md "Engine action logs"):
+  //
+  //   1. `--action-log-dir <path>` overrides everything.
+  //   2. Else, `PDF_ENGINE_ACTION_LOG_DIR` env var (set by run-bess-iter.sh
+  //      + engine-evidence-bg.sh wrappers).
+  //   3. Else, a sibling dir next to the PDF: `<cwd>/<output-base>-actions/`.
+  //      Keeps single-shot CLI invocations diagnose-able by default.
+  //
+  // Pure-additive: an unset value leaves the logger silent.
+  let actionLogDir: string | undefined = process.env.PDF_ENGINE_ACTION_LOG_DIR
+  const cliActionDirIdx = process.argv.indexOf('--action-log-dir')
+  if (cliActionDirIdx !== -1 && cliActionDirIdx + 1 < process.argv.length) {
+    actionLogDir = process.argv[cliActionDirIdx + 1]
+  }
+  if (!actionLogDir) {
+    const base = outputPrefix ? `output-${outputPrefix}` : `output-${Date.now()}`
+    actionLogDir = join(process.cwd(), `${base}-actions`)
+  }
+  console.error(`[run] action-log dir: ${actionLogDir}`)
+
   const result = await runPipeline(briefText, {
     trainingDataDossier,
     domain,
     ceilingGbp,
     projectId,
+    actionLogDir,
   })
 
   // Print summary to stderr

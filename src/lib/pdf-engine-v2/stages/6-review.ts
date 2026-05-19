@@ -1,6 +1,7 @@
 import type { Module, SpecialistReview, ResearchResult, StageResult } from '../types'
 import { sanitiseLlmOutput } from '../sanitiser'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
+import { getActionLogger } from '../lib/action-logger'
 
 /**
  * Stage 6: Review
@@ -116,15 +117,25 @@ Respond in valid JSON matching this schema:
   }
 
   if (!response.ok) {
+    getActionLogger().logLlm({ step_name: 'review:fang', model: 'xiaomi/mimo-v2.5-pro', ok: false, error: `OpenRouter ${response.status}` })
     throw new Error(`OpenRouter API failed: ${response.status} ${response.statusText}`)
   }
 
   const data = await response.json()
+  getActionLogger().logLlm({
+    step_name: 'review:fang',
+    model: 'xiaomi/mimo-v2.5-pro',
+    prompt_tokens: data?.usage?.prompt_tokens,
+    completion_tokens: data?.usage?.completion_tokens,
+    finish_reason: data?.choices?.[0]?.finish_reason,
+    ok: true,
+    module_id: module.id,
+  })
   const msg = data.choices?.[0]?.message
   const content = msg?.content || msg?.reasoning || (msg?.reasoning_details?.length
     ? msg.reasoning_details.filter((d: any) => d.type === 'reasoning.text').map((d: any) => d.text).join('\n')
     : '')
-  
+
   // Extract JSON in case LLM wraps it in markdown blocks
   let parsed: any = {}
   try {
@@ -213,14 +224,23 @@ Return a structured text summary of your findings.`
   }
 
   if (!response.ok) {
+    getActionLogger().logLlm({ step_name: 'review:proofread', model: 'xiaomi/mimo-v2.5-pro', ok: false, error: `OpenRouter ${response.status}` })
     throw new Error(`OpenRouter API failed: ${response.status} ${response.statusText}`)
   }
 
   const data = await response.json()
+  getActionLogger().logLlm({
+    step_name: 'review:proofread',
+    model: 'xiaomi/mimo-v2.5-pro',
+    prompt_tokens: data?.usage?.prompt_tokens,
+    completion_tokens: data?.usage?.completion_tokens,
+    finish_reason: data?.choices?.[0]?.finish_reason,
+    ok: true,
+  })
   const msg = data.choices?.[0]?.message
   const content = msg?.content || msg?.reasoning || (msg?.reasoning_details?.length
     ? msg.reasoning_details.filter((d: any) => d.type === 'reasoning.text').map((d: any) => d.text).join('\n')
     : '')
-  
+
   return sanitiseLlmOutput(content)
 }

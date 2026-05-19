@@ -1,0 +1,943 @@
+{
+  "verdict": "allocation_ready",
+  "summary": {
+    "modules": 9,
+    "subModules": 26,
+    "componentWords": 110,
+    "readySubModules": 26,
+    "reviewSubModules": 0,
+    "blockedSubModules": 0,
+    "interfaceCarrierSubModules": 26,
+    "interfaceCarrierWithoutComponents": 0,
+    "requiredCriticalParts": 8,
+    "allocatedCriticalParts": 8,
+    "missingCriticalParts": 0,
+    "bomLines": 110,
+    "criticalBomLines": 8,
+    "duplicateComponentGroups": 0,
+    "duplicateCriticalComponentGroups": 0,
+    "allocationRatio": 1,
+    "criticalAllocationRatio": 1
+  },
+  "subModules": [
+    {
+      "id": "structure_containment:carbon_airframe",
+      "moduleId": "structure_containment",
+      "moduleName": "Airframe Structure And Payload Mounting",
+      "subModuleId": "carbon_airframe",
+      "subModuleName": "Carbon airframe",
+      "purpose": "Provides rigid arms, centre plates and landing structure.",
+      "interfaces": [
+        "motor_mounts",
+        "payload_mount",
+        "battery_mount"
+      ],
+      "componentWordIds": [
+        "carbon_airframe",
+        "carbon_fibre_arm_tube",
+        "centre_plate_pair",
+        "arm_folding_hinge",
+        "landing_gear_strut"
+      ],
+      "componentNames": [
+        "Carbon airframe",
+        "carbon fibre arm tube",
+        "centre plate pair",
+        "arm folding hinge",
+        "landing gear strut"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "carbon_airframe"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:payload_mounting",
+      "moduleId": "structure_containment",
+      "moduleName": "Airframe Structure And Payload Mounting",
+      "subModuleId": "payload_mounting",
+      "subModuleName": "Payload mounting",
+      "purpose": "Supports vibration-isolated camera payload attachment.",
+      "interfaces": [
+        "payload_mount",
+        "video_link"
+      ],
+      "componentWordIds": [
+        "camera_gimbal_mount_plate",
+        "rubber_vibration_damper",
+        "payload_quick_release_latch",
+        "payload_cg_adjustment_rail"
+      ],
+      "componentNames": [
+        "camera gimbal mount plate",
+        "rubber vibration damper",
+        "payload quick-release latch",
+        "payload CG adjustment rail"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:battery_mounting",
+      "moduleId": "structure_containment",
+      "moduleName": "Airframe Structure And Payload Mounting",
+      "subModuleId": "battery_mounting",
+      "subModuleName": "Battery mounting",
+      "purpose": "Secures removable packs against manoeuvre loads.",
+      "interfaces": [
+        "battery_mount",
+        "power_bus"
+      ],
+      "componentWordIds": [
+        "battery_tray",
+        "battery_retention_strap",
+        "anti_slip_battery_pad",
+        "pack_latch_sensor"
+      ],
+      "componentNames": [
+        "battery tray",
+        "battery retention strap",
+        "anti-slip battery pad",
+        "pack latch sensor"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:flight_battery_pack",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Flight Energy Storage",
+      "subModuleId": "flight_battery_pack",
+      "subModuleName": "Flight battery pack",
+      "purpose": "Provides swappable energy storage for flight operations.",
+      "interfaces": [
+        "power_bus",
+        "charger_interface",
+        "battery_mount"
+      ],
+      "componentWordIds": [
+        "flight_battery_pack",
+        "high_discharge_cell_group",
+        "battery_management_pcb",
+        "xt90_anti_spark_connector",
+        "pack_temperature_sensor"
+      ],
+      "componentNames": [
+        "Flight battery pack",
+        "high-discharge cell group",
+        "battery management PCB",
+        "XT90 anti-spark connector",
+        "pack temperature sensor"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "flight_battery_pack"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:power_monitoring",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Flight Energy Storage",
+      "subModuleId": "power_monitoring",
+      "subModuleName": "Power monitoring",
+      "purpose": "Measures pack current and voltage for endurance management.",
+      "interfaces": [
+        "power_bus",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "power_module_shunt",
+        "voltage_divider_board",
+        "low_voltage_alarm_output",
+        "battery_telemetry_connector"
+      ],
+      "componentNames": [
+        "power module shunt",
+        "voltage divider board",
+        "low-voltage alarm output",
+        "battery telemetry connector"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_storage_source:charging_interface",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Flight Energy Storage",
+      "subModuleId": "charging_interface",
+      "subModuleName": "Charging interface",
+      "purpose": "Supports safe pack charging and fleet rotation.",
+      "interfaces": [
+        "charger_interface",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "balance_charge_harness",
+        "charging_cradle",
+        "pack_id_label",
+        "transport_storage_case_insert"
+      ],
+      "componentNames": [
+        "balance charge harness",
+        "charging cradle",
+        "pack ID label",
+        "transport storage case insert"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:motor_sets",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Flight Actuation",
+      "subModuleId": "motor_sets",
+      "subModuleName": "Motor sets",
+      "purpose": "Convert electrical power into shaft torque.",
+      "interfaces": [
+        "power_bus",
+        "motor_drive",
+        "motor_mounts"
+      ],
+      "componentWordIds": [
+        "brushless_motors",
+        "motor_mounting_screw_set",
+        "motor_phase_lead_set",
+        "motor_bearing_shield"
+      ],
+      "componentNames": [
+        "Brushless motors",
+        "motor mounting screw set",
+        "motor phase lead set",
+        "motor bearing shield"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "brushless_motors"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:esc_stack",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Flight Actuation",
+      "subModuleId": "esc_stack",
+      "subModuleName": "ESC stack",
+      "purpose": "Drives motors from flight-controller commands.",
+      "interfaces": [
+        "power_bus",
+        "motor_drive",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "esc",
+        "esc_cooling_plate",
+        "pwm_signal_harness",
+        "current_telemetry_line",
+        "esc_conformal_coating"
+      ],
+      "componentNames": [
+        "ESC",
+        "ESC cooling plate",
+        "PWM signal harness",
+        "current telemetry line",
+        "ESC conformal coating"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "esc"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "actuation_kinematics:propeller_sets",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Flight Actuation",
+      "subModuleId": "propeller_sets",
+      "subModuleName": "Propeller sets",
+      "purpose": "Generate thrust and set acoustic/efficiency envelope.",
+      "interfaces": [
+        "motor_mounts"
+      ],
+      "componentWordIds": [
+        "propeller_set",
+        "propeller_hub_adapter",
+        "propeller_lock_nut",
+        "spare_propeller_pouch"
+      ],
+      "componentNames": [
+        "Propeller set",
+        "propeller hub adapter",
+        "propeller lock nut",
+        "spare propeller pouch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "propeller_set"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:flight_controller_stack",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Flight Control Compute And Communications",
+      "subModuleId": "flight_controller_stack",
+      "subModuleName": "Flight controller stack",
+      "purpose": "Stabilises aircraft and executes flight modes.",
+      "interfaces": [
+        "sensor_bus",
+        "motor_drive",
+        "power_bus"
+      ],
+      "componentWordIds": [
+        "flight_controller",
+        "imu_vibration_isolation_mount",
+        "barometer_foam_cover",
+        "sd_card_flight_logger",
+        "failsafe_firmware_profile"
+      ],
+      "componentNames": [
+        "Flight controller",
+        "IMU vibration isolation mount",
+        "barometer foam cover",
+        "SD card flight logger",
+        "failsafe firmware profile"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "flight_controller"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:radio_navigation_link",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Flight Control Compute And Communications",
+      "subModuleId": "radio_navigation_link",
+      "subModuleName": "Radio and navigation link",
+      "purpose": "Provides pilot command, telemetry and positioning.",
+      "interfaces": [
+        "radio_link",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "radio_and_gnss_link",
+        "gnss_antenna_mast",
+        "rc_receiver",
+        "telemetry_radio_module",
+        "antenna_diversity_mount"
+      ],
+      "componentNames": [
+        "Radio and GNSS link",
+        "GNSS antenna mast",
+        "RC receiver",
+        "telemetry radio module",
+        "antenna diversity mount"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "radio_and_gnss_link"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:video_downlink",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Flight Control Compute And Communications",
+      "subModuleId": "video_downlink",
+      "subModuleName": "Video downlink",
+      "purpose": "Streams camera status and framing view to operator.",
+      "interfaces": [
+        "video_link",
+        "power_bus"
+      ],
+      "componentWordIds": [
+        "low_latency_video_transmitter",
+        "video_antenna_pair",
+        "hdmi_micro_cable",
+        "video_power_filter"
+      ],
+      "componentNames": [
+        "low-latency video transmitter",
+        "video antenna pair",
+        "HDMI micro cable",
+        "video power filter"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:camera_payload",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Cinematography Sensing",
+      "subModuleId": "camera_payload",
+      "subModuleName": "Camera payload",
+      "purpose": "Captures stabilised 4K imagery.",
+      "interfaces": [
+        "video_link",
+        "payload_mount"
+      ],
+      "componentWordIds": [
+        "4k_camera_payload",
+        "three_axis_gimbal",
+        "camera_control_cable",
+        "lens_protection_hood",
+        "microsd_media_card"
+      ],
+      "componentNames": [
+        "4K camera payload",
+        "three-axis gimbal",
+        "camera control cable",
+        "lens protection hood",
+        "microSD media card"
+      ],
+      "componentCount": 5,
+      "criticalComponentWordIds": [
+        "4k_camera_payload"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:navigation_sensors",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Cinematography Sensing",
+      "subModuleId": "navigation_sensors",
+      "subModuleName": "Navigation sensors",
+      "purpose": "Measures orientation, height and heading.",
+      "interfaces": [
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "magnetometer_module",
+        "rangefinder_altimeter",
+        "optical_flow_sensor",
+        "airspeed_estimate_port"
+      ],
+      "componentNames": [
+        "magnetometer module",
+        "rangefinder altimeter",
+        "optical flow sensor",
+        "airspeed estimate port"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:health_sensing",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Cinematography Sensing",
+      "subModuleId": "health_sensing",
+      "subModuleName": "Health sensing",
+      "purpose": "Monitors vibration, temperature and payload state.",
+      "interfaces": [
+        "sensor_bus",
+        "payload_mount"
+      ],
+      "componentWordIds": [
+        "vibration_monitor_pad",
+        "payload_presence_switch",
+        "avionics_temperature_probe",
+        "landing_contact_switch"
+      ],
+      "componentNames": [
+        "vibration monitor pad",
+        "payload presence switch",
+        "avionics temperature probe",
+        "landing contact switch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:main_power_bus",
+      "moduleId": "power_distribution",
+      "moduleName": "Aircraft Power Distribution",
+      "subModuleId": "main_power_bus",
+      "subModuleName": "Main power bus",
+      "purpose": "Distributes pack current to ESCs and avionics converters.",
+      "interfaces": [
+        "power_bus",
+        "motor_drive"
+      ],
+      "componentWordIds": [
+        "power_distribution_pcb",
+        "copper_bus_plane",
+        "main_fuse_link",
+        "anti_spark_loop_key"
+      ],
+      "componentNames": [
+        "power distribution PCB",
+        "copper bus plane",
+        "main fuse link",
+        "anti-spark loop key"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:voltage_regulation",
+      "moduleId": "power_distribution",
+      "moduleName": "Aircraft Power Distribution",
+      "subModuleId": "voltage_regulation",
+      "subModuleName": "Voltage regulation",
+      "purpose": "Creates stable rails for flight controller, radio and payload.",
+      "interfaces": [
+        "power_bus",
+        "video_link"
+      ],
+      "componentWordIds": [
+        "5_v_bec_regulator",
+        "12_v_payload_regulator",
+        "lc_noise_filter",
+        "rail_status_led"
+      ],
+      "componentNames": [
+        "5 V BEC regulator",
+        "12 V payload regulator",
+        "LC noise filter",
+        "rail status LED"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:wiring_harness",
+      "moduleId": "power_distribution",
+      "moduleName": "Aircraft Power Distribution",
+      "subModuleId": "wiring_harness",
+      "subModuleName": "Wiring harness",
+      "purpose": "Connects avionics with strain relief and field-service routing.",
+      "interfaces": [
+        "power_bus",
+        "sensor_bus",
+        "video_link"
+      ],
+      "componentWordIds": [
+        "silicone_power_lead_set",
+        "jst_signal_harness",
+        "braided_cable_sleeve",
+        "strain_relief_clip_set"
+      ],
+      "componentNames": [
+        "silicone power lead set",
+        "JST signal harness",
+        "braided cable sleeve",
+        "strain relief clip set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:arming_interlocks",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Containment",
+      "subModuleId": "arming_interlocks",
+      "subModuleName": "Arming interlocks",
+      "purpose": "Prevents unintended motor start during handling.",
+      "interfaces": [
+        "power_bus",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "arming_switch",
+        "status_buzzer",
+        "motor_inhibit_logic",
+        "preflight_checklist_tag"
+      ],
+      "componentNames": [
+        "arming switch",
+        "status buzzer",
+        "motor inhibit logic",
+        "preflight checklist tag"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:lost_link_response",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Containment",
+      "subModuleId": "lost_link_response",
+      "subModuleName": "Lost-link response",
+      "purpose": "Defines recovery path when command link degrades.",
+      "interfaces": [
+        "radio_link",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "return_to_home_failsafe",
+        "geofence_configuration",
+        "low_battery_landing_logic",
+        "flight_termination_setting"
+      ],
+      "componentNames": [
+        "return-to-home failsafe",
+        "geofence configuration",
+        "low battery landing logic",
+        "flight termination setting"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:battery_safety",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Containment",
+      "subModuleId": "battery_safety",
+      "subModuleName": "Battery safety",
+      "purpose": "Manages pack handling, thermal and transport risks.",
+      "interfaces": [
+        "power_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "fire_resistant_battery_pouch",
+        "pack_swelling_gauge",
+        "charge_log_sheet",
+        "thermal_warning_label"
+      ],
+      "componentNames": [
+        "fire-resistant battery pouch",
+        "pack swelling gauge",
+        "charge log sheet",
+        "thermal warning label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:field_repair_access",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance And Serviceability",
+      "subModuleId": "field_repair_access",
+      "subModuleName": "Field repair access",
+      "purpose": "Makes high-wear flight parts replaceable.",
+      "interfaces": [
+        "service_access",
+        "motor_mounts"
+      ],
+      "componentWordIds": [
+        "spare_arm_clamp",
+        "motor_alignment_gauge",
+        "propeller_torque_tool",
+        "field_fastener_kit"
+      ],
+      "componentNames": [
+        "spare arm clamp",
+        "motor alignment gauge",
+        "propeller torque tool",
+        "field fastener kit"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:inspection_points",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance And Serviceability",
+      "subModuleId": "inspection_points",
+      "subModuleName": "Inspection points",
+      "purpose": "Provides visible checks before launch.",
+      "interfaces": [
+        "service_access"
+      ],
+      "componentWordIds": [
+        "crack_inspection_marker",
+        "fastener_witness_paint",
+        "battery_cycle_counter_label",
+        "payload_latch_witness_mark"
+      ],
+      "componentNames": [
+        "crack inspection marker",
+        "fastener witness paint",
+        "battery cycle counter label",
+        "payload latch witness mark"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:transport_storage",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance And Serviceability",
+      "subModuleId": "transport_storage",
+      "subModuleName": "Transport and storage",
+      "purpose": "Protects aircraft between missions.",
+      "interfaces": [
+        "service_access",
+        "payload_mount"
+      ],
+      "componentWordIds": [
+        "foam_transport_case",
+        "propeller_guard_sleeve",
+        "gimbal_transport_lock",
+        "desiccant_storage_pouch"
+      ],
+      "componentNames": [
+        "foam transport case",
+        "propeller guard sleeve",
+        "gimbal transport lock",
+        "desiccant storage pouch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:ground_controller",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Ground Operator Interface",
+      "subModuleId": "ground_controller",
+      "subModuleName": "Ground controller",
+      "purpose": "Gives pilot manual control and flight status.",
+      "interfaces": [
+        "radio_link",
+        "video_link"
+      ],
+      "componentWordIds": [
+        "handheld_transmitter",
+        "ground_station_tablet",
+        "sun_hood",
+        "controller_neck_strap"
+      ],
+      "componentNames": [
+        "handheld transmitter",
+        "ground-station tablet",
+        "sun hood",
+        "controller neck strap"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:mission_labelling",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Ground Operator Interface",
+      "subModuleId": "mission_labelling",
+      "subModuleName": "Mission labelling",
+      "purpose": "Communicates safe setup, IDs and payload status.",
+      "interfaces": [
+        "service_access"
+      ],
+      "componentWordIds": [
+        "aircraft_id_label",
+        "propeller_rotation_label",
+        "payload_mass_placard",
+        "preflight_checklist_card"
+      ],
+      "componentNames": [
+        "aircraft ID label",
+        "propeller rotation label",
+        "payload mass placard",
+        "preflight checklist card"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    }
+  ],
+  "criticalParts": [
+    {
+      "componentWordId": "flight_controller",
+      "label": "Flight controller",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "flight_controller_stack"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "brushless_motors",
+      "label": "Brushless motors",
+      "allocated": true,
+      "moduleIds": [
+        "actuation_kinematics"
+      ],
+      "subModuleIds": [
+        "motor_sets"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "esc",
+      "label": "ESC",
+      "allocated": true,
+      "moduleIds": [
+        "actuation_kinematics"
+      ],
+      "subModuleIds": [
+        "esc_stack"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "4k_camera_payload",
+      "label": "4K camera payload",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "camera_payload"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "carbon_airframe",
+      "label": "Carbon airframe",
+      "allocated": true,
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "subModuleIds": [
+        "carbon_airframe"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "flight_battery_pack",
+      "label": "Flight battery pack",
+      "allocated": true,
+      "moduleIds": [
+        "energy_storage_source"
+      ],
+      "subModuleIds": [
+        "flight_battery_pack"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "propeller_set",
+      "label": "Propeller set",
+      "allocated": true,
+      "moduleIds": [
+        "actuation_kinematics"
+      ],
+      "subModuleIds": [
+        "propeller_sets"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "radio_and_gnss_link",
+      "label": "Radio and GNSS link",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "radio_navigation_link"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    }
+  ],
+  "duplicateGroups": [],
+  "blockers": [],
+  "nextActions": []
+}

@@ -1,0 +1,14 @@
+flowchart LR
+  structure_containment["Airframe Structure And Payload Mounting"]
+  energy_storage_source["Flight Energy Storage"]
+  actuation_kinematics["Propulsion And Flight Actuation"]
+  control_compute_communication["Flight Control Compute And Communications"]
+  sensing_instrumentation["Navigation And Cinematography Sensing"]
+  power_distribution["Aircraft Power Distribution"]
+  safety_protection["Flight Safety And Containment"]
+  maintenance_serviceability["Field Maintenance And Serviceability"]
+  hmi_ergonomics["Ground Operator Interface"]
+  energy_storage_source -->|"power_bus"| actuation_kinematics
+  control_compute_communication -->|"motor_drive"| actuation_kinematics
+  control_compute_communication -->|"sensor_bus"| sensing_instrumentation
+  classDef missing stroke:#a32626,stroke-width:3px,color:#a32626;

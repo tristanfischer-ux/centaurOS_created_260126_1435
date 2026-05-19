@@ -1,0 +1,8 @@
+id,label,scratchValue,benchmarkValue,unit,ratio,status,notes,action
+module_count,Functional modules,11,11,modules,1,meets,Core architecture breadth.,Add missing functional modules only when the product class genuinely requires them.
+submodule_count,Submodules,33,33,submodules,1,meets,Submodule count is a rough proxy for engineering decomposition depth.,Expand thin modules with concrete sub-functions and carrier interfaces.
+component_word_count,Component candidates,132,132,components,1,meets,"Component-word count is a rough proxy for BoM review surface, not sourcing quality.",Add justified component candidates where submodules still hide assemblies.
+interface_link_volume,Interface link volume,55,40,links,1.38,meets,Compares link volume only; chain-v2 grammar links and scratch interface edges are not semantically identical.,"Add interface contracts only where they clarify a real energy, material, signal, load or service path."
+priced_line_ratio,Admitted priced-line ratio,0,0.75,ratio,0,below,Prototype target expects most critical lines to become source-backed before publication.,Use sourcing intake to admit source-backed price/manufacturer/MPN evidence; do not copy benchmark estimates.
+sections_at_target,Sections scoring >=8,5,6,sections,0.83,below,Readiness gate requires every scored section to reach the target.,"Clear section-specific readiness actions, especially BoM evidence."
+verification_activities,Verification activities,44,26,activities,1.69,meets,Scratch-only evidence workflow depth; not compared to chain-v2 content.,"Keep adding verification activities when new requirements, interfaces or standards are introduced."

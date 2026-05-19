@@ -1,0 +1,12 @@
+moduleId,moduleName,verdict,subModuleCount,componentWordCount,interfaceCount,linkedRequirementCount,requiredInterfaceContracts,carrierCompleteInterfaceContracts,blockedAllocationRows,reviewQuestions,acceptedReviewQuestions,blockedReviewQuestions,linkedCalculationRows,assumptionReviewRows,criticalBomLines,unpricedCriticalLines,passRatio,blockers,requiredAction
+energy_storage_source,Energy Storage Source,review,6,29,8,1,3,3,0,18,18,0,3,8,2,0,1,,8 assumption row(s) need review or source evidence.
+energy_conversion_transduction,Power Conversion System,review,4,20,6,2,1,1,0,13,13,0,3,5,1,0,1,,5 assumption row(s) need review or source evidence.
+structure_containment,Container Structure And Fit-Out,review,4,17,5,1,0,0,0,7,7,0,1,1,0,0,1,,1 assumption row(s) need review or source evidence.
+sensing_instrumentation,Sensing And Instrumentation,review,4,17,6,0,0,0,0,5,5,0,0,1,0,0,0.86,,1 assumption row(s) need review or source evidence.
+control_compute_communication,Control Compute And Communication,review,4,17,7,1,1,1,0,10,10,0,1,4,1,0,1,,4 assumption row(s) need review or source evidence.
+safety_protection,Safety Protection And Interlocks,review,4,18,7,0,0,0,0,6,6,0,0,2,1,0,0.86,,2 assumption row(s) need review or source evidence.
+environmental_interface,Environmental Interface,review,4,17,6,0,1,1,0,6,6,0,0,1,0,0,0.86,,1 assumption row(s) need review or source evidence.
+power_distribution,DC And AC Power Distribution,review,4,17,6,2,0,0,0,11,11,0,3,4,0,0,1,,4 assumption row(s) need review or source evidence.
+maintenance_serviceability,Maintenance And Serviceability,review,4,17,7,1,0,0,0,7,7,0,1,2,0,0,1,,2 assumption row(s) need review or source evidence.
+mass_fluid_transport_process,Coolant Circulation Process,review,4,18,4,0,0,0,0,6,6,0,0,2,1,0,0.86,,2 assumption row(s) need review or source evidence.
+hmi_ergonomics,Operator HMI And Labelling,pass,4,17,3,0,0,0,0,5,5,0,0,0,0,0,0.86,,Module has no open deterministic engineering blocker.

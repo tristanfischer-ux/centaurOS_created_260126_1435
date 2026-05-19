@@ -1,0 +1,244 @@
+{
+  "summary": {
+    "rows": 3,
+    "accepted": 0,
+    "readyForReview": 0,
+    "needsReview": 3,
+    "blocked": 0,
+    "unlinked": 0,
+    "rowsWithCalculations": 3,
+    "rowsWithReviewQuestions": 3,
+    "rowsWithAcceptedVerification": 1
+  },
+  "rows": [
+    {
+      "requirementId": "capacity_mwh",
+      "label": "Energy capacity",
+      "value": "3.5 MWh",
+      "architectureCoverage": "covered",
+      "architectureModuleIds": [
+        "energy_storage_source",
+        "energy_conversion_transduction",
+        "power_distribution"
+      ],
+      "architectureModuleNames": [
+        "Energy Storage Source",
+        "Power Conversion System",
+        "DC And AC Power Distribution"
+      ],
+      "subModuleIds": [
+        "cell_string",
+        "pcs_inverter",
+        "dc_busbars"
+      ],
+      "componentWordIds": [
+        "lfp_prismatic_cells",
+        "pcs_inverter",
+        "copper_dc_busbar"
+      ],
+      "calculationIds": [
+        "bess_discharge_duration_h",
+        "bess_system_energy_density_wh_per_kg",
+        "bess_nameplate_annual_throughput_mwh"
+      ],
+      "calculationStatuses": [
+        "within_envelope",
+        "within_envelope",
+        "needs_review"
+      ],
+      "reviewQuestionIds": [
+        "assumption_resolution:component:energy_conversion_transduction_pcs_inverter_pcs_inverter",
+        "assumption_resolution:sanity:bess_c_rate",
+        "assumption_resolution:sanity:bess_container_energy_density",
+        "assumption_resolution:sanity:bess_duration",
+        "calculation_envelope:bess_nameplate_annual_throughput_mwh",
+        "calculation_envelope:bess_discharge_duration_h",
+        "calculation_envelope:bess_system_energy_density_wh_per_kg",
+        "interface_contract:energy_storage_source:control_compute_communication:bms_network",
+        "interface_contract:energy_storage_source:energy_conversion_transduction:dc_bus",
+        "interface_contract:energy_storage_source:environmental_interface:thermal_loop",
+        "module_allocation:energy_conversion_transduction",
+        "module_allocation:power_distribution",
+        "submodule_allocation:energy_conversion_transduction:grid_filter",
+        "submodule_allocation:energy_conversion_transduction:grid_protection_relay",
+        "submodule_allocation:energy_conversion_transduction:pcs_inverter",
+        "submodule_allocation:energy_conversion_transduction:transformer_stage",
+        "submodule_allocation:power_distribution:ac_switchgear",
+        "submodule_allocation:power_distribution:auxiliary_power",
+        "submodule_allocation:power_distribution:dc_busbars",
+        "submodule_allocation:power_distribution:earthing_lightning",
+        "assumption_resolution:component:energy_storage_source_cell_string_lfp_prismatic_cells",
+        "assumption_resolution:component:energy_storage_source_dc_string_output_dc_contactor_or_breaker",
+        "module_allocation:energy_storage_source",
+        "submodule_allocation:energy_storage_source:bms_slave",
+        "submodule_allocation:energy_storage_source:cell_string",
+        "submodule_allocation:energy_storage_source:dc_string_output",
+        "submodule_allocation:energy_storage_source:module_interconnect_harness",
+        "submodule_allocation:energy_storage_source:rack_structure",
+        "submodule_allocation:energy_storage_source:rack_thermal_interface"
+      ],
+      "reviewStatus": "needs_review",
+      "verificationActivityIds": [
+        "design_review:energy_storage_source",
+        "calculation:energy_storage_source",
+        "design_review:energy_conversion_transduction",
+        "calculation:energy_conversion_transduction",
+        "design_review:power_distribution",
+        "calculation:power_distribution"
+      ],
+      "verificationStatuses": [
+        "accepted",
+        "pending",
+        "pending",
+        "pending",
+        "pending",
+        "pending"
+      ],
+      "acceptedVerificationActivityIds": [
+        "design_review:energy_storage_source"
+      ],
+      "overallStatus": "needs_review",
+      "blockers": [],
+      "nextAction": "Complete engineering review questions, calculations or deferred verification evidence."
+    },
+    {
+      "requirementId": "mass_kg",
+      "label": "Mass constraint",
+      "value": "28000 kg",
+      "architectureCoverage": "covered",
+      "architectureModuleIds": [
+        "structure_containment",
+        "maintenance_serviceability"
+      ],
+      "architectureModuleNames": [
+        "Container Structure And Fit-Out",
+        "Maintenance And Serviceability"
+      ],
+      "subModuleIds": [
+        "container_shell",
+        "access_doors"
+      ],
+      "componentWordIds": [
+        "corten_steel_side_panel",
+        "lockable_access_door"
+      ],
+      "calculationIds": [
+        "bess_system_energy_density_wh_per_kg"
+      ],
+      "calculationStatuses": [
+        "within_envelope"
+      ],
+      "reviewQuestionIds": [
+        "assumption_resolution:sanity:bess_container_energy_density",
+        "calculation_envelope:bess_system_energy_density_wh_per_kg",
+        "module_allocation:maintenance_serviceability",
+        "module_allocation:structure_containment",
+        "submodule_allocation:maintenance_serviceability:access_doors",
+        "submodule_allocation:maintenance_serviceability:commissioning_ports",
+        "submodule_allocation:maintenance_serviceability:lifting_handling",
+        "submodule_allocation:maintenance_serviceability:service_lighting",
+        "submodule_allocation:structure_containment:cable_penetration_sealing",
+        "submodule_allocation:structure_containment:container_shell",
+        "submodule_allocation:structure_containment:internal_partitions",
+        "submodule_allocation:structure_containment:rack_mounting"
+      ],
+      "reviewStatus": "needs_review",
+      "verificationActivityIds": [
+        "design_review:structure_containment",
+        "calculation:structure_containment",
+        "design_review:maintenance_serviceability",
+        "calculation:maintenance_serviceability"
+      ],
+      "verificationStatuses": [
+        "pending",
+        "pending",
+        "pending",
+        "pending"
+      ],
+      "acceptedVerificationActivityIds": [],
+      "overallStatus": "needs_review",
+      "blockers": [],
+      "nextAction": "Complete engineering review questions, calculations or deferred verification evidence."
+    },
+    {
+      "requirementId": "power_mw",
+      "label": "Power rating",
+      "value": "1 MW",
+      "architectureCoverage": "covered",
+      "architectureModuleIds": [
+        "energy_conversion_transduction",
+        "power_distribution",
+        "control_compute_communication"
+      ],
+      "architectureModuleNames": [
+        "Power Conversion System",
+        "DC And AC Power Distribution",
+        "Control Compute And Communication"
+      ],
+      "subModuleIds": [
+        "pcs_inverter",
+        "dc_busbars",
+        "bms_master"
+      ],
+      "componentWordIds": [
+        "pcs_inverter",
+        "copper_dc_busbar",
+        "bms_master_controller"
+      ],
+      "calculationIds": [
+        "bess_discharge_duration_h"
+      ],
+      "calculationStatuses": [
+        "within_envelope"
+      ],
+      "reviewQuestionIds": [
+        "assumption_resolution:component:control_compute_communication_bms_master_bms_master_controller",
+        "assumption_resolution:component:energy_conversion_transduction_pcs_inverter_pcs_inverter",
+        "assumption_resolution:sanity:bess_c_rate",
+        "assumption_resolution:sanity:bess_container_energy_density",
+        "assumption_resolution:sanity:bess_duration",
+        "calculation_envelope:bess_nameplate_annual_throughput_mwh",
+        "calculation_envelope:bess_discharge_duration_h",
+        "calculation_envelope:bess_system_energy_density_wh_per_kg",
+        "interface_contract:energy_storage_source:control_compute_communication:bms_network",
+        "interface_contract:energy_storage_source:energy_conversion_transduction:dc_bus",
+        "module_allocation:control_compute_communication",
+        "module_allocation:energy_conversion_transduction",
+        "module_allocation:power_distribution",
+        "submodule_allocation:control_compute_communication:bms_master",
+        "submodule_allocation:control_compute_communication:communications_gateway",
+        "submodule_allocation:control_compute_communication:cybersecurity_monitoring",
+        "submodule_allocation:control_compute_communication:ems_controller",
+        "submodule_allocation:energy_conversion_transduction:grid_filter",
+        "submodule_allocation:energy_conversion_transduction:grid_protection_relay",
+        "submodule_allocation:energy_conversion_transduction:pcs_inverter",
+        "submodule_allocation:energy_conversion_transduction:transformer_stage",
+        "submodule_allocation:power_distribution:ac_switchgear",
+        "submodule_allocation:power_distribution:auxiliary_power",
+        "submodule_allocation:power_distribution:dc_busbars",
+        "submodule_allocation:power_distribution:earthing_lightning"
+      ],
+      "reviewStatus": "needs_review",
+      "verificationActivityIds": [
+        "design_review:energy_conversion_transduction",
+        "calculation:energy_conversion_transduction",
+        "design_review:control_compute_communication",
+        "calculation:control_compute_communication",
+        "design_review:power_distribution",
+        "calculation:power_distribution"
+      ],
+      "verificationStatuses": [
+        "pending",
+        "pending",
+        "pending",
+        "pending",
+        "pending",
+        "pending"
+      ],
+      "acceptedVerificationActivityIds": [],
+      "overallStatus": "needs_review",
+      "blockers": [],
+      "nextAction": "Complete engineering review questions, calculations or deferred verification evidence."
+    }
+  ]
+}

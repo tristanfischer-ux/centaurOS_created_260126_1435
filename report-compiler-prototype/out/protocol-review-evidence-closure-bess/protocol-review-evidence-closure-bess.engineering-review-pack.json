@@ -1,0 +1,3024 @@
+{
+  "summary": {
+    "rows": 81,
+    "accepted": 78,
+    "readyForReview": 0,
+    "needsReview": 3,
+    "blocked": 0,
+    "moduleQuestions": 11,
+    "subModuleQuestions": 46,
+    "interfaceQuestions": 3,
+    "calculationQuestions": 3,
+    "assumptionQuestions": 18
+  },
+  "questions": [
+    {
+      "id": "assumption_resolution:metric:capex_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated CAPEX",
+      "reviewerQuestion": "Can the Estimated CAPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:headline_output",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Annual MWh delivered",
+      "reviewerQuestion": "Can the Annual MWh delivered assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:opex_annual_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated annual OPEX",
+      "reviewerQuestion": "Can the Estimated annual OPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:G99",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "G99",
+      "reviewerQuestion": "Can the G99 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Protection settings, relay test certificates and commissioning records.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:IEC-62619",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "IEC-62619",
+      "reviewerQuestion": "Can the IEC-62619 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Cell certificates and pack-level safety validation.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:UL-9540A",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "UL-9540A",
+      "reviewerQuestion": "Can the UL-9540A assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Cell, module and unit-level propagation evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_bms_master_bms_master_controller",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "BMS master controller",
+      "reviewerQuestion": "Can the BMS master controller assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review admitted source evidence and component identity before procurement.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "bms_master_controller"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_conversion_transduction_pcs_inverter_pcs_inverter",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "PCS inverter",
+      "reviewerQuestion": "Can the PCS inverter assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review admitted source evidence and component identity before procurement.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "pcs_inverter"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_storage_source_cell_string_lfp_prismatic_cells",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "LFP prismatic cells",
+      "reviewerQuestion": "Can the LFP prismatic cells assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review admitted source evidence and component identity before procurement.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "lfp_prismatic_cells"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_storage_source_dc_string_output_dc_contactor_or_breaker",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "DC contactor or breaker",
+      "reviewerQuestion": "Can the DC contactor or breaker assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review admitted source evidence and component identity before procurement.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "dc_contactor_or_breaker"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:mass_fluid_transport_process_pump_station_thermal_management_loop",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Thermal management loop",
+      "reviewerQuestion": "Can the Thermal management loop assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review admitted source evidence and component identity before procurement.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "thermal_management_loop"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:safety_protection_fire_suppression_fire_detection_suppression",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Fire detection/suppression",
+      "reviewerQuestion": "Can the Fire detection/suppression assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review admitted source evidence and component identity before procurement.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "fire_detection_suppression"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:energy_storage_source:control_compute_communication:bms_network",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "energy_storage_source -> control_compute_communication",
+      "reviewerQuestion": "Can the energy_storage_source -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "bms_network"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:energy_storage_source:energy_conversion_transduction:dc_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "energy_storage_source -> energy_conversion_transduction",
+      "reviewerQuestion": "Can the energy_storage_source -> energy_conversion_transduction assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "dc_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:energy_storage_source:environmental_interface:thermal_loop",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "energy_storage_source -> environmental_interface",
+      "reviewerQuestion": "Can the energy_storage_source -> environmental_interface assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:bess_c_rate",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "BESS C-Rate",
+      "reviewerQuestion": "Can the BESS C-Rate assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "energy_conversion_transduction",
+        "power_distribution",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:bess_container_energy_density",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Container-Level Energy Density",
+      "reviewerQuestion": "Can the Container-Level Energy Density assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "energy_conversion_transduction",
+        "power_distribution",
+        "structure_containment",
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:bess_duration",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Rated Duration",
+      "reviewerQuestion": "Can the Rated Duration assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "energy_conversion_transduction",
+        "power_distribution",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:bess_discharge_duration_h",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "BESS discharge duration",
+      "reviewerQuestion": "Does the BESS discharge duration calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm use case, PCS rating, usable energy window, C-rate limits and warranty throughput.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "energy_conversion_transduction",
+        "power_distribution",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "bess_discharge_duration_h"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:bess_nameplate_annual_throughput_mwh",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "BESS annual nameplate throughput",
+      "reviewerQuestion": "Does the BESS annual nameplate throughput calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm cycles per year, usable depth of discharge, round-trip efficiency and degradation assumptions.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "energy_conversion_transduction",
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "capacity_mwh"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "bess_nameplate_annual_throughput_mwh"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:bess_system_energy_density_wh_per_kg",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "BESS system energy density",
+      "reviewerQuestion": "Does the BESS system energy density calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Review cell mass, racks, enclosure, HVAC, fire protection, transformer/PCS boundary and shipping mass allowance.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "energy_conversion_transduction",
+        "power_distribution",
+        "structure_containment",
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "bess_system_energy_density_wh_per_kg"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_contract:energy_storage_source:control_compute_communication:bms_network",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Energy Storage Source -> Control Compute And Communication via bms_network",
+      "reviewerQuestion": "Is the bms_network interface between Energy Storage Source and Control Compute And Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "bms_slave",
+        "bms_master"
+      ],
+      "linkedComponentWordIds": [
+        "bms_slave_pcb",
+        "afe_monitor_ic",
+        "ntc_thermistor_harness",
+        "isolated_can_transceiver",
+        "conformal_coating",
+        "bms_master_controller",
+        "isolation_interface",
+        "contactor_driver_output",
+        "soc_estimation_firmware"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "bms_network"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:energy_storage_source:energy_conversion_transduction:dc_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Energy Storage Source -> Power Conversion System via dc_bus",
+      "reviewerQuestion": "Is the dc_bus interface between Energy Storage Source and Power Conversion System correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "cell_string",
+        "dc_string_output",
+        "pcs_inverter"
+      ],
+      "linkedComponentWordIds": [
+        "lfp_prismatic_cells",
+        "cell_to_cell_busbar",
+        "cell_terminal_hardware_set",
+        "cell_insulation_pad",
+        "module_fuse",
+        "dc_contactor_or_breaker",
+        "precharge_resistor",
+        "hv_fuse_holder",
+        "pack_current_sensor",
+        "service_disconnect",
+        "pcs_inverter",
+        "igbt_power_module",
+        "dc_link_capacitor_bank",
+        "gate_driver_board",
+        "inverter_control_board",
+        "liquid_cooled_heatsink"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "dc_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:energy_storage_source:environmental_interface:thermal_loop",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Energy Storage Source -> Environmental Interface via thermal_loop",
+      "reviewerQuestion": "Is the thermal_loop interface between Energy Storage Source and Environmental Interface correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "cell_string",
+        "rack_thermal_interface",
+        "hvac_unit",
+        "ventilation_path",
+        "heat_rejection_coil"
+      ],
+      "linkedComponentWordIds": [
+        "lfp_prismatic_cells",
+        "cell_to_cell_busbar",
+        "cell_terminal_hardware_set",
+        "cell_insulation_pad",
+        "module_fuse",
+        "rack_cold_plate_manifold",
+        "thermally_conductive_gap_pad",
+        "coolant_quick_connector_pair",
+        "rack_drip_tray",
+        "leak_detection_rope",
+        "container_hvac_unit",
+        "air_filter_element",
+        "condensate_drain_kit",
+        "hvac_controller",
+        "intake_louvre",
+        "exhaust_louvre",
+        "ec_fan_assembly",
+        "airflow_baffle",
+        "dry_cooler_coil",
+        "ec_condenser_fan",
+        "fan_contactor",
+        "coil_guard_grille",
+        "drain_safe_condensate_pan"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Control Compute And Communication",
+      "reviewerQuestion": "Does Control Compute And Communication have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "bms_master",
+        "ems_controller",
+        "communications_gateway",
+        "cybersecurity_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "bms_master_controller",
+        "isolation_interface",
+        "contactor_driver_output",
+        "soc_estimation_firmware",
+        "industrial_controller",
+        "i_o_expansion_module",
+        "network_switch",
+        "cellular_router",
+        "modbus_tcp_gateway",
+        "scada_protocol_adapter",
+        "time_synchronisation_module",
+        "cybersecurity_firewall",
+        "vpn_access_appliance",
+        "syslog_collector",
+        "account_key_switch",
+        "firmware_escrow_tag",
+        "configuration_backup_module"
+      ],
+      "linkedRequirementIds": [
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "bms_network",
+        "modbus_tcp",
+        "sensor_bus",
+        "alarm_bus",
+        "site_scada",
+        "service_access",
+        "hardwired_trip"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:energy_conversion_transduction",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Power Conversion System",
+      "reviewerQuestion": "Does Power Conversion System have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "pcs_inverter",
+        "transformer_stage",
+        "grid_filter",
+        "grid_protection_relay"
+      ],
+      "linkedComponentWordIds": [
+        "pcs_inverter",
+        "igbt_power_module",
+        "dc_link_capacitor_bank",
+        "gate_driver_board",
+        "inverter_control_board",
+        "liquid_cooled_heatsink",
+        "cast_resin_transformer",
+        "hv_winding",
+        "lv_winding",
+        "temperature_probe",
+        "anti_vibration_mount",
+        "grid_filter_choke",
+        "ac_filter_capacitor",
+        "emi_filter_assembly",
+        "protective_earth_bar",
+        "grid_protection_relay",
+        "voltage_sensing_fuse_set",
+        "relay_test_block",
+        "trip_circuit_monitor",
+        "g99_settings_label"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "dc_bus",
+        "ac_bus",
+        "modbus_tcp",
+        "thermal_path",
+        "hardwired_trip",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:energy_storage_source",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Energy Storage Source",
+      "reviewerQuestion": "Does Energy Storage Source have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "cell_string",
+        "rack_structure",
+        "bms_slave",
+        "dc_string_output",
+        "module_interconnect_harness",
+        "rack_thermal_interface"
+      ],
+      "linkedComponentWordIds": [
+        "lfp_prismatic_cells",
+        "cell_to_cell_busbar",
+        "cell_terminal_hardware_set",
+        "cell_insulation_pad",
+        "module_fuse",
+        "module_steel_frame",
+        "compression_plate",
+        "compression_tie_rod_set",
+        "module_top_cover",
+        "rack_label_plate",
+        "bms_slave_pcb",
+        "afe_monitor_ic",
+        "ntc_thermistor_harness",
+        "isolated_can_transceiver",
+        "conformal_coating",
+        "dc_contactor_or_breaker",
+        "precharge_resistor",
+        "hv_fuse_holder",
+        "pack_current_sensor",
+        "service_disconnect",
+        "cell_voltage_sense_loom",
+        "rack_can_drop_cable",
+        "harness_strain_relief_rail",
+        "low_smoke_cable_sleeve",
+        "rack_cold_plate_manifold",
+        "thermally_conductive_gap_pad",
+        "coolant_quick_connector_pair",
+        "rack_drip_tray",
+        "leak_detection_rope"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh"
+      ],
+      "linkedInterfaceIds": [
+        "dc_bus",
+        "thermal_loop",
+        "bms_network",
+        "mechanical_mounts",
+        "bms_tap_harness",
+        "service_access",
+        "sensor_harness",
+        "hardwired_trip"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Environmental Interface",
+      "reviewerQuestion": "Does Environmental Interface have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "hvac_unit",
+        "ventilation_path",
+        "thermal_insulation",
+        "heat_rejection_coil"
+      ],
+      "linkedComponentWordIds": [
+        "container_hvac_unit",
+        "air_filter_element",
+        "condensate_drain_kit",
+        "hvac_controller",
+        "intake_louvre",
+        "exhaust_louvre",
+        "ec_fan_assembly",
+        "airflow_baffle",
+        "insulation_panel",
+        "vapour_barrier_film",
+        "thermal_break_strip",
+        "seal_gasket_set",
+        "dry_cooler_coil",
+        "ec_condenser_fan",
+        "fan_contactor",
+        "coil_guard_grille",
+        "drain_safe_condensate_pan"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_loop",
+        "thermal_path",
+        "electrical_power",
+        "sensor_bus",
+        "service_access",
+        "fire_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:hmi_ergonomics",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Operator HMI And Labelling",
+      "reviewerQuestion": "Does Operator HMI And Labelling have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "local_hmi",
+        "external_labelling",
+        "operator_workflow",
+        "remote_notification"
+      ],
+      "linkedComponentWordIds": [
+        "industrial_touchscreen",
+        "panel_pc",
+        "key_switch",
+        "alarm_buzzer_beacon",
+        "high_voltage_warning_label",
+        "arc_flash_boundary_label",
+        "fire_suppression_instruction_placard",
+        "asset_qr_label",
+        "laminated_isolation_checklist",
+        "inspection_log_holder",
+        "status_stack_light",
+        "manual_reset_station",
+        "operator_notification_relay",
+        "sms_alarm_output_module",
+        "alarm_acknowledgement_button",
+        "escalation_contact_label",
+        "remote_reset_inhibit_relay"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "site_scada",
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Maintenance And Serviceability",
+      "reviewerQuestion": "Does Maintenance And Serviceability have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "access_doors",
+        "service_lighting",
+        "lifting_handling",
+        "commissioning_ports"
+      ],
+      "linkedComponentWordIds": [
+        "lockable_access_door",
+        "door_seal_gasket",
+        "panic_release_latch",
+        "door_stay_arm",
+        "led_service_luminaire",
+        "emergency_light_fitting",
+        "maintenance_receptacle",
+        "lighting_switchgear",
+        "certified_lifting_lug",
+        "forklift_pocket_reinforcement",
+        "removable_rack_guide",
+        "service_trolley_interface",
+        "insulated_test_socket",
+        "coolant_sampling_port",
+        "laptop_service_port",
+        "lockout_hasp_rail",
+        "commissioning_torque_log_plate"
+      ],
+      "linkedRequirementIds": [
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "lifting_points",
+        "protective_earth",
+        "sensor_bus",
+        "dc_bus",
+        "electrical_power",
+        "mechanical_mounts"
+      ],
+      "linkedCalculationIds": [
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:mass_fluid_transport_process",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Coolant Circulation Process",
+      "reviewerQuestion": "Does Coolant Circulation Process have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "pump_station",
+        "filtration_treatment",
+        "expansion_air_removal",
+        "heat_exchanger_manifold"
+      ],
+      "linkedComponentWordIds": [
+        "thermal_management_loop",
+        "coolant_circulation_pump",
+        "pump_vfd",
+        "check_valve",
+        "isolation_valve",
+        "coolant_filter_housing",
+        "replaceable_filter_cartridge",
+        "glycol_concentration_sensor",
+        "fill_and_drain_manifold",
+        "expansion_vessel",
+        "automatic_air_vent",
+        "pressure_relief_valve",
+        "low_pressure_switch",
+        "plate_heat_exchanger",
+        "temperature_balancing_valve",
+        "purge_valve_set",
+        "service_bypass_loop",
+        "insulated_hose_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_loop",
+        "sensor_bus",
+        "service_access",
+        "electrical_power"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "DC And AC Power Distribution",
+      "reviewerQuestion": "Does DC And AC Power Distribution have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "dc_busbars",
+        "ac_switchgear",
+        "auxiliary_power",
+        "earthing_lightning"
+      ],
+      "linkedComponentWordIds": [
+        "copper_dc_busbar",
+        "busbar_support_insulator",
+        "busbar_shroud",
+        "torque_witness_marker",
+        "moulded_case_circuit_breaker",
+        "ac_contactor",
+        "metering_ct_set",
+        "terminal_block_assembly",
+        "auxiliary_transformer",
+        "24_v_dc_power_supply",
+        "miniature_circuit_breaker_bank",
+        "ups_module",
+        "main_earth_bar",
+        "earth_stud_array",
+        "lightning_surge_counter",
+        "equipotential_bonding_strap",
+        "earth_continuity_test_point"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "dc_bus",
+        "ac_bus",
+        "electrical_power",
+        "protective_earth",
+        "hardwired_trip",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Safety Protection And Interlocks",
+      "reviewerQuestion": "Does Safety Protection And Interlocks have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "fire_suppression",
+        "emergency_stop",
+        "surge_fault_protection",
+        "deflagration_venting"
+      ],
+      "linkedComponentWordIds": [
+        "fire_detection_suppression",
+        "clean_agent_cylinder",
+        "release_solenoid",
+        "nozzle_pipework",
+        "pressure_switch",
+        "e_stop_mushroom_button",
+        "safety_relay",
+        "dc_shunt_trip_output",
+        "ac_breaker_trip_coil",
+        "dc_surge_protection_device",
+        "ac_surge_protection_device",
+        "arc_flash_label_set",
+        "protective_earth_bonding_kit",
+        "pressure_relief_vent_panel",
+        "vent_microswitch",
+        "flame_arrestor_mesh",
+        "vent_weather_hood",
+        "post_event_inspection_tag"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "alarm_bus",
+        "hardwired_trip",
+        "fire_boundary",
+        "dc_bus",
+        "ac_bus",
+        "service_access",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Sensing And Instrumentation",
+      "reviewerQuestion": "Does Sensing And Instrumentation have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "electrical_measurement",
+        "environmental_sensors",
+        "thermal_sensors",
+        "event_recording"
+      ],
+      "linkedComponentWordIds": [
+        "dc_voltage_transducer",
+        "hall_current_sensor",
+        "insulation_monitoring_device",
+        "auxiliary_metering_transducer",
+        "temperature_humidity_sensor",
+        "hydrogen_detector",
+        "smoke_aspirating_detector",
+        "door_position_switch",
+        "coolant_inlet_thermistor",
+        "coolant_outlet_thermistor",
+        "flow_meter",
+        "pressure_transducer",
+        "fault_recorder_module",
+        "event_timestamp_logger",
+        "digital_input_card",
+        "local_historian_buffer",
+        "calibration_certificate_holder"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "alarm_bus",
+        "bms_network",
+        "site_scada",
+        "dc_bus",
+        "thermal_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Container Structure And Fit-Out",
+      "reviewerQuestion": "Does Container Structure And Fit-Out have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "container_shell",
+        "internal_partitions",
+        "rack_mounting",
+        "cable_penetration_sealing"
+      ],
+      "linkedComponentWordIds": [
+        "corten_steel_side_panel",
+        "corner_casting",
+        "marine_plywood_floor",
+        "roof_panel",
+        "steel_stud_frame",
+        "fire_rated_board",
+        "mineral_wool_insulation",
+        "intumescent_sealant",
+        "floor_reinforcement_plate",
+        "rack_mounting_rail",
+        "vibration_isolator",
+        "anchor_bolt_set",
+        "gland_plate_assembly",
+        "firestop_collar_set",
+        "emc_cable_gland",
+        "rain_drip_shield",
+        "penetration_schedule_label"
+      ],
+      "linkedRequirementIds": [
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [
+        "mechanical_mounts",
+        "service_access",
+        "fire_boundary",
+        "lifting_points",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:bms_master",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Control Compute And Communication / BMS master controller",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to BMS master controller make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "bms_master"
+      ],
+      "linkedComponentWordIds": [
+        "bms_master_controller",
+        "isolation_interface",
+        "contactor_driver_output",
+        "soc_estimation_firmware"
+      ],
+      "linkedRequirementIds": [
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "bms_network",
+        "hardwired_trip"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:communications_gateway",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Control Compute And Communication / Communications gateway",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Communications gateway make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "communications_gateway"
+      ],
+      "linkedComponentWordIds": [
+        "modbus_tcp_gateway",
+        "scada_protocol_adapter",
+        "time_synchronisation_module",
+        "cybersecurity_firewall"
+      ],
+      "linkedRequirementIds": [
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "site_scada",
+        "modbus_tcp"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:cybersecurity_monitoring",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Control Compute And Communication / Cybersecurity monitoring",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Cybersecurity monitoring make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "cybersecurity_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "vpn_access_appliance",
+        "syslog_collector",
+        "account_key_switch",
+        "firmware_escrow_tag",
+        "configuration_backup_module"
+      ],
+      "linkedRequirementIds": [
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "site_scada",
+        "modbus_tcp",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:ems_controller",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Control Compute And Communication / EMS controller",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to EMS controller make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "ems_controller"
+      ],
+      "linkedComponentWordIds": [
+        "industrial_controller",
+        "i_o_expansion_module",
+        "network_switch",
+        "cellular_router"
+      ],
+      "linkedRequirementIds": [
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "modbus_tcp",
+        "site_scada"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:grid_filter",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Power Conversion System / Grid filter",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Grid filter make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "grid_filter"
+      ],
+      "linkedComponentWordIds": [
+        "grid_filter_choke",
+        "ac_filter_capacitor",
+        "emi_filter_assembly",
+        "protective_earth_bar"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "ac_bus",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:grid_protection_relay",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Power Conversion System / Grid protection relay",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Grid protection relay make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "grid_protection_relay"
+      ],
+      "linkedComponentWordIds": [
+        "grid_protection_relay",
+        "voltage_sensing_fuse_set",
+        "relay_test_block",
+        "trip_circuit_monitor",
+        "g99_settings_label"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "ac_bus",
+        "modbus_tcp",
+        "hardwired_trip",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:pcs_inverter",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Power Conversion System / PCS inverter bridge",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to PCS inverter bridge make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "pcs_inverter"
+      ],
+      "linkedComponentWordIds": [
+        "pcs_inverter",
+        "igbt_power_module",
+        "dc_link_capacitor_bank",
+        "gate_driver_board",
+        "inverter_control_board",
+        "liquid_cooled_heatsink"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "dc_bus",
+        "ac_bus",
+        "modbus_tcp"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_conversion_transduction:transformer_stage",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Power Conversion System / Transformer stage",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Transformer stage make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_conversion_transduction"
+      ],
+      "linkedSubModuleIds": [
+        "transformer_stage"
+      ],
+      "linkedComponentWordIds": [
+        "cast_resin_transformer",
+        "hv_winding",
+        "lv_winding",
+        "temperature_probe",
+        "anti_vibration_mount"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "ac_bus",
+        "thermal_path"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:bms_slave",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Energy Storage Source / BMS slave board",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to BMS slave board make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "bms_slave"
+      ],
+      "linkedComponentWordIds": [
+        "bms_slave_pcb",
+        "afe_monitor_ic",
+        "ntc_thermistor_harness",
+        "isolated_can_transceiver",
+        "conformal_coating"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh"
+      ],
+      "linkedInterfaceIds": [
+        "bms_network",
+        "sensor_harness"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:cell_string",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Energy Storage Source / Cell string",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Cell string make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "cell_string"
+      ],
+      "linkedComponentWordIds": [
+        "lfp_prismatic_cells",
+        "cell_to_cell_busbar",
+        "cell_terminal_hardware_set",
+        "cell_insulation_pad",
+        "module_fuse"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh"
+      ],
+      "linkedInterfaceIds": [
+        "dc_bus",
+        "thermal_loop",
+        "bms_tap_harness"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:dc_string_output",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Energy Storage Source / DC string output",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to DC string output make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "dc_string_output"
+      ],
+      "linkedComponentWordIds": [
+        "dc_contactor_or_breaker",
+        "precharge_resistor",
+        "hv_fuse_holder",
+        "pack_current_sensor",
+        "service_disconnect"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh"
+      ],
+      "linkedInterfaceIds": [
+        "dc_bus",
+        "hardwired_trip"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:module_interconnect_harness",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Energy Storage Source / Module interconnect harness",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Module interconnect harness make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "module_interconnect_harness"
+      ],
+      "linkedComponentWordIds": [
+        "cell_voltage_sense_loom",
+        "rack_can_drop_cable",
+        "harness_strain_relief_rail",
+        "low_smoke_cable_sleeve"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh"
+      ],
+      "linkedInterfaceIds": [
+        "bms_tap_harness",
+        "sensor_harness",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:rack_structure",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Energy Storage Source / Rack structure",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Rack structure make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "rack_structure"
+      ],
+      "linkedComponentWordIds": [
+        "module_steel_frame",
+        "compression_plate",
+        "compression_tie_rod_set",
+        "module_top_cover",
+        "rack_label_plate"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh"
+      ],
+      "linkedInterfaceIds": [
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:rack_thermal_interface",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Energy Storage Source / Rack thermal interface",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Rack thermal interface make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "rack_thermal_interface"
+      ],
+      "linkedComponentWordIds": [
+        "rack_cold_plate_manifold",
+        "thermally_conductive_gap_pad",
+        "coolant_quick_connector_pair",
+        "rack_drip_tray",
+        "leak_detection_rope"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh"
+      ],
+      "linkedInterfaceIds": [
+        "thermal_loop",
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:heat_rejection_coil",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Environmental Interface / Heat rejection coil",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Heat rejection coil make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "heat_rejection_coil"
+      ],
+      "linkedComponentWordIds": [
+        "dry_cooler_coil",
+        "ec_condenser_fan",
+        "fan_contactor",
+        "coil_guard_grille",
+        "drain_safe_condensate_pan"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_loop",
+        "thermal_path",
+        "electrical_power",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:hvac_unit",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Environmental Interface / HVAC unit",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to HVAC unit make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "hvac_unit"
+      ],
+      "linkedComponentWordIds": [
+        "container_hvac_unit",
+        "air_filter_element",
+        "condensate_drain_kit",
+        "hvac_controller"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "electrical_power",
+        "thermal_loop",
+        "thermal_path",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:thermal_insulation",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Environmental Interface / Thermal insulation",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Thermal insulation make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_insulation"
+      ],
+      "linkedComponentWordIds": [
+        "insulation_panel",
+        "vapour_barrier_film",
+        "thermal_break_strip",
+        "seal_gasket_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "fire_boundary",
+        "thermal_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:ventilation_path",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Environmental Interface / Ventilation path",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Ventilation path make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "ventilation_path"
+      ],
+      "linkedComponentWordIds": [
+        "intake_louvre",
+        "exhaust_louvre",
+        "ec_fan_assembly",
+        "airflow_baffle"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_loop",
+        "thermal_path",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:external_labelling",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Operator HMI And Labelling / External labelling",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to External labelling make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "external_labelling"
+      ],
+      "linkedComponentWordIds": [
+        "high_voltage_warning_label",
+        "arc_flash_boundary_label",
+        "fire_suppression_instruction_placard",
+        "asset_qr_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:local_hmi",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Operator HMI And Labelling / Local HMI panel",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Local HMI panel make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "local_hmi"
+      ],
+      "linkedComponentWordIds": [
+        "industrial_touchscreen",
+        "panel_pc",
+        "key_switch",
+        "alarm_buzzer_beacon"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "site_scada",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:operator_workflow",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Operator HMI And Labelling / Operator workflow aids",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Operator workflow aids make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "operator_workflow"
+      ],
+      "linkedComponentWordIds": [
+        "laminated_isolation_checklist",
+        "inspection_log_holder",
+        "status_stack_light",
+        "manual_reset_station"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:hmi_ergonomics:remote_notification",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Operator HMI And Labelling / Remote notification interface",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Remote notification interface make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "hmi_ergonomics"
+      ],
+      "linkedSubModuleIds": [
+        "remote_notification"
+      ],
+      "linkedComponentWordIds": [
+        "operator_notification_relay",
+        "sms_alarm_output_module",
+        "alarm_acknowledgement_button",
+        "escalation_contact_label",
+        "remote_reset_inhibit_relay"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "site_scada",
+        "alarm_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:access_doors",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Maintenance And Serviceability / Access doors and hardware",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Access doors and hardware make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "access_doors"
+      ],
+      "linkedComponentWordIds": [
+        "lockable_access_door",
+        "door_seal_gasket",
+        "panic_release_latch",
+        "door_stay_arm"
+      ],
+      "linkedRequirementIds": [
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:commissioning_ports",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Maintenance And Serviceability / Commissioning ports",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Commissioning ports make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "commissioning_ports"
+      ],
+      "linkedComponentWordIds": [
+        "insulated_test_socket",
+        "coolant_sampling_port",
+        "laptop_service_port",
+        "lockout_hasp_rail",
+        "commissioning_torque_log_plate"
+      ],
+      "linkedRequirementIds": [
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "sensor_bus",
+        "dc_bus"
+      ],
+      "linkedCalculationIds": [
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:lifting_handling",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Maintenance And Serviceability / Lifting and handling points",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Lifting and handling points make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "lifting_handling"
+      ],
+      "linkedComponentWordIds": [
+        "certified_lifting_lug",
+        "forklift_pocket_reinforcement",
+        "removable_rack_guide",
+        "service_trolley_interface"
+      ],
+      "linkedRequirementIds": [
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [
+        "lifting_points",
+        "mechanical_mounts"
+      ],
+      "linkedCalculationIds": [
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:service_lighting",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Maintenance And Serviceability / Service lighting",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Service lighting make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "service_lighting"
+      ],
+      "linkedComponentWordIds": [
+        "led_service_luminaire",
+        "emergency_light_fitting",
+        "maintenance_receptacle",
+        "lighting_switchgear"
+      ],
+      "linkedRequirementIds": [
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [
+        "electrical_power",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:expansion_air_removal",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Coolant Circulation Process / Expansion and air removal",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Expansion and air removal make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "expansion_air_removal"
+      ],
+      "linkedComponentWordIds": [
+        "expansion_vessel",
+        "automatic_air_vent",
+        "pressure_relief_valve",
+        "low_pressure_switch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_loop",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:filtration_treatment",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Coolant Circulation Process / Filtration and treatment",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Filtration and treatment make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "filtration_treatment"
+      ],
+      "linkedComponentWordIds": [
+        "coolant_filter_housing",
+        "replaceable_filter_cartridge",
+        "glycol_concentration_sensor",
+        "fill_and_drain_manifold"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_loop",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:heat_exchanger_manifold",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Coolant Circulation Process / Heat exchanger manifold",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Heat exchanger manifold make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "heat_exchanger_manifold"
+      ],
+      "linkedComponentWordIds": [
+        "plate_heat_exchanger",
+        "temperature_balancing_valve",
+        "purge_valve_set",
+        "service_bypass_loop",
+        "insulated_hose_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_loop",
+        "service_access",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:mass_fluid_transport_process:pump_station",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Coolant Circulation Process / Coolant pump station",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Coolant pump station make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "linkedSubModuleIds": [
+        "pump_station"
+      ],
+      "linkedComponentWordIds": [
+        "thermal_management_loop",
+        "coolant_circulation_pump",
+        "pump_vfd",
+        "check_valve",
+        "isolation_valve"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_loop",
+        "electrical_power",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:ac_switchgear",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "DC And AC Power Distribution / AC switchgear",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to AC switchgear make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "ac_switchgear"
+      ],
+      "linkedComponentWordIds": [
+        "moulded_case_circuit_breaker",
+        "ac_contactor",
+        "metering_ct_set",
+        "terminal_block_assembly"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "ac_bus",
+        "protective_earth",
+        "hardwired_trip"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:auxiliary_power",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "DC And AC Power Distribution / Auxiliary power distribution",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Auxiliary power distribution make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "auxiliary_power"
+      ],
+      "linkedComponentWordIds": [
+        "auxiliary_transformer",
+        "24_v_dc_power_supply",
+        "miniature_circuit_breaker_bank",
+        "ups_module"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "electrical_power",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:dc_busbars",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "DC And AC Power Distribution / Main DC busbars",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Main DC busbars make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "dc_busbars"
+      ],
+      "linkedComponentWordIds": [
+        "copper_dc_busbar",
+        "busbar_support_insulator",
+        "busbar_shroud",
+        "torque_witness_marker"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "dc_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:earthing_lightning",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "DC And AC Power Distribution / Earthing and lightning protection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Earthing and lightning protection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "earthing_lightning"
+      ],
+      "linkedComponentWordIds": [
+        "main_earth_bar",
+        "earth_stud_array",
+        "lightning_surge_counter",
+        "equipotential_bonding_strap",
+        "earth_continuity_test_point"
+      ],
+      "linkedRequirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaceIds": [
+        "protective_earth",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:deflagration_venting",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Safety Protection And Interlocks / Deflagration venting",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Deflagration venting make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "deflagration_venting"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_relief_vent_panel",
+        "vent_microswitch",
+        "flame_arrestor_mesh",
+        "vent_weather_hood",
+        "post_event_inspection_tag"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "fire_boundary",
+        "alarm_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:emergency_stop",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Safety Protection And Interlocks / Emergency stop chain",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Emergency stop chain make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "emergency_stop"
+      ],
+      "linkedComponentWordIds": [
+        "e_stop_mushroom_button",
+        "safety_relay",
+        "dc_shunt_trip_output",
+        "ac_breaker_trip_coil"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "hardwired_trip",
+        "dc_bus",
+        "ac_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:fire_suppression",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Safety Protection And Interlocks / Fire suppression system",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Fire suppression system make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "fire_suppression"
+      ],
+      "linkedComponentWordIds": [
+        "fire_detection_suppression",
+        "clean_agent_cylinder",
+        "release_solenoid",
+        "nozzle_pipework",
+        "pressure_switch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "alarm_bus",
+        "fire_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:surge_fault_protection",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Safety Protection And Interlocks / Surge and fault protection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Surge and fault protection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "surge_fault_protection"
+      ],
+      "linkedComponentWordIds": [
+        "dc_surge_protection_device",
+        "ac_surge_protection_device",
+        "arc_flash_label_set",
+        "protective_earth_bonding_kit"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "dc_bus",
+        "ac_bus",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:electrical_measurement",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Sensing And Instrumentation / Electrical measurement",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Electrical measurement make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "electrical_measurement"
+      ],
+      "linkedComponentWordIds": [
+        "dc_voltage_transducer",
+        "hall_current_sensor",
+        "insulation_monitoring_device",
+        "auxiliary_metering_transducer"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "dc_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:environmental_sensors",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Sensing And Instrumentation / Environmental sensors",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Environmental sensors make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "environmental_sensors"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_humidity_sensor",
+        "hydrogen_detector",
+        "smoke_aspirating_detector",
+        "door_position_switch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:event_recording",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Sensing And Instrumentation / Event recording",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Event recording make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "event_recording"
+      ],
+      "linkedComponentWordIds": [
+        "fault_recorder_module",
+        "event_timestamp_logger",
+        "digital_input_card",
+        "local_historian_buffer",
+        "calibration_certificate_holder"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "alarm_bus",
+        "site_scada"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:thermal_sensors",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Sensing And Instrumentation / Thermal sensors",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Thermal sensors make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_sensors"
+      ],
+      "linkedComponentWordIds": [
+        "coolant_inlet_thermistor",
+        "coolant_outlet_thermistor",
+        "flow_meter",
+        "pressure_transducer"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "thermal_loop"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:cable_penetration_sealing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Container Structure And Fit-Out / Cable penetration sealing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Cable penetration sealing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "cable_penetration_sealing"
+      ],
+      "linkedComponentWordIds": [
+        "gland_plate_assembly",
+        "firestop_collar_set",
+        "emc_cable_gland",
+        "rain_drip_shield",
+        "penetration_schedule_label"
+      ],
+      "linkedRequirementIds": [
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [
+        "fire_boundary",
+        "service_access",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:container_shell",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Container Structure And Fit-Out / ISO container shell",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to ISO container shell make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "container_shell"
+      ],
+      "linkedComponentWordIds": [
+        "corten_steel_side_panel",
+        "corner_casting",
+        "marine_plywood_floor",
+        "roof_panel"
+      ],
+      "linkedRequirementIds": [
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [
+        "lifting_points",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:internal_partitions",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Container Structure And Fit-Out / Internal partitions",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Internal partitions make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "internal_partitions"
+      ],
+      "linkedComponentWordIds": [
+        "steel_stud_frame",
+        "fire_rated_board",
+        "mineral_wool_insulation",
+        "intumescent_sealant"
+      ],
+      "linkedRequirementIds": [
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [
+        "fire_boundary",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:rack_mounting",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "accepted",
+      "scope": "Container Structure And Fit-Out / Rack mounting rails",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Rack mounting rails make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "rack_mounting"
+      ],
+      "linkedComponentWordIds": [
+        "floor_reinforcement_plate",
+        "rack_mounting_rail",
+        "vibration_isolator",
+        "anchor_bolt_set"
+      ],
+      "linkedRequirementIds": [
+        "mass_kg"
+      ],
+      "linkedInterfaceIds": [
+        "mechanical_mounts"
+      ],
+      "linkedCalculationIds": [
+        "bess_container_energy_density"
+      ],
+      "blockers": []
+    }
+  ]
+}

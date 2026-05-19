@@ -1,0 +1,232 @@
+{
+  "summary": {
+    "modules": 10,
+    "readyModules": 5,
+    "sourcingBlockedModules": 5,
+    "attentionModules": 0,
+    "criticalUnpricedLines": 9,
+    "issueCount": 0
+  },
+  "modules": [
+    {
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Refrigerant Energy Conversion",
+      "status": "sourcing_blocked",
+      "subModuleCount": 4,
+      "componentCount": 16,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 3,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "thermal_output_kw",
+        "cop"
+      ],
+      "sanityCheckIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "criticalUnpricedLines": [
+        "inverter_scroll_compressor",
+        "electronic_expansion_valve"
+      ],
+      "candidateUnpricedLines": 14,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "environmental_interface",
+      "moduleName": "Outdoor Air Interface",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 7,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "thermal_output_kw"
+      ],
+      "sanityCheckIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "criticalUnpricedLines": [
+        "outdoor_finned_evaporator_coil",
+        "variable_speed_fan_assembly"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Hydronic Heat Delivery",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 7,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "thermal_output_kw"
+      ],
+      "sanityCheckIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "criticalUnpricedLines": [
+        "brazed_plate_heat_exchanger",
+        "hydronic_circulation_pump",
+        "hydronic_safety_valve_kit"
+      ],
+      "candidateUnpricedLines": 9,
+      "issueCodes": [],
+      "notes": [
+        "3 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "cop"
+      ],
+      "sanityCheckIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "criticalUnpricedLines": [
+        "heat_pump_controller_pcb"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing Instrumentation",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "cop"
+      ],
+      "sanityCheckIds": [
+        "heatpump_cop_input_power",
+        "heatpump_refrigerant_hydronic_closure"
+      ],
+      "criticalUnpricedLines": [
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "power_distribution",
+      "moduleName": "Electrical Power Distribution",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "structure_containment",
+      "moduleName": "Monobloc Structure And Containment",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 8,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Commissioning",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 7,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "User And Installer Interface",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    }
+  ]
+}

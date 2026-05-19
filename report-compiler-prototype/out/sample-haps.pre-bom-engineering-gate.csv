@@ -1,0 +1,7 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+architecture_readiness,pass,"11 modules, 33 submodules and 132 component words pass architecture readiness.",1,,Architecture is structurally ready for engineering review.
+component_allocation,pass,33/33 submodules ready; 12/12 critical parts allocated; 0 duplicate component groups.,1,,Component candidates are allocated well enough for engineering review.
+interface_verification,pass,8/8 required interfaces have endpoint carriers; 0 accepted with evidence.,1,,Required interfaces are structurally ready for reviewer evidence.
+requirement_coverage,pass,3/3 requirements are structurally ready or accepted; accepted evidence ratio 0.,1,,Requirements are structurally ready for reviewer evidence.
+calculation_envelope,review,1/3 calculations are within envelope; 2 need review; 0 block.,0.33,,Attach reviewer evidence to calculations marked needs_review.
+engineering_assumptions,review,11/34 assumptions are brief-supported or model-present; 23 need review/source evidence; 0 block architecture.,0.32,,Review assumptions and keep BoM/source-required assumptions out of trusted claims until evidence is admitted.

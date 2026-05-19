@@ -1,0 +1,6 @@
+componentWordId,description,priority,supplierName,manufacturer,mpn,unitCostGbp,leadTimeWeeks,sourceGrade,evidence.ref,evidence.quote,retrievedAt
+dc_contactor_or_breaker,DC contactor or breaker,critical,,,,,,catalogue,,,
+pcs_inverter,PCS inverter,critical,,,,,,catalogue,,,
+bms_master_controller,BMS master controller,critical,,,,,,catalogue,,,
+fire_detection_suppression,Fire detection/suppression,critical,,,,,,catalogue,,,
+thermal_management_loop,Thermal management loop,critical,,,,,,catalogue,,,

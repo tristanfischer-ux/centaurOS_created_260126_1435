@@ -1,0 +1,5513 @@
+{
+  "summary": {
+    "lines": 110,
+    "claimRows": 550,
+    "sourceBackedClaims": 0,
+    "missingSourceClaims": 32,
+    "notClaimedRows": 518,
+    "provenanceViolations": 0,
+    "criticalMissingSourceClaims": 32
+  },
+  "rows": [
+    {
+      "lineId": "structure_containment_carbon_airframe_carbon_airframe",
+      "componentWordId": "carbon_airframe",
+      "description": "Carbon airframe",
+      "critical": true,
+      "field": "supplier",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_carbon_airframe",
+      "componentWordId": "carbon_airframe",
+      "description": "Carbon airframe",
+      "critical": true,
+      "field": "manufacturer",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_carbon_airframe",
+      "componentWordId": "carbon_airframe",
+      "description": "Carbon airframe",
+      "critical": true,
+      "field": "mpn",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_carbon_airframe",
+      "componentWordId": "carbon_airframe",
+      "description": "Carbon airframe",
+      "critical": true,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_carbon_airframe",
+      "componentWordId": "carbon_airframe",
+      "description": "Carbon airframe",
+      "critical": true,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_carbon_fibre_arm_tube",
+      "componentWordId": "carbon_fibre_arm_tube",
+      "description": "carbon fibre arm tube",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_carbon_fibre_arm_tube",
+      "componentWordId": "carbon_fibre_arm_tube",
+      "description": "carbon fibre arm tube",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_carbon_fibre_arm_tube",
+      "componentWordId": "carbon_fibre_arm_tube",
+      "description": "carbon fibre arm tube",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_carbon_fibre_arm_tube",
+      "componentWordId": "carbon_fibre_arm_tube",
+      "description": "carbon fibre arm tube",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_carbon_fibre_arm_tube",
+      "componentWordId": "carbon_fibre_arm_tube",
+      "description": "carbon fibre arm tube",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_centre_plate_pair",
+      "componentWordId": "centre_plate_pair",
+      "description": "centre plate pair",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_centre_plate_pair",
+      "componentWordId": "centre_plate_pair",
+      "description": "centre plate pair",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_centre_plate_pair",
+      "componentWordId": "centre_plate_pair",
+      "description": "centre plate pair",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_centre_plate_pair",
+      "componentWordId": "centre_plate_pair",
+      "description": "centre plate pair",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_centre_plate_pair",
+      "componentWordId": "centre_plate_pair",
+      "description": "centre plate pair",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_arm_folding_hinge",
+      "componentWordId": "arm_folding_hinge",
+      "description": "arm folding hinge",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_arm_folding_hinge",
+      "componentWordId": "arm_folding_hinge",
+      "description": "arm folding hinge",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_arm_folding_hinge",
+      "componentWordId": "arm_folding_hinge",
+      "description": "arm folding hinge",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_arm_folding_hinge",
+      "componentWordId": "arm_folding_hinge",
+      "description": "arm folding hinge",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_arm_folding_hinge",
+      "componentWordId": "arm_folding_hinge",
+      "description": "arm folding hinge",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_landing_gear_strut",
+      "componentWordId": "landing_gear_strut",
+      "description": "landing gear strut",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_landing_gear_strut",
+      "componentWordId": "landing_gear_strut",
+      "description": "landing gear strut",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_landing_gear_strut",
+      "componentWordId": "landing_gear_strut",
+      "description": "landing gear strut",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_landing_gear_strut",
+      "componentWordId": "landing_gear_strut",
+      "description": "landing gear strut",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_carbon_airframe_landing_gear_strut",
+      "componentWordId": "landing_gear_strut",
+      "description": "landing gear strut",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_camera_gimbal_mount_plate",
+      "componentWordId": "camera_gimbal_mount_plate",
+      "description": "camera gimbal mount plate",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_camera_gimbal_mount_plate",
+      "componentWordId": "camera_gimbal_mount_plate",
+      "description": "camera gimbal mount plate",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_camera_gimbal_mount_plate",
+      "componentWordId": "camera_gimbal_mount_plate",
+      "description": "camera gimbal mount plate",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_camera_gimbal_mount_plate",
+      "componentWordId": "camera_gimbal_mount_plate",
+      "description": "camera gimbal mount plate",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_camera_gimbal_mount_plate",
+      "componentWordId": "camera_gimbal_mount_plate",
+      "description": "camera gimbal mount plate",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_rubber_vibration_damper",
+      "componentWordId": "rubber_vibration_damper",
+      "description": "rubber vibration damper",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_rubber_vibration_damper",
+      "componentWordId": "rubber_vibration_damper",
+      "description": "rubber vibration damper",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_rubber_vibration_damper",
+      "componentWordId": "rubber_vibration_damper",
+      "description": "rubber vibration damper",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_rubber_vibration_damper",
+      "componentWordId": "rubber_vibration_damper",
+      "description": "rubber vibration damper",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_rubber_vibration_damper",
+      "componentWordId": "rubber_vibration_damper",
+      "description": "rubber vibration damper",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_payload_quick_release_latch",
+      "componentWordId": "payload_quick_release_latch",
+      "description": "payload quick-release latch",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_payload_quick_release_latch",
+      "componentWordId": "payload_quick_release_latch",
+      "description": "payload quick-release latch",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_payload_quick_release_latch",
+      "componentWordId": "payload_quick_release_latch",
+      "description": "payload quick-release latch",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_payload_quick_release_latch",
+      "componentWordId": "payload_quick_release_latch",
+      "description": "payload quick-release latch",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_payload_quick_release_latch",
+      "componentWordId": "payload_quick_release_latch",
+      "description": "payload quick-release latch",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_payload_cg_adjustment_rail",
+      "componentWordId": "payload_cg_adjustment_rail",
+      "description": "payload CG adjustment rail",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_payload_cg_adjustment_rail",
+      "componentWordId": "payload_cg_adjustment_rail",
+      "description": "payload CG adjustment rail",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_payload_cg_adjustment_rail",
+      "componentWordId": "payload_cg_adjustment_rail",
+      "description": "payload CG adjustment rail",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_payload_cg_adjustment_rail",
+      "componentWordId": "payload_cg_adjustment_rail",
+      "description": "payload CG adjustment rail",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_payload_mounting_payload_cg_adjustment_rail",
+      "componentWordId": "payload_cg_adjustment_rail",
+      "description": "payload CG adjustment rail",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_battery_tray",
+      "componentWordId": "battery_tray",
+      "description": "battery tray",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_battery_tray",
+      "componentWordId": "battery_tray",
+      "description": "battery tray",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_battery_tray",
+      "componentWordId": "battery_tray",
+      "description": "battery tray",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_battery_tray",
+      "componentWordId": "battery_tray",
+      "description": "battery tray",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_battery_tray",
+      "componentWordId": "battery_tray",
+      "description": "battery tray",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_battery_retention_strap",
+      "componentWordId": "battery_retention_strap",
+      "description": "battery retention strap",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_battery_retention_strap",
+      "componentWordId": "battery_retention_strap",
+      "description": "battery retention strap",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_battery_retention_strap",
+      "componentWordId": "battery_retention_strap",
+      "description": "battery retention strap",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_battery_retention_strap",
+      "componentWordId": "battery_retention_strap",
+      "description": "battery retention strap",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_battery_retention_strap",
+      "componentWordId": "battery_retention_strap",
+      "description": "battery retention strap",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_anti_slip_battery_pad",
+      "componentWordId": "anti_slip_battery_pad",
+      "description": "anti-slip battery pad",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_anti_slip_battery_pad",
+      "componentWordId": "anti_slip_battery_pad",
+      "description": "anti-slip battery pad",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_anti_slip_battery_pad",
+      "componentWordId": "anti_slip_battery_pad",
+      "description": "anti-slip battery pad",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_anti_slip_battery_pad",
+      "componentWordId": "anti_slip_battery_pad",
+      "description": "anti-slip battery pad",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_anti_slip_battery_pad",
+      "componentWordId": "anti_slip_battery_pad",
+      "description": "anti-slip battery pad",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_pack_latch_sensor",
+      "componentWordId": "pack_latch_sensor",
+      "description": "pack latch sensor",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_pack_latch_sensor",
+      "componentWordId": "pack_latch_sensor",
+      "description": "pack latch sensor",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_pack_latch_sensor",
+      "componentWordId": "pack_latch_sensor",
+      "description": "pack latch sensor",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_pack_latch_sensor",
+      "componentWordId": "pack_latch_sensor",
+      "description": "pack latch sensor",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "structure_containment_battery_mounting_pack_latch_sensor",
+      "componentWordId": "pack_latch_sensor",
+      "description": "pack latch sensor",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_flight_battery_pack",
+      "componentWordId": "flight_battery_pack",
+      "description": "Flight battery pack",
+      "critical": true,
+      "field": "supplier",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_flight_battery_pack",
+      "componentWordId": "flight_battery_pack",
+      "description": "Flight battery pack",
+      "critical": true,
+      "field": "manufacturer",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_flight_battery_pack",
+      "componentWordId": "flight_battery_pack",
+      "description": "Flight battery pack",
+      "critical": true,
+      "field": "mpn",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_flight_battery_pack",
+      "componentWordId": "flight_battery_pack",
+      "description": "Flight battery pack",
+      "critical": true,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_flight_battery_pack",
+      "componentWordId": "flight_battery_pack",
+      "description": "Flight battery pack",
+      "critical": true,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_high_discharge_cell_group",
+      "componentWordId": "high_discharge_cell_group",
+      "description": "high-discharge cell group",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_high_discharge_cell_group",
+      "componentWordId": "high_discharge_cell_group",
+      "description": "high-discharge cell group",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_high_discharge_cell_group",
+      "componentWordId": "high_discharge_cell_group",
+      "description": "high-discharge cell group",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_high_discharge_cell_group",
+      "componentWordId": "high_discharge_cell_group",
+      "description": "high-discharge cell group",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_high_discharge_cell_group",
+      "componentWordId": "high_discharge_cell_group",
+      "description": "high-discharge cell group",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_battery_management_pcb",
+      "componentWordId": "battery_management_pcb",
+      "description": "battery management PCB",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_battery_management_pcb",
+      "componentWordId": "battery_management_pcb",
+      "description": "battery management PCB",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_battery_management_pcb",
+      "componentWordId": "battery_management_pcb",
+      "description": "battery management PCB",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_battery_management_pcb",
+      "componentWordId": "battery_management_pcb",
+      "description": "battery management PCB",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_battery_management_pcb",
+      "componentWordId": "battery_management_pcb",
+      "description": "battery management PCB",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_xt90_anti_spark_connector",
+      "componentWordId": "xt90_anti_spark_connector",
+      "description": "XT90 anti-spark connector",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_xt90_anti_spark_connector",
+      "componentWordId": "xt90_anti_spark_connector",
+      "description": "XT90 anti-spark connector",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_xt90_anti_spark_connector",
+      "componentWordId": "xt90_anti_spark_connector",
+      "description": "XT90 anti-spark connector",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_xt90_anti_spark_connector",
+      "componentWordId": "xt90_anti_spark_connector",
+      "description": "XT90 anti-spark connector",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_xt90_anti_spark_connector",
+      "componentWordId": "xt90_anti_spark_connector",
+      "description": "XT90 anti-spark connector",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_pack_temperature_sensor",
+      "componentWordId": "pack_temperature_sensor",
+      "description": "pack temperature sensor",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_pack_temperature_sensor",
+      "componentWordId": "pack_temperature_sensor",
+      "description": "pack temperature sensor",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_pack_temperature_sensor",
+      "componentWordId": "pack_temperature_sensor",
+      "description": "pack temperature sensor",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_pack_temperature_sensor",
+      "componentWordId": "pack_temperature_sensor",
+      "description": "pack temperature sensor",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_flight_battery_pack_pack_temperature_sensor",
+      "componentWordId": "pack_temperature_sensor",
+      "description": "pack temperature sensor",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_power_module_shunt",
+      "componentWordId": "power_module_shunt",
+      "description": "power module shunt",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_power_module_shunt",
+      "componentWordId": "power_module_shunt",
+      "description": "power module shunt",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_power_module_shunt",
+      "componentWordId": "power_module_shunt",
+      "description": "power module shunt",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_power_module_shunt",
+      "componentWordId": "power_module_shunt",
+      "description": "power module shunt",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_power_module_shunt",
+      "componentWordId": "power_module_shunt",
+      "description": "power module shunt",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_voltage_divider_board",
+      "componentWordId": "voltage_divider_board",
+      "description": "voltage divider board",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_voltage_divider_board",
+      "componentWordId": "voltage_divider_board",
+      "description": "voltage divider board",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_voltage_divider_board",
+      "componentWordId": "voltage_divider_board",
+      "description": "voltage divider board",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_voltage_divider_board",
+      "componentWordId": "voltage_divider_board",
+      "description": "voltage divider board",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_voltage_divider_board",
+      "componentWordId": "voltage_divider_board",
+      "description": "voltage divider board",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_low_voltage_alarm_output",
+      "componentWordId": "low_voltage_alarm_output",
+      "description": "low-voltage alarm output",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_low_voltage_alarm_output",
+      "componentWordId": "low_voltage_alarm_output",
+      "description": "low-voltage alarm output",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_low_voltage_alarm_output",
+      "componentWordId": "low_voltage_alarm_output",
+      "description": "low-voltage alarm output",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_low_voltage_alarm_output",
+      "componentWordId": "low_voltage_alarm_output",
+      "description": "low-voltage alarm output",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_low_voltage_alarm_output",
+      "componentWordId": "low_voltage_alarm_output",
+      "description": "low-voltage alarm output",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_battery_telemetry_connector",
+      "componentWordId": "battery_telemetry_connector",
+      "description": "battery telemetry connector",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_battery_telemetry_connector",
+      "componentWordId": "battery_telemetry_connector",
+      "description": "battery telemetry connector",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_battery_telemetry_connector",
+      "componentWordId": "battery_telemetry_connector",
+      "description": "battery telemetry connector",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_battery_telemetry_connector",
+      "componentWordId": "battery_telemetry_connector",
+      "description": "battery telemetry connector",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_power_monitoring_battery_telemetry_connector",
+      "componentWordId": "battery_telemetry_connector",
+      "description": "battery telemetry connector",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_balance_charge_harness",
+      "componentWordId": "balance_charge_harness",
+      "description": "balance charge harness",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_balance_charge_harness",
+      "componentWordId": "balance_charge_harness",
+      "description": "balance charge harness",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_balance_charge_harness",
+      "componentWordId": "balance_charge_harness",
+      "description": "balance charge harness",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_balance_charge_harness",
+      "componentWordId": "balance_charge_harness",
+      "description": "balance charge harness",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_balance_charge_harness",
+      "componentWordId": "balance_charge_harness",
+      "description": "balance charge harness",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_charging_cradle",
+      "componentWordId": "charging_cradle",
+      "description": "charging cradle",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_charging_cradle",
+      "componentWordId": "charging_cradle",
+      "description": "charging cradle",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_charging_cradle",
+      "componentWordId": "charging_cradle",
+      "description": "charging cradle",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_charging_cradle",
+      "componentWordId": "charging_cradle",
+      "description": "charging cradle",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_charging_cradle",
+      "componentWordId": "charging_cradle",
+      "description": "charging cradle",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_pack_id_label",
+      "componentWordId": "pack_id_label",
+      "description": "pack ID label",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_pack_id_label",
+      "componentWordId": "pack_id_label",
+      "description": "pack ID label",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_pack_id_label",
+      "componentWordId": "pack_id_label",
+      "description": "pack ID label",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_pack_id_label",
+      "componentWordId": "pack_id_label",
+      "description": "pack ID label",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_pack_id_label",
+      "componentWordId": "pack_id_label",
+      "description": "pack ID label",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_transport_storage_case_insert",
+      "componentWordId": "transport_storage_case_insert",
+      "description": "transport storage case insert",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_transport_storage_case_insert",
+      "componentWordId": "transport_storage_case_insert",
+      "description": "transport storage case insert",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_transport_storage_case_insert",
+      "componentWordId": "transport_storage_case_insert",
+      "description": "transport storage case insert",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_transport_storage_case_insert",
+      "componentWordId": "transport_storage_case_insert",
+      "description": "transport storage case insert",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "energy_storage_source_charging_interface_transport_storage_case_insert",
+      "componentWordId": "transport_storage_case_insert",
+      "description": "transport storage case insert",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_brushless_motors",
+      "componentWordId": "brushless_motors",
+      "description": "Brushless motors",
+      "critical": true,
+      "field": "supplier",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_brushless_motors",
+      "componentWordId": "brushless_motors",
+      "description": "Brushless motors",
+      "critical": true,
+      "field": "manufacturer",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_brushless_motors",
+      "componentWordId": "brushless_motors",
+      "description": "Brushless motors",
+      "critical": true,
+      "field": "mpn",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_brushless_motors",
+      "componentWordId": "brushless_motors",
+      "description": "Brushless motors",
+      "critical": true,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_brushless_motors",
+      "componentWordId": "brushless_motors",
+      "description": "Brushless motors",
+      "critical": true,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_mounting_screw_set",
+      "componentWordId": "motor_mounting_screw_set",
+      "description": "motor mounting screw set",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_mounting_screw_set",
+      "componentWordId": "motor_mounting_screw_set",
+      "description": "motor mounting screw set",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_mounting_screw_set",
+      "componentWordId": "motor_mounting_screw_set",
+      "description": "motor mounting screw set",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_mounting_screw_set",
+      "componentWordId": "motor_mounting_screw_set",
+      "description": "motor mounting screw set",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_mounting_screw_set",
+      "componentWordId": "motor_mounting_screw_set",
+      "description": "motor mounting screw set",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_phase_lead_set",
+      "componentWordId": "motor_phase_lead_set",
+      "description": "motor phase lead set",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_phase_lead_set",
+      "componentWordId": "motor_phase_lead_set",
+      "description": "motor phase lead set",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_phase_lead_set",
+      "componentWordId": "motor_phase_lead_set",
+      "description": "motor phase lead set",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_phase_lead_set",
+      "componentWordId": "motor_phase_lead_set",
+      "description": "motor phase lead set",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_phase_lead_set",
+      "componentWordId": "motor_phase_lead_set",
+      "description": "motor phase lead set",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_bearing_shield",
+      "componentWordId": "motor_bearing_shield",
+      "description": "motor bearing shield",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_bearing_shield",
+      "componentWordId": "motor_bearing_shield",
+      "description": "motor bearing shield",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_bearing_shield",
+      "componentWordId": "motor_bearing_shield",
+      "description": "motor bearing shield",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_bearing_shield",
+      "componentWordId": "motor_bearing_shield",
+      "description": "motor bearing shield",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_motor_sets_motor_bearing_shield",
+      "componentWordId": "motor_bearing_shield",
+      "description": "motor bearing shield",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc",
+      "componentWordId": "esc",
+      "description": "ESC",
+      "critical": true,
+      "field": "supplier",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc",
+      "componentWordId": "esc",
+      "description": "ESC",
+      "critical": true,
+      "field": "manufacturer",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc",
+      "componentWordId": "esc",
+      "description": "ESC",
+      "critical": true,
+      "field": "mpn",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc",
+      "componentWordId": "esc",
+      "description": "ESC",
+      "critical": true,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc",
+      "componentWordId": "esc",
+      "description": "ESC",
+      "critical": true,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc_cooling_plate",
+      "componentWordId": "esc_cooling_plate",
+      "description": "ESC cooling plate",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc_cooling_plate",
+      "componentWordId": "esc_cooling_plate",
+      "description": "ESC cooling plate",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc_cooling_plate",
+      "componentWordId": "esc_cooling_plate",
+      "description": "ESC cooling plate",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc_cooling_plate",
+      "componentWordId": "esc_cooling_plate",
+      "description": "ESC cooling plate",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc_cooling_plate",
+      "componentWordId": "esc_cooling_plate",
+      "description": "ESC cooling plate",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_pwm_signal_harness",
+      "componentWordId": "pwm_signal_harness",
+      "description": "PWM signal harness",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_pwm_signal_harness",
+      "componentWordId": "pwm_signal_harness",
+      "description": "PWM signal harness",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_pwm_signal_harness",
+      "componentWordId": "pwm_signal_harness",
+      "description": "PWM signal harness",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_pwm_signal_harness",
+      "componentWordId": "pwm_signal_harness",
+      "description": "PWM signal harness",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_pwm_signal_harness",
+      "componentWordId": "pwm_signal_harness",
+      "description": "PWM signal harness",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_current_telemetry_line",
+      "componentWordId": "current_telemetry_line",
+      "description": "current telemetry line",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_current_telemetry_line",
+      "componentWordId": "current_telemetry_line",
+      "description": "current telemetry line",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_current_telemetry_line",
+      "componentWordId": "current_telemetry_line",
+      "description": "current telemetry line",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_current_telemetry_line",
+      "componentWordId": "current_telemetry_line",
+      "description": "current telemetry line",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_current_telemetry_line",
+      "componentWordId": "current_telemetry_line",
+      "description": "current telemetry line",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc_conformal_coating",
+      "componentWordId": "esc_conformal_coating",
+      "description": "ESC conformal coating",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc_conformal_coating",
+      "componentWordId": "esc_conformal_coating",
+      "description": "ESC conformal coating",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc_conformal_coating",
+      "componentWordId": "esc_conformal_coating",
+      "description": "ESC conformal coating",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc_conformal_coating",
+      "componentWordId": "esc_conformal_coating",
+      "description": "ESC conformal coating",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_esc_stack_esc_conformal_coating",
+      "componentWordId": "esc_conformal_coating",
+      "description": "ESC conformal coating",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_set",
+      "componentWordId": "propeller_set",
+      "description": "Propeller set",
+      "critical": true,
+      "field": "supplier",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_set",
+      "componentWordId": "propeller_set",
+      "description": "Propeller set",
+      "critical": true,
+      "field": "manufacturer",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_set",
+      "componentWordId": "propeller_set",
+      "description": "Propeller set",
+      "critical": true,
+      "field": "mpn",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_set",
+      "componentWordId": "propeller_set",
+      "description": "Propeller set",
+      "critical": true,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_set",
+      "componentWordId": "propeller_set",
+      "description": "Propeller set",
+      "critical": true,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_hub_adapter",
+      "componentWordId": "propeller_hub_adapter",
+      "description": "propeller hub adapter",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_hub_adapter",
+      "componentWordId": "propeller_hub_adapter",
+      "description": "propeller hub adapter",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_hub_adapter",
+      "componentWordId": "propeller_hub_adapter",
+      "description": "propeller hub adapter",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_hub_adapter",
+      "componentWordId": "propeller_hub_adapter",
+      "description": "propeller hub adapter",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_hub_adapter",
+      "componentWordId": "propeller_hub_adapter",
+      "description": "propeller hub adapter",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_lock_nut",
+      "componentWordId": "propeller_lock_nut",
+      "description": "propeller lock nut",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_lock_nut",
+      "componentWordId": "propeller_lock_nut",
+      "description": "propeller lock nut",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_lock_nut",
+      "componentWordId": "propeller_lock_nut",
+      "description": "propeller lock nut",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_lock_nut",
+      "componentWordId": "propeller_lock_nut",
+      "description": "propeller lock nut",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_propeller_lock_nut",
+      "componentWordId": "propeller_lock_nut",
+      "description": "propeller lock nut",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_spare_propeller_pouch",
+      "componentWordId": "spare_propeller_pouch",
+      "description": "spare propeller pouch",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_spare_propeller_pouch",
+      "componentWordId": "spare_propeller_pouch",
+      "description": "spare propeller pouch",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_spare_propeller_pouch",
+      "componentWordId": "spare_propeller_pouch",
+      "description": "spare propeller pouch",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_spare_propeller_pouch",
+      "componentWordId": "spare_propeller_pouch",
+      "description": "spare propeller pouch",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "actuation_kinematics_propeller_sets_spare_propeller_pouch",
+      "componentWordId": "spare_propeller_pouch",
+      "description": "spare propeller pouch",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_flight_controller",
+      "componentWordId": "flight_controller",
+      "description": "Flight controller",
+      "critical": true,
+      "field": "supplier",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_flight_controller",
+      "componentWordId": "flight_controller",
+      "description": "Flight controller",
+      "critical": true,
+      "field": "manufacturer",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_flight_controller",
+      "componentWordId": "flight_controller",
+      "description": "Flight controller",
+      "critical": true,
+      "field": "mpn",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_flight_controller",
+      "componentWordId": "flight_controller",
+      "description": "Flight controller",
+      "critical": true,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_flight_controller",
+      "componentWordId": "flight_controller",
+      "description": "Flight controller",
+      "critical": true,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_imu_vibration_isolation_mount",
+      "componentWordId": "imu_vibration_isolation_mount",
+      "description": "IMU vibration isolation mount",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_imu_vibration_isolation_mount",
+      "componentWordId": "imu_vibration_isolation_mount",
+      "description": "IMU vibration isolation mount",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_imu_vibration_isolation_mount",
+      "componentWordId": "imu_vibration_isolation_mount",
+      "description": "IMU vibration isolation mount",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_imu_vibration_isolation_mount",
+      "componentWordId": "imu_vibration_isolation_mount",
+      "description": "IMU vibration isolation mount",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_imu_vibration_isolation_mount",
+      "componentWordId": "imu_vibration_isolation_mount",
+      "description": "IMU vibration isolation mount",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_barometer_foam_cover",
+      "componentWordId": "barometer_foam_cover",
+      "description": "barometer foam cover",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_barometer_foam_cover",
+      "componentWordId": "barometer_foam_cover",
+      "description": "barometer foam cover",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_barometer_foam_cover",
+      "componentWordId": "barometer_foam_cover",
+      "description": "barometer foam cover",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_barometer_foam_cover",
+      "componentWordId": "barometer_foam_cover",
+      "description": "barometer foam cover",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_barometer_foam_cover",
+      "componentWordId": "barometer_foam_cover",
+      "description": "barometer foam cover",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_sd_card_flight_logger",
+      "componentWordId": "sd_card_flight_logger",
+      "description": "SD card flight logger",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_sd_card_flight_logger",
+      "componentWordId": "sd_card_flight_logger",
+      "description": "SD card flight logger",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_sd_card_flight_logger",
+      "componentWordId": "sd_card_flight_logger",
+      "description": "SD card flight logger",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_sd_card_flight_logger",
+      "componentWordId": "sd_card_flight_logger",
+      "description": "SD card flight logger",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_sd_card_flight_logger",
+      "componentWordId": "sd_card_flight_logger",
+      "description": "SD card flight logger",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_failsafe_firmware_profile",
+      "componentWordId": "failsafe_firmware_profile",
+      "description": "failsafe firmware profile",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_failsafe_firmware_profile",
+      "componentWordId": "failsafe_firmware_profile",
+      "description": "failsafe firmware profile",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_failsafe_firmware_profile",
+      "componentWordId": "failsafe_firmware_profile",
+      "description": "failsafe firmware profile",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_failsafe_firmware_profile",
+      "componentWordId": "failsafe_firmware_profile",
+      "description": "failsafe firmware profile",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_flight_controller_stack_failsafe_firmware_profile",
+      "componentWordId": "failsafe_firmware_profile",
+      "description": "failsafe firmware profile",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_radio_and_gnss_link",
+      "componentWordId": "radio_and_gnss_link",
+      "description": "Radio and GNSS link",
+      "critical": true,
+      "field": "supplier",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_radio_and_gnss_link",
+      "componentWordId": "radio_and_gnss_link",
+      "description": "Radio and GNSS link",
+      "critical": true,
+      "field": "manufacturer",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_radio_and_gnss_link",
+      "componentWordId": "radio_and_gnss_link",
+      "description": "Radio and GNSS link",
+      "critical": true,
+      "field": "mpn",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_radio_and_gnss_link",
+      "componentWordId": "radio_and_gnss_link",
+      "description": "Radio and GNSS link",
+      "critical": true,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_radio_and_gnss_link",
+      "componentWordId": "radio_and_gnss_link",
+      "description": "Radio and GNSS link",
+      "critical": true,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_gnss_antenna_mast",
+      "componentWordId": "gnss_antenna_mast",
+      "description": "GNSS antenna mast",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_gnss_antenna_mast",
+      "componentWordId": "gnss_antenna_mast",
+      "description": "GNSS antenna mast",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_gnss_antenna_mast",
+      "componentWordId": "gnss_antenna_mast",
+      "description": "GNSS antenna mast",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_gnss_antenna_mast",
+      "componentWordId": "gnss_antenna_mast",
+      "description": "GNSS antenna mast",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_gnss_antenna_mast",
+      "componentWordId": "gnss_antenna_mast",
+      "description": "GNSS antenna mast",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_rc_receiver",
+      "componentWordId": "rc_receiver",
+      "description": "RC receiver",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_rc_receiver",
+      "componentWordId": "rc_receiver",
+      "description": "RC receiver",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_rc_receiver",
+      "componentWordId": "rc_receiver",
+      "description": "RC receiver",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_rc_receiver",
+      "componentWordId": "rc_receiver",
+      "description": "RC receiver",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_rc_receiver",
+      "componentWordId": "rc_receiver",
+      "description": "RC receiver",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_telemetry_radio_module",
+      "componentWordId": "telemetry_radio_module",
+      "description": "telemetry radio module",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_telemetry_radio_module",
+      "componentWordId": "telemetry_radio_module",
+      "description": "telemetry radio module",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_telemetry_radio_module",
+      "componentWordId": "telemetry_radio_module",
+      "description": "telemetry radio module",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_telemetry_radio_module",
+      "componentWordId": "telemetry_radio_module",
+      "description": "telemetry radio module",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_telemetry_radio_module",
+      "componentWordId": "telemetry_radio_module",
+      "description": "telemetry radio module",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_antenna_diversity_mount",
+      "componentWordId": "antenna_diversity_mount",
+      "description": "antenna diversity mount",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_antenna_diversity_mount",
+      "componentWordId": "antenna_diversity_mount",
+      "description": "antenna diversity mount",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_antenna_diversity_mount",
+      "componentWordId": "antenna_diversity_mount",
+      "description": "antenna diversity mount",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_antenna_diversity_mount",
+      "componentWordId": "antenna_diversity_mount",
+      "description": "antenna diversity mount",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_radio_navigation_link_antenna_diversity_mount",
+      "componentWordId": "antenna_diversity_mount",
+      "description": "antenna diversity mount",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_low_latency_video_transmitter",
+      "componentWordId": "low_latency_video_transmitter",
+      "description": "low-latency video transmitter",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_low_latency_video_transmitter",
+      "componentWordId": "low_latency_video_transmitter",
+      "description": "low-latency video transmitter",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_low_latency_video_transmitter",
+      "componentWordId": "low_latency_video_transmitter",
+      "description": "low-latency video transmitter",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_low_latency_video_transmitter",
+      "componentWordId": "low_latency_video_transmitter",
+      "description": "low-latency video transmitter",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_low_latency_video_transmitter",
+      "componentWordId": "low_latency_video_transmitter",
+      "description": "low-latency video transmitter",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_video_antenna_pair",
+      "componentWordId": "video_antenna_pair",
+      "description": "video antenna pair",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_video_antenna_pair",
+      "componentWordId": "video_antenna_pair",
+      "description": "video antenna pair",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_video_antenna_pair",
+      "componentWordId": "video_antenna_pair",
+      "description": "video antenna pair",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_video_antenna_pair",
+      "componentWordId": "video_antenna_pair",
+      "description": "video antenna pair",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_video_antenna_pair",
+      "componentWordId": "video_antenna_pair",
+      "description": "video antenna pair",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_hdmi_micro_cable",
+      "componentWordId": "hdmi_micro_cable",
+      "description": "HDMI micro cable",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_hdmi_micro_cable",
+      "componentWordId": "hdmi_micro_cable",
+      "description": "HDMI micro cable",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_hdmi_micro_cable",
+      "componentWordId": "hdmi_micro_cable",
+      "description": "HDMI micro cable",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_hdmi_micro_cable",
+      "componentWordId": "hdmi_micro_cable",
+      "description": "HDMI micro cable",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_hdmi_micro_cable",
+      "componentWordId": "hdmi_micro_cable",
+      "description": "HDMI micro cable",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_video_power_filter",
+      "componentWordId": "video_power_filter",
+      "description": "video power filter",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_video_power_filter",
+      "componentWordId": "video_power_filter",
+      "description": "video power filter",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_video_power_filter",
+      "componentWordId": "video_power_filter",
+      "description": "video power filter",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_video_power_filter",
+      "componentWordId": "video_power_filter",
+      "description": "video power filter",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "control_compute_communication_video_downlink_video_power_filter",
+      "componentWordId": "video_power_filter",
+      "description": "video power filter",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_4k_camera_payload",
+      "componentWordId": "4k_camera_payload",
+      "description": "4K camera payload",
+      "critical": true,
+      "field": "supplier",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_4k_camera_payload",
+      "componentWordId": "4k_camera_payload",
+      "description": "4K camera payload",
+      "critical": true,
+      "field": "manufacturer",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_4k_camera_payload",
+      "componentWordId": "4k_camera_payload",
+      "description": "4K camera payload",
+      "critical": true,
+      "field": "mpn",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_4k_camera_payload",
+      "componentWordId": "4k_camera_payload",
+      "description": "4K camera payload",
+      "critical": true,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "missing_source",
+      "nextAction": "Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_4k_camera_payload",
+      "componentWordId": "4k_camera_payload",
+      "description": "4K camera payload",
+      "critical": true,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_three_axis_gimbal",
+      "componentWordId": "three_axis_gimbal",
+      "description": "three-axis gimbal",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_three_axis_gimbal",
+      "componentWordId": "three_axis_gimbal",
+      "description": "three-axis gimbal",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_three_axis_gimbal",
+      "componentWordId": "three_axis_gimbal",
+      "description": "three-axis gimbal",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_three_axis_gimbal",
+      "componentWordId": "three_axis_gimbal",
+      "description": "three-axis gimbal",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_three_axis_gimbal",
+      "componentWordId": "three_axis_gimbal",
+      "description": "three-axis gimbal",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_camera_control_cable",
+      "componentWordId": "camera_control_cable",
+      "description": "camera control cable",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_camera_control_cable",
+      "componentWordId": "camera_control_cable",
+      "description": "camera control cable",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_camera_control_cable",
+      "componentWordId": "camera_control_cable",
+      "description": "camera control cable",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_camera_control_cable",
+      "componentWordId": "camera_control_cable",
+      "description": "camera control cable",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_camera_control_cable",
+      "componentWordId": "camera_control_cable",
+      "description": "camera control cable",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_lens_protection_hood",
+      "componentWordId": "lens_protection_hood",
+      "description": "lens protection hood",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_lens_protection_hood",
+      "componentWordId": "lens_protection_hood",
+      "description": "lens protection hood",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_lens_protection_hood",
+      "componentWordId": "lens_protection_hood",
+      "description": "lens protection hood",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_lens_protection_hood",
+      "componentWordId": "lens_protection_hood",
+      "description": "lens protection hood",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_lens_protection_hood",
+      "componentWordId": "lens_protection_hood",
+      "description": "lens protection hood",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_microsd_media_card",
+      "componentWordId": "microsd_media_card",
+      "description": "microSD media card",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_microsd_media_card",
+      "componentWordId": "microsd_media_card",
+      "description": "microSD media card",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_microsd_media_card",
+      "componentWordId": "microsd_media_card",
+      "description": "microSD media card",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_microsd_media_card",
+      "componentWordId": "microsd_media_card",
+      "description": "microSD media card",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_camera_payload_microsd_media_card",
+      "componentWordId": "microsd_media_card",
+      "description": "microSD media card",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_magnetometer_module",
+      "componentWordId": "magnetometer_module",
+      "description": "magnetometer module",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_magnetometer_module",
+      "componentWordId": "magnetometer_module",
+      "description": "magnetometer module",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_magnetometer_module",
+      "componentWordId": "magnetometer_module",
+      "description": "magnetometer module",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_magnetometer_module",
+      "componentWordId": "magnetometer_module",
+      "description": "magnetometer module",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_magnetometer_module",
+      "componentWordId": "magnetometer_module",
+      "description": "magnetometer module",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_rangefinder_altimeter",
+      "componentWordId": "rangefinder_altimeter",
+      "description": "rangefinder altimeter",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_rangefinder_altimeter",
+      "componentWordId": "rangefinder_altimeter",
+      "description": "rangefinder altimeter",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_rangefinder_altimeter",
+      "componentWordId": "rangefinder_altimeter",
+      "description": "rangefinder altimeter",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_rangefinder_altimeter",
+      "componentWordId": "rangefinder_altimeter",
+      "description": "rangefinder altimeter",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_rangefinder_altimeter",
+      "componentWordId": "rangefinder_altimeter",
+      "description": "rangefinder altimeter",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_optical_flow_sensor",
+      "componentWordId": "optical_flow_sensor",
+      "description": "optical flow sensor",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_optical_flow_sensor",
+      "componentWordId": "optical_flow_sensor",
+      "description": "optical flow sensor",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_optical_flow_sensor",
+      "componentWordId": "optical_flow_sensor",
+      "description": "optical flow sensor",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_optical_flow_sensor",
+      "componentWordId": "optical_flow_sensor",
+      "description": "optical flow sensor",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_optical_flow_sensor",
+      "componentWordId": "optical_flow_sensor",
+      "description": "optical flow sensor",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_airspeed_estimate_port",
+      "componentWordId": "airspeed_estimate_port",
+      "description": "airspeed estimate port",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_airspeed_estimate_port",
+      "componentWordId": "airspeed_estimate_port",
+      "description": "airspeed estimate port",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_airspeed_estimate_port",
+      "componentWordId": "airspeed_estimate_port",
+      "description": "airspeed estimate port",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_airspeed_estimate_port",
+      "componentWordId": "airspeed_estimate_port",
+      "description": "airspeed estimate port",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_navigation_sensors_airspeed_estimate_port",
+      "componentWordId": "airspeed_estimate_port",
+      "description": "airspeed estimate port",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_vibration_monitor_pad",
+      "componentWordId": "vibration_monitor_pad",
+      "description": "vibration monitor pad",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_vibration_monitor_pad",
+      "componentWordId": "vibration_monitor_pad",
+      "description": "vibration monitor pad",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_vibration_monitor_pad",
+      "componentWordId": "vibration_monitor_pad",
+      "description": "vibration monitor pad",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_vibration_monitor_pad",
+      "componentWordId": "vibration_monitor_pad",
+      "description": "vibration monitor pad",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_vibration_monitor_pad",
+      "componentWordId": "vibration_monitor_pad",
+      "description": "vibration monitor pad",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_payload_presence_switch",
+      "componentWordId": "payload_presence_switch",
+      "description": "payload presence switch",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_payload_presence_switch",
+      "componentWordId": "payload_presence_switch",
+      "description": "payload presence switch",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_payload_presence_switch",
+      "componentWordId": "payload_presence_switch",
+      "description": "payload presence switch",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_payload_presence_switch",
+      "componentWordId": "payload_presence_switch",
+      "description": "payload presence switch",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_payload_presence_switch",
+      "componentWordId": "payload_presence_switch",
+      "description": "payload presence switch",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_avionics_temperature_probe",
+      "componentWordId": "avionics_temperature_probe",
+      "description": "avionics temperature probe",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_avionics_temperature_probe",
+      "componentWordId": "avionics_temperature_probe",
+      "description": "avionics temperature probe",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_avionics_temperature_probe",
+      "componentWordId": "avionics_temperature_probe",
+      "description": "avionics temperature probe",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_avionics_temperature_probe",
+      "componentWordId": "avionics_temperature_probe",
+      "description": "avionics temperature probe",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_avionics_temperature_probe",
+      "componentWordId": "avionics_temperature_probe",
+      "description": "avionics temperature probe",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_landing_contact_switch",
+      "componentWordId": "landing_contact_switch",
+      "description": "landing contact switch",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_landing_contact_switch",
+      "componentWordId": "landing_contact_switch",
+      "description": "landing contact switch",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_landing_contact_switch",
+      "componentWordId": "landing_contact_switch",
+      "description": "landing contact switch",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_landing_contact_switch",
+      "componentWordId": "landing_contact_switch",
+      "description": "landing contact switch",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "sensing_instrumentation_health_sensing_landing_contact_switch",
+      "componentWordId": "landing_contact_switch",
+      "description": "landing contact switch",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_power_distribution_pcb",
+      "componentWordId": "power_distribution_pcb",
+      "description": "power distribution PCB",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_power_distribution_pcb",
+      "componentWordId": "power_distribution_pcb",
+      "description": "power distribution PCB",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_power_distribution_pcb",
+      "componentWordId": "power_distribution_pcb",
+      "description": "power distribution PCB",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_power_distribution_pcb",
+      "componentWordId": "power_distribution_pcb",
+      "description": "power distribution PCB",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_power_distribution_pcb",
+      "componentWordId": "power_distribution_pcb",
+      "description": "power distribution PCB",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_copper_bus_plane",
+      "componentWordId": "copper_bus_plane",
+      "description": "copper bus plane",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_copper_bus_plane",
+      "componentWordId": "copper_bus_plane",
+      "description": "copper bus plane",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_copper_bus_plane",
+      "componentWordId": "copper_bus_plane",
+      "description": "copper bus plane",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_copper_bus_plane",
+      "componentWordId": "copper_bus_plane",
+      "description": "copper bus plane",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_copper_bus_plane",
+      "componentWordId": "copper_bus_plane",
+      "description": "copper bus plane",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_main_fuse_link",
+      "componentWordId": "main_fuse_link",
+      "description": "main fuse link",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_main_fuse_link",
+      "componentWordId": "main_fuse_link",
+      "description": "main fuse link",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_main_fuse_link",
+      "componentWordId": "main_fuse_link",
+      "description": "main fuse link",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_main_fuse_link",
+      "componentWordId": "main_fuse_link",
+      "description": "main fuse link",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_main_fuse_link",
+      "componentWordId": "main_fuse_link",
+      "description": "main fuse link",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_anti_spark_loop_key",
+      "componentWordId": "anti_spark_loop_key",
+      "description": "anti-spark loop key",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_anti_spark_loop_key",
+      "componentWordId": "anti_spark_loop_key",
+      "description": "anti-spark loop key",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_anti_spark_loop_key",
+      "componentWordId": "anti_spark_loop_key",
+      "description": "anti-spark loop key",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_anti_spark_loop_key",
+      "componentWordId": "anti_spark_loop_key",
+      "description": "anti-spark loop key",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_main_power_bus_anti_spark_loop_key",
+      "componentWordId": "anti_spark_loop_key",
+      "description": "anti-spark loop key",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_5_v_bec_regulator",
+      "componentWordId": "5_v_bec_regulator",
+      "description": "5 V BEC regulator",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_5_v_bec_regulator",
+      "componentWordId": "5_v_bec_regulator",
+      "description": "5 V BEC regulator",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_5_v_bec_regulator",
+      "componentWordId": "5_v_bec_regulator",
+      "description": "5 V BEC regulator",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_5_v_bec_regulator",
+      "componentWordId": "5_v_bec_regulator",
+      "description": "5 V BEC regulator",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_5_v_bec_regulator",
+      "componentWordId": "5_v_bec_regulator",
+      "description": "5 V BEC regulator",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_12_v_payload_regulator",
+      "componentWordId": "12_v_payload_regulator",
+      "description": "12 V payload regulator",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_12_v_payload_regulator",
+      "componentWordId": "12_v_payload_regulator",
+      "description": "12 V payload regulator",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_12_v_payload_regulator",
+      "componentWordId": "12_v_payload_regulator",
+      "description": "12 V payload regulator",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_12_v_payload_regulator",
+      "componentWordId": "12_v_payload_regulator",
+      "description": "12 V payload regulator",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_12_v_payload_regulator",
+      "componentWordId": "12_v_payload_regulator",
+      "description": "12 V payload regulator",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_lc_noise_filter",
+      "componentWordId": "lc_noise_filter",
+      "description": "LC noise filter",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_lc_noise_filter",
+      "componentWordId": "lc_noise_filter",
+      "description": "LC noise filter",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_lc_noise_filter",
+      "componentWordId": "lc_noise_filter",
+      "description": "LC noise filter",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_lc_noise_filter",
+      "componentWordId": "lc_noise_filter",
+      "description": "LC noise filter",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_lc_noise_filter",
+      "componentWordId": "lc_noise_filter",
+      "description": "LC noise filter",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_rail_status_led",
+      "componentWordId": "rail_status_led",
+      "description": "rail status LED",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_rail_status_led",
+      "componentWordId": "rail_status_led",
+      "description": "rail status LED",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_rail_status_led",
+      "componentWordId": "rail_status_led",
+      "description": "rail status LED",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_rail_status_led",
+      "componentWordId": "rail_status_led",
+      "description": "rail status LED",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_voltage_regulation_rail_status_led",
+      "componentWordId": "rail_status_led",
+      "description": "rail status LED",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_silicone_power_lead_set",
+      "componentWordId": "silicone_power_lead_set",
+      "description": "silicone power lead set",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_silicone_power_lead_set",
+      "componentWordId": "silicone_power_lead_set",
+      "description": "silicone power lead set",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_silicone_power_lead_set",
+      "componentWordId": "silicone_power_lead_set",
+      "description": "silicone power lead set",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_silicone_power_lead_set",
+      "componentWordId": "silicone_power_lead_set",
+      "description": "silicone power lead set",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_silicone_power_lead_set",
+      "componentWordId": "silicone_power_lead_set",
+      "description": "silicone power lead set",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_jst_signal_harness",
+      "componentWordId": "jst_signal_harness",
+      "description": "JST signal harness",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_jst_signal_harness",
+      "componentWordId": "jst_signal_harness",
+      "description": "JST signal harness",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_jst_signal_harness",
+      "componentWordId": "jst_signal_harness",
+      "description": "JST signal harness",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_jst_signal_harness",
+      "componentWordId": "jst_signal_harness",
+      "description": "JST signal harness",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_jst_signal_harness",
+      "componentWordId": "jst_signal_harness",
+      "description": "JST signal harness",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_braided_cable_sleeve",
+      "componentWordId": "braided_cable_sleeve",
+      "description": "braided cable sleeve",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_braided_cable_sleeve",
+      "componentWordId": "braided_cable_sleeve",
+      "description": "braided cable sleeve",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_braided_cable_sleeve",
+      "componentWordId": "braided_cable_sleeve",
+      "description": "braided cable sleeve",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_braided_cable_sleeve",
+      "componentWordId": "braided_cable_sleeve",
+      "description": "braided cable sleeve",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_braided_cable_sleeve",
+      "componentWordId": "braided_cable_sleeve",
+      "description": "braided cable sleeve",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_strain_relief_clip_set",
+      "componentWordId": "strain_relief_clip_set",
+      "description": "strain relief clip set",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_strain_relief_clip_set",
+      "componentWordId": "strain_relief_clip_set",
+      "description": "strain relief clip set",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_strain_relief_clip_set",
+      "componentWordId": "strain_relief_clip_set",
+      "description": "strain relief clip set",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_strain_relief_clip_set",
+      "componentWordId": "strain_relief_clip_set",
+      "description": "strain relief clip set",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "power_distribution_wiring_harness_strain_relief_clip_set",
+      "componentWordId": "strain_relief_clip_set",
+      "description": "strain relief clip set",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_arming_switch",
+      "componentWordId": "arming_switch",
+      "description": "arming switch",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_arming_switch",
+      "componentWordId": "arming_switch",
+      "description": "arming switch",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_arming_switch",
+      "componentWordId": "arming_switch",
+      "description": "arming switch",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_arming_switch",
+      "componentWordId": "arming_switch",
+      "description": "arming switch",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_arming_switch",
+      "componentWordId": "arming_switch",
+      "description": "arming switch",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_status_buzzer",
+      "componentWordId": "status_buzzer",
+      "description": "status buzzer",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_status_buzzer",
+      "componentWordId": "status_buzzer",
+      "description": "status buzzer",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_status_buzzer",
+      "componentWordId": "status_buzzer",
+      "description": "status buzzer",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_status_buzzer",
+      "componentWordId": "status_buzzer",
+      "description": "status buzzer",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_status_buzzer",
+      "componentWordId": "status_buzzer",
+      "description": "status buzzer",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_motor_inhibit_logic",
+      "componentWordId": "motor_inhibit_logic",
+      "description": "motor inhibit logic",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_motor_inhibit_logic",
+      "componentWordId": "motor_inhibit_logic",
+      "description": "motor inhibit logic",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_motor_inhibit_logic",
+      "componentWordId": "motor_inhibit_logic",
+      "description": "motor inhibit logic",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_motor_inhibit_logic",
+      "componentWordId": "motor_inhibit_logic",
+      "description": "motor inhibit logic",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_motor_inhibit_logic",
+      "componentWordId": "motor_inhibit_logic",
+      "description": "motor inhibit logic",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_preflight_checklist_tag",
+      "componentWordId": "preflight_checklist_tag",
+      "description": "preflight checklist tag",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_preflight_checklist_tag",
+      "componentWordId": "preflight_checklist_tag",
+      "description": "preflight checklist tag",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_preflight_checklist_tag",
+      "componentWordId": "preflight_checklist_tag",
+      "description": "preflight checklist tag",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_preflight_checklist_tag",
+      "componentWordId": "preflight_checklist_tag",
+      "description": "preflight checklist tag",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_arming_interlocks_preflight_checklist_tag",
+      "componentWordId": "preflight_checklist_tag",
+      "description": "preflight checklist tag",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_return_to_home_failsafe",
+      "componentWordId": "return_to_home_failsafe",
+      "description": "return-to-home failsafe",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_return_to_home_failsafe",
+      "componentWordId": "return_to_home_failsafe",
+      "description": "return-to-home failsafe",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_return_to_home_failsafe",
+      "componentWordId": "return_to_home_failsafe",
+      "description": "return-to-home failsafe",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_return_to_home_failsafe",
+      "componentWordId": "return_to_home_failsafe",
+      "description": "return-to-home failsafe",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_return_to_home_failsafe",
+      "componentWordId": "return_to_home_failsafe",
+      "description": "return-to-home failsafe",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_geofence_configuration",
+      "componentWordId": "geofence_configuration",
+      "description": "geofence configuration",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_geofence_configuration",
+      "componentWordId": "geofence_configuration",
+      "description": "geofence configuration",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_geofence_configuration",
+      "componentWordId": "geofence_configuration",
+      "description": "geofence configuration",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_geofence_configuration",
+      "componentWordId": "geofence_configuration",
+      "description": "geofence configuration",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_geofence_configuration",
+      "componentWordId": "geofence_configuration",
+      "description": "geofence configuration",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_low_battery_landing_logic",
+      "componentWordId": "low_battery_landing_logic",
+      "description": "low battery landing logic",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_low_battery_landing_logic",
+      "componentWordId": "low_battery_landing_logic",
+      "description": "low battery landing logic",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_low_battery_landing_logic",
+      "componentWordId": "low_battery_landing_logic",
+      "description": "low battery landing logic",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_low_battery_landing_logic",
+      "componentWordId": "low_battery_landing_logic",
+      "description": "low battery landing logic",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_low_battery_landing_logic",
+      "componentWordId": "low_battery_landing_logic",
+      "description": "low battery landing logic",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_flight_termination_setting",
+      "componentWordId": "flight_termination_setting",
+      "description": "flight termination setting",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_flight_termination_setting",
+      "componentWordId": "flight_termination_setting",
+      "description": "flight termination setting",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_flight_termination_setting",
+      "componentWordId": "flight_termination_setting",
+      "description": "flight termination setting",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_flight_termination_setting",
+      "componentWordId": "flight_termination_setting",
+      "description": "flight termination setting",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_lost_link_response_flight_termination_setting",
+      "componentWordId": "flight_termination_setting",
+      "description": "flight termination setting",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_fire_resistant_battery_pouch",
+      "componentWordId": "fire_resistant_battery_pouch",
+      "description": "fire-resistant battery pouch",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_fire_resistant_battery_pouch",
+      "componentWordId": "fire_resistant_battery_pouch",
+      "description": "fire-resistant battery pouch",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_fire_resistant_battery_pouch",
+      "componentWordId": "fire_resistant_battery_pouch",
+      "description": "fire-resistant battery pouch",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_fire_resistant_battery_pouch",
+      "componentWordId": "fire_resistant_battery_pouch",
+      "description": "fire-resistant battery pouch",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_fire_resistant_battery_pouch",
+      "componentWordId": "fire_resistant_battery_pouch",
+      "description": "fire-resistant battery pouch",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_pack_swelling_gauge",
+      "componentWordId": "pack_swelling_gauge",
+      "description": "pack swelling gauge",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_pack_swelling_gauge",
+      "componentWordId": "pack_swelling_gauge",
+      "description": "pack swelling gauge",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_pack_swelling_gauge",
+      "componentWordId": "pack_swelling_gauge",
+      "description": "pack swelling gauge",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_pack_swelling_gauge",
+      "componentWordId": "pack_swelling_gauge",
+      "description": "pack swelling gauge",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_pack_swelling_gauge",
+      "componentWordId": "pack_swelling_gauge",
+      "description": "pack swelling gauge",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_charge_log_sheet",
+      "componentWordId": "charge_log_sheet",
+      "description": "charge log sheet",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_charge_log_sheet",
+      "componentWordId": "charge_log_sheet",
+      "description": "charge log sheet",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_charge_log_sheet",
+      "componentWordId": "charge_log_sheet",
+      "description": "charge log sheet",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_charge_log_sheet",
+      "componentWordId": "charge_log_sheet",
+      "description": "charge log sheet",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_charge_log_sheet",
+      "componentWordId": "charge_log_sheet",
+      "description": "charge log sheet",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_thermal_warning_label",
+      "componentWordId": "thermal_warning_label",
+      "description": "thermal warning label",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_thermal_warning_label",
+      "componentWordId": "thermal_warning_label",
+      "description": "thermal warning label",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_thermal_warning_label",
+      "componentWordId": "thermal_warning_label",
+      "description": "thermal warning label",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_thermal_warning_label",
+      "componentWordId": "thermal_warning_label",
+      "description": "thermal warning label",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "safety_protection_battery_safety_thermal_warning_label",
+      "componentWordId": "thermal_warning_label",
+      "description": "thermal warning label",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_spare_arm_clamp",
+      "componentWordId": "spare_arm_clamp",
+      "description": "spare arm clamp",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_spare_arm_clamp",
+      "componentWordId": "spare_arm_clamp",
+      "description": "spare arm clamp",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_spare_arm_clamp",
+      "componentWordId": "spare_arm_clamp",
+      "description": "spare arm clamp",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_spare_arm_clamp",
+      "componentWordId": "spare_arm_clamp",
+      "description": "spare arm clamp",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_spare_arm_clamp",
+      "componentWordId": "spare_arm_clamp",
+      "description": "spare arm clamp",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_motor_alignment_gauge",
+      "componentWordId": "motor_alignment_gauge",
+      "description": "motor alignment gauge",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_motor_alignment_gauge",
+      "componentWordId": "motor_alignment_gauge",
+      "description": "motor alignment gauge",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_motor_alignment_gauge",
+      "componentWordId": "motor_alignment_gauge",
+      "description": "motor alignment gauge",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_motor_alignment_gauge",
+      "componentWordId": "motor_alignment_gauge",
+      "description": "motor alignment gauge",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_motor_alignment_gauge",
+      "componentWordId": "motor_alignment_gauge",
+      "description": "motor alignment gauge",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_propeller_torque_tool",
+      "componentWordId": "propeller_torque_tool",
+      "description": "propeller torque tool",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_propeller_torque_tool",
+      "componentWordId": "propeller_torque_tool",
+      "description": "propeller torque tool",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_propeller_torque_tool",
+      "componentWordId": "propeller_torque_tool",
+      "description": "propeller torque tool",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_propeller_torque_tool",
+      "componentWordId": "propeller_torque_tool",
+      "description": "propeller torque tool",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_propeller_torque_tool",
+      "componentWordId": "propeller_torque_tool",
+      "description": "propeller torque tool",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_field_fastener_kit",
+      "componentWordId": "field_fastener_kit",
+      "description": "field fastener kit",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_field_fastener_kit",
+      "componentWordId": "field_fastener_kit",
+      "description": "field fastener kit",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_field_fastener_kit",
+      "componentWordId": "field_fastener_kit",
+      "description": "field fastener kit",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_field_fastener_kit",
+      "componentWordId": "field_fastener_kit",
+      "description": "field fastener kit",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_field_repair_access_field_fastener_kit",
+      "componentWordId": "field_fastener_kit",
+      "description": "field fastener kit",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_crack_inspection_marker",
+      "componentWordId": "crack_inspection_marker",
+      "description": "crack inspection marker",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_crack_inspection_marker",
+      "componentWordId": "crack_inspection_marker",
+      "description": "crack inspection marker",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_crack_inspection_marker",
+      "componentWordId": "crack_inspection_marker",
+      "description": "crack inspection marker",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_crack_inspection_marker",
+      "componentWordId": "crack_inspection_marker",
+      "description": "crack inspection marker",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_crack_inspection_marker",
+      "componentWordId": "crack_inspection_marker",
+      "description": "crack inspection marker",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_fastener_witness_paint",
+      "componentWordId": "fastener_witness_paint",
+      "description": "fastener witness paint",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_fastener_witness_paint",
+      "componentWordId": "fastener_witness_paint",
+      "description": "fastener witness paint",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_fastener_witness_paint",
+      "componentWordId": "fastener_witness_paint",
+      "description": "fastener witness paint",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_fastener_witness_paint",
+      "componentWordId": "fastener_witness_paint",
+      "description": "fastener witness paint",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_fastener_witness_paint",
+      "componentWordId": "fastener_witness_paint",
+      "description": "fastener witness paint",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_battery_cycle_counter_label",
+      "componentWordId": "battery_cycle_counter_label",
+      "description": "battery cycle counter label",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_battery_cycle_counter_label",
+      "componentWordId": "battery_cycle_counter_label",
+      "description": "battery cycle counter label",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_battery_cycle_counter_label",
+      "componentWordId": "battery_cycle_counter_label",
+      "description": "battery cycle counter label",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_battery_cycle_counter_label",
+      "componentWordId": "battery_cycle_counter_label",
+      "description": "battery cycle counter label",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_battery_cycle_counter_label",
+      "componentWordId": "battery_cycle_counter_label",
+      "description": "battery cycle counter label",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_payload_latch_witness_mark",
+      "componentWordId": "payload_latch_witness_mark",
+      "description": "payload latch witness mark",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_payload_latch_witness_mark",
+      "componentWordId": "payload_latch_witness_mark",
+      "description": "payload latch witness mark",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_payload_latch_witness_mark",
+      "componentWordId": "payload_latch_witness_mark",
+      "description": "payload latch witness mark",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_payload_latch_witness_mark",
+      "componentWordId": "payload_latch_witness_mark",
+      "description": "payload latch witness mark",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_inspection_points_payload_latch_witness_mark",
+      "componentWordId": "payload_latch_witness_mark",
+      "description": "payload latch witness mark",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_foam_transport_case",
+      "componentWordId": "foam_transport_case",
+      "description": "foam transport case",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_foam_transport_case",
+      "componentWordId": "foam_transport_case",
+      "description": "foam transport case",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_foam_transport_case",
+      "componentWordId": "foam_transport_case",
+      "description": "foam transport case",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_foam_transport_case",
+      "componentWordId": "foam_transport_case",
+      "description": "foam transport case",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_foam_transport_case",
+      "componentWordId": "foam_transport_case",
+      "description": "foam transport case",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_propeller_guard_sleeve",
+      "componentWordId": "propeller_guard_sleeve",
+      "description": "propeller guard sleeve",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_propeller_guard_sleeve",
+      "componentWordId": "propeller_guard_sleeve",
+      "description": "propeller guard sleeve",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_propeller_guard_sleeve",
+      "componentWordId": "propeller_guard_sleeve",
+      "description": "propeller guard sleeve",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_propeller_guard_sleeve",
+      "componentWordId": "propeller_guard_sleeve",
+      "description": "propeller guard sleeve",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_propeller_guard_sleeve",
+      "componentWordId": "propeller_guard_sleeve",
+      "description": "propeller guard sleeve",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_gimbal_transport_lock",
+      "componentWordId": "gimbal_transport_lock",
+      "description": "gimbal transport lock",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_gimbal_transport_lock",
+      "componentWordId": "gimbal_transport_lock",
+      "description": "gimbal transport lock",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_gimbal_transport_lock",
+      "componentWordId": "gimbal_transport_lock",
+      "description": "gimbal transport lock",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_gimbal_transport_lock",
+      "componentWordId": "gimbal_transport_lock",
+      "description": "gimbal transport lock",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_gimbal_transport_lock",
+      "componentWordId": "gimbal_transport_lock",
+      "description": "gimbal transport lock",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_desiccant_storage_pouch",
+      "componentWordId": "desiccant_storage_pouch",
+      "description": "desiccant storage pouch",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_desiccant_storage_pouch",
+      "componentWordId": "desiccant_storage_pouch",
+      "description": "desiccant storage pouch",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_desiccant_storage_pouch",
+      "componentWordId": "desiccant_storage_pouch",
+      "description": "desiccant storage pouch",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_desiccant_storage_pouch",
+      "componentWordId": "desiccant_storage_pouch",
+      "description": "desiccant storage pouch",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "maintenance_serviceability_transport_storage_desiccant_storage_pouch",
+      "componentWordId": "desiccant_storage_pouch",
+      "description": "desiccant storage pouch",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_handheld_transmitter",
+      "componentWordId": "handheld_transmitter",
+      "description": "handheld transmitter",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_handheld_transmitter",
+      "componentWordId": "handheld_transmitter",
+      "description": "handheld transmitter",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_handheld_transmitter",
+      "componentWordId": "handheld_transmitter",
+      "description": "handheld transmitter",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_handheld_transmitter",
+      "componentWordId": "handheld_transmitter",
+      "description": "handheld transmitter",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_handheld_transmitter",
+      "componentWordId": "handheld_transmitter",
+      "description": "handheld transmitter",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_ground_station_tablet",
+      "componentWordId": "ground_station_tablet",
+      "description": "ground-station tablet",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_ground_station_tablet",
+      "componentWordId": "ground_station_tablet",
+      "description": "ground-station tablet",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_ground_station_tablet",
+      "componentWordId": "ground_station_tablet",
+      "description": "ground-station tablet",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_ground_station_tablet",
+      "componentWordId": "ground_station_tablet",
+      "description": "ground-station tablet",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_ground_station_tablet",
+      "componentWordId": "ground_station_tablet",
+      "description": "ground-station tablet",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_sun_hood",
+      "componentWordId": "sun_hood",
+      "description": "sun hood",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_sun_hood",
+      "componentWordId": "sun_hood",
+      "description": "sun hood",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_sun_hood",
+      "componentWordId": "sun_hood",
+      "description": "sun hood",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_sun_hood",
+      "componentWordId": "sun_hood",
+      "description": "sun hood",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_sun_hood",
+      "componentWordId": "sun_hood",
+      "description": "sun hood",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_controller_neck_strap",
+      "componentWordId": "controller_neck_strap",
+      "description": "controller neck strap",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_controller_neck_strap",
+      "componentWordId": "controller_neck_strap",
+      "description": "controller neck strap",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_controller_neck_strap",
+      "componentWordId": "controller_neck_strap",
+      "description": "controller neck strap",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_controller_neck_strap",
+      "componentWordId": "controller_neck_strap",
+      "description": "controller neck strap",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_ground_controller_controller_neck_strap",
+      "componentWordId": "controller_neck_strap",
+      "description": "controller neck strap",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_aircraft_id_label",
+      "componentWordId": "aircraft_id_label",
+      "description": "aircraft ID label",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_aircraft_id_label",
+      "componentWordId": "aircraft_id_label",
+      "description": "aircraft ID label",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_aircraft_id_label",
+      "componentWordId": "aircraft_id_label",
+      "description": "aircraft ID label",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_aircraft_id_label",
+      "componentWordId": "aircraft_id_label",
+      "description": "aircraft ID label",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_aircraft_id_label",
+      "componentWordId": "aircraft_id_label",
+      "description": "aircraft ID label",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_propeller_rotation_label",
+      "componentWordId": "propeller_rotation_label",
+      "description": "propeller rotation label",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_propeller_rotation_label",
+      "componentWordId": "propeller_rotation_label",
+      "description": "propeller rotation label",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_propeller_rotation_label",
+      "componentWordId": "propeller_rotation_label",
+      "description": "propeller rotation label",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_propeller_rotation_label",
+      "componentWordId": "propeller_rotation_label",
+      "description": "propeller rotation label",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_propeller_rotation_label",
+      "componentWordId": "propeller_rotation_label",
+      "description": "propeller rotation label",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_payload_mass_placard",
+      "componentWordId": "payload_mass_placard",
+      "description": "payload mass placard",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_payload_mass_placard",
+      "componentWordId": "payload_mass_placard",
+      "description": "payload mass placard",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_payload_mass_placard",
+      "componentWordId": "payload_mass_placard",
+      "description": "payload mass placard",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_payload_mass_placard",
+      "componentWordId": "payload_mass_placard",
+      "description": "payload mass placard",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_payload_mass_placard",
+      "componentWordId": "payload_mass_placard",
+      "description": "payload mass placard",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_preflight_checklist_card",
+      "componentWordId": "preflight_checklist_card",
+      "description": "preflight checklist card",
+      "critical": false,
+      "field": "supplier",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_preflight_checklist_card",
+      "componentWordId": "preflight_checklist_card",
+      "description": "preflight checklist card",
+      "critical": false,
+      "field": "manufacturer",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_preflight_checklist_card",
+      "componentWordId": "preflight_checklist_card",
+      "description": "preflight checklist card",
+      "critical": false,
+      "field": "mpn",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_preflight_checklist_card",
+      "componentWordId": "preflight_checklist_card",
+      "description": "preflight checklist card",
+      "critical": false,
+      "field": "unit_cost_gbp",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    },
+    {
+      "lineId": "hmi_ergonomics_mission_labelling_preflight_checklist_card",
+      "componentWordId": "preflight_checklist_card",
+      "description": "preflight checklist card",
+      "critical": false,
+      "field": "lead_time_weeks",
+      "value": "",
+      "status": "not_claimed",
+      "nextAction": "No claim is made for this field yet."
+    }
+  ]
+}

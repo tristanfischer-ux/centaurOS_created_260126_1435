@@ -5,6 +5,7 @@ import { RESEARCH_SYNTHESIS_SYSTEM, RESEARCH_SYNTHESIS_SYSTEM_PA } from '../prom
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 import { callFastExtract } from '../lib/openrouter-models'
 import { parseJsonFromLlm } from '../lib/llm-json'
+import { getActionLogger } from '../lib/action-logger'
 
 // Stage 1: Research — uses RESEARCH_SYNTHESIS_SYSTEM from prompts.ts
 // The prompt is defined in prompts.ts and imported above.
@@ -52,10 +53,12 @@ async function callOpenRouter(
 ): Promise<any> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 300_000)
+  const t0 = Date.now()
+  const MODEL = 'xiaomi/mimo-v2.5-pro'
 
   try {
     const body: any = {
-      model: 'xiaomi/mimo-v2.5-pro',
+      model: MODEL,
       temperature: STAGE_TEMPERATURES.research,
       // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
       max_tokens: 150_000,
@@ -81,10 +84,28 @@ async function callOpenRouter(
     clearTimeout(timeout)
 
     if (!response.ok) {
+      getActionLogger().logLlm({
+        step_name: stageTag,
+        model: MODEL,
+        latency_ms: Date.now() - t0,
+        ok: false,
+        error: `OpenRouter ${response.status}`,
+      })
       throw new Error(`OpenRouter API returned status: ${response.status}`)
     }
 
     const json = await response.json()
+    // Per-LLM-call record (audit Gap #2: research stage emits 1 line via
+    // chain-v2 but the inner 3 LLM calls were invisible).
+    getActionLogger().logLlm({
+      step_name: stageTag,
+      model: MODEL,
+      prompt_tokens: json?.usage?.prompt_tokens,
+      completion_tokens: json?.usage?.completion_tokens,
+      latency_ms: Date.now() - t0,
+      finish_reason: json?.choices?.[0]?.finish_reason,
+      ok: true,
+    })
     const msg = json.choices?.[0]?.message
     let raw = msg?.content || msg?.reasoning || ''
     if (!raw && msg?.reasoning_details?.length) {
@@ -204,6 +225,8 @@ export async function runResearchSynthesis(
   classification: string,
 ): Promise<StageResult<ResearchSynthesis>> {
   const startTime = Date.now()
+  const logger = getActionLogger()
+  logger.logStage({ step_name: 'research', action_type: 'stage_start', variant: 'pa_synthesis' })
   console.log('[research-synthesis] Starting PA Stage 3 Research Synthesis...')
   console.log(`[research-synthesis] Classification: ${classification}`)
 

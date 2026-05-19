@@ -1,0 +1,803 @@
+{
+  "summary": {
+    "activities": 24,
+    "readyForReview": 15,
+    "open": 4,
+    "blocked": 5,
+    "designReviewActivities": 9,
+    "calculationActivities": 3,
+    "interfaceReviewActivities": 3,
+    "sourceEvidenceActivities": 5,
+    "complianceReviewActivities": 4
+  },
+  "activities": [
+    {
+      "id": "design_review:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Growing Structure And Containment",
+      "activity": "Review Growing Structure And Containment architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "sanityCheckIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "interfaceIds": [
+        "service_access",
+        "tray_support",
+        "washdown_boundary",
+        "mains_supply",
+        "nutrient_loop",
+        "airflow"
+      ],
+      "componentWordIds": [
+        "growing_rack_structure",
+        "aluminium_extrusion_upright",
+        "cross_brace_set",
+        "adjustable_levelling_foot",
+        "tray_slide_rail",
+        "food_safe_grow_tray",
+        "nft_channel_insert",
+        "seedling_raft",
+        "root_zone_cover",
+        "tray_drain_fitting",
+        "washdown_side_panel",
+        "clear_inspection_door",
+        "epdm_door_gasket",
+        "condensate_drip_channel"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Growing Structure And Containment",
+      "activity": "Verify Growing Structure And Containment requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "sanityCheckIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Growing Structure And Containment",
+      "activity": "Collect source-backed evidence for Growing Structure And Containment critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "growing_rack_structure"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "growing_rack_structure"
+      ]
+    },
+    {
+      "id": "design_review:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Light Climate And Gas Environment",
+      "activity": "Review Light Climate And Gas Environment architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "sanityCheckIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "interfaceIds": [
+        "lighting_control",
+        "airflow",
+        "sensor_bus",
+        "actuator_bus",
+        "mains_supply",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "led_grow_lights",
+        "dimmable_led_driver",
+        "lighting_suspension_bracket",
+        "ppfd_calibration_target",
+        "glare_shield",
+        "air_circulation_fans",
+        "fan_guard_grille",
+        "airflow_baffle_plate",
+        "replaceable_intake_filter",
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay",
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Light Climate And Gas Environment",
+      "activity": "Verify Light Climate And Gas Environment requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "sanityCheckIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Light Climate And Gas Environment",
+      "activity": "Collect source-backed evidence for Light Climate And Gas Environment critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "led_grow_lights",
+        "air_circulation_fans",
+        "co2_sensor_or_dosing"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "led_grow_lights",
+        "air_circulation_fans",
+        "co2_sensor_or_dosing"
+      ]
+    },
+    {
+      "id": "design_review:mass_fluid_transport_process",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Nutrient And Water Transport Process",
+      "activity": "Review Nutrient And Water Transport Process architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "nutrient_loop",
+        "sensor_bus",
+        "actuator_bus",
+        "service_access",
+        "washdown_boundary"
+      ],
+      "componentWordIds": [
+        "reservoir_and_plumbing_set",
+        "opaque_nutrient_reservoir",
+        "bulkhead_fitting_set",
+        "pvc_u_manifold",
+        "return_drain_header",
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount",
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor",
+        "inline_mesh_filter",
+        "uv_steriliser",
+        "drain_valve",
+        "sample_port"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:mass_fluid_transport_process",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Nutrient And Water Transport Process",
+      "activity": "Collect source-backed evidence for Nutrient And Water Transport Process critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "reservoir_and_plumbing_set",
+        "nutrient_pump"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "reservoir_and_plumbing_set",
+        "nutrient_pump"
+      ]
+    },
+    {
+      "id": "design_review:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Crop And Process Instrumentation",
+      "activity": "Review Crop And Process Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_bus",
+        "video_link",
+        "nutrient_loop",
+        "airflow"
+      ],
+      "componentWordIds": [
+        "temperature_humidity_probe",
+        "par_light_sensor",
+        "leaf_temperature_sensor",
+        "differential_pressure_switch",
+        "ph_probe",
+        "ec_probe",
+        "reservoir_level_sensor",
+        "solution_temperature_probe",
+        "rgb_crop_camera",
+        "camera_light_shield",
+        "time_lapse_controller",
+        "calibration_colour_card"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Recipe Control And Communications",
+      "activity": "Review Recipe Control And Communications architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_bus",
+        "actuator_bus",
+        "lighting_control",
+        "video_link",
+        "operator_network"
+      ],
+      "componentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module",
+        "recipe_database",
+        "set_point_scheduler",
+        "alarm_historian",
+        "data_export_module",
+        "industrial_ethernet_switch",
+        "wi_fi_gateway",
+        "mqtt_telemetry_bridge",
+        "sms_alarm_modem"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Recipe Control And Communications",
+      "activity": "Collect source-backed evidence for Recipe Control And Communications critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "environmental_controller"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "environmental_controller"
+      ]
+    },
+    {
+      "id": "design_review:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Wet-Zone Power Distribution",
+      "activity": "Review Wet-Zone Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "mains_supply",
+        "lighting_control",
+        "actuator_bus",
+        "protective_earth",
+        "service_access",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "rcd_isolator_panel",
+        "lockable_main_isolator",
+        "rcbo_breaker_bank",
+        "protective_earth_bar",
+        "surge_protection_device",
+        "lighting_bus_trunk",
+        "ip65_cable_gland_set",
+        "driver_mounting_rail",
+        "fused_spur_module",
+        "24_v_dc_power_supply",
+        "dc_distribution_terminal",
+        "ups_buffer_module",
+        "control_cabinet_heater"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Wet-Zone Power Distribution",
+      "activity": "Collect source-backed evidence for Wet-Zone Power Distribution critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "rcd_isolator_panel"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "rcd_isolator_panel"
+      ]
+    },
+    {
+      "id": "design_review:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Food-Safe Safety And Protection",
+      "activity": "Review Food-Safe Safety And Protection architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "mains_supply",
+        "washdown_boundary",
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "leak_detection_rope",
+        "bunded_base_tray",
+        "overflow_standpipe",
+        "floor_drain_adapter",
+        "door_interlock_switch",
+        "lighting_inhibit_relay",
+        "chemical_storage_latch",
+        "emergency_stop_button",
+        "food_grade_tubing_set",
+        "cleaning_validation_swab_kit",
+        "material_traceability_label",
+        "washdown_sop_placard"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Harvest Cleaning And Serviceability",
+      "activity": "Review Harvest Cleaning And Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "sanityCheckIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "interfaceIds": [
+        "service_access",
+        "washdown_boundary",
+        "nutrient_loop",
+        "tray_support"
+      ],
+      "componentWordIds": [
+        "slide_out_tray_handle",
+        "shelf_stop_latch",
+        "harvest_work_ledge",
+        "removable_seedling_cassette",
+        "quick_release_manifold_union",
+        "removable_sump_screen",
+        "washdown_hose_connection",
+        "drying_fan_mode_switch",
+        "filter_service_hatch",
+        "probe_calibration_cup",
+        "dosing_bottle_tray",
+        "spare_gasket_kit"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Harvest Cleaning And Serviceability",
+      "activity": "Verify Harvest Cleaning And Serviceability requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "sanityCheckIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:hmi_ergonomics",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Operator HMI And Labelling",
+      "activity": "Review Operator HMI And Labelling architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "operator_network",
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "touchscreen_hmi",
+        "recipe_selector_control",
+        "alarm_buzzer_beacon",
+        "usb_data_export_port",
+        "crop_lot_label_holder",
+        "chemical_hazard_label_set",
+        "cleaning_checklist_card",
+        "electrical_isolation_placard"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:control_compute_communication:environmental_interface:actuator_bus",
+      "moduleId": "control_compute_communication:environmental_interface",
+      "moduleName": "Recipe Control And Communications -> Light Climate And Gas Environment",
+      "activity": "Verify actuator_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "actuator_bus"
+      ],
+      "componentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module",
+        "air_circulation_fans",
+        "fan_guard_grille",
+        "airflow_baffle_plate",
+        "replaceable_intake_filter",
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay",
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube"
+      ],
+      "rationale": "Farm controller must command lighting, CO2 dosing and airflow.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:control_compute_communication:mass_fluid_transport_process:actuator_bus",
+      "moduleId": "control_compute_communication:mass_fluid_transport_process",
+      "moduleName": "Recipe Control And Communications -> Nutrient And Water Transport Process",
+      "activity": "Verify actuator_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "actuator_bus"
+      ],
+      "componentWordIds": [
+        "environmental_controller",
+        "din_rail_plc",
+        "analog_input_module",
+        "relay_output_module",
+        "real_time_clock_module",
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount",
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor"
+      ],
+      "rationale": "Farm controller must command fertigation pumps and nutrient circulation.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:environmental_interface:mass_fluid_transport_process:sensor_bus",
+      "moduleId": "environmental_interface:mass_fluid_transport_process",
+      "moduleName": "Light Climate And Gas Environment -> Nutrient And Water Transport Process",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "dehumidifier_module",
+        "heat_exchanger_coil",
+        "condensate_pump",
+        "supply_air_temperature_probe",
+        "humidity_control_relay",
+        "co2_sensor_or_dosing",
+        "ndir_co2_sensor_head",
+        "co2_solenoid_valve",
+        "gas_regulator",
+        "co2_distribution_tube",
+        "nutrient_pump",
+        "pump_isolation_valve",
+        "check_valve",
+        "flow_meter",
+        "pump_vibration_mount",
+        "peristaltic_dosing_pump",
+        "ph_dosing_pump",
+        "chemical_suction_lance",
+        "anti_siphon_valve",
+        "mixing_eductor"
+      ],
+      "rationale": "Climate and fertigation state must be observable by the same control layer.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "compliance_review:CE-UKCA",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for CE-UKCA",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Electrical safety and UKCA/CE file",
+      "acceptanceCriteria": [
+        "Technical file, electrical risk assessment and declarations."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:WRAS",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for WRAS",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Water fittings compliance",
+      "acceptanceCriteria": [
+        "Approved fittings or evidence for water-contact components."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:1",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Crop loss from pump failure",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 112; mitigation: Dual pumps, flow monitoring and low-level alarms.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:2",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Electrical fault in humid grow area",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 96; mitigation: Ingress-rated drivers, RCD protection and cable separation.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    }
+  ]
+}

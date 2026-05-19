@@ -1,0 +1,869 @@
+{
+  "nodes": [
+    {
+      "id": "structure_containment",
+      "label": "Sterile Structure Containment",
+      "kind": "module"
+    },
+    {
+      "id": "structure_containment.single_use_bag_chamber",
+      "label": "Single-use bag chamber",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.support_frame_load_path",
+      "label": "Support frame and load path",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.sterile_connector_panel",
+      "label": "Sterile connector panel",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "actuation_kinematics",
+      "label": "Mixing And Agitation",
+      "kind": "module"
+    },
+    {
+      "id": "actuation_kinematics.agitation_drive_train",
+      "label": "Agitation drive train",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "actuation_kinematics.mixing_impeller_interface",
+      "label": "Mixing impeller interface",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "actuation_kinematics.agitation_safety_feedback",
+      "label": "Agitation safety feedback",
+      "kind": "submodule",
+      "moduleId": "actuation_kinematics"
+    },
+    {
+      "id": "mass_fluid_transport_process",
+      "label": "Media Gas And Harvest Transport",
+      "kind": "module"
+    },
+    {
+      "id": "mass_fluid_transport_process.feed_pump_manifold",
+      "label": "Feed pump manifold",
+      "kind": "submodule",
+      "moduleId": "mass_fluid_transport_process"
+    },
+    {
+      "id": "mass_fluid_transport_process.harvest_sampling_path",
+      "label": "Harvest and sampling path",
+      "kind": "submodule",
+      "moduleId": "mass_fluid_transport_process"
+    },
+    {
+      "id": "mass_fluid_transport_process.sparger_gas_mixing",
+      "label": "Sparger gas mixing",
+      "kind": "submodule",
+      "moduleId": "mass_fluid_transport_process"
+    },
+    {
+      "id": "environmental_interface",
+      "label": "Thermal Gas Exhaust Interface",
+      "kind": "module"
+    },
+    {
+      "id": "environmental_interface.temperature_control_loop",
+      "label": "Temperature control loop",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.exhaust_filter_train",
+      "label": "Exhaust filter train",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.ambient_enclosure_conditions",
+      "label": "Ambient enclosure conditions",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "sensing_instrumentation",
+      "label": "Process Sensing Instrumentation",
+      "kind": "module"
+    },
+    {
+      "id": "sensing_instrumentation.do_ph_sensing",
+      "label": "DO and pH sensing",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.pressure_mass_temperature_sensing",
+      "label": "Pressure, mass and temperature sensing",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.gas_flow_sensing",
+      "label": "Gas flow sensing",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "control_compute_communication",
+      "label": "Control Compute Communication",
+      "kind": "module"
+    },
+    {
+      "id": "control_compute_communication.process_controller",
+      "label": "Process controller",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.batch_record_gateway",
+      "label": "Batch record gateway",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.operator_alarm_logic",
+      "label": "Operator and alarm logic",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "power_distribution",
+      "label": "Power Distribution",
+      "kind": "module"
+    },
+    {
+      "id": "power_distribution.control_power_panel",
+      "label": "Control power panel",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.actuator_power_feeds",
+      "label": "Actuator power feeds",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.backup_power_and_shutdown",
+      "label": "Backup power and shutdown",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "safety_protection",
+      "label": "Aseptic And Pressure Safety",
+      "kind": "module"
+    },
+    {
+      "id": "safety_protection.sterile_pressure_safety",
+      "label": "Sterile pressure safety",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.aseptic_setup_controls",
+      "label": "Aseptic setup controls",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.operator_electrical_safety",
+      "label": "Operator electrical safety",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "maintenance_serviceability",
+      "label": "Setup Calibration And Service",
+      "kind": "module"
+    },
+    {
+      "id": "maintenance_serviceability.single_use_setup",
+      "label": "Single-use setup",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.sensor_calibration_access",
+      "label": "Sensor calibration access",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.cleaning_turnaround",
+      "label": "Cleaning and turnaround",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    }
+  ],
+  "edges": [
+    {
+      "id": "contains:structure_containment:structure_containment.single_use_bag_chamber:single_use_bag_chamber",
+      "from": "structure_containment",
+      "to": "structure_containment.single_use_bag_chamber",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Single-use bag chamber is contained by Sterile Structure Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.support_frame_load_path:support_frame_load_path",
+      "from": "structure_containment",
+      "to": "structure_containment.support_frame_load_path",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Support frame and load path is contained by Sterile Structure Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.sterile_connector_panel:sterile_connector_panel",
+      "from": "structure_containment",
+      "to": "structure_containment.sterile_connector_panel",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Sterile connector panel is contained by Sterile Structure Containment."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.agitation_drive_train:agitation_drive_train",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.agitation_drive_train",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Agitation drive train is contained by Mixing And Agitation."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.mixing_impeller_interface:mixing_impeller_interface",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.mixing_impeller_interface",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Mixing impeller interface is contained by Mixing And Agitation."
+    },
+    {
+      "id": "contains:actuation_kinematics:actuation_kinematics.agitation_safety_feedback:agitation_safety_feedback",
+      "from": "actuation_kinematics",
+      "to": "actuation_kinematics.agitation_safety_feedback",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Agitation safety feedback is contained by Mixing And Agitation."
+    },
+    {
+      "id": "contains:mass_fluid_transport_process:mass_fluid_transport_process.feed_pump_manifold:feed_pump_manifold",
+      "from": "mass_fluid_transport_process",
+      "to": "mass_fluid_transport_process.feed_pump_manifold",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Feed pump manifold is contained by Media Gas And Harvest Transport."
+    },
+    {
+      "id": "contains:mass_fluid_transport_process:mass_fluid_transport_process.harvest_sampling_path:harvest_sampling_path",
+      "from": "mass_fluid_transport_process",
+      "to": "mass_fluid_transport_process.harvest_sampling_path",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Harvest and sampling path is contained by Media Gas And Harvest Transport."
+    },
+    {
+      "id": "contains:mass_fluid_transport_process:mass_fluid_transport_process.sparger_gas_mixing:sparger_gas_mixing",
+      "from": "mass_fluid_transport_process",
+      "to": "mass_fluid_transport_process.sparger_gas_mixing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Sparger gas mixing is contained by Media Gas And Harvest Transport."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.temperature_control_loop:temperature_control_loop",
+      "from": "environmental_interface",
+      "to": "environmental_interface.temperature_control_loop",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Temperature control loop is contained by Thermal Gas Exhaust Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.exhaust_filter_train:exhaust_filter_train",
+      "from": "environmental_interface",
+      "to": "environmental_interface.exhaust_filter_train",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Exhaust filter train is contained by Thermal Gas Exhaust Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.ambient_enclosure_conditions:ambient_enclosure_conditions",
+      "from": "environmental_interface",
+      "to": "environmental_interface.ambient_enclosure_conditions",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Ambient enclosure conditions is contained by Thermal Gas Exhaust Interface."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.do_ph_sensing:do_ph_sensing",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.do_ph_sensing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "DO and pH sensing is contained by Process Sensing Instrumentation."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.pressure_mass_temperature_sensing:pressure_mass_temperature_sensing",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.pressure_mass_temperature_sensing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Pressure, mass and temperature sensing is contained by Process Sensing Instrumentation."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.gas_flow_sensing:gas_flow_sensing",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.gas_flow_sensing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Gas flow sensing is contained by Process Sensing Instrumentation."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.process_controller:process_controller",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.process_controller",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Process controller is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.batch_record_gateway:batch_record_gateway",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.batch_record_gateway",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Batch record gateway is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.operator_alarm_logic:operator_alarm_logic",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.operator_alarm_logic",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Operator and alarm logic is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.control_power_panel:control_power_panel",
+      "from": "power_distribution",
+      "to": "power_distribution.control_power_panel",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Control power panel is contained by Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.actuator_power_feeds:actuator_power_feeds",
+      "from": "power_distribution",
+      "to": "power_distribution.actuator_power_feeds",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Actuator power feeds is contained by Power Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.backup_power_and_shutdown:backup_power_and_shutdown",
+      "from": "power_distribution",
+      "to": "power_distribution.backup_power_and_shutdown",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Backup power and shutdown is contained by Power Distribution."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.sterile_pressure_safety:sterile_pressure_safety",
+      "from": "safety_protection",
+      "to": "safety_protection.sterile_pressure_safety",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Sterile pressure safety is contained by Aseptic And Pressure Safety."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.aseptic_setup_controls:aseptic_setup_controls",
+      "from": "safety_protection",
+      "to": "safety_protection.aseptic_setup_controls",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Aseptic setup controls is contained by Aseptic And Pressure Safety."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.operator_electrical_safety:operator_electrical_safety",
+      "from": "safety_protection",
+      "to": "safety_protection.operator_electrical_safety",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Operator electrical safety is contained by Aseptic And Pressure Safety."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.single_use_setup:single_use_setup",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.single_use_setup",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Single-use setup is contained by Setup Calibration And Service."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.sensor_calibration_access:sensor_calibration_access",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.sensor_calibration_access",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Sensor calibration access is contained by Setup Calibration And Service."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.cleaning_turnaround:cleaning_turnaround",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.cleaning_turnaround",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Cleaning and turnaround is contained by Setup Calibration And Service."
+    },
+    {
+      "id": "shared_interface:structure_containment:actuation_kinematics:sterile_boundary",
+      "from": "structure_containment",
+      "to": "actuation_kinematics",
+      "via": "sterile_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sterile_boundary."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:environmental_interface:sterile_boundary",
+      "from": "actuation_kinematics",
+      "to": "environmental_interface",
+      "via": "sterile_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sterile_boundary."
+    },
+    {
+      "id": "shared_interface:environmental_interface:safety_protection:sterile_boundary",
+      "from": "environmental_interface",
+      "to": "safety_protection",
+      "via": "sterile_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sterile_boundary."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:sterile_boundary",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "sterile_boundary",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sterile_boundary."
+    },
+    {
+      "id": "shared_interface:structure_containment:mass_fluid_transport_process:sterile_fluid_path",
+      "from": "structure_containment",
+      "to": "mass_fluid_transport_process",
+      "via": "sterile_fluid_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sterile_fluid_path."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:sensing_instrumentation:sterile_fluid_path",
+      "from": "mass_fluid_transport_process",
+      "to": "sensing_instrumentation",
+      "via": "sterile_fluid_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sterile_fluid_path."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:maintenance_serviceability:sterile_fluid_path",
+      "from": "sensing_instrumentation",
+      "to": "maintenance_serviceability",
+      "via": "sterile_fluid_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sterile_fluid_path."
+    },
+    {
+      "id": "shared_interface:structure_containment:sensing_instrumentation:mechanical_mounts",
+      "from": "structure_containment",
+      "to": "sensing_instrumentation",
+      "via": "mechanical_mounts",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare mechanical_mounts."
+    },
+    {
+      "id": "shared_interface:structure_containment:actuation_kinematics:service_access",
+      "from": "structure_containment",
+      "to": "actuation_kinematics",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:mass_fluid_transport_process:service_access",
+      "from": "actuation_kinematics",
+      "to": "mass_fluid_transport_process",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:environmental_interface:service_access",
+      "from": "mass_fluid_transport_process",
+      "to": "environmental_interface",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:environmental_interface:power_distribution:service_access",
+      "from": "environmental_interface",
+      "to": "power_distribution",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:service_access",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:service_access",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:structure_containment:environmental_interface:pressure_relief",
+      "from": "structure_containment",
+      "to": "environmental_interface",
+      "via": "pressure_relief",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pressure_relief."
+    },
+    {
+      "id": "shared_interface:environmental_interface:sensing_instrumentation:pressure_relief",
+      "from": "environmental_interface",
+      "to": "sensing_instrumentation",
+      "via": "pressure_relief",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pressure_relief."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:pressure_relief",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "pressure_relief",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pressure_relief."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:mass_fluid_transport_process:control_bus",
+      "from": "actuation_kinematics",
+      "to": "mass_fluid_transport_process",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:environmental_interface:control_bus",
+      "from": "mass_fluid_transport_process",
+      "to": "environmental_interface",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:environmental_interface:control_compute_communication:control_bus",
+      "from": "environmental_interface",
+      "to": "control_compute_communication",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:power_distribution:control_bus",
+      "from": "control_compute_communication",
+      "to": "power_distribution",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:mass_fluid_transport_process:sensor_bus",
+      "from": "actuation_kinematics",
+      "to": "mass_fluid_transport_process",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:environmental_interface:sensor_bus",
+      "from": "mass_fluid_transport_process",
+      "to": "environmental_interface",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:environmental_interface:sensing_instrumentation:sensor_bus",
+      "from": "environmental_interface",
+      "to": "sensing_instrumentation",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:maintenance_serviceability:sensor_bus",
+      "from": "control_compute_communication",
+      "to": "maintenance_serviceability",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:environmental_interface:gas_path",
+      "from": "mass_fluid_transport_process",
+      "to": "environmental_interface",
+      "via": "gas_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare gas_path."
+    },
+    {
+      "id": "shared_interface:environmental_interface:sensing_instrumentation:gas_path",
+      "from": "environmental_interface",
+      "to": "sensing_instrumentation",
+      "via": "gas_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare gas_path."
+    },
+    {
+      "id": "shared_interface:mass_fluid_transport_process:control_compute_communication:pump_control",
+      "from": "mass_fluid_transport_process",
+      "to": "control_compute_communication",
+      "via": "pump_control",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare pump_control."
+    },
+    {
+      "id": "shared_interface:environmental_interface:sensing_instrumentation:thermal_loop",
+      "from": "environmental_interface",
+      "to": "sensing_instrumentation",
+      "via": "thermal_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare thermal_loop."
+    },
+    {
+      "id": "shared_interface:environmental_interface:sensing_instrumentation:exhaust_path",
+      "from": "environmental_interface",
+      "to": "sensing_instrumentation",
+      "via": "exhaust_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare exhaust_path."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:exhaust_path",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "exhaust_path",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare exhaust_path."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:maintenance_serviceability:batch_record_network",
+      "from": "control_compute_communication",
+      "to": "maintenance_serviceability",
+      "via": "batch_record_network",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare batch_record_network."
+    },
+    {
+      "id": "shared_interface:actuation_kinematics:environmental_interface:alarm_bus",
+      "from": "actuation_kinematics",
+      "to": "environmental_interface",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:environmental_interface:control_compute_communication:alarm_bus",
+      "from": "environmental_interface",
+      "to": "control_compute_communication",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:power_distribution:alarm_bus",
+      "from": "control_compute_communication",
+      "to": "power_distribution",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:alarm_bus",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:mains_supply",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "mains_supply",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare mains_supply."
+    },
+    {
+      "id": "shared_interface:power_distribution:safety_protection:protective_earth",
+      "from": "power_distribution",
+      "to": "safety_protection",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "required_interface:structure_containment:mass_fluid_transport_process:sterile_fluid_path",
+      "from": "structure_containment",
+      "to": "mass_fluid_transport_process",
+      "via": "sterile_fluid_path",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "The sterile bag must connect to feed, harvest and sampling fluid paths."
+    },
+    {
+      "id": "required_interface:actuation_kinematics:structure_containment:sterile_boundary",
+      "from": "actuation_kinematics",
+      "to": "structure_containment",
+      "via": "sterile_boundary",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Mixing drive must couple into the disposable culture boundary without breaking sterility."
+    },
+    {
+      "id": "required_interface:mass_fluid_transport_process:environmental_interface:gas_path",
+      "from": "mass_fluid_transport_process",
+      "to": "environmental_interface",
+      "via": "gas_path",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Sparging and exhaust conditioning must share a declared gas path."
+    },
+    {
+      "id": "required_interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "sensor_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "DO, pH, mass and temperature measurements must feed process control."
+    },
+    {
+      "id": "required_interface:control_compute_communication:mass_fluid_transport_process:pump_control",
+      "from": "control_compute_communication",
+      "to": "mass_fluid_transport_process",
+      "via": "pump_control",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Controller must command feed, harvest and gas-flow actuators."
+    },
+    {
+      "id": "required_interface:safety_protection:structure_containment:pressure_relief",
+      "from": "safety_protection",
+      "to": "structure_containment",
+      "via": "pressure_relief",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Disposable culture containment must connect to pressure relief and sterile exhaust protection."
+    }
+  ],
+  "summary": {
+    "moduleNodes": 9,
+    "subModuleNodes": 27,
+    "containsEdges": 27,
+    "sharedInterfaceEdges": 39,
+    "requiredInterfaceEdges": 6,
+    "missingRequiredInterfaceEdges": 0
+  }
+}

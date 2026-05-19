@@ -1,0 +1,1030 @@
+{
+  "summary": {
+    "activities": 30,
+    "readyForReview": 20,
+    "open": 5,
+    "blocked": 5,
+    "designReviewActivities": 11,
+    "calculationActivities": 6,
+    "interfaceReviewActivities": 3,
+    "sourceEvidenceActivities": 5,
+    "complianceReviewActivities": 5
+  },
+  "activities": [
+    {
+      "id": "design_review:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "activity": "Review Energy Storage Source architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "capacity_mwh"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "interfaceIds": [
+        "dc_bus",
+        "thermal_loop",
+        "bms_network",
+        "mechanical_mounts",
+        "bms_tap_harness",
+        "service_access",
+        "sensor_harness",
+        "hardwired_trip"
+      ],
+      "componentWordIds": [
+        "lfp_prismatic_cells",
+        "cell_to_cell_busbar",
+        "cell_terminal_hardware_set",
+        "cell_insulation_pad",
+        "module_fuse",
+        "module_steel_frame",
+        "compression_plate",
+        "compression_tie_rod_set",
+        "module_top_cover",
+        "rack_label_plate",
+        "bms_slave_pcb",
+        "afe_monitor_ic",
+        "ntc_thermistor_harness",
+        "isolated_can_transceiver",
+        "conformal_coating",
+        "dc_contactor_or_breaker",
+        "precharge_resistor",
+        "hv_fuse_holder",
+        "pack_current_sensor",
+        "service_disconnect",
+        "cell_voltage_sense_loom",
+        "rack_can_drop_cable",
+        "harness_strain_relief_rail",
+        "low_smoke_cable_sleeve",
+        "rack_cold_plate_manifold",
+        "thermally_conductive_gap_pad",
+        "coolant_quick_connector_pair",
+        "rack_drip_tray",
+        "leak_detection_rope"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "activity": "Verify Energy Storage Source requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "capacity_mwh"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "activity": "Collect source-backed evidence for Energy Storage Source critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "capacity_mwh"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "dc_contactor_or_breaker"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "dc_contactor_or_breaker"
+      ]
+    },
+    {
+      "id": "design_review:energy_conversion_transduction",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion System",
+      "activity": "Review Power Conversion System architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "interfaceIds": [
+        "dc_bus",
+        "ac_bus",
+        "modbus_tcp",
+        "thermal_path",
+        "hardwired_trip",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "pcs_inverter",
+        "igbt_power_module",
+        "dc_link_capacitor_bank",
+        "gate_driver_board",
+        "inverter_control_board",
+        "liquid_cooled_heatsink",
+        "cast_resin_transformer",
+        "hv_winding",
+        "lv_winding",
+        "temperature_probe",
+        "anti_vibration_mount",
+        "grid_filter_choke",
+        "ac_filter_capacitor",
+        "emi_filter_assembly",
+        "protective_earth_bar",
+        "grid_protection_relay",
+        "voltage_sensing_fuse_set",
+        "relay_test_block",
+        "trip_circuit_monitor",
+        "g99_settings_label"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:energy_conversion_transduction",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion System",
+      "activity": "Verify Power Conversion System requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:energy_conversion_transduction",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion System",
+      "activity": "Collect source-backed evidence for Power Conversion System critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "pcs_inverter"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "pcs_inverter"
+      ]
+    },
+    {
+      "id": "design_review:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Container Structure And Fit-Out",
+      "activity": "Review Container Structure And Fit-Out architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "mass_kg"
+      ],
+      "sanityCheckIds": [
+        "bess_container_energy_density"
+      ],
+      "interfaceIds": [
+        "mechanical_mounts",
+        "service_access",
+        "fire_boundary",
+        "lifting_points",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "corten_steel_side_panel",
+        "corner_casting",
+        "marine_plywood_floor",
+        "roof_panel",
+        "steel_stud_frame",
+        "fire_rated_board",
+        "mineral_wool_insulation",
+        "intumescent_sealant",
+        "floor_reinforcement_plate",
+        "rack_mounting_rail",
+        "vibration_isolator",
+        "anchor_bolt_set",
+        "gland_plate_assembly",
+        "firestop_collar_set",
+        "emc_cable_gland",
+        "rain_drip_shield",
+        "penetration_schedule_label"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Container Structure And Fit-Out",
+      "activity": "Verify Container Structure And Fit-Out requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "mass_kg"
+      ],
+      "sanityCheckIds": [
+        "bess_container_energy_density"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing And Instrumentation",
+      "activity": "Review Sensing And Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_bus",
+        "alarm_bus",
+        "bms_network",
+        "site_scada",
+        "dc_bus",
+        "thermal_loop"
+      ],
+      "componentWordIds": [
+        "dc_voltage_transducer",
+        "hall_current_sensor",
+        "insulation_monitoring_device",
+        "auxiliary_metering_transducer",
+        "temperature_humidity_sensor",
+        "hydrogen_detector",
+        "smoke_aspirating_detector",
+        "door_position_switch",
+        "coolant_inlet_thermistor",
+        "coolant_outlet_thermistor",
+        "flow_meter",
+        "pressure_transducer",
+        "fault_recorder_module",
+        "event_timestamp_logger",
+        "digital_input_card",
+        "local_historian_buffer",
+        "calibration_certificate_holder"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute And Communication",
+      "activity": "Review Control Compute And Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "power_mw"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration"
+      ],
+      "interfaceIds": [
+        "bms_network",
+        "modbus_tcp",
+        "sensor_bus",
+        "alarm_bus",
+        "site_scada",
+        "service_access",
+        "hardwired_trip"
+      ],
+      "componentWordIds": [
+        "bms_master_controller",
+        "isolation_interface",
+        "contactor_driver_output",
+        "soc_estimation_firmware",
+        "industrial_controller",
+        "i_o_expansion_module",
+        "network_switch",
+        "cellular_router",
+        "modbus_tcp_gateway",
+        "scada_protocol_adapter",
+        "time_synchronisation_module",
+        "cybersecurity_firewall",
+        "vpn_access_appliance",
+        "syslog_collector",
+        "account_key_switch",
+        "firmware_escrow_tag",
+        "configuration_backup_module"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute And Communication",
+      "activity": "Verify Control Compute And Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "power_mw"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute And Communication",
+      "activity": "Collect source-backed evidence for Control Compute And Communication critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "power_mw"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "bms_master_controller"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "bms_master_controller"
+      ]
+    },
+    {
+      "id": "design_review:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection And Interlocks",
+      "activity": "Review Safety Protection And Interlocks architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "alarm_bus",
+        "hardwired_trip",
+        "fire_boundary",
+        "dc_bus",
+        "ac_bus",
+        "service_access",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "fire_detection_suppression",
+        "clean_agent_cylinder",
+        "release_solenoid",
+        "nozzle_pipework",
+        "pressure_switch",
+        "e_stop_mushroom_button",
+        "safety_relay",
+        "dc_shunt_trip_output",
+        "ac_breaker_trip_coil",
+        "dc_surge_protection_device",
+        "ac_surge_protection_device",
+        "arc_flash_label_set",
+        "protective_earth_bonding_kit",
+        "pressure_relief_vent_panel",
+        "vent_microswitch",
+        "flame_arrestor_mesh",
+        "vent_weather_hood",
+        "post_event_inspection_tag"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection And Interlocks",
+      "activity": "Collect source-backed evidence for Safety Protection And Interlocks critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "fire_detection_suppression"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "fire_detection_suppression"
+      ]
+    },
+    {
+      "id": "design_review:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Environmental Interface",
+      "activity": "Review Environmental Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "thermal_loop",
+        "thermal_path",
+        "electrical_power",
+        "sensor_bus",
+        "service_access",
+        "fire_boundary"
+      ],
+      "componentWordIds": [
+        "container_hvac_unit",
+        "air_filter_element",
+        "condensate_drain_kit",
+        "hvac_controller",
+        "intake_louvre",
+        "exhaust_louvre",
+        "ec_fan_assembly",
+        "airflow_baffle",
+        "insulation_panel",
+        "vapour_barrier_film",
+        "thermal_break_strip",
+        "seal_gasket_set",
+        "dry_cooler_coil",
+        "ec_condenser_fan",
+        "fan_contactor",
+        "coil_guard_grille",
+        "drain_safe_condensate_pan"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "DC And AC Power Distribution",
+      "activity": "Review DC And AC Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "interfaceIds": [
+        "dc_bus",
+        "ac_bus",
+        "electrical_power",
+        "protective_earth",
+        "hardwired_trip",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "copper_dc_busbar",
+        "busbar_support_insulator",
+        "busbar_shroud",
+        "torque_witness_marker",
+        "moulded_case_circuit_breaker",
+        "ac_contactor",
+        "metering_ct_set",
+        "terminal_block_assembly",
+        "auxiliary_transformer",
+        "24_v_dc_power_supply",
+        "miniature_circuit_breaker_bank",
+        "ups_module",
+        "main_earth_bar",
+        "earth_stud_array",
+        "lightning_surge_counter",
+        "equipotential_bonding_strap",
+        "earth_continuity_test_point"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "DC And AC Power Distribution",
+      "activity": "Verify DC And AC Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Serviceability",
+      "activity": "Review Maintenance And Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "mass_kg"
+      ],
+      "sanityCheckIds": [
+        "bess_container_energy_density"
+      ],
+      "interfaceIds": [
+        "service_access",
+        "lifting_points",
+        "protective_earth",
+        "sensor_bus",
+        "dc_bus",
+        "electrical_power",
+        "mechanical_mounts"
+      ],
+      "componentWordIds": [
+        "lockable_access_door",
+        "door_seal_gasket",
+        "panic_release_latch",
+        "door_stay_arm",
+        "led_service_luminaire",
+        "emergency_light_fitting",
+        "maintenance_receptacle",
+        "lighting_switchgear",
+        "certified_lifting_lug",
+        "forklift_pocket_reinforcement",
+        "removable_rack_guide",
+        "service_trolley_interface",
+        "insulated_test_socket",
+        "coolant_sampling_port",
+        "laptop_service_port",
+        "lockout_hasp_rail",
+        "commissioning_torque_log_plate"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Serviceability",
+      "activity": "Verify Maintenance And Serviceability requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "mass_kg"
+      ],
+      "sanityCheckIds": [
+        "bess_container_energy_density"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:mass_fluid_transport_process",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Coolant Circulation Process",
+      "activity": "Review Coolant Circulation Process architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "thermal_loop",
+        "sensor_bus",
+        "service_access",
+        "electrical_power"
+      ],
+      "componentWordIds": [
+        "thermal_management_loop",
+        "coolant_circulation_pump",
+        "pump_vfd",
+        "check_valve",
+        "isolation_valve",
+        "coolant_filter_housing",
+        "replaceable_filter_cartridge",
+        "glycol_concentration_sensor",
+        "fill_and_drain_manifold",
+        "expansion_vessel",
+        "automatic_air_vent",
+        "pressure_relief_valve",
+        "low_pressure_switch",
+        "plate_heat_exchanger",
+        "temperature_balancing_valve",
+        "purge_valve_set",
+        "service_bypass_loop",
+        "insulated_hose_set"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:mass_fluid_transport_process",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Coolant Circulation Process",
+      "activity": "Collect source-backed evidence for Coolant Circulation Process critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "thermal_management_loop"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "thermal_management_loop"
+      ]
+    },
+    {
+      "id": "design_review:hmi_ergonomics",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Operator HMI And Labelling",
+      "activity": "Review Operator HMI And Labelling architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "site_scada",
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "industrial_touchscreen",
+        "panel_pc",
+        "key_switch",
+        "alarm_buzzer_beacon",
+        "high_voltage_warning_label",
+        "arc_flash_boundary_label",
+        "fire_suppression_instruction_placard",
+        "asset_qr_label",
+        "laminated_isolation_checklist",
+        "inspection_log_holder",
+        "status_stack_light",
+        "manual_reset_station",
+        "operator_notification_relay",
+        "sms_alarm_output_module",
+        "alarm_acknowledgement_button",
+        "escalation_contact_label",
+        "remote_reset_inhibit_relay"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:energy_storage_source:energy_conversion_transduction:dc_bus",
+      "moduleId": "energy_storage_source:energy_conversion_transduction",
+      "moduleName": "Energy Storage Source -> Power Conversion System",
+      "activity": "Verify dc_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "dc_bus"
+      ],
+      "componentWordIds": [
+        "lfp_prismatic_cells",
+        "cell_to_cell_busbar",
+        "cell_terminal_hardware_set",
+        "cell_insulation_pad",
+        "module_fuse",
+        "dc_contactor_or_breaker",
+        "precharge_resistor",
+        "hv_fuse_holder",
+        "pack_current_sensor",
+        "service_disconnect",
+        "pcs_inverter",
+        "igbt_power_module",
+        "dc_link_capacitor_bank",
+        "gate_driver_board",
+        "inverter_control_board",
+        "liquid_cooled_heatsink"
+      ],
+      "rationale": "Battery racks must feed the PCS over a declared DC bus.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:energy_storage_source:environmental_interface:thermal_loop",
+      "moduleId": "energy_storage_source:environmental_interface",
+      "moduleName": "Energy Storage Source -> Environmental Interface",
+      "activity": "Verify thermal_loop interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "thermal_loop"
+      ],
+      "componentWordIds": [
+        "lfp_prismatic_cells",
+        "cell_to_cell_busbar",
+        "cell_terminal_hardware_set",
+        "cell_insulation_pad",
+        "module_fuse",
+        "rack_cold_plate_manifold",
+        "thermally_conductive_gap_pad",
+        "coolant_quick_connector_pair",
+        "rack_drip_tray",
+        "leak_detection_rope",
+        "container_hvac_unit",
+        "air_filter_element",
+        "condensate_drain_kit",
+        "hvac_controller",
+        "intake_louvre",
+        "exhaust_louvre",
+        "ec_fan_assembly",
+        "airflow_baffle",
+        "dry_cooler_coil",
+        "ec_condenser_fan",
+        "fan_contactor",
+        "coil_guard_grille",
+        "drain_safe_condensate_pan"
+      ],
+      "rationale": "Cell heat must be coupled to the thermal management loop.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:energy_storage_source:control_compute_communication:bms_network",
+      "moduleId": "energy_storage_source:control_compute_communication",
+      "moduleName": "Energy Storage Source -> Control Compute And Communication",
+      "activity": "Verify bms_network interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "bms_network"
+      ],
+      "componentWordIds": [
+        "bms_slave_pcb",
+        "afe_monitor_ic",
+        "ntc_thermistor_harness",
+        "isolated_can_transceiver",
+        "conformal_coating",
+        "bms_master_controller",
+        "isolation_interface",
+        "contactor_driver_output",
+        "soc_estimation_firmware"
+      ],
+      "rationale": "Cell/rack state must be visible to BMS and EMS supervision.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "compliance_review:IEC-62619",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for IEC-62619",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Industrial lithium battery safety",
+      "acceptanceCriteria": [
+        "Cell certificates and pack-level safety validation."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:UL-9540A",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for UL-9540A",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Thermal runaway fire propagation test",
+      "acceptanceCriteria": [
+        "Cell, module and unit-level propagation evidence."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:G99",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for G99",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "UK grid connection requirements",
+      "acceptanceCriteria": [
+        "Protection settings, relay test certificates and commissioning records."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:1",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Thermal runaway propagation",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 120; mitigation: Cell spacing, thermal monitoring and clean-agent suppression.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:2",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for DC arc fault",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 108; mitigation: Arc detection, contactor isolation and maintenance access controls.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+area,verdict,rows,passedClaims,reviewRequiredClaims,blockedClaims,sourceRequiredClaims,generatedNeedsReviewClaims,calculatedNeedsReviewClaims,acceptedClaims,sourceBackedClaims,briefSuppliedClaims,bomBlockingClaims,publishBlockingClaims,passRatio,requiredAction
+brief_requirements,claim_evidence_complete,1,1,0,0,0,0,0,0,0,1,0,0,1,No claim-evidence action required for this area.
+architecture_design,review_required,40,0,40,0,0,40,0,0,0,0,0,40,0,"Accept, correct or reject generated module and submodule allocation claims through engineering review."
+engineering_math,evidence_blocked,5,0,3,2,2,0,3,0,0,0,2,4,0,"Accept, correct or reject calculated metrics and engineering envelopes through reviewer evidence."
+bom_sourcing,evidence_blocked,172,0,107,65,65,107,0,0,0,0,65,172,0,"Admit source-backed supplier, manufacturer, MPN, unit-cost and lead-time evidence for required BoM claims."
+compliance_risk,review_required,7,0,7,0,0,7,0,0,0,0,0,7,0,"Accept, correct or reject class-pack regulatory and risk claims through compliance/domain review."

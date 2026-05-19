@@ -1,0 +1,2 @@
+id,componentWordId,supplierName,manufacturer,mpn,ref,referenceClass,status,hasHttps,hasCompleteMetadata,quoteAnchoredToManufacturerOrMpn,timestampFresh,sourceGrade,issues,requiredAction
+source-quality:1:lfp_prismatic_cells,lfp_prismatic_cells,Protocol CSV Supplier,Protocol CSV Manufacturer,PROTOCOL-CSV-NOT-A-REAL-PART,test-fixture://csv-sourcing/lfp_prismatic_cells,protocol_fixture,review,false,true,false,true,priced,,Replace protocol fixture with a retrievable supplier/catalogue URL before production costing.

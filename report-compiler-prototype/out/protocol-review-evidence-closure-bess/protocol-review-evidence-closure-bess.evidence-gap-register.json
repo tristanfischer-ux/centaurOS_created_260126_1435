@@ -1,0 +1,178 @@
+{
+  "summary": {
+    "rows": 10,
+    "blockers": 0,
+    "majors": 10,
+    "minors": 0,
+    "architectureBlockingRows": 0,
+    "bomBlockingRows": 0,
+    "publishBlockingRows": 10,
+    "sourcingIntakeRows": 0,
+    "verificationIntakeRows": 0,
+    "engineeringReviewRows": 10,
+    "architectureRevisionRows": 0
+  },
+  "rows": [
+    {
+      "id": "calculation:bess_nameplate_annual_throughput_mwh",
+      "kind": "calculation_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "BESS annual nameplate throughput",
+      "issue": "1277.5 MWh/year assumes one full equivalent cycle per day.",
+      "requiredEvidence": "Confirm cycles per year, usable depth of discharge, round-trip efficiency and degradation assumptions.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "capacity_mwh"
+      ],
+      "source": "engineering_calculation_ledger"
+    },
+    {
+      "id": "assumption:metric:headline_output",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Annual MWh delivered",
+      "issue": "Annual MWh delivered uses capacity_mwh * cycles_per_year * efficiency with medium confidence.",
+      "requiredEvidence": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:metric:capex_gbp",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated CAPEX",
+      "issue": "Estimated CAPEX uses an implicit model with low confidence.",
+      "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:metric:opex_annual_gbp",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated annual OPEX",
+      "issue": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:bess_c_rate",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "BESS C-Rate",
+      "issue": "BESS C-Rate currently evaluates as pass against 0.1C to 1.0C for typical grid-storage duration systems.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:bess_duration",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Rated Duration",
+      "issue": "Rated Duration currently evaluates as pass against 1 to 6 hours for common containerised BESS applications.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:bess_container_energy_density",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Container-Level Energy Density",
+      "issue": "Container-Level Energy Density currently evaluates as pass against 50 to 200 Wh/kg at container/system level before detailed structural mass review.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "capacity_mwh",
+        "mass_kg"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:IEC-62619",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "IEC-62619",
+      "issue": "Industrial lithium battery safety is relevant to this product class in Global / UK-adopted.",
+      "requiredEvidence": "Cell certificates and pack-level safety validation.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:UL-9540A",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "UL-9540A",
+      "issue": "Thermal runaway fire propagation test is relevant to this product class in US / investor diligence.",
+      "requiredEvidence": "Cell, module and unit-level propagation evidence.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:G99",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "G99",
+      "issue": "UK grid connection requirements is relevant to this product class in UK.",
+      "requiredEvidence": "Protection settings, relay test certificates and commissioning records.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    }
+  ]
+}

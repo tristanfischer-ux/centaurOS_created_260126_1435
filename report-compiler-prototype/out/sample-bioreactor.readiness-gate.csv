@@ -1,0 +1,7 @@
+section,score,targetScore,passesTarget,issueCount,blockerCount,majorCount,minorCount,actions
+executive_summary,9,8,true,0,0,0,0,No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending.
+brief_requirements,9,8,true,0,0,0,0,No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending.
+design_modules,9,8,true,0,0,0,0,No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending.
+bom,1,8,false,12,11,1,0,"Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates."
+feasibility_notes,9,8,true,0,0,0,0,No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending.
+sources_references,9,8,true,0,0,0,0,No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending.

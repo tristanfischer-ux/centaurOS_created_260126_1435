@@ -1,0 +1,73 @@
+{
+  "verdict": "sourcing_authorized",
+  "summary": {
+    "rows": 6,
+    "passRows": 6,
+    "reviewRows": 0,
+    "blockedRows": 0,
+    "passRatio": 1,
+    "architectureAdmissionVerdict": "architecture_generation_admitted",
+    "componentCandidateVerdict": "component_candidates_ready_for_sourcing",
+    "criticalUnpricedRows": 12,
+    "candidateUnpricedRows": 108,
+    "criticalIntakeRows": 12,
+    "fullIntakeRows": 120,
+    "admittedSourcingEvidenceRows": 0,
+    "rejectedSourcingEvidenceRows": 0,
+    "provenanceViolations": 0,
+    "sourcingAuthorized": true,
+    "nextAction": null
+  },
+  "rows": [
+    {
+      "area": "architecture_authorization",
+      "verdict": "pass",
+      "signal": "architecture_generation_admitted; review yes, BoM yes.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Architecture admission permits evidence-gated sourcing work."
+    },
+    {
+      "area": "component_candidate_authorization",
+      "verdict": "pass",
+      "signal": "component_candidates_ready_for_sourcing; 120 candidate line(s), 120 sourcing-worklist row(s), 0 provenance violation(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Component candidates are concrete enough for sourcing intake."
+    },
+    {
+      "area": "critical_intake_scope",
+      "verdict": "pass",
+      "signal": "12/12 critical unpriced line(s) appear in the critical sourcing intake template.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Critical sourcing intake scope is complete."
+    },
+    {
+      "area": "full_worklist_scope",
+      "verdict": "pass",
+      "signal": "120/120 total unpriced line(s) appear in the full sourcing intake template.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Full sourcing intake scope matches the unpriced worklist."
+    },
+    {
+      "area": "evidence_admission_boundary",
+      "verdict": "pass",
+      "signal": "0 admitted source evidence row(s), 0 rejected source evidence row(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "No rejected sourcing evidence is waiting for repair."
+    },
+    {
+      "area": "provenance_boundary",
+      "verdict": "pass",
+      "signal": "0 source-backed BoM claim(s), 0 provenance violation(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Supplier, manufacturer, MPN, lead-time and cost fields remain behind admitted evidence."
+    }
+  ],
+  "blockers": [],
+  "nextActions": []
+}

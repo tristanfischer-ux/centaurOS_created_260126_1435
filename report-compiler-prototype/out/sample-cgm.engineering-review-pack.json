@@ -1,0 +1,3042 @@
+{
+  "summary": {
+    "rows": 87,
+    "accepted": 0,
+    "readyForReview": 52,
+    "needsReview": 35,
+    "blocked": 0,
+    "moduleQuestions": 10,
+    "subModuleQuestions": 30,
+    "interfaceQuestions": 10,
+    "calculationQuestions": 3,
+    "assumptionQuestions": 34
+  },
+  "questions": [
+    {
+      "id": "assumption_resolution:compliance:IEC-60601-1",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "IEC-60601-1",
+      "reviewerQuestion": "Can the IEC-60601-1 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Electrical safety, leakage, power source and abnormal-operation evidence tailored to wearable use.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:IEC-62304",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "IEC-62304",
+      "reviewerQuestion": "Can the IEC-62304 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Software architecture, risk class, verification and release evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:ISO-10993",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "ISO-10993",
+      "reviewerQuestion": "Can the ISO-10993 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Skin-contact material, adhesive and wear-duration biocompatibility evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:ISO-14971",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "ISO-14971",
+      "reviewerQuestion": "Can the ISO-14971 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Hazard analysis, risk controls and residual-risk acceptability.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:actuation_kinematics_disposable_applicator_disposable_applicator",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Disposable applicator",
+      "reviewerQuestion": "Can the Disposable applicator assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "disposable_applicator"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_ble_telemetry_ble_radio_module",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "BLE radio module",
+      "reviewerQuestion": "Can the BLE radio module assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "ble_radio_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_mcu_firmware_low_power_microcontroller",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Low-power microcontroller",
+      "reviewerQuestion": "Can the Low-power microcontroller assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "low_power_microcontroller"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_storage_source_battery_cell_thin_film_battery",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Thin-film battery",
+      "reviewerQuestion": "Can the Thin-film battery assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "thin_film_battery"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_temperature_compensation_temperature_sensor",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Temperature sensor",
+      "reviewerQuestion": "Can the Temperature sensor assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "temperature_sensor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:maintenance_serviceability_lot_traceability_udi_label_set",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "UDI label set",
+      "reviewerQuestion": "Can the UDI label set assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "udi_label_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:maintenance_serviceability_sterile_packaging_sterile_barrier_pouch",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Sterile barrier pouch",
+      "reviewerQuestion": "Can the Sterile barrier pouch assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "sterile_barrier_pouch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_glucose_filament_stack_enzyme_reagent_membrane",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Enzyme reagent membrane",
+      "reviewerQuestion": "Can the Enzyme reagent membrane assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "enzyme_reagent_membrane"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_glucose_filament_stack_glucose_sensing_filament",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Glucose sensing filament",
+      "reviewerQuestion": "Can the Glucose sensing filament assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "glucose_sensing_filament"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_glucose_filament_stack_reference_electrode",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Reference electrode",
+      "reviewerQuestion": "Can the Reference electrode assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "reference_electrode"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:skin_patient_interface_adhesive_patch_stack_adhesive_skin_patch",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Adhesive skin patch",
+      "reviewerQuestion": "Can the Adhesive skin patch assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "skin_patient_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "adhesive_skin_patch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:structure_containment_transmitter_housing_protective_transmitter_housing",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Protective transmitter housing",
+      "reviewerQuestion": "Can the Protective transmitter housing assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "protective_transmitter_housing"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:actuation_kinematics:skin_patient_interface:insertion_path",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "actuation_kinematics -> skin_patient_interface",
+      "reviewerQuestion": "Can the actuation_kinematics -> skin_patient_interface assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "insertion_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:safety_protection:alarm_state_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> safety_protection",
+      "reviewerQuestion": "Can the control_compute_communication -> safety_protection assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "alarm_state_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:energy_storage_source:power_distribution:cell_power_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "energy_storage_source -> power_distribution",
+      "reviewerQuestion": "Can the energy_storage_source -> power_distribution assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "cell_power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:environmental_interface:control_compute_communication:temperature_compensation_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "environmental_interface -> control_compute_communication",
+      "reviewerQuestion": "Can the environmental_interface -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "temperature_compensation_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:maintenance_serviceability:skin_patient_interface:sterile_boundary",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "maintenance_serviceability -> skin_patient_interface",
+      "reviewerQuestion": "Can the maintenance_serviceability -> skin_patient_interface assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sterile_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:power_distribution:control_compute_communication:low_power_rail",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "power_distribution -> control_compute_communication",
+      "reviewerQuestion": "Can the power_distribution -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "low_power_rail"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:power_distribution:sensing_instrumentation:analog_power_rail",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "power_distribution -> sensing_instrumentation",
+      "reviewerQuestion": "Can the power_distribution -> sensing_instrumentation assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "analog_power_rail"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:sensing_instrumentation:control_compute_communication:calibration_data_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "reviewerQuestion": "Can the sensing_instrumentation -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "calibration_data_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:sensing_instrumentation:control_compute_communication:sensor_signal_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "reviewerQuestion": "Can the sensing_instrumentation -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_signal_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "skin_patient_interface -> sensing_instrumentation",
+      "reviewerQuestion": "Can the skin_patient_interface -> sensing_instrumentation assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "interstitial_fluid_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:capex_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated CAPEX",
+      "reviewerQuestion": "Can the Estimated CAPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:headline_output",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Sensor wear duration",
+      "reviewerQuestion": "Can the Sensor wear duration assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:opex_annual_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated annual OPEX",
+      "reviewerQuestion": "Can the Estimated annual OPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:cgm_accuracy_target",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "MARD Accuracy Target",
+      "reviewerQuestion": "Can the MARD Accuracy Target assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "environmental_interface",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:cgm_biofluid_signal_closure",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Biofluid/Signal Closure",
+      "reviewerQuestion": "Can the Biofluid/Signal Closure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "power_distribution",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:cgm_patch_power_comms_safety",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Patch/Power/Comms/Safety Closure",
+      "reviewerQuestion": "Can the Patch/Power/Comms/Safety Closure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "skin_patient_interface",
+        "energy_storage_source",
+        "environmental_interface",
+        "safety_protection",
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "wear_days",
+        "reading_interval_minutes"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:cgm_reading_interval",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Reading Interval",
+      "reviewerQuestion": "Can the Reading Interval assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "reading_interval_minutes"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:cgm_wear_duration",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Wear Duration",
+      "reviewerQuestion": "Can the Wear Duration assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "skin_patient_interface",
+        "energy_storage_source",
+        "environmental_interface",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:cgm_total_wear_readings",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "CGM total wear readings",
+      "reviewerQuestion": "Does the CGM total wear readings calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm memory, telemetry retries, battery capacity, sensor drift and calibration strategy.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "skin_patient_interface",
+        "energy_storage_source",
+        "environmental_interface",
+        "safety_protection",
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "wear_days",
+        "reading_interval_minutes"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "cgm_total_wear_readings"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:cgm_mard_margin_to_10_percent",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "CGM MARD margin to 10%",
+      "reviewerQuestion": "Does the CGM MARD margin to 10% calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm clinical protocol, comparator, calibration method, population mix and error-grid analysis.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "environmental_interface",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "cgm_mard_margin_to_10_percent"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:cgm_readings_per_day",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "CGM readings per day",
+      "reviewerQuestion": "Does the CGM readings per day calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm sensor settling, BLE duty cycle, local buffering, timestamping and battery budget.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "reading_interval_minutes"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "cgm_readings_per_day"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_contract:actuation_kinematics:skin_patient_interface:insertion_path",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Applicator Insertion Mechanism -> Skin Patient Interface via insertion_path",
+      "reviewerQuestion": "Is the insertion_path interface between Applicator Insertion Mechanism and Skin Patient Interface correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics",
+        "skin_patient_interface"
+      ],
+      "linkedSubModuleIds": [
+        "disposable_applicator",
+        "insertion_mechanism",
+        "cannula_skin_contact"
+      ],
+      "linkedComponentWordIds": [
+        "disposable_applicator",
+        "spring_insertion_driver",
+        "trigger_button",
+        "safety_cap",
+        "introducer_needle",
+        "filament_deployment_shuttle",
+        "depth_stop_collar",
+        "retraction_latch",
+        "skin_contact_gasket",
+        "filament_entry_seal",
+        "antimicrobial_contact_pad",
+        "insertion_site_spacing_ring"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "insertion_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:control_compute_communication:safety_protection:alarm_state_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication -> Patient Safety Protection via alarm_state_bus",
+      "reviewerQuestion": "Is the alarm_state_bus interface between Control Compute Communication and Patient Safety Protection correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "ble_telemetry",
+        "data_buffering",
+        "patient_alarm_logic"
+      ],
+      "linkedComponentWordIds": [
+        "ble_radio_module",
+        "printed_antenna",
+        "pairing_button_pad",
+        "encrypted_session_counter",
+        "glucose_trend_buffer_flash",
+        "event_log_memory",
+        "calibration_data_bus_bridge",
+        "clock_drift_compensator",
+        "hypoglycaemia_alarm_state",
+        "hyperglycaemia_alarm_state",
+        "sensor_fault_classifier",
+        "stale_data_lockout"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "alarm_state_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:energy_storage_source:power_distribution:cell_power_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wearable Energy Source -> Low-Power Distribution via cell_power_bus",
+      "reviewerQuestion": "Is the cell_power_bus interface between Wearable Energy Source and Low-Power Distribution correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "battery_cell",
+        "power_reserve",
+        "battery_safety",
+        "low_power_rails",
+        "analog_excitation"
+      ],
+      "linkedComponentWordIds": [
+        "thin_film_battery",
+        "battery_weld_tab",
+        "battery_pouch_insulator",
+        "state_of_charge_witness_pad",
+        "brownout_hold_up_capacitor",
+        "battery_cut_off_tab",
+        "shelf_life_isolation_film",
+        "activation_pull_strip",
+        "battery_vent_clearance",
+        "reverse_polarity_fuse",
+        "pack_temperature_dot",
+        "battery_lot_barcode",
+        "nanoamp_power_switch",
+        "digital_buck_regulator",
+        "rail_measurement_divider",
+        "wake_timer_oscillator",
+        "sensor_excitation_mux",
+        "analog_power_filter",
+        "electrode_guard_driver",
+        "afe_wake_timer"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "cell_power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:environmental_interface:control_compute_communication:temperature_compensation_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wear Environment Compensation -> Control Compute Communication via temperature_compensation_bus",
+      "reviewerQuestion": "Is the temperature_compensation_bus interface between Wear Environment Compensation and Control Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "temperature_compensation",
+        "mcu_firmware"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_sensor",
+        "thermal_model_table",
+        "skin_temperature_flex_tail",
+        "cold_start_delay_flag",
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "temperature_compensation_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:maintenance_serviceability:skin_patient_interface:sterile_boundary",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Packaging Traceability Serviceability -> Skin Patient Interface via sterile_boundary",
+      "reviewerQuestion": "Is the sterile_boundary interface between Packaging Traceability Serviceability and Skin Patient Interface correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability",
+        "skin_patient_interface"
+      ],
+      "linkedSubModuleIds": [
+        "sterile_packaging",
+        "adhesive_patch_stack",
+        "cannula_skin_contact"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_barrier_pouch",
+        "desiccant_sachet",
+        "pouch_seal_indicator",
+        "expiry_date_label",
+        "adhesive_skin_patch",
+        "hydrocolloid_edge_seal",
+        "breathable_backing_film",
+        "pull_tab_liner",
+        "skin_contact_gasket",
+        "filament_entry_seal",
+        "antimicrobial_contact_pad",
+        "insertion_site_spacing_ring"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sterile_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:power_distribution:control_compute_communication:low_power_rail",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Low-Power Distribution -> Control Compute Communication via low_power_rail",
+      "reviewerQuestion": "Is the low_power_rail interface between Low-Power Distribution and Control Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "low_power_rails",
+        "power_fault_handling",
+        "mcu_firmware",
+        "ble_telemetry"
+      ],
+      "linkedComponentWordIds": [
+        "nanoamp_power_switch",
+        "digital_buck_regulator",
+        "rail_measurement_divider",
+        "wake_timer_oscillator",
+        "hardwired_reset_supervisor",
+        "overcurrent_limiter",
+        "load_gate_transistor",
+        "fault_latch",
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock",
+        "ble_radio_module",
+        "printed_antenna",
+        "pairing_button_pad",
+        "encrypted_session_counter"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "low_power_rail"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:power_distribution:sensing_instrumentation:analog_power_rail",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Low-Power Distribution -> Glucose Sensing Instrumentation via analog_power_rail",
+      "reviewerQuestion": "Is the analog_power_rail interface between Low-Power Distribution and Glucose Sensing Instrumentation correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "analog_excitation",
+        "power_fault_handling",
+        "glucose_filament_stack",
+        "analog_front_end"
+      ],
+      "linkedComponentWordIds": [
+        "sensor_excitation_mux",
+        "analog_power_filter",
+        "electrode_guard_driver",
+        "afe_wake_timer",
+        "hardwired_reset_supervisor",
+        "overcurrent_limiter",
+        "load_gate_transistor",
+        "fault_latch",
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode",
+        "diffusion_limiting_membrane",
+        "potentiostat_afe",
+        "low_leakage_input_guard",
+        "electrode_flex_tail",
+        "sensor_bias_resistor_network"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "analog_power_rail"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:sensing_instrumentation:control_compute_communication:calibration_data_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Glucose Sensing Instrumentation -> Control Compute Communication via calibration_data_bus",
+      "reviewerQuestion": "Is the calibration_data_bus interface between Glucose Sensing Instrumentation and Control Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "calibration_drift_monitoring",
+        "mcu_firmware",
+        "data_buffering"
+      ],
+      "linkedComponentWordIds": [
+        "calibration_data_eeprom",
+        "drift_estimator_firmware_table",
+        "factory_calibration_code",
+        "signal_integrity_test_pad",
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock",
+        "glucose_trend_buffer_flash",
+        "event_log_memory",
+        "calibration_data_bus_bridge",
+        "clock_drift_compensator"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "calibration_data_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:sensing_instrumentation:control_compute_communication:sensor_signal_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Glucose Sensing Instrumentation -> Control Compute Communication via sensor_signal_bus",
+      "reviewerQuestion": "Is the sensor_signal_bus interface between Glucose Sensing Instrumentation and Control Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "analog_front_end",
+        "calibration_drift_monitoring",
+        "mcu_firmware",
+        "data_buffering"
+      ],
+      "linkedComponentWordIds": [
+        "potentiostat_afe",
+        "low_leakage_input_guard",
+        "electrode_flex_tail",
+        "sensor_bias_resistor_network",
+        "calibration_data_eeprom",
+        "drift_estimator_firmware_table",
+        "factory_calibration_code",
+        "signal_integrity_test_pad",
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock",
+        "glucose_trend_buffer_flash",
+        "event_log_memory",
+        "calibration_data_bus_bridge",
+        "clock_drift_compensator"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_signal_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Skin Patient Interface -> Glucose Sensing Instrumentation via interstitial_fluid_path",
+      "reviewerQuestion": "Is the interstitial_fluid_path interface between Skin Patient Interface and Glucose Sensing Instrumentation correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "skin_patient_interface",
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "adhesive_patch_stack",
+        "cannula_skin_contact",
+        "glucose_filament_stack"
+      ],
+      "linkedComponentWordIds": [
+        "adhesive_skin_patch",
+        "hydrocolloid_edge_seal",
+        "breathable_backing_film",
+        "pull_tab_liner",
+        "skin_contact_gasket",
+        "filament_entry_seal",
+        "antimicrobial_contact_pad",
+        "insertion_site_spacing_ring",
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode",
+        "diffusion_limiting_membrane"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "interstitial_fluid_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "module_allocation:actuation_kinematics",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Applicator Insertion Mechanism",
+      "reviewerQuestion": "Does Applicator Insertion Mechanism have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "disposable_applicator",
+        "insertion_mechanism",
+        "sharps_lockout"
+      ],
+      "linkedComponentWordIds": [
+        "disposable_applicator",
+        "spring_insertion_driver",
+        "trigger_button",
+        "safety_cap",
+        "introducer_needle",
+        "filament_deployment_shuttle",
+        "depth_stop_collar",
+        "retraction_latch",
+        "needle_shield",
+        "post_use_lock_tab",
+        "applicator_status_window",
+        "trigger_interlock_spring"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "insertion_path",
+        "sterile_boundary",
+        "user_trigger",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication",
+      "reviewerQuestion": "Does Control Compute Communication have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "mcu_firmware",
+        "ble_telemetry",
+        "data_buffering"
+      ],
+      "linkedComponentWordIds": [
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock",
+        "ble_radio_module",
+        "printed_antenna",
+        "pairing_button_pad",
+        "encrypted_session_counter",
+        "glucose_trend_buffer_flash",
+        "event_log_memory",
+        "calibration_data_bus_bridge",
+        "clock_drift_compensator"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_signal_bus",
+        "calibration_data_bus",
+        "ble_link",
+        "alarm_state_bus",
+        "low_power_rail",
+        "temperature_compensation_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:energy_storage_source",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wearable Energy Source",
+      "reviewerQuestion": "Does Wearable Energy Source have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "battery_cell",
+        "power_reserve",
+        "battery_safety"
+      ],
+      "linkedComponentWordIds": [
+        "thin_film_battery",
+        "battery_weld_tab",
+        "battery_pouch_insulator",
+        "state_of_charge_witness_pad",
+        "brownout_hold_up_capacitor",
+        "battery_cut_off_tab",
+        "shelf_life_isolation_film",
+        "activation_pull_strip",
+        "battery_vent_clearance",
+        "reverse_polarity_fuse",
+        "pack_temperature_dot",
+        "battery_lot_barcode"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "cell_power_bus",
+        "service_access",
+        "lot_traceability"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wear Environment Compensation",
+      "reviewerQuestion": "Does Wear Environment Compensation have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "temperature_compensation",
+        "sweat_water_boundary",
+        "motion_pressure"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_sensor",
+        "thermal_model_table",
+        "skin_temperature_flex_tail",
+        "cold_start_delay_flag",
+        "sweat_barrier_film",
+        "condensation_drain_groove",
+        "humidity_indicator_dot",
+        "ingress_exposure_witness",
+        "motion_artefact_filter_table",
+        "patch_pressure_relief_slot",
+        "compression_warning_marker",
+        "activity_context_accelerometer"
+      ],
+      "linkedRequirementIds": [
+        "wear_days",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "temperature_compensation_bus",
+        "ingress_boundary",
+        "adhesive_skin_boundary",
+        "sensor_signal_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target",
+        "cgm_biofluid_signal_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Packaging Traceability Serviceability",
+      "reviewerQuestion": "Does Packaging Traceability Serviceability have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "sterile_packaging",
+        "lot_traceability",
+        "user_setup"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_barrier_pouch",
+        "desiccant_sachet",
+        "pouch_seal_indicator",
+        "expiry_date_label",
+        "udi_label_set",
+        "ifu_leaflet",
+        "lot_traceability_barcode",
+        "release_inspection_stamp",
+        "phone_pairing_qr_card",
+        "applicator_instruction_card",
+        "sensor_warm_up_timer_label",
+        "adhesive_removal_wipe"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sterile_boundary",
+        "lot_traceability",
+        "service_access",
+        "ble_link"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Low-Power Distribution",
+      "reviewerQuestion": "Does Low-Power Distribution have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "low_power_rails",
+        "analog_excitation",
+        "power_fault_handling"
+      ],
+      "linkedComponentWordIds": [
+        "nanoamp_power_switch",
+        "digital_buck_regulator",
+        "rail_measurement_divider",
+        "wake_timer_oscillator",
+        "sensor_excitation_mux",
+        "analog_power_filter",
+        "electrode_guard_driver",
+        "afe_wake_timer",
+        "hardwired_reset_supervisor",
+        "overcurrent_limiter",
+        "load_gate_transistor",
+        "fault_latch"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "cell_power_bus",
+        "low_power_rail",
+        "analog_power_rail",
+        "hardwired_trip",
+        "sensor_signal_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Patient Safety Protection",
+      "reviewerQuestion": "Does Patient Safety Protection have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "patient_alarm_logic",
+        "biocompatibility_controls",
+        "sterile_sharps_safety"
+      ],
+      "linkedComponentWordIds": [
+        "hypoglycaemia_alarm_state",
+        "hyperglycaemia_alarm_state",
+        "sensor_fault_classifier",
+        "stale_data_lockout",
+        "biocompatibility_material_record",
+        "adhesive_irritation_limit_tag",
+        "latex_free_label",
+        "skin_contact_change_log",
+        "sterile_boundary_indicator",
+        "sharps_injury_warning_label",
+        "applicator_disposal_instruction",
+        "tamper_evident_seal"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "alarm_state_bus",
+        "sterile_boundary",
+        "adhesive_skin_boundary",
+        "hardwired_trip",
+        "service_access",
+        "sensor_signal_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Glucose Sensing Instrumentation",
+      "reviewerQuestion": "Does Glucose Sensing Instrumentation have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "glucose_filament_stack",
+        "analog_front_end",
+        "calibration_drift_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode",
+        "diffusion_limiting_membrane",
+        "potentiostat_afe",
+        "low_leakage_input_guard",
+        "electrode_flex_tail",
+        "sensor_bias_resistor_network",
+        "calibration_data_eeprom",
+        "drift_estimator_firmware_table",
+        "factory_calibration_code",
+        "signal_integrity_test_pad"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "interstitial_fluid_path",
+        "electrode_signal_path",
+        "sensor_signal_bus",
+        "calibration_data_bus",
+        "analog_power_rail",
+        "temperature_compensation_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:skin_patient_interface",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Skin Patient Interface",
+      "reviewerQuestion": "Does Skin Patient Interface have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "skin_patient_interface"
+      ],
+      "linkedSubModuleIds": [
+        "adhesive_patch_stack",
+        "cannula_skin_contact",
+        "wear_comfort_retention"
+      ],
+      "linkedComponentWordIds": [
+        "adhesive_skin_patch",
+        "hydrocolloid_edge_seal",
+        "breathable_backing_film",
+        "pull_tab_liner",
+        "skin_contact_gasket",
+        "filament_entry_seal",
+        "antimicrobial_contact_pad",
+        "insertion_site_spacing_ring",
+        "flex_relief_bridge",
+        "sweat_channel_texture",
+        "patch_stretch_zone",
+        "removal_aid_tab"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "adhesive_skin_boundary",
+        "interstitial_fluid_path",
+        "sterile_boundary",
+        "insertion_path",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Transmitter Housing Structure",
+      "reviewerQuestion": "Does Transmitter Housing Structure have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "transmitter_housing",
+        "patch_mechanical_frame",
+        "ingress_boundary"
+      ],
+      "linkedComponentWordIds": [
+        "protective_transmitter_housing",
+        "ultrasonic_weld_seam",
+        "electronics_carrier_tray",
+        "ingress_gasket",
+        "flexible_patch_frame",
+        "sensor_port_boss",
+        "transmitter_latch_rail",
+        "strain_relief_web",
+        "hydrophobic_vent_membrane",
+        "ip_ingress_seal",
+        "splash_shield_lip",
+        "housing_serial_marking"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "electronics_mount",
+        "ingress_boundary",
+        "adhesive_skin_boundary",
+        "service_access",
+        "insertion_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:disposable_applicator",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Applicator Insertion Mechanism / Disposable applicator",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Disposable applicator make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "disposable_applicator"
+      ],
+      "linkedComponentWordIds": [
+        "disposable_applicator",
+        "spring_insertion_driver",
+        "trigger_button",
+        "safety_cap"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "insertion_path",
+        "sterile_boundary",
+        "user_trigger"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:insertion_mechanism",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Applicator Insertion Mechanism / Insertion mechanism",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Insertion mechanism make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "insertion_mechanism"
+      ],
+      "linkedComponentWordIds": [
+        "introducer_needle",
+        "filament_deployment_shuttle",
+        "depth_stop_collar",
+        "retraction_latch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "insertion_path",
+        "user_trigger"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:sharps_lockout",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Applicator Insertion Mechanism / Sharps lockout",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Sharps lockout make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "sharps_lockout"
+      ],
+      "linkedComponentWordIds": [
+        "needle_shield",
+        "post_use_lock_tab",
+        "applicator_status_window",
+        "trigger_interlock_spring"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "sterile_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:ble_telemetry",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / BLE telemetry",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to BLE telemetry make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "ble_telemetry"
+      ],
+      "linkedComponentWordIds": [
+        "ble_radio_module",
+        "printed_antenna",
+        "pairing_button_pad",
+        "encrypted_session_counter"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "ble_link",
+        "low_power_rail",
+        "alarm_state_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:data_buffering",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Data buffering",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Data buffering make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "data_buffering"
+      ],
+      "linkedComponentWordIds": [
+        "glucose_trend_buffer_flash",
+        "event_log_memory",
+        "calibration_data_bus_bridge",
+        "clock_drift_compensator"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_signal_bus",
+        "calibration_data_bus",
+        "alarm_state_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:mcu_firmware",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / MCU firmware",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to MCU firmware make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "mcu_firmware"
+      ],
+      "linkedComponentWordIds": [
+        "low_power_microcontroller",
+        "firmware_image",
+        "secure_boot_key_store",
+        "real_time_clock"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_signal_bus",
+        "calibration_data_bus",
+        "low_power_rail",
+        "temperature_compensation_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:battery_cell",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wearable Energy Source / Battery cell",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Battery cell make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "battery_cell"
+      ],
+      "linkedComponentWordIds": [
+        "thin_film_battery",
+        "battery_weld_tab",
+        "battery_pouch_insulator",
+        "state_of_charge_witness_pad"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "cell_power_bus",
+        "lot_traceability"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:battery_safety",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wearable Energy Source / Battery safety",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Battery safety make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "battery_safety"
+      ],
+      "linkedComponentWordIds": [
+        "battery_vent_clearance",
+        "reverse_polarity_fuse",
+        "pack_temperature_dot",
+        "battery_lot_barcode"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "cell_power_bus",
+        "lot_traceability"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:power_reserve",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wearable Energy Source / Power reserve",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Power reserve make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "power_reserve"
+      ],
+      "linkedComponentWordIds": [
+        "brownout_hold_up_capacitor",
+        "battery_cut_off_tab",
+        "shelf_life_isolation_film",
+        "activation_pull_strip"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "cell_power_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:motion_pressure",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wear Environment Compensation / Motion and pressure artefact control",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Motion and pressure artefact control make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "motion_pressure"
+      ],
+      "linkedComponentWordIds": [
+        "motion_artefact_filter_table",
+        "patch_pressure_relief_slot",
+        "compression_warning_marker",
+        "activity_context_accelerometer"
+      ],
+      "linkedRequirementIds": [
+        "wear_days",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "adhesive_skin_boundary",
+        "sensor_signal_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target",
+        "cgm_biofluid_signal_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:sweat_water_boundary",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wear Environment Compensation / Sweat and water boundary",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Sweat and water boundary make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "sweat_water_boundary"
+      ],
+      "linkedComponentWordIds": [
+        "sweat_barrier_film",
+        "condensation_drain_groove",
+        "humidity_indicator_dot",
+        "ingress_exposure_witness"
+      ],
+      "linkedRequirementIds": [
+        "wear_days",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "ingress_boundary",
+        "adhesive_skin_boundary"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target",
+        "cgm_biofluid_signal_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:temperature_compensation",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Wear Environment Compensation / Temperature compensation",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Temperature compensation make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "temperature_compensation"
+      ],
+      "linkedComponentWordIds": [
+        "temperature_sensor",
+        "thermal_model_table",
+        "skin_temperature_flex_tail",
+        "cold_start_delay_flag"
+      ],
+      "linkedRequirementIds": [
+        "wear_days",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "temperature_compensation_bus",
+        "sensor_signal_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target",
+        "cgm_biofluid_signal_closure"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:lot_traceability",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Packaging Traceability Serviceability / Lot traceability",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Lot traceability make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "lot_traceability"
+      ],
+      "linkedComponentWordIds": [
+        "udi_label_set",
+        "ifu_leaflet",
+        "lot_traceability_barcode",
+        "release_inspection_stamp"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "lot_traceability",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:sterile_packaging",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Packaging Traceability Serviceability / Sterile packaging",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Sterile packaging make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "sterile_packaging"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_barrier_pouch",
+        "desiccant_sachet",
+        "pouch_seal_indicator",
+        "expiry_date_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sterile_boundary",
+        "lot_traceability"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:user_setup",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Packaging Traceability Serviceability / User setup",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to User setup make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "user_setup"
+      ],
+      "linkedComponentWordIds": [
+        "phone_pairing_qr_card",
+        "applicator_instruction_card",
+        "sensor_warm_up_timer_label",
+        "adhesive_removal_wipe"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "ble_link"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:analog_excitation",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Low-Power Distribution / Analog excitation",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Analog excitation make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "analog_excitation"
+      ],
+      "linkedComponentWordIds": [
+        "sensor_excitation_mux",
+        "analog_power_filter",
+        "electrode_guard_driver",
+        "afe_wake_timer"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "cell_power_bus",
+        "analog_power_rail",
+        "sensor_signal_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:low_power_rails",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Low-Power Distribution / Low-power rails",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Low-power rails make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "low_power_rails"
+      ],
+      "linkedComponentWordIds": [
+        "nanoamp_power_switch",
+        "digital_buck_regulator",
+        "rail_measurement_divider",
+        "wake_timer_oscillator"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "cell_power_bus",
+        "low_power_rail",
+        "hardwired_trip"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:power_fault_handling",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Low-Power Distribution / Power fault handling",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Power fault handling make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "power_fault_handling"
+      ],
+      "linkedComponentWordIds": [
+        "hardwired_reset_supervisor",
+        "overcurrent_limiter",
+        "load_gate_transistor",
+        "fault_latch"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes"
+      ],
+      "linkedInterfaceIds": [
+        "hardwired_trip",
+        "low_power_rail",
+        "analog_power_rail"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:biocompatibility_controls",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Patient Safety Protection / Biocompatibility controls",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Biocompatibility controls make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "biocompatibility_controls"
+      ],
+      "linkedComponentWordIds": [
+        "biocompatibility_material_record",
+        "adhesive_irritation_limit_tag",
+        "latex_free_label",
+        "skin_contact_change_log"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "adhesive_skin_boundary",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:patient_alarm_logic",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Patient Safety Protection / Patient alarm logic",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Patient alarm logic make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "patient_alarm_logic"
+      ],
+      "linkedComponentWordIds": [
+        "hypoglycaemia_alarm_state",
+        "hyperglycaemia_alarm_state",
+        "sensor_fault_classifier",
+        "stale_data_lockout"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "alarm_state_bus",
+        "sensor_signal_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:sterile_sharps_safety",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Patient Safety Protection / Sterile and sharps safety",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Sterile and sharps safety make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "sterile_sharps_safety"
+      ],
+      "linkedComponentWordIds": [
+        "sterile_boundary_indicator",
+        "sharps_injury_warning_label",
+        "applicator_disposal_instruction",
+        "tamper_evident_seal"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "sterile_boundary",
+        "hardwired_trip",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:analog_front_end",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Glucose Sensing Instrumentation / Analog front end",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Analog front end make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "analog_front_end"
+      ],
+      "linkedComponentWordIds": [
+        "potentiostat_afe",
+        "low_leakage_input_guard",
+        "electrode_flex_tail",
+        "sensor_bias_resistor_network"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "electrode_signal_path",
+        "sensor_signal_bus",
+        "analog_power_rail"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:calibration_drift_monitoring",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Glucose Sensing Instrumentation / Calibration and drift monitoring",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Calibration and drift monitoring make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "calibration_drift_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "calibration_data_eeprom",
+        "drift_estimator_firmware_table",
+        "factory_calibration_code",
+        "signal_integrity_test_pad"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "sensor_signal_bus",
+        "calibration_data_bus",
+        "temperature_compensation_bus"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:glucose_filament_stack",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Glucose Sensing Instrumentation / Glucose filament stack",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Glucose filament stack make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "glucose_filament_stack"
+      ],
+      "linkedComponentWordIds": [
+        "glucose_sensing_filament",
+        "enzyme_reagent_membrane",
+        "reference_electrode",
+        "diffusion_limiting_membrane"
+      ],
+      "linkedRequirementIds": [
+        "reading_interval_minutes",
+        "mard_percent"
+      ],
+      "linkedInterfaceIds": [
+        "interstitial_fluid_path",
+        "electrode_signal_path",
+        "analog_power_rail"
+      ],
+      "linkedCalculationIds": [
+        "cgm_reading_interval",
+        "cgm_biofluid_signal_closure",
+        "cgm_patch_power_comms_safety",
+        "cgm_accuracy_target"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:skin_patient_interface:adhesive_patch_stack",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Skin Patient Interface / Adhesive patch stack",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Adhesive patch stack make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "skin_patient_interface"
+      ],
+      "linkedSubModuleIds": [
+        "adhesive_patch_stack"
+      ],
+      "linkedComponentWordIds": [
+        "adhesive_skin_patch",
+        "hydrocolloid_edge_seal",
+        "breathable_backing_film",
+        "pull_tab_liner"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "adhesive_skin_boundary",
+        "interstitial_fluid_path",
+        "sterile_boundary"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:skin_patient_interface:cannula_skin_contact",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Skin Patient Interface / Sensor skin contact",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Sensor skin contact make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "skin_patient_interface"
+      ],
+      "linkedSubModuleIds": [
+        "cannula_skin_contact"
+      ],
+      "linkedComponentWordIds": [
+        "skin_contact_gasket",
+        "filament_entry_seal",
+        "antimicrobial_contact_pad",
+        "insertion_site_spacing_ring"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "interstitial_fluid_path",
+        "insertion_path",
+        "sterile_boundary"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:skin_patient_interface:wear_comfort_retention",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Skin Patient Interface / Wear comfort and retention",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Wear comfort and retention make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "skin_patient_interface"
+      ],
+      "linkedSubModuleIds": [
+        "wear_comfort_retention"
+      ],
+      "linkedComponentWordIds": [
+        "flex_relief_bridge",
+        "sweat_channel_texture",
+        "patch_stretch_zone",
+        "removal_aid_tab"
+      ],
+      "linkedRequirementIds": [
+        "wear_days"
+      ],
+      "linkedInterfaceIds": [
+        "adhesive_skin_boundary",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "cgm_wear_duration",
+        "cgm_patch_power_comms_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:ingress_boundary",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Transmitter Housing Structure / Ingress boundary",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Ingress boundary make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "ingress_boundary"
+      ],
+      "linkedComponentWordIds": [
+        "hydrophobic_vent_membrane",
+        "ip_ingress_seal",
+        "splash_shield_lip",
+        "housing_serial_marking"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "ingress_boundary",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:patch_mechanical_frame",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Transmitter Housing Structure / Patch mechanical frame",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Patch mechanical frame make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "patch_mechanical_frame"
+      ],
+      "linkedComponentWordIds": [
+        "flexible_patch_frame",
+        "sensor_port_boss",
+        "transmitter_latch_rail",
+        "strain_relief_web"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "electronics_mount",
+        "adhesive_skin_boundary",
+        "insertion_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:transmitter_housing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Transmitter Housing Structure / Transmitter housing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Transmitter housing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "transmitter_housing"
+      ],
+      "linkedComponentWordIds": [
+        "protective_transmitter_housing",
+        "ultrasonic_weld_seam",
+        "electronics_carrier_tray",
+        "ingress_gasket"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "electronics_mount",
+        "ingress_boundary",
+        "adhesive_skin_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    }
+  ]
+}

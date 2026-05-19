@@ -1,0 +1,47 @@
+{
+  "summary": {
+    "rows": 2,
+    "withinEnvelope": 0,
+    "needsReview": 2,
+    "outsideEnvelope": 0,
+    "blocked": 0
+  },
+  "rows": [
+    {
+      "id": "bioreactor_nominal_bag_volume_l",
+      "status": "needs_review",
+      "label": "Bioreactor nominal bag volume",
+      "formula": "working_volume_l / 0.8",
+      "inputs": {
+        "working_volume_l": 50,
+        "fill_fraction": 0.8
+      },
+      "result": 62.5,
+      "unit": "L",
+      "envelope": "80% fill fraction is a planning assumption before vendor bag geometry.",
+      "interpretation": "62.5 L nominal bag volume at 80% working fill.",
+      "evidenceRequired": "Confirm bag platform, mixing turndown, foam allowance, sparging rate and working-volume range.",
+      "linkedRequirements": [
+        "working_volume_l"
+      ]
+    },
+    {
+      "id": "bioreactor_annual_working_volume_l",
+      "status": "needs_review",
+      "label": "Bioreactor annual working volume",
+      "formula": "working_volume_l * 40",
+      "inputs": {
+        "working_volume_l": 50,
+        "batches_per_year": 40
+      },
+      "result": 2000,
+      "unit": "L/year",
+      "envelope": "40 batches/year is a throughput assumption, not validated scheduling.",
+      "interpretation": "2000 L/year assumes 40 batches per year.",
+      "evidenceRequired": "Confirm batch duration, turnaround, cleaning/assembly time, hold steps and campaign model.",
+      "linkedRequirements": [
+        "working_volume_l"
+      ]
+    }
+  ]
+}

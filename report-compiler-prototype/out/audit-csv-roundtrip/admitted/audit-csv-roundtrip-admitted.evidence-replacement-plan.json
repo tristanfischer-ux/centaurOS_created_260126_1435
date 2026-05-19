@@ -1,0 +1,93 @@
+{
+  "summary": {
+    "authenticityVerdict": "protocol_only",
+    "rows": 2,
+    "sourcingRows": 1,
+    "verificationRows": 1,
+    "protocolRows": 2,
+    "reviewRequiredRows": 0,
+    "missingMetadataRows": 0,
+    "blocksBomRows": 1,
+    "blocksPublishRows": 2,
+    "nextRowId": "replace:1:sourcing:1:lfp_prismatic_cells"
+  },
+  "rows": [
+    {
+      "id": "replace:1:sourcing:1:lfp_prismatic_cells",
+      "sequence": 1,
+      "kind": "sourcing",
+      "subjectId": "lfp_prismatic_cells",
+      "currentRef": "test-fixture://csv-sourcing/lfp_prismatic_cells",
+      "currentReferenceClass": "protocol_fixture",
+      "currentStatus": "protocol_fixture",
+      "replacementTarget": "external_supplier_or_catalogue_url",
+      "acceptedReferenceClasses": [
+        "external_url"
+      ],
+      "requiredFields": [
+        "componentWordId",
+        "supplierName",
+        "manufacturer",
+        "mpn where applicable",
+        "unitCostGbp",
+        "leadTimeWeeks where stated",
+        "sourceGrade",
+        "evidence.ref",
+        "evidence.quote",
+        "retrievedAt"
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.evidence-authenticity-gate.csv"
+      ],
+      "exitCriteria": [
+        "Sourcing record uses a retrievable external supplier or catalogue URL.",
+        "BoM provenance manifest marks supplier, manufacturer, MPN, unit cost and lead time as source-backed where claimed.",
+        "Evidence Authenticity Gate row becomes accepted_production_evidence."
+      ],
+      "blocksBom": true,
+      "blocksPublish": true,
+      "action": "Replace sourcing:1:lfp_prismatic_cells with source-backed supplier/catalogue evidence before this BoM line can support trusted publication."
+    },
+    {
+      "id": "replace:2:verification:1:design_review:energy_storage_source",
+      "sequence": 2,
+      "kind": "verification",
+      "subjectId": "design_review:energy_storage_source",
+      "currentRef": "test-fixture://csv-verification/design_review:energy_storage_source",
+      "currentReferenceClass": "protocol_fixture",
+      "currentStatus": "protocol_fixture",
+      "replacementTarget": "governed_reviewer_reference",
+      "acceptedReferenceClasses": [
+        "external_url",
+        "internal_reference",
+        "local_file"
+      ],
+      "requiredFields": [
+        "activityId",
+        "evidenceKind",
+        "reviewerName",
+        "verdict",
+        "evidenceRef",
+        "evidenceNote",
+        "reviewedAt"
+      ],
+      "sourceArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-ledger.csv",
+        "*.engineering-review-pack.csv",
+        "*.evidence-authenticity-gate.csv"
+      ],
+      "exitCriteria": [
+        "Reviewer evidence uses a named reviewer and governed evidence reference.",
+        "Verification ledger row remains accepted after intake.",
+        "Evidence Authenticity Gate row becomes accepted_production_evidence."
+      ],
+      "blocksBom": false,
+      "blocksPublish": true,
+      "action": "Replace verification:1:design_review:energy_storage_source with named reviewer signoff evidence before this review can support trusted publication."
+    }
+  ]
+}

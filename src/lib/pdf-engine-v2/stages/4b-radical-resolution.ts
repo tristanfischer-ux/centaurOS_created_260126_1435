@@ -41,6 +41,7 @@ import {
   writeCharacterToRegistry,
   type CharacterRegistryRow,
 } from '../lib/character-registry.js'
+import { getActionLogger } from '../lib/action-logger'
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -1688,6 +1689,13 @@ export async function runRadicalResolution(
   tree: RadicalTree,
   productClass: string = 'unknown',
 ): Promise<ResolvedRadicalTree> {
+  const _resolutionT0 = Date.now()
+  const _resolutionLogger = getActionLogger()
+  _resolutionLogger.logStage({
+    step_name: 'radical-resolution',
+    action_type: 'stage_start',
+    product_class: productClass,
+  })
   console.log('[Phase2/resolution] Starting Radical Phase 2 resolution...')
 
   const callsUsed = { count: 0 }
@@ -1963,6 +1971,30 @@ export async function runRadicalResolution(
     `Catalog: ${stats.from_vendor_catalog}, LLM: ${stats.from_llm_estimate}, ` +
     `Grade-D: ${stats.grade_d}, Stub: ${stats.stub}, Data-gap: ${stats.data_gap}`
   )
+
+  const _verifiedPct = stats.total_leaves > 0
+    ? Math.round((stats.verified_by_distributor / stats.total_leaves) * 100)
+    : 0
+  _resolutionLogger.logGate({
+    step_name: 'radical-resolution',
+    gate_name: 'G5_radical_resolution',
+    verdict: _verifiedPct >= 30 ? 'PASS' : 'WARN',
+    score: _verifiedPct,
+    reasons: [
+      `${stats.verified_by_distributor}/${stats.total_leaves} leaves verified by distributor (${_verifiedPct}%)`,
+      `catalog: ${stats.from_vendor_catalog}, llm_estimate: ${stats.from_llm_estimate}, grade_d: ${stats.grade_d}, stub: ${stats.stub}, data_gap: ${stats.data_gap}`,
+      `distributor_calls_made: ${stats.distributor_calls_made}`,
+    ],
+  })
+  _resolutionLogger.logStage({
+    step_name: 'radical-resolution',
+    action_type: 'stage_end',
+    outcome: 'ok',
+    duration_ms: Date.now() - _resolutionT0,
+    total_leaves: stats.total_leaves,
+    verified_by_distributor: stats.verified_by_distributor,
+    distributor_calls_made: stats.distributor_calls_made,
+  })
 
   return {
     radical_spec_version: tree.radical_spec_version,

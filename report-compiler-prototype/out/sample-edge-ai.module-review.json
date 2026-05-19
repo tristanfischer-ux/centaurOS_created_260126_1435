@@ -1,0 +1,253 @@
+{
+  "summary": {
+    "modules": 10,
+    "readyModules": 2,
+    "sourcingBlockedModules": 8,
+    "attentionModules": 0,
+    "criticalUnpricedLines": 12,
+    "issueCount": 0
+  },
+  "modules": [
+    {
+      "moduleId": "structure_containment",
+      "moduleName": "Rack Structure Containment",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "rack_units"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "criticalUnpricedLines": [
+        "1u_rack_chassis"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "compute_acceleration",
+      "moduleName": "Compute Acceleration",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 3,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "compute_tops"
+      ],
+      "sanityCheckIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "criticalUnpricedLines": [
+        "ai_accelerator_module",
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard"
+      ],
+      "candidateUnpricedLines": 8,
+      "issueCodes": [],
+      "notes": [
+        "4 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "network_io",
+      "moduleName": "Network IO",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "high_speed_nic"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "data_storage",
+      "moduleName": "Data Storage",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "nvme_ssd"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 8,
+      "requiredInterfaceEdges": 4,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "compute_tops"
+      ],
+      "sanityCheckIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "criticalUnpricedLines": [
+        "bmc_management_controller"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 7,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "criticalUnpricedLines": [
+        "redundant_power_supply"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Airflow Interface",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety",
+        "edgeai_power_density"
+      ],
+      "criticalUnpricedLines": [
+        "fan_wall_assembly",
+        "heatsink_cold_plate"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Telemetry Instrumentation",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "safety_protection",
+      "moduleName": "Security And Safety Protection",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 7,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "criticalUnpricedLines": [
+        "tpm_security_module"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance Serviceability",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "rack_units"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    }
+  ]
+}

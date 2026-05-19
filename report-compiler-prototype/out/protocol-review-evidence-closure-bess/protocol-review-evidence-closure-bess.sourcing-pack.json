@@ -1,0 +1,11 @@
+{
+  "productClass": "energy_storage",
+  "status": "complete",
+  "criticalPackets": [],
+  "candidatePackets": [],
+  "limitations": [
+    "This pack requests sourcing evidence only; it does not contain admitted supplier, manufacturer, part number, lead-time or price claims.",
+    "A BoM line becomes priced only after a SourcingEvidenceRecord passes admission validation.",
+    "Search terms are deterministic starting points and must be verified against live supplier or manufacturer evidence."
+  ]
+}

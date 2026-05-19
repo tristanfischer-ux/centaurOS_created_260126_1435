@@ -1,0 +1,699 @@
+#!/usr/bin/env -S npx tsx
+/**
+ * estimate-missing-prices.tsx — for every word in moduleDecomposition that
+ * doesn't have a real distributor price, attach a plausible UK trade price
+ * estimate. Updates state.partVerifications (synthesising new rows for words
+ * without any verification entry).
+ *
+ * Engine B (post-council, 2026-05-18): the estimator NO LONGER asks Flash-
+ * Lite for "scale-of-one trade pricing". Instead:
+ *   1. Determine the brief's annual production volume (per-class default if
+ *      undeclared — see component-classes.ts DEFAULT_VOLUME_BY_BUCKET).
+ *   2. Classify each part into one of 20 component classes (lookup against
+ *      the forge-truth.db pretraining corpus first; Flash-Lite fallback).
+ *   3. Compute unit_cost = reference_unit_cost_gbp × interpolate(curve, V).
+ *
+ * For parts that don't classify (component_class = 'unknown'), fall back to
+ * a Flash-Lite call with a NEW volume-aware prompt rather than the old
+ * scale-of-one anchor.
+ *
+ * Per the diagnostic
+ * (forgeos-illustration-experiments/pretraining/cost-engine-heatpump-
+ * attribution.html): Layer 2 (the old estimator's wrong anchor) was 85% of
+ * the heatpump +789% deviation. This patch eliminates that layer.
+ *
+ * Usage:
+ *   npx tsx scripts/estimate-missing-prices.tsx <state.json> [--write] [--volume N]
+ *
+ * The optional --volume <N> overrides annual production volume. Otherwise
+ * read from state.parsedBrief.constraints.annual_production_volume.value or
+ * the class default.
+ *
+ * Cost: ~£0.05-£0.10 per BESS (mostly from on-the-fly classification of
+ * parts that aren't in the corpus). Curve lookups are free (deterministic).
+ *
+ * W3 RELATIONSHIP: this script writes per-part estimates that are ALREADY
+ * volume-anchored. The renderer's `applyBatchEconomics()` still multiplies
+ * by `bom_scale_factor` on top — for now. After Engine A ships and we re-
+ * validate, the W3 multiplier will be retired (set to 1.0). Keep both
+ * layered until then per PLAN-2026-05-18 §"W3 retires the day Engine B
+ * ships". See drawer forgeos_gotchas_e1f18dd3cfae9ee3.
+ */
+import { readFileSync, writeFileSync, existsSync, appendFileSync } from 'fs'
+import { execFileSync } from 'child_process'
+import { resolve } from 'path'
+import { homedir } from 'os'
+import { join } from 'path'
+import Database from 'better-sqlite3'
+import {
+  COMPONENT_CURVES,
+  COMPONENT_CLASS_ORDER,
+  interpolateCurve,
+  defaultVolumeFor,
+  referenceUnitCostFor,
+  type ComponentClass,
+} from '../src/lib/pdf-engine-v2/component-classes'
+
+const CONCURRENCY = 8
+const FORGE_TRUTH_DB = join(homedir(), '.forge-truth/forge-truth.db')
+const COST_LOG = '/tmp/engine-b-cost.log'
+
+const OPENROUTER_KEY = (() => {
+  if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY
+  for (const f of [
+    '/Users/tristanfischer/secrets/openrouter.env',
+    join(process.cwd(), '.env.local'),
+  ]) {
+    if (existsSync(f)) {
+      const content = readFileSync(f, 'utf-8')
+      const m = content.match(/^OPENROUTER_API_KEY="?([^\s"]+)"?/m)
+      if (m) return m[1]
+    }
+  }
+  try {
+    return execFileSync('zsh', ['-ic', 'echo $OPENROUTER_API_KEY'], { encoding: 'utf8' }).trim()
+  } catch {
+    return ''
+  }
+})()
+
+if (!OPENROUTER_KEY) {
+  console.error('[estimate] OPENROUTER_API_KEY not found — cannot estimate prices')
+  process.exit(1)
+}
+
+interface PartContext {
+  word_id: string
+  word_name: string
+  module: string
+  sub_module_id: string
+  manufacturer: string | null
+  part_number: string | null
+  description: string | null
+  quantity: number
+}
+
+interface PriceEstimate {
+  price_estimate_gbp: number
+  estimate_low_gbp: number
+  estimate_high_gbp: number
+  reasoning: string
+  // Engine B additions
+  component_class: ComponentClass | 'unknown'
+  curve_multiplier: number
+  reference_unit_cost_gbp: number
+  annual_volume: number
+  classification_source: 'corpus' | 'flash_lite' | 'fallback'
+  estimate_source: 'curve' | 'flash_lite_unknown_class'
+}
+
+// ---------------------------------------------------------------------------
+// Annual volume resolution — brief value first, then class-bucket default.
+// Per the council plan: brief should declare annual_production_volume; if
+// missing, defaults are consumer 100k, mid-volume 1k, industrial-heavy 100.
+// ---------------------------------------------------------------------------
+
+function resolveAnnualVolume(
+  state: any,
+  productClassSlug: string,
+  cliOverride: number | null,
+): { volume: number; source: 'cli' | 'brief' | 'default' } {
+  if (cliOverride && cliOverride > 0) return { volume: cliOverride, source: 'cli' }
+  const briefVol =
+    state?.parsedBrief?.constraints?.annual_production_volume?.value ??
+    state?.parsedBrief?.constraints?.annual_volume?.value ??
+    null
+  if (typeof briefVol === 'number' && briefVol > 0) {
+    return { volume: briefVol, source: 'brief' }
+  }
+  return { volume: defaultVolumeFor(productClassSlug), source: 'default' }
+}
+
+// Pull the canonical product class slug from state. Tries the three places
+// the slug lives in iter-64 states (varies by pipeline version).
+function getProductClassSlug(state: any): string {
+  return String(
+    state?.keyMetrics?.product_class ??
+      state?.moduleDecomposition?.product_class ??
+      state?.parsedBrief?.product_class ??
+      String(state?.projectId || '').split('-')[0]?.toLowerCase() ??
+      '',
+  ).toLowerCase()
+}
+
+// ---------------------------------------------------------------------------
+// Corpus lookup — for a given part name, find a matching pretraining row and
+// return its component_class. Uses case-insensitive contains-match against
+// the part_name column (cheap; <2 ms per lookup). Returns 'unknown' or null
+// when no match (caller falls back to Flash-Lite classification).
+// ---------------------------------------------------------------------------
+
+class CorpusClassifier {
+  private db: Database.Database | null = null
+  private stmt: Database.Statement | null = null
+  private memo = new Map<string, ComponentClass | 'unknown' | null>()
+
+  constructor() {
+    if (existsSync(FORGE_TRUTH_DB)) {
+      this.db = new Database(FORGE_TRUTH_DB, { readonly: true })
+      try {
+        this.stmt = this.db.prepare(`
+          SELECT component_class, COUNT(*) AS n
+          FROM pretraining_extracted_parts
+          WHERE component_class IS NOT NULL
+            AND part_name IS NOT NULL
+            AND LOWER(part_name) LIKE ?
+          GROUP BY component_class
+          ORDER BY n DESC
+          LIMIT 1
+        `)
+      } catch {
+        this.db.close()
+        this.db = null
+      }
+    }
+  }
+
+  lookup(partName: string): ComponentClass | 'unknown' | null {
+    if (!this.stmt) return null
+    const key = partName.toLowerCase().trim()
+    if (this.memo.has(key)) return this.memo.get(key)!
+    // Try exact word-boundary match first via LIKE %word%; trim to <=80 chars.
+    const needle = `%${key.slice(0, 80)}%`
+    let result: ComponentClass | 'unknown' | null = null
+    try {
+      const row = this.stmt.get(needle) as any
+      if (row && row.component_class) {
+        result = row.component_class as ComponentClass | 'unknown'
+      }
+    } catch {
+      result = null
+    }
+    this.memo.set(key, result)
+    return result
+  }
+
+  close() {
+    this.db?.close()
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Flash-Lite on-the-fly classification for parts not in the corpus.
+// Batched up to 20 at a time (small enough that Flash-Lite doesn't self-
+// summarise — drawer forgeos_gotchas_115d8319262232ae).
+// ---------------------------------------------------------------------------
+
+async function classifyOnTheFly(
+  parts: Array<{ ctx: PartContext }>,
+): Promise<Map<string, ComponentClass | 'unknown'>> {
+  const result = new Map<string, ComponentClass | 'unknown'>()
+  if (parts.length === 0) return result
+  const classList = COMPONENT_CLASS_ORDER.join(', ')
+  const partsJson = parts
+    .map((p, i) => {
+      const ctx = p.ctx
+      const bits = [`idx=${i}`, `name="${ctx.word_name.replace(/"/g, "'").slice(0, 120)}"`]
+      if (ctx.manufacturer) bits.push(`mfr="${ctx.manufacturer.slice(0, 40)}"`)
+      if (ctx.part_number) bits.push(`pn="${ctx.part_number.slice(0, 40)}"`)
+      if (ctx.module) bits.push(`module=${ctx.module}`)
+      return `  - { ${bits.join(', ')} }`
+    })
+    .join('\n')
+  const prompt = `Classify each hardware part below into ONE of these 20 component classes:
+${classList}
+
+Class guidance (CRITICAL — read carefully before assigning oem_subsystem):
+- oem_subsystem: ONLY for big pre-built modules with substantial BoM inside them — compressors, fully-assembled inverters / PSUs / GPU boards, complete BMS mainboards, complete pump units (>£100 each). Do NOT use for: small control PCBs, displays, sensors, MCBs, contactors, gauges, MCU modules — those have their own dedicated classes.
+- electronic_ic: ICs, MCUs, ASICs, FPGAs, RTC chips, ADCs (chip-level)
+- electronic_pcb: bare PCB or small PCBA / control board (£20-£200) — anti-icing controller, comms board, daughter card
+- sensor: thermistor, Hall, IMU, pressure gauge, temperature probe, flow sensor, encoder, transducer
+- optical: LEDs, photodiodes, displays (LCD, OLED), lenses
+- safety_consumable: fuses, MCBs, RCDs, contactors, breakers, fire-suppression cartridges
+- thermal: heatsinks, cold plates, fans, TIM, plate heat exchangers (BPHE), evaporators, condensers
+- fluid_path: pipes, copper tubing, valves, manifolds, fittings, hoses, expansion vessels
+- magnetic: transformers, large inductors (>100uH), motor magnets, motor stators
+- motor_actuator: BLDC/stepper/servo motor units, solenoids, linear actuators (the motor itself, not its driver)
+- electronic_power_module: SiC/IGBT modules / integrated power stages (the silicon — not the assembled PSU)
+- electronic_passive: discrete resistors, capacitors, MLCCs, small ferrites
+- electronic_discrete: discrete diodes, MOSFETs, BJTs, TVS
+- electronic_connector: headers, terminal blocks, USB-C, RJ45, Molex/JST
+- electronic_cable: cable assemblies, harnesses, ribbon, coax
+- structural_metal: chassis, brackets, sheet metal, weldments, frames
+- structural_polymer: injection-moulded plastics, gaskets, polymer housings, mouldings
+- mechanical_fastener: bolts, nuts, washers, pins, springs, rivets
+- mechanical_assembly: hinges, bearings, gears, fans (as a complete unit), pumps (small)
+- battery_cell: lithium-ion cells, lead-acid, supercapacitors
+
+PARTS:
+${partsJson}
+
+Return ONLY a JSON array, one entry per part in the same order:
+[{"idx":<idx>,"component_class":"<class or 'unknown'>"}, ...]
+No prose, no markdown.`
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENROUTER_KEY}`,
+        'HTTP-Referer': 'https://fractionalforge.com',
+        'X-Title': 'ForgeOS Engine B on-the-fly classifier',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-3.1-flash-lite-preview',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1800,
+        temperature: 0.1,
+      }),
+    })
+    if (!res.ok) return result
+    const j: any = await res.json()
+    const text: string = j.choices?.[0]?.message?.content ?? ''
+    const m = text.match(/\[[\s\S]*\]/)
+    if (!m) return result
+    const parsed = JSON.parse(m[0])
+    if (!Array.isArray(parsed)) return result
+    const valid = new Set<string>([...COMPONENT_CLASS_ORDER, 'unknown'])
+    for (const r of parsed) {
+      const idx = Number(r.idx)
+      const cls = String(r.component_class ?? '').trim()
+      if (!Number.isFinite(idx) || !valid.has(cls)) continue
+      const ctx = parts[idx]?.ctx
+      if (!ctx) continue
+      result.set(ctx.word_id, cls as ComponentClass | 'unknown')
+    }
+  } catch (err) {
+    console.error('[estimate] on-the-fly classify failed:', err)
+  }
+  return result
+}
+
+// ---------------------------------------------------------------------------
+// Flash-Lite fallback price estimator — used ONLY when the classifier
+// returned 'unknown'. New prompt is volume-aware (NOT scale-of-one).
+// ---------------------------------------------------------------------------
+
+async function estimatePriceForUnknown(
+  ctx: PartContext,
+  productClass: string,
+  annualVolume: number,
+): Promise<{ central: number; low: number; high: number; reasoning: string } | null> {
+  const prompt = `You are a UK engineering procurement specialist. Estimate the unit price IN GBP for the part described below AT AN ANNUAL PRODUCTION VOLUME OF ${annualVolume.toLocaleString()} units per year. Use industry-standard component pricing benchmarks for that volume tier. This is NOT scale-of-one distributor pricing — it is the realistic at-volume OEM unit cost.
+
+PART:
+  name: ${ctx.word_name}
+  module: ${ctx.module}
+  sub-module: ${ctx.sub_module_id}
+  manufacturer: ${ctx.manufacturer ?? 'unspecified'}
+  part number: ${ctx.part_number ?? 'unspecified'}
+  context (product type): ${productClass}
+  annual production volume: ${annualVolume.toLocaleString()} units/yr
+  ${ctx.description ? `description: ${ctx.description.slice(0, 500)}` : ''}
+
+Return ONLY a JSON object (no prose, no code fence):
+{"price_estimate_gbp": <central estimate at the given volume>, "estimate_low_gbp": <low end>, "estimate_high_gbp": <high end>, "reasoning": "<one short sentence explaining your reasoning, including the volume tier's effect on pricing>"}
+
+Guidance:
+- At 100,000+/yr the part should price near commodity / OEM contract price (often 30-200x cheaper than 1-off distributor price for ICs, plastics, fasteners).
+- At 1,000/yr expect distributor-discounted pricing.
+- At 100/yr or below distributor 1-off rates apply.
+- estimate_low_gbp and estimate_high_gbp bracket a plausible range.
+- Use industry knowledge — don't return 0.`
+
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${OPENROUTER_KEY}`,
+        'HTTP-Referer': 'https://fractionalforge.com',
+        'X-Title': 'ForgeOS price estimator (unknown class fallback)',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-3.1-flash-lite-preview',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 300,
+        temperature: 0.3,
+      }),
+    })
+    if (!res.ok) return null
+    const j: any = await res.json()
+    const text: string = j.choices?.[0]?.message?.content ?? ''
+    const jsonMatch = text.match(/\{[\s\S]*?\}/)
+    if (!jsonMatch) return null
+    const parsed = JSON.parse(jsonMatch[0])
+    const central = Number(parsed.price_estimate_gbp)
+    const low = Number(parsed.estimate_low_gbp ?? central * 0.7)
+    const high = Number(parsed.estimate_high_gbp ?? central * 1.3)
+    if (!Number.isFinite(central) || central <= 0) return null
+    return {
+      central,
+      low: Number.isFinite(low) && low > 0 ? low : central * 0.7,
+      high: Number.isFinite(high) && high > 0 ? high : central * 1.3,
+      reasoning: String(parsed.reasoning ?? '').trim(),
+    }
+  } catch {
+    return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Pure compute — no LLM. Given a class + volume, return the curve-anchored
+// unit cost in GBP. Quantity uncertainty handled by ±25% low/high bracket.
+// ---------------------------------------------------------------------------
+
+function curveEstimateFor(
+  cls: ComponentClass,
+  annualVolume: number,
+  productClassSlug?: string | null,
+): { central: number; low: number; high: number; multiplier: number; reference: number } {
+  const c = COMPONENT_CURVES[cls]
+  // Engine B (2026-05-18 BESS investigation): the reference unit cost can be
+  // overridden per (product_class, component_class) so industrial-heavy hosts
+  // (e.g. utility BESS using 280 Ah LFP prismatics + £100k PCS oem_subsystems)
+  // don't get under-priced by the median-part anchor. See
+  // PRODUCT_CLASS_REFERENCE_OVERRIDES in component-classes.ts for the table
+  // and rationale. The curve shape (volume multiplier) is unchanged — only
+  // the magnitude anchor shifts.
+  const ref = referenceUnitCostFor(cls, productClassSlug)
+  const m = interpolateCurve(c.curve, annualVolume)
+  const central = ref * m
+  return {
+    central: round2(central),
+    low: round2(central * 0.7),
+    high: round2(central * 1.3),
+    multiplier: m,
+    reference: ref,
+  }
+}
+
+function round2(n: number): number {
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return Math.round(n * 100) / 100
+}
+
+function logCost(line: string) {
+  appendFileSync(COST_LOG, `${new Date().toISOString()} | ${line}\n`)
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+async function main() {
+  const args = process.argv.slice(2)
+  const statePath = resolve(args[0])
+  const write = args.includes('--write')
+  const volumeOverride = (() => {
+    const i = args.indexOf('--volume')
+    if (i >= 0 && args[i + 1]) {
+      const n = parseInt(args[i + 1], 10)
+      if (Number.isFinite(n) && n > 0) return n
+    }
+    return null
+  })()
+  if (!existsSync(statePath)) {
+    console.error(`State not found: ${statePath}`)
+    process.exit(1)
+  }
+  const state = JSON.parse(readFileSync(statePath, 'utf-8'))
+  const productClass = getProductClassSlug(state)
+  const { volume: annualVolume, source: volumeSource } = resolveAnnualVolume(
+    state,
+    productClass,
+    volumeOverride,
+  )
+  console.log(`[estimate] product_class=${productClass} annual_volume=${annualVolume.toLocaleString()} (${volumeSource})`)
+
+  // Build verificationByWordId index
+  state.partVerifications = state.partVerifications ?? []
+  const verifByWordId = new Map<string, any>()
+  for (const v of state.partVerifications) {
+    if (v.word_id) verifByWordId.set(v.word_id, v)
+  }
+
+  // Collect all targets that need estimates
+  const targets: PartContext[] = []
+  for (const m of state.moduleDecomposition?.modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        const existing = verifByWordId.get(w.id)
+        if (existing?.distributor_price_gbp != null) continue
+        if (existing?.price_estimate_gbp != null) continue
+        const qmod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'quantity')
+        let qty = 1
+        if (qmod) {
+          const numStr = String(qmod.value).replace(/[×x,\s]/g, '')
+          const n = parseInt(numStr, 10)
+          if (Number.isFinite(n) && n > 0) qty = n
+        }
+        const mfgMod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'manufacturer')
+        const pnMod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'part_number')
+        targets.push({
+          word_id: w.id,
+          word_name: w.name_human || w.id,
+          module: m.module,
+          sub_module_id: sm.id,
+          manufacturer: existing?.manufacturer ?? (mfgMod ? String(mfgMod.value) : null),
+          part_number: existing?.part_number ?? (pnMod ? String(pnMod.value) : null),
+          description: existing?.reasoning ?? null,
+          quantity: qty,
+        })
+      }
+    }
+  }
+
+  console.log(`[estimate] ${targets.length} parts need price estimates`)
+  if (targets.length === 0) {
+    console.log('[estimate] nothing to do')
+    return
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 1 — corpus classification pass. Free, sub-millisecond per lookup.
+  // -------------------------------------------------------------------------
+  const corpus = new CorpusClassifier()
+  const classByWordId = new Map<string, ComponentClass | 'unknown'>()
+  const classSource = new Map<string, 'corpus' | 'flash_lite' | 'fallback'>()
+  const needsClassify: PartContext[] = []
+
+  for (const ctx of targets) {
+    const cls = corpus.lookup(ctx.word_name)
+    if (cls && cls !== 'unknown') {
+      classByWordId.set(ctx.word_id, cls)
+      classSource.set(ctx.word_id, 'corpus')
+    } else {
+      needsClassify.push(ctx)
+    }
+  }
+  console.log(
+    `[estimate] corpus-classified ${classByWordId.size}/${targets.length}; ${needsClassify.length} need Flash-Lite`,
+  )
+
+  // -------------------------------------------------------------------------
+  // Step 2 — on-the-fly classify remaining via Flash-Lite (batches of 20).
+  // -------------------------------------------------------------------------
+  const BATCH = 20
+  const batches: Array<Array<{ ctx: PartContext }>> = []
+  for (let i = 0; i < needsClassify.length; i += BATCH) {
+    batches.push(needsClassify.slice(i, i + BATCH).map((ctx) => ({ ctx })))
+  }
+  if (batches.length > 0) {
+    let done = 0
+    await new Promise<void>((resolveAll) => {
+      let inFlight = 0
+      let nextIdx = 0
+      const tick = () => {
+        while (inFlight < CONCURRENCY && nextIdx < batches.length) {
+          const batch = batches[nextIdx++]
+          inFlight += 1
+          classifyOnTheFly(batch).then((map) => {
+            for (const [wid, cls] of map.entries()) {
+              classByWordId.set(wid, cls)
+              classSource.set(wid, 'flash_lite')
+            }
+            done += 1
+            inFlight -= 1
+            if (done === batches.length) resolveAll()
+            else tick()
+          })
+        }
+      }
+      tick()
+    })
+    console.log(`[estimate] Flash-Lite classified ${batches.length} batches`)
+  }
+
+  // Any targets that still don't have a class get 'unknown' fallback.
+  for (const ctx of targets) {
+    if (!classByWordId.has(ctx.word_id)) {
+      classByWordId.set(ctx.word_id, 'unknown')
+      classSource.set(ctx.word_id, 'fallback')
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Step 3 — compute estimates. For known classes use the curve (free).
+  // For 'unknown' classes use Flash-Lite with the new volume-aware prompt.
+  // -------------------------------------------------------------------------
+  const results: Array<{ ctx: PartContext; estimate: PriceEstimate | null }> = []
+  const unknowns: PartContext[] = []
+
+  for (const ctx of targets) {
+    const cls = classByWordId.get(ctx.word_id)!
+    if (cls === 'unknown') {
+      unknowns.push(ctx)
+      continue
+    }
+    const c = curveEstimateFor(cls, annualVolume, productClass)
+    results.push({
+      ctx,
+      estimate: {
+        price_estimate_gbp: c.central,
+        estimate_low_gbp: c.low,
+        estimate_high_gbp: c.high,
+        reasoning:
+          `Engine B curve: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, ` +
+          `reference £${c.reference}, multiplier ${c.multiplier.toFixed(3)} → £${c.central}`,
+        component_class: cls,
+        curve_multiplier: c.multiplier,
+        reference_unit_cost_gbp: c.reference,
+        annual_volume: annualVolume,
+        classification_source: classSource.get(ctx.word_id)!,
+        estimate_source: 'curve',
+      },
+    })
+  }
+
+  // Flash-Lite for unknowns (concurrency 8).
+  if (unknowns.length > 0) {
+    console.log(`[estimate] Flash-Lite (volume-aware) for ${unknowns.length} 'unknown' parts`)
+    let done = 0
+    await new Promise<void>((resolveAll) => {
+      let inFlight = 0
+      let nextIdx = 0
+      const tick = () => {
+        while (inFlight < CONCURRENCY && nextIdx < unknowns.length) {
+          const ctx = unknowns[nextIdx++]
+          inFlight += 1
+          estimatePriceForUnknown(ctx, productClass, annualVolume).then((e) => {
+            if (e) {
+              results.push({
+                ctx,
+                estimate: {
+                  price_estimate_gbp: round2(e.central),
+                  estimate_low_gbp: round2(e.low),
+                  estimate_high_gbp: round2(e.high),
+                  reasoning: `Engine B fallback (unknown class): ${e.reasoning}`,
+                  component_class: 'unknown',
+                  curve_multiplier: 0,
+                  reference_unit_cost_gbp: 0,
+                  annual_volume: annualVolume,
+                  classification_source: classSource.get(ctx.word_id)!,
+                  estimate_source: 'flash_lite_unknown_class',
+                },
+              })
+            } else {
+              results.push({ ctx, estimate: null })
+            }
+            done += 1
+            inFlight -= 1
+            if (done === unknowns.length) resolveAll()
+            else tick()
+          })
+        }
+      }
+      tick()
+    })
+  }
+
+  corpus.close()
+
+  // -------------------------------------------------------------------------
+  // Step 4 — write back into state.partVerifications.
+  // -------------------------------------------------------------------------
+  let updated = 0
+  let synthesised = 0
+  let bySource = { corpus: 0, flash_lite: 0, fallback: 0 }
+  let byEstimate = { curve: 0, flash_lite_unknown_class: 0 }
+  const classCounts: Record<string, number> = {}
+
+  for (const { ctx, estimate } of results) {
+    if (!estimate) continue
+    const existing = verifByWordId.get(ctx.word_id)
+    bySource[estimate.classification_source]! += 1
+    byEstimate[estimate.estimate_source]! += 1
+    classCounts[estimate.component_class] = (classCounts[estimate.component_class] || 0) + 1
+
+    const enriched = {
+      price_estimate_gbp: estimate.price_estimate_gbp,
+      price_estimate_low_gbp: estimate.estimate_low_gbp,
+      price_estimate_high_gbp: estimate.estimate_high_gbp,
+      price_estimate_reasoning: estimate.reasoning,
+      price_estimate_model: estimate.estimate_source === 'curve'
+        ? 'engine-b-curve'
+        : 'google/gemini-3.1-flash-lite-preview',
+      // Engine B attribution columns (new).
+      engine_b_component_class: estimate.component_class,
+      engine_b_curve_multiplier: estimate.curve_multiplier,
+      engine_b_reference_unit_cost_gbp: estimate.reference_unit_cost_gbp,
+      engine_b_annual_volume: estimate.annual_volume,
+      engine_b_classification_source: estimate.classification_source,
+      engine_b_estimate_source: estimate.estimate_source,
+    }
+
+    if (existing) {
+      Object.assign(existing, enriched)
+      updated += 1
+    } else {
+      state.partVerifications.push({
+        id: `${ctx.module}::${ctx.sub_module_id}::${ctx.word_id}`,
+        module: ctx.module,
+        sub_module_id: ctx.sub_module_id,
+        word_id: ctx.word_id,
+        word_name: ctx.word_name,
+        manufacturer: ctx.manufacturer,
+        part_number: ctx.part_number,
+        status: 'uncertain',
+        confidence: 'low',
+        reasoning: estimate.reasoning,
+        source_method: 'estimate',
+        generated_at: new Date().toISOString(),
+        generated_by: 'estimate-missing-prices.tsx (Engine B)',
+        ...enriched,
+      })
+      synthesised += 1
+    }
+  }
+
+  const noEstimate = results.filter((r) => !r.estimate).length
+  console.log(
+    `[estimate] updated ${updated} existing, synthesised ${synthesised} new, ${noEstimate} failed`,
+  )
+  console.log(`[estimate] classification source: corpus=${bySource.corpus} flash_lite=${bySource.flash_lite} fallback=${bySource.fallback}`)
+  console.log(`[estimate] estimate source: curve=${byEstimate.curve} flash_lite_unknown=${byEstimate.flash_lite_unknown_class}`)
+  const top = Object.entries(classCounts).sort((a, b) => b[1] - a[1]).slice(0, 8)
+  console.log('[estimate] top classes in BoM:')
+  for (const [k, v] of top) console.log(`  ${k}: ${v}`)
+
+  // Engine B cost: ~£0.0003 per Flash-Lite classify batch + ~£0.0006 per
+  // unknown-class fallback. Rough estimate.
+  const classifyBatchCost = batches.length * 0.0003
+  const unknownFallbackCost = unknowns.length * 0.0006
+  const totalGbp = (classifyBatchCost + unknownFallbackCost) * 0.78
+  logCost(`estimate-missing-prices | ${targets.length} parts, ${results.length} results, ${updated + synthesised} written | est GBP ${totalGbp.toFixed(3)}`)
+  console.log(`[estimate] estimated cost: GBP ${totalGbp.toFixed(3)}`)
+
+  if (write) {
+    writeFileSync(statePath, JSON.stringify(state, null, 2))
+    console.log(`[estimate] wrote → ${statePath}`)
+  } else {
+    console.log('[estimate] dry run; pass --write to persist')
+  }
+}
+
+main().catch((err) => {
+  console.error('[estimate] fatal:', err)
+  process.exit(1)
+})

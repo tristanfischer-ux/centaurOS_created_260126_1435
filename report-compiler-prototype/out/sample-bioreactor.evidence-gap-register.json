@@ -1,0 +1,910 @@
+{
+  "summary": {
+    "rows": 53,
+    "blockers": 17,
+    "majors": 36,
+    "minors": 0,
+    "architectureBlockingRows": 0,
+    "bomBlockingRows": 14,
+    "publishBlockingRows": 53,
+    "sourcingIntakeRows": 14,
+    "verificationIntakeRows": 28,
+    "engineeringReviewRows": 10,
+    "architectureRevisionRows": 0
+  },
+  "rows": [
+    {
+      "id": "readiness:1",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "bom score 1 is below 8.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "score_repair",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:2",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "11 critical BoM line(s) lack source-backed cost evidence.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:3",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "6 verification activity/activities remain blocked.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "readiness:4",
+      "kind": "readiness_blocker",
+      "priority": "blocker",
+      "status": "open",
+      "scope": "Report readiness gate",
+      "issue": "0/26 non-sourcing verification activity/activities have accepted reviewer evidence.",
+      "requiredEvidence": "Admit source-backed evidence for every critical BoM line through sourcing intake. Increase priced-line coverage with admissible supplier evidence, not estimates. Collect engineering-review evidence for pending verification activities. Accept reviewer evidence for every non-sourcing verification activity before treating the report as publishable. Clear blocked verification activities or explicitly defer them with reviewer evidence. Use sourcing intake to admit source-backed supplier, manufacturer, MPN and cost evidence for critical BoM lines.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "report_readiness_gate"
+    },
+    {
+      "id": "calculation:bioreactor_nominal_bag_volume_l",
+      "kind": "calculation_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Bioreactor nominal bag volume",
+      "issue": "62.5 L nominal bag volume at 80% working fill.",
+      "requiredEvidence": "Confirm bag platform, mixing turndown, foam allowance, sparging rate and working-volume range.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "working_volume_l"
+      ],
+      "source": "engineering_calculation_ledger"
+    },
+    {
+      "id": "calculation:bioreactor_annual_working_volume_l",
+      "kind": "calculation_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Bioreactor annual working volume",
+      "issue": "2000 L/year assumes 40 batches per year.",
+      "requiredEvidence": "Confirm batch duration, turnaround, cleaning/assembly time, hold steps and campaign model.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "working_volume_l"
+      ],
+      "source": "engineering_calculation_ledger"
+    },
+    {
+      "id": "assumption:metric:headline_output",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Annual culture volume",
+      "issue": "Annual culture volume uses working_volume_l * batches_per_year with medium confidence.",
+      "requiredEvidence": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:metric:capex_gbp",
+      "kind": "assumption_review",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Estimated CAPEX",
+      "issue": "Estimated CAPEX uses an implicit model with low confidence.",
+      "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:metric:opex_annual_gbp",
+      "kind": "assumption_review",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Estimated annual OPEX",
+      "issue": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "requiredEvidence": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:bioreactor_working_volume",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Single-Use Working Volume",
+      "issue": "Single-Use Working Volume currently evaluates as pass against 1 to 2000 L for common single-use mammalian-cell systems; larger volumes need platform-specific bag and mixing evidence.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "working_volume_l"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:bioreactor_process_closure",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Sterile Process Closure",
+      "issue": "Sterile Process Closure currently evaluates as pass against sterile fluid path, gas path, sensor bus and pump control present.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "working_volume_l"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:sanity:bioreactor_aseptic_pressure_safety",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Aseptic And Pressure Safety",
+      "issue": "Aseptic And Pressure Safety currently evaluates as pass against sterile boundary, pressure relief, exhaust path, alarm bus and service access present.",
+      "requiredEvidence": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "working_volume_l"
+      ],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:ISO-13485",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "ISO-13485",
+      "issue": "Quality management for medical-device-adjacent manufacturing systems is relevant to this product class in Global / supplier quality.",
+      "requiredEvidence": "Supplier quality evidence, change control and traceability where applicable.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:USP-CLASS-VI",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "USP-CLASS-VI",
+      "issue": "Biocompatibility for polymer contact materials is relevant to this product class in US / global supplier evidence.",
+      "requiredEvidence": "Material certificates for single-use bag and tubing contact surfaces.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:IEC-61010",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "IEC-61010",
+      "issue": "Electrical safety for laboratory control equipment is relevant to this product class in UK/EU/global.",
+      "requiredEvidence": "Electrical safety design, protective earth and abnormal operation evidence.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "assumption:compliance:EU-GMP-ANNEX-11",
+      "kind": "assumption_review",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "EU-GMP-ANNEX-11",
+      "issue": "Computerised systems for GMP records is relevant to this product class in EU / pharma operations.",
+      "requiredEvidence": "Batch record integrity, audit trail and access-control evidence.",
+      "closurePath": "engineering_review",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [],
+      "source": "engineering_assumption_ledger"
+    },
+    {
+      "id": "sourcing:single_use_bioreactor_bag",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Single-use bioreactor bag",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "single_use_bioreactor_bag"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:sterile_tubing_and_connector_set",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Sterile tubing and connector set",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "sterile_tubing_and_connector_set"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:agitation_drive",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Agitation drive",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "agitation_drive"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:peristaltic_feed_pump",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Peristaltic feed pump",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "peristaltic_feed_pump"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:sparger_and_gas_mix_manifold",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Sparger and gas-mix manifold",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "sparger_and_gas_mix_manifold"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:temperature_control_loop",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Temperature control loop",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "temperature_control_loop"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:exhaust_filter_and_pressure_relief_set",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Exhaust filter and pressure relief set",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "exhaust_filter_and_pressure_relief_set"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:dissolved_oxygen_optical_sensor",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Dissolved oxygen optical sensor",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "dissolved_oxygen_optical_sensor"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:single_use_ph_sensor",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Single-use pH sensor",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "single_use_ph_sensor"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:load_cell_set",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Load cell set",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "load_cell_set"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "sourcing:bioreactor_controller",
+      "kind": "sourcing_evidence",
+      "priority": "blocker",
+      "status": "ready_for_intake",
+      "scope": "Bioreactor controller",
+      "issue": "Required class-critical line must be sourced before BoM can pass.",
+      "requiredEvidence": "Supplier name, manufacturer, MPN where applicable, unit cost, lead time and source quote/reference through sourcing intake.",
+      "closurePath": "sourcing_intake",
+      "blocks": [
+        "bom",
+        "publishable"
+      ],
+      "linkedIds": [
+        "bioreactor_controller"
+      ],
+      "source": "sourcing_worklist"
+    },
+    {
+      "id": "verification:design_review:structure_containment",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Sterile Structure Containment",
+      "issue": "Review Sterile Structure Containment architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:structure_containment"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:structure_containment",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Sterile Structure Containment",
+      "issue": "Verify Sterile Structure Containment requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:structure_containment"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:actuation_kinematics",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Mixing And Agitation",
+      "issue": "Review Mixing And Agitation architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:actuation_kinematics"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:actuation_kinematics",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Mixing And Agitation",
+      "issue": "Verify Mixing And Agitation requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:actuation_kinematics"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:mass_fluid_transport_process",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Media Gas And Harvest Transport",
+      "issue": "Review Media Gas And Harvest Transport architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:mass_fluid_transport_process"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:mass_fluid_transport_process",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Media Gas And Harvest Transport",
+      "issue": "Verify Media Gas And Harvest Transport requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:mass_fluid_transport_process"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:environmental_interface",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Thermal Gas Exhaust Interface",
+      "issue": "Review Thermal Gas Exhaust Interface architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:environmental_interface"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:calculation:environmental_interface",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Thermal Gas Exhaust Interface",
+      "issue": "Verify Thermal Gas Exhaust Interface requirement calculations",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "calculation:environmental_interface"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:sensing_instrumentation",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Process Sensing Instrumentation",
+      "issue": "Review Process Sensing Instrumentation architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:sensing_instrumentation"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:control_compute_communication",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Control Compute Communication",
+      "issue": "Review Control Compute Communication architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:control_compute_communication"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:power_distribution",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Power Distribution",
+      "issue": "Review Power Distribution architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:power_distribution"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:safety_protection",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Aseptic And Pressure Safety",
+      "issue": "Review Aseptic And Pressure Safety architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:safety_protection"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:design_review:maintenance_serviceability",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Setup Calibration And Service",
+      "issue": "Review Setup Calibration And Service architecture allocation",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "design_review:maintenance_serviceability"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:structure_containment:mass_fluid_transport_process:sterile_fluid_path",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Sterile Structure Containment -> Media Gas And Harvest Transport",
+      "issue": "Verify sterile_fluid_path interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:structure_containment:mass_fluid_transport_process:sterile_fluid_path"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:actuation_kinematics:structure_containment:sterile_boundary",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Mixing And Agitation -> Sterile Structure Containment",
+      "issue": "Verify sterile_boundary interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:actuation_kinematics:structure_containment:sterile_boundary"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:mass_fluid_transport_process:environmental_interface:gas_path",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Media Gas And Harvest Transport -> Thermal Gas Exhaust Interface",
+      "issue": "Verify gas_path interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:mass_fluid_transport_process:environmental_interface:gas_path"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Process Sensing Instrumentation -> Control Compute Communication",
+      "issue": "Verify sensor_bus interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:control_compute_communication:mass_fluid_transport_process:pump_control",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Control Compute Communication -> Media Gas And Harvest Transport",
+      "issue": "Verify pump_control interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:control_compute_communication:mass_fluid_transport_process:pump_control"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:interface_review:safety_protection:structure_containment:pressure_relief",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "Aseptic And Pressure Safety -> Sterile Structure Containment",
+      "issue": "Verify pressure_relief interface contract",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "interface_review:safety_protection:structure_containment:pressure_relief"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:ISO-13485",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for ISO-13485",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:ISO-13485"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:USP-CLASS-VI",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for USP-CLASS-VI",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:USP-CLASS-VI"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:IEC-61010",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for IEC-61010",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:IEC-61010"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:compliance_review:EU-GMP-ANNEX-11",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Compliance",
+      "issue": "Plan evidence for EU-GMP-ANNEX-11",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "compliance_review:EU-GMP-ANNEX-11"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:1",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Loss of sterility through connector or bag handling",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:1"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:2",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Cell culture loss from DO or pH control failure",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:2"
+      ],
+      "source": "verification_evidence_ledger"
+    },
+    {
+      "id": "verification:risk_review:3",
+      "kind": "verification_evidence",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "scope": "System Risk Register",
+      "issue": "Review risk control for Disposable bag overpressure",
+      "requiredEvidence": "Collect reviewer evidence through the verification intake template.",
+      "closurePath": "verification_intake",
+      "blocks": [
+        "publishable"
+      ],
+      "linkedIds": [
+        "risk_review:3"
+      ],
+      "source": "verification_evidence_ledger"
+    }
+  ]
+}

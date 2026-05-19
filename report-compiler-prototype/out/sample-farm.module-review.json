@@ -1,0 +1,211 @@
+{
+  "summary": {
+    "modules": 9,
+    "readyModules": 4,
+    "sourcingBlockedModules": 5,
+    "attentionModules": 0,
+    "criticalUnpricedLines": 8,
+    "issueCount": 0
+  },
+  "modules": [
+    {
+      "moduleId": "structure_containment",
+      "moduleName": "Growing Structure And Containment",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 14,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "sanityCheckIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "criticalUnpricedLines": [
+        "growing_rack_structure"
+      ],
+      "candidateUnpricedLines": 13,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "environmental_interface",
+      "moduleName": "Light Climate And Gas Environment",
+      "status": "sourcing_blocked",
+      "subModuleCount": 4,
+      "componentCount": 19,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "sanityCheckIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "criticalUnpricedLines": [
+        "led_grow_lights",
+        "air_circulation_fans",
+        "co2_sensor_or_dosing"
+      ],
+      "candidateUnpricedLines": 16,
+      "issueCodes": [],
+      "notes": [
+        "3 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Nutrient And Water Transport Process",
+      "status": "sourcing_blocked",
+      "subModuleCount": 4,
+      "componentCount": 19,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "reservoir_and_plumbing_set",
+        "nutrient_pump"
+      ],
+      "candidateUnpricedLines": 17,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Crop And Process Instrumentation",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "control_compute_communication",
+      "moduleName": "Recipe Control And Communications",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 13,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "environmental_controller"
+      ],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "power_distribution",
+      "moduleName": "Wet-Zone Power Distribution",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 13,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "rcd_isolator_panel"
+      ],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "safety_protection",
+      "moduleName": "Food-Safe Safety And Protection",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Harvest Cleaning And Serviceability",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ],
+      "sanityCheckIds": [
+        "farm_footprint",
+        "farm_wet_electrical_separation",
+        "farm_process_closure"
+      ],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Operator HMI And Labelling",
+      "status": "ready",
+      "subModuleCount": 2,
+      "componentCount": 8,
+      "interfaceCount": 3,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 8,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 8 candidate line(s) remain for later sourcing."
+      ]
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "summary": {
+    "rows": 3,
+    "withinEnvelope": 1,
+    "needsReview": 2,
+    "outsideEnvelope": 0,
+    "blocked": 0
+  },
+  "rows": [
+    {
+      "id": "haps_endurance_hours",
+      "status": "needs_review",
+      "label": "HAPS endurance hours",
+      "formula": "endurance_days * 24",
+      "inputs": {
+        "endurance_days": 30
+      },
+      "result": 720,
+      "unit": "h",
+      "envelope": "Arithmetic only; station keeping needs wind, day/night energy and degradation proof.",
+      "interpretation": "720 h endurance target before stratospheric energy-balance proof.",
+      "evidenceRequired": "Confirm solar resource, battery reserve, wind field, degradation, payload power and recovery plan.",
+      "linkedRequirements": [
+        "endurance_days"
+      ]
+    },
+    {
+      "id": "haps_altitude_ft",
+      "status": "within_envelope",
+      "label": "HAPS altitude conversion",
+      "formula": "altitude_km * 3,280.84",
+      "inputs": {
+        "altitude_km": 20
+      },
+      "result": 65616.8,
+      "unit": "ft",
+      "envelope": "49,000 to 82,000 ft is a broad HAPS operating band before airspace proof.",
+      "interpretation": "65616.8 ft converted from target altitude.",
+      "evidenceRequired": "Confirm operating altitude, airspace permissions, atmospheric density, thermal envelope and wind model.",
+      "linkedRequirements": [
+        "altitude_km"
+      ]
+    },
+    {
+      "id": "haps_wingspan_to_altitude_ratio",
+      "status": "needs_review",
+      "label": "HAPS wingspan-to-altitude marker",
+      "formula": "wingspan_m / altitude_km",
+      "inputs": {
+        "wingspan_m": 35,
+        "altitude_km": 20
+      },
+      "result": 1.75,
+      "unit": "m/km",
+      "envelope": "Marker only; aerodynamic feasibility needs wing area, mass, Reynolds number and aeroelastic proof.",
+      "interpretation": "1.75 m/km is a trace marker, not an aerodynamic proof.",
+      "evidenceRequired": "Confirm wing area, mass budget, airfoil, aeroelastic margin, launch loads and transport constraints.",
+      "linkedRequirements": [
+        "wingspan_m",
+        "altitude_km"
+      ]
+    }
+  ]
+}

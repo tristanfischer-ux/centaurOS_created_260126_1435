@@ -1,0 +1,291 @@
+{
+  "summary": {
+    "modules": 11,
+    "readyModules": 2,
+    "sourcingBlockedModules": 9,
+    "attentionModules": 0,
+    "criticalUnpricedLines": 12,
+    "issueCount": 0
+  },
+  "modules": [
+    {
+      "moduleId": "structure_containment",
+      "moduleName": "Ultra-Light Wing Structure",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "wingspan_m"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "criticalUnpricedLines": [
+        "high_aspect_ratio_wing_structure"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "energy_harvesting",
+      "moduleName": "Solar Energy Harvesting",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "criticalUnpricedLines": [
+        "solar_cell_array",
+        "mppt_power_tracker"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "energy_storage_source",
+      "moduleName": "Night-Cycle Energy Storage",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "criticalUnpricedLines": [
+        "stratospheric_battery_pack"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "power_distribution",
+      "moduleName": "Flight Power Distribution",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 8,
+      "requiredInterfaceEdges": 3,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure"
+      ],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Control Surfaces",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "wingspan_m",
+        "endurance_days"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure",
+        "haps_endurance_target"
+      ],
+      "criticalUnpricedLines": [
+        "electric_propulsion_pod"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Control Communication",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 7,
+      "requiredInterfaceEdges": 4,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "endurance_days",
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_endurance_target",
+        "haps_energy_flight_closure",
+        "haps_altitude_band",
+        "haps_payload_comms_safety"
+      ],
+      "criticalUnpricedLines": [
+        "flight_control_computer",
+        "ground_control_link"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Airdata Sensing",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "criticalUnpricedLines": [
+        "gnss_ins_navigation_unit"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "payload_communication",
+      "moduleName": "Communications Payload",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "stratospheric_communications_payload",
+        "payload_antenna_array"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "environmental_interface",
+      "moduleName": "Stratospheric Environmental Interface",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "criticalUnpricedLines": [
+        "thermal_insulation_blanket"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Recovery",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "altitude_km"
+      ],
+      "sanityCheckIds": [
+        "haps_altitude_band",
+        "haps_energy_flight_closure",
+        "haps_payload_comms_safety"
+      ],
+      "criticalUnpricedLines": [
+        "recovery_parachute_system"
+      ],
+      "candidateUnpricedLines": 11,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Ground Handling Serviceability",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "wingspan_m"
+      ],
+      "sanityCheckIds": [
+        "haps_wingspan_envelope",
+        "haps_energy_flight_closure"
+      ],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    }
+  ]
+}

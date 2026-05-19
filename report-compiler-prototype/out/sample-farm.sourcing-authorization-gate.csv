@@ -1,0 +1,7 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+architecture_authorization,pass,"architecture_generation_admitted; review yes, BoM yes.",1,,Architecture admission permits evidence-gated sourcing work.
+component_candidate_authorization,pass,"component_candidates_ready_for_sourcing; 122 candidate line(s), 122 sourcing-worklist row(s), 0 provenance violation(s).",1,,Component candidates are concrete enough for sourcing intake.
+critical_intake_scope,pass,8/8 critical unpriced line(s) appear in the critical sourcing intake template.,1,,Critical sourcing intake scope is complete.
+full_worklist_scope,pass,122/122 total unpriced line(s) appear in the full sourcing intake template.,1,,Full sourcing intake scope matches the unpriced worklist.
+evidence_admission_boundary,pass,"0 admitted source evidence row(s), 0 rejected source evidence row(s).",1,,No rejected sourcing evidence is waiting for repair.
+provenance_boundary,pass,"0 source-backed BoM claim(s), 0 provenance violation(s).",1,,"Supplier, manufacturer, MPN, lead-time and cost fields remain behind admitted evidence."

@@ -1,4 +1,5 @@
 import type { Module, DimensionSheet, DimensionSheetPA, SizingZone, StageResult, Envelope, ModuleDimensions } from '../types'
+import { suggestEnvelope, defaultEnvelopeForClass } from '../deployment-envelopes'
 
 // A5 FIX (2026-05-06): The research stage produces industryDomain values from
 // the LLM (e.g. "thermal_system", "energy_storage", "bess") while the sizing
@@ -771,6 +772,31 @@ function extendSizingSheetPA(
   // consumer (gate check, sizing section, cover verdict) sees the correct status.
   const layoutFeasible = massOverrun ? false : sheet.feasible
 
+  // ── Deployment-envelope suggestion ───────────────────────────────────────
+  // Prefer suggestEnvelope (size-constrained) when we have volume + mass data;
+  // fall back to defaultEnvelopeForClass (slug lookup) when those numbers are
+  // unavailable.  If neither helper returns a result (AUV, HAPS, wearables —
+  // the device IS the envelope) the field is left undefined — do NOT throw.
+  //
+  // suggestEnvelope requires a category.  For the common container-class
+  // products we always suggest from 'shipping_container' first; if the class
+  // lookup returns a non-container envelope we skip the volume-based helper
+  // (rack/pallet/cabinet selection is class-driven, not volume-driven at this
+  // stage) and fall through to the class default.
+  const classDefault = defaultEnvelopeForClass(domain)
+  let deploymentEnvelope: import('../deployment-envelopes').DeploymentEnvelope | undefined
+  if (
+    classDefault?.category === 'shipping_container' &&
+    totalVolumeM3 !== null &&
+    allocatedMassKg > 0
+  ) {
+    const payloadVolumeLiters = allocatedVolumeM3 * 1000
+    const containerCandidates = suggestEnvelope(payloadVolumeLiters, allocatedMassKg, 'shipping_container')
+    deploymentEnvelope = containerCandidates[0] ?? classDefault ?? undefined
+  } else {
+    deploymentEnvelope = classDefault ?? undefined
+  }
+
   return {
     ...sheet,
     feasible: layoutFeasible,
@@ -783,6 +809,7 @@ function extendSizingSheetPA(
     availablePayloadMassKg,
     clearanceNotes,
     massMarginNote,
+    deploymentEnvelope,
   }
 }
 

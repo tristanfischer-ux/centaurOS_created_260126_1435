@@ -31,6 +31,10 @@ export RADICAL_PHASE_5_RENDER=true
 # and Stage 1.7 + naturalLanguageLayer + briefOverviewProse never fire. Confirmed 2026-05-13.
 export RADICAL_PHASE_3_PER_MODULE=true
 export PA_PIPELINE=true
+# WS-A Option A (commit c0615358): enable 6-emitter + 2-judge Stage 1.7 ensemble
+export RADICAL_MULTI_EMITTER=true
+# WS-B (commit f94af1b1): drive BoM from Tier 4 emission, bypass character-hierarchy WORDS[] filter
+export RADICAL_TIER4_TREE=true
 
 DISTRIBUTOR_ENV="$HOME/.claude/secrets/distributor-apis.env"
 if [ -f "$DISTRIBUTOR_ENV" ]; then

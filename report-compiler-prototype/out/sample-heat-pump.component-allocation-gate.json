@@ -1,0 +1,1115 @@
+{
+  "verdict": "allocation_ready",
+  "summary": {
+    "modules": 10,
+    "subModules": 31,
+    "componentWords": 124,
+    "readySubModules": 31,
+    "reviewSubModules": 0,
+    "blockedSubModules": 0,
+    "interfaceCarrierSubModules": 31,
+    "interfaceCarrierWithoutComponents": 0,
+    "requiredCriticalParts": 9,
+    "allocatedCriticalParts": 9,
+    "missingCriticalParts": 0,
+    "bomLines": 124,
+    "criticalBomLines": 9,
+    "duplicateComponentGroups": 0,
+    "duplicateCriticalComponentGroups": 0,
+    "allocationRatio": 1,
+    "criticalAllocationRatio": 1
+  },
+  "subModules": [
+    {
+      "id": "energy_conversion_transduction:compressor_inverter_stage",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Refrigerant Energy Conversion",
+      "subModuleId": "compressor_inverter_stage",
+      "subModuleName": "Compressor inverter stage",
+      "purpose": "Raises refrigerant pressure while modulating thermal output.",
+      "interfaces": [
+        "refrigerant_loop",
+        "control_bus",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "inverter_scroll_compressor",
+        "compressor_inverter_drive",
+        "compressor_mounting_grommet_set",
+        "crankcase_heater_band"
+      ],
+      "componentNames": [
+        "Inverter scroll compressor",
+        "compressor inverter drive",
+        "compressor mounting grommet set",
+        "crankcase heater band"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "inverter_scroll_compressor"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_conversion_transduction:expansion_metering_stage",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Refrigerant Energy Conversion",
+      "subModuleId": "expansion_metering_stage",
+      "subModuleName": "Expansion metering stage",
+      "purpose": "Meters refrigerant into the outdoor coil across operating conditions.",
+      "interfaces": [
+        "refrigerant_loop",
+        "control_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "electronic_expansion_valve",
+        "eev_stepper_harness",
+        "liquid_line_filter_drier",
+        "sight_glass_indicator"
+      ],
+      "componentNames": [
+        "Electronic expansion valve",
+        "EEV stepper harness",
+        "liquid-line filter drier",
+        "sight glass indicator"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "electronic_expansion_valve"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_conversion_transduction:refrigerant_manifold",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Refrigerant Energy Conversion",
+      "subModuleId": "refrigerant_manifold",
+      "subModuleName": "Refrigerant manifold",
+      "purpose": "Routes refrigerant between compressor, evaporator, condenser and service points.",
+      "interfaces": [
+        "refrigerant_loop",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "copper_refrigerant_tube_set",
+        "service_valve_pair",
+        "brazed_joint_sleeve_set",
+        "refrigerant_charge_label"
+      ],
+      "componentNames": [
+        "copper refrigerant tube set",
+        "service valve pair",
+        "brazed joint sleeve set",
+        "refrigerant charge label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "energy_conversion_transduction:condenser_coupling_boundary",
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Refrigerant Energy Conversion",
+      "subModuleId": "condenser_coupling_boundary",
+      "subModuleName": "Condenser coupling boundary",
+      "purpose": "Defines the refrigerant-to-water handoff into the hydronic heat-delivery module.",
+      "interfaces": [
+        "refrigerant_loop",
+        "hydronic_loop",
+        "sensor_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "refrigerant_stub_out_pair",
+        "hydronic_stub_out_pair",
+        "plate_heat_exchanger_mounting_bracket",
+        "condenser_insulation_sleeve"
+      ],
+      "componentNames": [
+        "refrigerant stub-out pair",
+        "hydronic stub-out pair",
+        "plate heat exchanger mounting bracket",
+        "condenser insulation sleeve"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:outdoor_evaporator",
+      "moduleId": "environmental_interface",
+      "moduleName": "Outdoor Air Interface",
+      "subModuleId": "outdoor_evaporator",
+      "subModuleName": "Outdoor evaporator",
+      "purpose": "Transfers ambient heat into the refrigerant loop.",
+      "interfaces": [
+        "refrigerant_loop",
+        "airflow_path",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "outdoor_finned_evaporator_coil",
+        "coil_temperature_sensor",
+        "coil_guard_grille",
+        "hydrophilic_fin_coating"
+      ],
+      "componentNames": [
+        "Outdoor finned evaporator coil",
+        "coil temperature sensor",
+        "coil guard grille",
+        "hydrophilic fin coating"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "outdoor_finned_evaporator_coil"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:fan_air_path",
+      "moduleId": "environmental_interface",
+      "moduleName": "Outdoor Air Interface",
+      "subModuleId": "fan_air_path",
+      "subModuleName": "Fan air path",
+      "purpose": "Drives controlled airflow through the coil face.",
+      "interfaces": [
+        "airflow_path",
+        "control_bus",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "variable_speed_fan_assembly",
+        "ec_fan_motor_controller",
+        "fan_shroud",
+        "inlet_debris_screen"
+      ],
+      "componentNames": [
+        "Variable-speed fan assembly",
+        "EC fan motor controller",
+        "fan shroud",
+        "inlet debris screen"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "variable_speed_fan_assembly"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:defrost_condensate",
+      "moduleId": "environmental_interface",
+      "moduleName": "Outdoor Air Interface",
+      "subModuleId": "defrost_condensate",
+      "subModuleName": "Defrost and condensate path",
+      "purpose": "Controls frost meltwater and drainage away from the outdoor unit.",
+      "interfaces": [
+        "condensate_drain",
+        "sensor_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "condensate_drain_tray",
+        "trace_heater_cable",
+        "defrost_temperature_probe",
+        "drain_hose_barb"
+      ],
+      "componentNames": [
+        "condensate drain tray",
+        "trace heater cable",
+        "defrost temperature probe",
+        "drain hose barb"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:condenser_heat_exchanger",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Hydronic Heat Delivery",
+      "subModuleId": "condenser_heat_exchanger",
+      "subModuleName": "Condenser heat exchanger",
+      "purpose": "Transfers refrigerant heat to the water loop.",
+      "interfaces": [
+        "refrigerant_loop",
+        "hydronic_loop",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "brazed_plate_heat_exchanger",
+        "plate_exchanger_insulation_jacket",
+        "water_outlet_temperature_sensor",
+        "refrigerant_outlet_temperature_sensor"
+      ],
+      "componentNames": [
+        "Brazed plate heat exchanger",
+        "plate exchanger insulation jacket",
+        "water outlet temperature sensor",
+        "refrigerant outlet temperature sensor"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "brazed_plate_heat_exchanger"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:circulation_pump_group",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Hydronic Heat Delivery",
+      "subModuleId": "circulation_pump_group",
+      "subModuleName": "Circulation pump group",
+      "purpose": "Maintains water flow through the condenser and heating circuit.",
+      "interfaces": [
+        "hydronic_loop",
+        "control_bus",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "hydronic_circulation_pump",
+        "pump_isolation_valve_pair",
+        "flow_proving_switch",
+        "strainer_filter"
+      ],
+      "componentNames": [
+        "Hydronic circulation pump",
+        "pump isolation valve pair",
+        "flow proving switch",
+        "strainer filter"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "hydronic_circulation_pump"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "mass_fluid_transport_process:hydronic_safety_group",
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Hydronic Heat Delivery",
+      "subModuleId": "hydronic_safety_group",
+      "subModuleName": "Hydronic safety group",
+      "purpose": "Limits water pressure and allows commissioning service.",
+      "interfaces": [
+        "hydronic_loop",
+        "pressure_relief",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "hydronic_safety_valve_kit",
+        "expansion_vessel",
+        "automatic_air_vent",
+        "fill_and_drain_valve_set"
+      ],
+      "componentNames": [
+        "Hydronic safety valve kit",
+        "expansion vessel",
+        "automatic air vent",
+        "fill and drain valve set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "hydronic_safety_valve_kit"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:main_controller",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "main_controller",
+      "subModuleName": "Main controller",
+      "purpose": "Runs heating, hot-water, anti-freeze and defrost state machines.",
+      "interfaces": [
+        "control_bus",
+        "sensor_bus",
+        "service_port"
+      ],
+      "componentWordIds": [
+        "heat_pump_controller_pcb",
+        "controller_enclosure",
+        "real_time_clock_module",
+        "non_volatile_fault_memory"
+      ],
+      "componentNames": [
+        "Heat pump controller PCB",
+        "controller enclosure",
+        "real-time clock module",
+        "non-volatile fault memory"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "heat_pump_controller_pcb"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:power_driver_io",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "power_driver_io",
+      "subModuleName": "Power driver IO",
+      "purpose": "Switches controlled loads and reads discrete safety inputs.",
+      "interfaces": [
+        "control_bus",
+        "protective_earth",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "compressor_contactor",
+        "pump_relay_output",
+        "fan_pwm_output_board",
+        "safety_chain_input_terminal"
+      ],
+      "componentNames": [
+        "compressor contactor",
+        "pump relay output",
+        "fan PWM output board",
+        "safety chain input terminal"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:service_communications",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "service_communications",
+      "subModuleName": "Service communications",
+      "purpose": "Exposes commissioning and diagnostics to installers.",
+      "interfaces": [
+        "service_port",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "modbus_service_port",
+        "usb_commissioning_adapter",
+        "fault_led_stack",
+        "installer_qr_code_label"
+      ],
+      "componentNames": [
+        "Modbus service port",
+        "USB commissioning adapter",
+        "fault LED stack",
+        "installer QR code label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:refrigerant_sensing",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing Instrumentation",
+      "subModuleId": "refrigerant_sensing",
+      "subModuleName": "Refrigerant sensing",
+      "purpose": "Measures pressure and temperature around the refrigerant circuit.",
+      "interfaces": [
+        "sensor_bus",
+        "refrigerant_loop"
+      ],
+      "componentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers",
+        "suction_temperature_probe",
+        "discharge_temperature_probe",
+        "refrigerant_leak_sensor"
+      ],
+      "componentNames": [
+        "Refrigerant sensor and pressure transducers",
+        "suction temperature probe",
+        "discharge temperature probe",
+        "refrigerant leak sensor"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:water_sensing",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing Instrumentation",
+      "subModuleId": "water_sensing",
+      "subModuleName": "Water sensing",
+      "purpose": "Measures water-loop temperatures and flow evidence.",
+      "interfaces": [
+        "sensor_bus",
+        "hydronic_loop"
+      ],
+      "componentWordIds": [
+        "flow_temperature_sensor",
+        "return_temperature_sensor",
+        "flow_meter_cartridge",
+        "water_pressure_transducer"
+      ],
+      "componentNames": [
+        "flow temperature sensor",
+        "return temperature sensor",
+        "flow meter cartridge",
+        "water pressure transducer"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:ambient_sensing",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing Instrumentation",
+      "subModuleId": "ambient_sensing",
+      "subModuleName": "Ambient sensing",
+      "purpose": "Measures external conditions that affect capacity and defrost.",
+      "interfaces": [
+        "sensor_bus",
+        "airflow_path"
+      ],
+      "componentWordIds": [
+        "ambient_temperature_sensor",
+        "ambient_humidity_sensor",
+        "air_pressure_switch",
+        "rain_ingress_sensor"
+      ],
+      "componentNames": [
+        "ambient temperature sensor",
+        "ambient humidity sensor",
+        "air pressure switch",
+        "rain ingress sensor"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:mains_input_protection",
+      "moduleId": "power_distribution",
+      "moduleName": "Electrical Power Distribution",
+      "subModuleId": "mains_input_protection",
+      "subModuleName": "Mains input protection",
+      "purpose": "Provides isolation and over-current protection at the unit boundary.",
+      "interfaces": [
+        "mains_supply",
+        "protective_earth",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "lockable_isolator_switch",
+        "mcb_breaker_set",
+        "rcd_protection_device",
+        "surge_protection_device"
+      ],
+      "componentNames": [
+        "lockable isolator switch",
+        "MCB breaker set",
+        "RCD protection device",
+        "surge protection device"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:internal_power_rails",
+      "moduleId": "power_distribution",
+      "moduleName": "Electrical Power Distribution",
+      "subModuleId": "internal_power_rails",
+      "subModuleName": "Internal power rails",
+      "purpose": "Creates protected rails for control and auxiliary loads.",
+      "interfaces": [
+        "mains_supply",
+        "control_bus",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "24_v_dc_power_supply",
+        "terminal_rail_assembly",
+        "fused_auxiliary_terminal",
+        "protective_earth_bar"
+      ],
+      "componentNames": [
+        "24 V DC power supply",
+        "terminal rail assembly",
+        "fused auxiliary terminal",
+        "protective earth bar"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:cable_management",
+      "moduleId": "power_distribution",
+      "moduleName": "Electrical Power Distribution",
+      "subModuleId": "cable_management",
+      "subModuleName": "Cable management",
+      "purpose": "Separates mains, sensor and refrigerant-adjacent wiring.",
+      "interfaces": [
+        "service_access",
+        "sensor_bus",
+        "control_bus"
+      ],
+      "componentWordIds": [
+        "segregated_cable_duct",
+        "ip_rated_cable_gland_set",
+        "emc_ferrite_clamp_set",
+        "wiring_diagram_label"
+      ],
+      "componentNames": [
+        "segregated cable duct",
+        "IP-rated cable gland set",
+        "EMC ferrite clamp set",
+        "wiring diagram label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:weatherproof_cabinet",
+      "moduleId": "structure_containment",
+      "moduleName": "Monobloc Structure And Containment",
+      "subModuleId": "weatherproof_cabinet",
+      "subModuleName": "Weatherproof cabinet",
+      "purpose": "Protects refrigerant, electrical and hydronic assemblies outdoors.",
+      "interfaces": [
+        "airflow_path",
+        "service_access",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "galvanised_steel_cabinet",
+        "powder_coated_access_panel",
+        "epdm_door_gasket",
+        "ip_rated_fastener_set"
+      ],
+      "componentNames": [
+        "galvanised steel cabinet",
+        "powder-coated access panel",
+        "EPDM door gasket",
+        "IP-rated fastener set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:mounting_base",
+      "moduleId": "structure_containment",
+      "moduleName": "Monobloc Structure And Containment",
+      "subModuleId": "mounting_base",
+      "subModuleName": "Mounting base",
+      "purpose": "Carries compressor mass and isolates installation vibration.",
+      "interfaces": [
+        "mechanical_mounts",
+        "condensate_drain"
+      ],
+      "componentWordIds": [
+        "anti_vibration_foot_set",
+        "base_rail_pair",
+        "condensate_fall_spacer",
+        "lifting_lug_set"
+      ],
+      "componentNames": [
+        "anti-vibration foot set",
+        "base rail pair",
+        "condensate fall spacer",
+        "lifting lug set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:service_access_panels",
+      "moduleId": "structure_containment",
+      "moduleName": "Monobloc Structure And Containment",
+      "subModuleId": "service_access_panels",
+      "subModuleName": "Service access panels",
+      "purpose": "Creates access for commissioning and repair without dismantling the unit.",
+      "interfaces": [
+        "service_access"
+      ],
+      "componentWordIds": [
+        "removable_service_panel",
+        "hinged_controller_cover",
+        "quarter_turn_latch_set",
+        "service_clearance_label"
+      ],
+      "componentNames": [
+        "removable service panel",
+        "hinged controller cover",
+        "quarter-turn latch set",
+        "service clearance label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:refrigerant_safety",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection",
+      "subModuleId": "refrigerant_safety",
+      "subModuleName": "Refrigerant safety",
+      "purpose": "Detects abnormal refrigerant conditions and defines response paths.",
+      "interfaces": [
+        "refrigerant_loop",
+        "sensor_bus",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "high_pressure_cut_out_switch",
+        "low_pressure_cut_out_switch",
+        "refrigerant_leak_alarm_output",
+        "refrigerant_warning_label"
+      ],
+      "componentNames": [
+        "high-pressure cut-out switch",
+        "low-pressure cut-out switch",
+        "refrigerant leak alarm output",
+        "refrigerant warning label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:hydronic_freeze_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection",
+      "subModuleId": "hydronic_freeze_protection",
+      "subModuleName": "Hydronic freeze protection",
+      "purpose": "Prevents water-loop freeze damage in low ambient conditions.",
+      "interfaces": [
+        "hydronic_loop",
+        "sensor_bus",
+        "control_bus"
+      ],
+      "componentWordIds": [
+        "anti_freeze_thermostat",
+        "backup_immersion_heater_relay",
+        "drain_down_instruction_label",
+        "glycol_compatibility_tag"
+      ],
+      "componentNames": [
+        "anti-freeze thermostat",
+        "backup immersion heater relay",
+        "drain-down instruction label",
+        "glycol compatibility tag"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:electrical_safety",
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection",
+      "subModuleId": "electrical_safety",
+      "subModuleName": "Electrical safety",
+      "purpose": "Maintains protection and earthing integrity.",
+      "interfaces": [
+        "protective_earth",
+        "mains_supply",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "earth_continuity_test_point",
+        "touch_safe_terminal_cover",
+        "over_temperature_cut_out",
+        "safety_compliance_label"
+      ],
+      "componentNames": [
+        "earth continuity test point",
+        "touch-safe terminal cover",
+        "over-temperature cut-out",
+        "safety compliance label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:commissioning_ports",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Commissioning",
+      "subModuleId": "commissioning_ports",
+      "subModuleName": "Commissioning ports",
+      "purpose": "Provides controlled access to refrigerant and water commissioning points.",
+      "interfaces": [
+        "service_access",
+        "refrigerant_loop",
+        "hydronic_loop"
+      ],
+      "componentWordIds": [
+        "refrigerant_service_port_cap_set",
+        "hydronic_drain_cock",
+        "pressure_gauge_pocket",
+        "commissioning_checklist_card"
+      ],
+      "componentNames": [
+        "refrigerant service port cap set",
+        "hydronic drain cock",
+        "pressure gauge pocket",
+        "commissioning checklist card"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:filter_service",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Commissioning",
+      "subModuleId": "filter_service",
+      "subModuleName": "Filter service",
+      "purpose": "Keeps hydronic and air paths maintainable.",
+      "interfaces": [
+        "service_access",
+        "hydronic_loop",
+        "airflow_path"
+      ],
+      "componentWordIds": [
+        "cleanable_y_strainer_basket",
+        "coil_cleaning_access_cover",
+        "service_interval_label",
+        "spare_gasket_kit"
+      ],
+      "componentNames": [
+        "cleanable Y-strainer basket",
+        "coil cleaning access cover",
+        "service interval label",
+        "spare gasket kit"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:diagnostic_access",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Commissioning",
+      "subModuleId": "diagnostic_access",
+      "subModuleName": "Diagnostic access",
+      "purpose": "Lets technicians verify states without dismantling assemblies.",
+      "interfaces": [
+        "service_port",
+        "sensor_bus",
+        "control_bus"
+      ],
+      "componentWordIds": [
+        "diagnostic_test_header",
+        "fault_code_label",
+        "data_log_export_button",
+        "installer_handover_record"
+      ],
+      "componentNames": [
+        "diagnostic test header",
+        "fault code label",
+        "data log export button",
+        "installer handover record"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:local_display",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "User And Installer Interface",
+      "subModuleId": "local_display",
+      "subModuleName": "Local display",
+      "purpose": "Shows heat-pump status and permits basic configuration.",
+      "interfaces": [
+        "control_bus",
+        "service_port"
+      ],
+      "componentWordIds": [
+        "lcd_status_display",
+        "menu_button_membrane",
+        "weatherproof_display_window",
+        "mode_indicator_led_set"
+      ],
+      "componentNames": [
+        "LCD status display",
+        "menu button membrane",
+        "weatherproof display window",
+        "mode indicator LED set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:remote_thermostat_interface",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "User And Installer Interface",
+      "subModuleId": "remote_thermostat_interface",
+      "subModuleName": "Remote thermostat interface",
+      "purpose": "Connects building demand to heat pump control.",
+      "interfaces": [
+        "control_bus",
+        "service_port"
+      ],
+      "componentWordIds": [
+        "thermostat_input_terminal",
+        "modbus_room_controller_link",
+        "demand_signal_opto_isolator",
+        "installer_wiring_label"
+      ],
+      "componentNames": [
+        "thermostat input terminal",
+        "Modbus room controller link",
+        "demand signal opto-isolator",
+        "installer wiring label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "hmi_ergonomics:alarm_and_user_guidance",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "User And Installer Interface",
+      "subModuleId": "alarm_and_user_guidance",
+      "subModuleName": "Alarm and user guidance",
+      "purpose": "Communicates faults and safe user actions.",
+      "interfaces": [
+        "alarm_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "alarm_relay_output",
+        "user_quick_start_label",
+        "fault_reset_button",
+        "qr_service_documentation_label"
+      ],
+      "componentNames": [
+        "alarm relay output",
+        "user quick-start label",
+        "fault reset button",
+        "QR service documentation label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    }
+  ],
+  "criticalParts": [
+    {
+      "componentWordId": "inverter_scroll_compressor",
+      "label": "Inverter scroll compressor",
+      "allocated": true,
+      "moduleIds": [
+        "energy_conversion_transduction"
+      ],
+      "subModuleIds": [
+        "compressor_inverter_stage"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "outdoor_finned_evaporator_coil",
+      "label": "Outdoor finned evaporator coil",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "outdoor_evaporator"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "brazed_plate_heat_exchanger",
+      "label": "Brazed plate heat exchanger",
+      "allocated": true,
+      "moduleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "subModuleIds": [
+        "condenser_heat_exchanger"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "electronic_expansion_valve",
+      "label": "Electronic expansion valve",
+      "allocated": true,
+      "moduleIds": [
+        "energy_conversion_transduction"
+      ],
+      "subModuleIds": [
+        "expansion_metering_stage"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "variable_speed_fan_assembly",
+      "label": "Variable-speed fan assembly",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "fan_air_path"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "hydronic_circulation_pump",
+      "label": "Hydronic circulation pump",
+      "allocated": true,
+      "moduleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "subModuleIds": [
+        "circulation_pump_group"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "refrigerant_sensor_and_pressure_transducers",
+      "label": "Refrigerant sensor and pressure transducers",
+      "allocated": true,
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "subModuleIds": [
+        "refrigerant_sensing"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "heat_pump_controller_pcb",
+      "label": "Heat pump controller PCB",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "main_controller"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "hydronic_safety_valve_kit",
+      "label": "Hydronic safety valve kit",
+      "allocated": true,
+      "moduleIds": [
+        "mass_fluid_transport_process"
+      ],
+      "subModuleIds": [
+        "hydronic_safety_group"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    }
+  ],
+  "duplicateGroups": [],
+  "blockers": [],
+  "nextActions": []
+}

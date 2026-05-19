@@ -1,0 +1,254 @@
+{
+  "summary": {
+    "modules": 11,
+    "readyModules": 6,
+    "sourcingBlockedModules": 5,
+    "attentionModules": 0,
+    "criticalUnpricedLines": 6,
+    "issueCount": 0
+  },
+  "modules": [
+    {
+      "moduleId": "energy_storage_source",
+      "moduleName": "Energy Storage Source",
+      "status": "sourcing_blocked",
+      "subModuleCount": 6,
+      "componentCount": 29,
+      "interfaceCount": 8,
+      "requiredInterfaceEdges": 3,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "capacity_mwh"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "criticalUnpricedLines": [
+        "lfp_prismatic_cells",
+        "dc_contactor_or_breaker"
+      ],
+      "candidateUnpricedLines": 27,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "energy_conversion_transduction",
+      "moduleName": "Power Conversion System",
+      "status": "sourcing_blocked",
+      "subModuleCount": 4,
+      "componentCount": 20,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "criticalUnpricedLines": [
+        "pcs_inverter"
+      ],
+      "candidateUnpricedLines": 19,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "structure_containment",
+      "moduleName": "Container Structure And Fit-Out",
+      "status": "ready",
+      "subModuleCount": 4,
+      "componentCount": 17,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "mass_kg"
+      ],
+      "sanityCheckIds": [
+        "bess_container_energy_density"
+      ],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 17,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 17 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Sensing And Instrumentation",
+      "status": "ready",
+      "subModuleCount": 4,
+      "componentCount": 17,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 17,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 17 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute And Communication",
+      "status": "sourcing_blocked",
+      "subModuleCount": 4,
+      "componentCount": 17,
+      "interfaceCount": 7,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "power_mw"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration"
+      ],
+      "criticalUnpricedLines": [
+        "bms_master_controller"
+      ],
+      "candidateUnpricedLines": 16,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "safety_protection",
+      "moduleName": "Safety Protection And Interlocks",
+      "status": "sourcing_blocked",
+      "subModuleCount": 4,
+      "componentCount": 18,
+      "interfaceCount": 7,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "fire_detection_suppression"
+      ],
+      "candidateUnpricedLines": 17,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "environmental_interface",
+      "moduleName": "Environmental Interface",
+      "status": "ready",
+      "subModuleCount": 4,
+      "componentCount": 17,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 17,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 17 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "power_distribution",
+      "moduleName": "DC And AC Power Distribution",
+      "status": "ready",
+      "subModuleCount": 4,
+      "componentCount": 17,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "sanityCheckIds": [
+        "bess_c_rate",
+        "bess_duration",
+        "bess_container_energy_density"
+      ],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 17,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 17 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Maintenance And Serviceability",
+      "status": "ready",
+      "subModuleCount": 4,
+      "componentCount": 17,
+      "interfaceCount": 7,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "mass_kg"
+      ],
+      "sanityCheckIds": [
+        "bess_container_energy_density"
+      ],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 17,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 17 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "mass_fluid_transport_process",
+      "moduleName": "Coolant Circulation Process",
+      "status": "sourcing_blocked",
+      "subModuleCount": 4,
+      "componentCount": 18,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "thermal_management_loop"
+      ],
+      "candidateUnpricedLines": 17,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Operator HMI And Labelling",
+      "status": "ready",
+      "subModuleCount": 4,
+      "componentCount": 17,
+      "interfaceCount": 3,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 17,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 17 candidate line(s) remain for later sourcing."
+      ]
+    }
+  ]
+}

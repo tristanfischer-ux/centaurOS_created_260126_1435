@@ -1,0 +1,22 @@
+flowchart LR
+  skin_patient_interface["Skin Patient Interface"]
+  sensing_instrumentation["Glucose Sensing Instrumentation"]
+  actuation_kinematics["Applicator Insertion Mechanism"]
+  structure_containment["Transmitter Housing Structure"]
+  energy_storage_source["Wearable Energy Source"]
+  power_distribution["Low-Power Distribution"]
+  control_compute_communication["Control Compute Communication"]
+  environmental_interface["Wear Environment Compensation"]
+  safety_protection["Patient Safety Protection"]
+  maintenance_serviceability["Packaging Traceability Serviceability"]
+  skin_patient_interface -->|"interstitial_fluid_path"| sensing_instrumentation
+  actuation_kinematics -->|"insertion_path"| skin_patient_interface
+  sensing_instrumentation -->|"sensor_signal_bus"| control_compute_communication
+  sensing_instrumentation -->|"calibration_data_bus"| control_compute_communication
+  energy_storage_source -->|"cell_power_bus"| power_distribution
+  power_distribution -->|"analog_power_rail"| sensing_instrumentation
+  power_distribution -->|"low_power_rail"| control_compute_communication
+  environmental_interface -->|"temperature_compensation_bus"| control_compute_communication
+  control_compute_communication -->|"alarm_state_bus"| safety_protection
+  maintenance_serviceability -->|"sterile_boundary"| skin_patient_interface
+  classDef missing stroke:#a32626,stroke-width:3px,color:#a32626;

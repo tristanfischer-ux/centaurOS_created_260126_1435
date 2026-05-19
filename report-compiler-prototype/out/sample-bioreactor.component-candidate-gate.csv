@@ -1,0 +1,8 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+candidate_presence,pass,"108 candidate BoM line(s), 108 distinct component identity key(s).",1,,Component candidates exist for downstream sourcing review.
+candidate_identity,pass,"108/108 candidate line(s) have non-generic identity, description and role context.",1,,Candidate identities are specific enough for first-pass sourcing worklists.
+quantity_basis,pass,108/108 candidate line(s) have positive quantity and unit.,1,,Candidate quantities have positive values and explicit units.
+critical_candidate_coverage,pass,11/11 class-critical part(s) are represented by candidate lines; 11 critical BoM line(s).,1,,Class-critical parts have candidate lines before sourcing begins.
+duplicate_identity_review,pass,"0 duplicate component identity group(s), 0 involving critical lines.",1,,No duplicate component identities need sourcing review.
+sourcing_worklist_alignment,pass,108/108 unpriced candidate line(s) appear in the sourcing worklist.,1,,Every unpriced candidate line is visible in the sourcing worklist.
+provenance_boundary,pass,"0 source evidence row(s), 0 source-backed claim(s), 0 provenance violation(s).",1,,Candidate sourcing fields remain clean unless admitted evidence supplies them.

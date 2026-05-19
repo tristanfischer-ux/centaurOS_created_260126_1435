@@ -1,0 +1,150 @@
+{
+  "verdict": "interface_review_ready",
+  "summary": {
+    "rows": 3,
+    "acceptedRows": 0,
+    "reviewReadyRows": 3,
+    "pendingEvidenceRows": 0,
+    "deferredRows": 0,
+    "blockedRows": 0,
+    "presentContracts": 3,
+    "missingContracts": 0,
+    "carrierCompleteRows": 3,
+    "verificationActivityRows": 3,
+    "acceptedEvidenceRatio": 0,
+    "structuralPassRatio": 1
+  },
+  "rows": [
+    {
+      "id": "required:energy_storage_source:actuation_kinematics:power_bus",
+      "interfaceId": "power_bus",
+      "fromModuleId": "energy_storage_source",
+      "fromModuleName": "Flight Energy Storage",
+      "toModuleId": "actuation_kinematics",
+      "toModuleName": "Propulsion And Flight Actuation",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "flight_battery_pack",
+        "power_monitoring"
+      ],
+      "toCarrierSubModules": [
+        "motor_sets",
+        "esc_stack"
+      ],
+      "componentWordIds": [
+        "flight_battery_pack",
+        "high_discharge_cell_group",
+        "battery_management_pcb",
+        "xt90_anti_spark_connector",
+        "pack_temperature_sensor",
+        "power_module_shunt",
+        "voltage_divider_board",
+        "low_voltage_alarm_output",
+        "battery_telemetry_connector",
+        "brushless_motors",
+        "motor_mounting_screw_set",
+        "motor_phase_lead_set",
+        "motor_bearing_shield",
+        "esc",
+        "esc_cooling_plate",
+        "pwm_signal_harness",
+        "current_telemetry_line",
+        "esc_conformal_coating"
+      ],
+      "verificationActivityId": "interface_review:energy_storage_source:actuation_kinematics:power_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:control_compute_communication:actuation_kinematics:motor_drive",
+      "interfaceId": "motor_drive",
+      "fromModuleId": "control_compute_communication",
+      "fromModuleName": "Flight Control Compute And Communications",
+      "toModuleId": "actuation_kinematics",
+      "toModuleName": "Propulsion And Flight Actuation",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "flight_controller_stack"
+      ],
+      "toCarrierSubModules": [
+        "motor_sets",
+        "esc_stack"
+      ],
+      "componentWordIds": [
+        "flight_controller",
+        "imu_vibration_isolation_mount",
+        "barometer_foam_cover",
+        "sd_card_flight_logger",
+        "failsafe_firmware_profile",
+        "brushless_motors",
+        "motor_mounting_screw_set",
+        "motor_phase_lead_set",
+        "motor_bearing_shield",
+        "esc",
+        "esc_cooling_plate",
+        "pwm_signal_harness",
+        "current_telemetry_line",
+        "esc_conformal_coating"
+      ],
+      "verificationActivityId": "interface_review:control_compute_communication:actuation_kinematics:motor_drive",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:control_compute_communication:sensing_instrumentation:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "fromModuleId": "control_compute_communication",
+      "fromModuleName": "Flight Control Compute And Communications",
+      "toModuleId": "sensing_instrumentation",
+      "toModuleName": "Navigation And Cinematography Sensing",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "flight_controller_stack",
+        "radio_navigation_link"
+      ],
+      "toCarrierSubModules": [
+        "navigation_sensors",
+        "health_sensing"
+      ],
+      "componentWordIds": [
+        "flight_controller",
+        "imu_vibration_isolation_mount",
+        "barometer_foam_cover",
+        "sd_card_flight_logger",
+        "failsafe_firmware_profile",
+        "radio_and_gnss_link",
+        "gnss_antenna_mast",
+        "rc_receiver",
+        "telemetry_radio_module",
+        "antenna_diversity_mount",
+        "magnetometer_module",
+        "rangefinder_altimeter",
+        "optical_flow_sensor",
+        "airspeed_estimate_port",
+        "vibration_monitor_pad",
+        "payload_presence_switch",
+        "avionics_temperature_probe",
+        "landing_contact_switch"
+      ],
+      "verificationActivityId": "interface_review:control_compute_communication:sensing_instrumentation:sensor_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Collect named interface-review evidence through verification intake."
+  ]
+}

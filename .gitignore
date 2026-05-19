@@ -126,3 +126,9 @@ state-*.json
 # Phase-N iteration scratch dirs at repo root
 /phase[0-9]*/
 /iter-[0-9]*/
+
+# Phase-5 state snapshots + rendered PDFs at repo root (generated per-class)
+/radical-phase5-*.json
+/radical-phase5-*.pdf
+/radical-phase[0-9]*.json
+/radical-phase[0-9]*.pdf

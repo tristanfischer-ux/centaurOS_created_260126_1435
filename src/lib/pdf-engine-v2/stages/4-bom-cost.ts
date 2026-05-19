@@ -28,6 +28,7 @@ import { sanitiseLlmOutput } from '../sanitiser'
 import { BOM_GENERATION_SYSTEM } from '../prompts'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 import { parseJsonFromLlm } from '../lib/llm-json'
+import { getActionLogger } from '../lib/action-logger'
 import { REQUIRED_PARTS } from '../lib/required-parts-manifest'
 import { classifyRegime } from '../lib/part-regime'
 import { routePartLookup } from '../lib/regime-router'
@@ -63,6 +64,7 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
   for (const model of models) {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 300_000)
+    const t0 = Date.now()
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
@@ -86,10 +88,20 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
       clearTimeout(timeout)
 
       if (!response.ok) {
+        getActionLogger().logLlm({ step_name: 'bom_cost', model, latency_ms: Date.now() - t0, ok: false, error: `OpenRouter ${response.status}` })
         throw new Error(`OpenRouter ${model} returned ${response.status}`)
       }
 
       const json = await response.json()
+      getActionLogger().logLlm({
+        step_name: 'bom_cost',
+        model,
+        prompt_tokens: json?.usage?.prompt_tokens,
+        completion_tokens: json?.usage?.completion_tokens,
+        latency_ms: Date.now() - t0,
+        finish_reason: json?.choices?.[0]?.finish_reason,
+        ok: true,
+      })
       const msg = json.choices?.[0]?.message
       let raw = msg?.content || msg?.reasoning || ''
       if (!raw && msg?.reasoning_details?.length) {

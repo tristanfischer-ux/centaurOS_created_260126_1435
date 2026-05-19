@@ -1,0 +1,7 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+brief_intake_clearance,review,5/6 intake areas pass; class bioreactor (high); 1 quantified requirement(s).,0.83,,Treat generated architecture as review-only until recommended clarification questions are answered.
+clarification_clearance,review,"4 clarification question(s): 0 required, 3 recommended, 0 architecture-blocking.",1,,Keep the architecture labelled as review-only until recommended brief clarifications are answered.
+class_grammar_clearance,pass,Product class bioreactor; scratch universal grammar supported: yes.,1,,Route this class through the scratch universal module grammar.
+scratch_stage_clearance,pass,Architecture stage passed; source scratch_universal_architecture; modules 9; submodules 27; components 108.,1,,Architecture was produced by the scratch universal architecture stage.
+architecture_readiness_boundary,pass,Architecture ready for BoM: yes; blocking issues 0; required links 6/6.,1,,Deterministic architecture readiness checks passed; sourcing work may begin only with explicit evidence.
+bom_provenance_hold,pass,"0 admitted sourcing evidence row(s), 0 source-backed BoM claim(s), 0 provenance violation(s).",1,,BoM fields remain behind the explicit sourcing-evidence boundary.

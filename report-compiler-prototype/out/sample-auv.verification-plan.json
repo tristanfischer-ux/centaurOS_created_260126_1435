@@ -1,0 +1,1165 @@
+{
+  "summary": {
+    "activities": 37,
+    "readyForReview": 24,
+    "open": 6,
+    "blocked": 7,
+    "designReviewActivities": 9,
+    "calculationActivities": 7,
+    "interfaceReviewActivities": 8,
+    "sourceEvidenceActivities": 7,
+    "complianceReviewActivities": 6
+  },
+  "activities": [
+    {
+      "id": "design_review:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Pressure Structure Containment",
+      "activity": "Review Pressure Structure Containment architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "depth_rating_m"
+      ],
+      "sanityCheckIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [
+        "pressure_boundary",
+        "mechanical_mounts",
+        "service_access",
+        "hydrodynamic_shell"
+      ],
+      "componentWordIds": [
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port",
+        "electronics_tray_rail",
+        "battery_cradle_frame",
+        "payload_mounting_rail",
+        "trim_weight_pocket",
+        "nose_fairing",
+        "tail_cone_fairing",
+        "stabilising_fin_set",
+        "access_hatch_latch_set"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Pressure Structure Containment",
+      "activity": "Verify Pressure Structure Containment requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "depth_rating_m"
+      ],
+      "sanityCheckIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Pressure Structure Containment",
+      "activity": "Collect source-backed evidence for Pressure Structure Containment critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "depth_rating_m"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "pressure_hull"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "pressure_hull"
+      ]
+    },
+    {
+      "id": "design_review:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Subsea Energy Storage",
+      "activity": "Review Subsea Energy Storage architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [
+        "dc_power_bus",
+        "battery_monitor_bus",
+        "service_access",
+        "thermal_path",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "battery_pack",
+        "battery_management_board",
+        "pack_isolation_fuse",
+        "pressure_rated_battery_enclosure",
+        "charge_interlock_plug",
+        "shore_charger_adapter",
+        "state_of_charge_display_puck",
+        "battery_vent_inspection_plug",
+        "coulomb_counter_module",
+        "pack_temperature_sensor_strip",
+        "energy_reserve_indicator",
+        "battery_telemetry_isolator"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Subsea Energy Storage",
+      "activity": "Verify Subsea Energy Storage requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Subsea Energy Storage",
+      "activity": "Collect source-backed evidence for Subsea Energy Storage critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "battery_pack"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "battery_pack"
+      ]
+    },
+    {
+      "id": "design_review:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Subsea Power Distribution",
+      "activity": "Review Subsea Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [
+        "dc_power_bus",
+        "thruster_power_bus",
+        "payload_power_bus",
+        "low_voltage_rail",
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor",
+        "24_v_dc_converter",
+        "12_v_payload_converter",
+        "5_v_avionics_converter",
+        "emi_power_filter",
+        "ground_fault_monitor",
+        "chassis_bonding_strap",
+        "service_isolation_key",
+        "fault_annunciator_module"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Subsea Power Distribution",
+      "activity": "Verify Subsea Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Subsea Power Distribution",
+      "activity": "Collect source-backed evidence for Subsea Power Distribution critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "wet_mate_connector_set"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "wet_mate_connector_set"
+      ]
+    },
+    {
+      "id": "design_review:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Thruster Actuation Kinematics",
+      "activity": "Review Thruster Actuation Kinematics architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [
+        "thruster_power_bus",
+        "thrust_command_bus",
+        "mechanical_mounts",
+        "hydrodynamic_shell",
+        "alarm_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness",
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table",
+        "adjustable_trim_fin",
+        "ballast_trim_block",
+        "roll_trim_screw_set",
+        "tow_tank_trim_mark"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Thruster Actuation Kinematics",
+      "activity": "Verify Thruster Actuation Kinematics requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Thruster Actuation Kinematics",
+      "activity": "Collect source-backed evidence for Thruster Actuation Kinematics critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "thruster_set"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "thruster_set"
+      ]
+    },
+    {
+      "id": "design_review:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Compute Communication",
+      "activity": "Review Autonomy Compute Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [
+        "navigation_sensor_bus",
+        "payload_data_bus",
+        "thrust_command_bus",
+        "acoustic_link",
+        "alarm_bus",
+        "service_access",
+        "battery_monitor_bus"
+      ],
+      "componentWordIds": [
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder",
+        "acoustic_modem",
+        "acoustic_transducer_mount",
+        "acoustic_isolation_pad",
+        "surface_command_protocol_adapter",
+        "failsafe_state_machine",
+        "time_sync_module",
+        "configuration_backup_storage",
+        "debug_service_port"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Compute Communication",
+      "activity": "Verify Autonomy Compute Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Autonomy Compute Communication",
+      "activity": "Collect source-backed evidence for Autonomy Compute Communication critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "endurance_hours"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "mission_computer",
+        "acoustic_modem"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "mission_computer",
+        "acoustic_modem"
+      ]
+    },
+    {
+      "id": "design_review:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Payload Sensing",
+      "activity": "Review Navigation And Payload Sensing architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "navigation_sensor_bus",
+        "payload_data_bus",
+        "pressure_boundary",
+        "acoustic_link",
+        "service_access",
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "dvl",
+        "inertial_navigation_unit",
+        "magnetic_compass_module",
+        "gnss_surface_receiver",
+        "depth_and_pressure_sensor",
+        "water_temperature_probe",
+        "conductivity_sensor",
+        "internal_humidity_sensor",
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Payload Sensing",
+      "activity": "Collect source-backed evidence for Navigation And Payload Sensing critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "dvl",
+        "inertial_navigation_unit",
+        "depth_and_pressure_sensor",
+        "forward_sonar_payload"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "dvl",
+        "inertial_navigation_unit",
+        "depth_and_pressure_sensor",
+        "forward_sonar_payload"
+      ]
+    },
+    {
+      "id": "design_review:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Pressure Thermal Buoyancy Interface",
+      "activity": "Review Pressure Thermal Buoyancy Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "depth_rating_m"
+      ],
+      "sanityCheckIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [
+        "pressure_boundary",
+        "thermal_path",
+        "buoyancy_trim",
+        "service_access",
+        "hydrodynamic_shell",
+        "mechanical_mounts"
+      ],
+      "componentWordIds": [
+        "cable_penetrator_seal",
+        "pressure_compensation_bladder",
+        "oil_fill_service_port",
+        "pressure_equalisation_valve",
+        "electronics_thermal_bridge",
+        "hull_heat_spreader_plate",
+        "battery_thermal_pad",
+        "thruster_heat_sink_collar",
+        "syntactic_foam_block_set",
+        "ballast_rail",
+        "buoyancy_calibration_tag",
+        "field_trim_worksheet"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Pressure Thermal Buoyancy Interface",
+      "activity": "Verify Pressure Thermal Buoyancy Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "depth_rating_m"
+      ],
+      "sanityCheckIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Leak Abort And Recovery Safety",
+      "activity": "Review Leak Abort And Recovery Safety architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "depth_rating_m"
+      ],
+      "sanityCheckIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [
+        "leak_alarm_bus",
+        "alarm_bus",
+        "pressure_boundary",
+        "dc_power_bus",
+        "service_access",
+        "acoustic_link"
+      ],
+      "componentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad",
+        "recovery_beacon",
+        "drop_weight_release",
+        "emergency_strobe",
+        "surface_flag_float",
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Leak Abort And Recovery Safety",
+      "activity": "Verify Leak Abort And Recovery Safety requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "depth_rating_m"
+      ],
+      "sanityCheckIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Leak Abort And Recovery Safety",
+      "activity": "Collect source-backed evidence for Leak Abort And Recovery Safety critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "depth_rating_m"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "leak_detection_sensor",
+        "recovery_beacon"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "leak_detection_sensor",
+        "recovery_beacon"
+      ]
+    },
+    {
+      "id": "design_review:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Deck Recovery And Service",
+      "activity": "Review Deck Recovery And Service architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "service_access",
+        "mechanical_mounts",
+        "pressure_boundary",
+        "dc_power_bus",
+        "hydrodynamic_shell"
+      ],
+      "componentWordIds": [
+        "lifting_bridle",
+        "deck_recovery_handle",
+        "launch_cradle_interface",
+        "tow_point_fitting",
+        "o_ring_grease_kit",
+        "vacuum_leak_test_port",
+        "diagnostic_connector",
+        "service_checklist_card",
+        "transport_cradle",
+        "protective_nose_cover",
+        "desiccant_cartridge",
+        "maintenance_log_tag"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:energy_storage_source:power_distribution:dc_power_bus",
+      "moduleId": "energy_storage_source:power_distribution",
+      "moduleName": "Subsea Energy Storage -> Subsea Power Distribution",
+      "activity": "Verify dc_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "dc_power_bus"
+      ],
+      "componentWordIds": [
+        "battery_pack",
+        "battery_management_board",
+        "pack_isolation_fuse",
+        "pressure_rated_battery_enclosure",
+        "charge_interlock_plug",
+        "shore_charger_adapter",
+        "state_of_charge_display_puck",
+        "battery_vent_inspection_plug",
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor",
+        "ground_fault_monitor",
+        "chassis_bonding_strap",
+        "service_isolation_key",
+        "fault_annunciator_module"
+      ],
+      "rationale": "Battery energy must enter protected DC distribution through an explicit bus.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:power_distribution:actuation_kinematics:thruster_power_bus",
+      "moduleId": "power_distribution:actuation_kinematics",
+      "moduleName": "Subsea Power Distribution -> Thruster Actuation Kinematics",
+      "activity": "Verify thruster_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "thruster_power_bus"
+      ],
+      "componentWordIds": [
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor",
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness",
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table"
+      ],
+      "rationale": "Thrusters must receive protected power separately from avionics and payload rails.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "moduleId": "control_compute_communication:actuation_kinematics",
+      "moduleName": "Autonomy Compute Communication -> Thruster Actuation Kinematics",
+      "activity": "Verify thrust_command_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "thrust_command_bus"
+      ],
+      "componentWordIds": [
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder",
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness",
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table"
+      ],
+      "rationale": "Mission control must command thruster drive states over a declared control interface.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Navigation And Payload Sensing -> Autonomy Compute Communication",
+      "activity": "Verify navigation_sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "navigation_sensor_bus"
+      ],
+      "componentWordIds": [
+        "dvl",
+        "inertial_navigation_unit",
+        "magnetic_compass_module",
+        "gnss_surface_receiver",
+        "depth_and_pressure_sensor",
+        "water_temperature_probe",
+        "conductivity_sensor",
+        "internal_humidity_sensor",
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module",
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder"
+      ],
+      "rationale": "DVL, INS and depth data must feed navigation fusion before mission autonomy is credible.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Navigation And Payload Sensing -> Autonomy Compute Communication",
+      "activity": "Verify payload_data_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "payload_data_bus"
+      ],
+      "componentWordIds": [
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module",
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder"
+      ],
+      "rationale": "Inspection payload data must be logged or acted on by the mission computer.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:environmental_interface:structure_containment:pressure_boundary",
+      "moduleId": "environmental_interface:structure_containment",
+      "moduleName": "Pressure Thermal Buoyancy Interface -> Pressure Structure Containment",
+      "activity": "Verify pressure_boundary interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "pressure_boundary"
+      ],
+      "componentWordIds": [
+        "cable_penetrator_seal",
+        "pressure_compensation_bladder",
+        "oil_fill_service_port",
+        "pressure_equalisation_valve",
+        "electronics_thermal_bridge",
+        "hull_heat_spreader_plate",
+        "battery_thermal_pad",
+        "thruster_heat_sink_collar",
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port"
+      ],
+      "rationale": "Hull, penetrators, thermal path and buoyancy hardware must share one depth-rated boundary model.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:safety_protection:control_compute_communication:alarm_bus",
+      "moduleId": "safety_protection:control_compute_communication",
+      "moduleName": "Leak Abort And Recovery Safety -> Autonomy Compute Communication",
+      "activity": "Verify alarm_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "alarm_bus"
+      ],
+      "componentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad",
+        "recovery_beacon",
+        "drop_weight_release",
+        "emergency_strobe",
+        "surface_flag_float",
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug",
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder",
+        "acoustic_modem",
+        "acoustic_transducer_mount",
+        "acoustic_isolation_pad",
+        "surface_command_protocol_adapter",
+        "failsafe_state_machine",
+        "time_sync_module",
+        "configuration_backup_storage",
+        "debug_service_port"
+      ],
+      "rationale": "Leak, over-depth and recovery alarms must drive fail-safe mission states.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:safety_protection:structure_containment:pressure_boundary",
+      "moduleId": "safety_protection:structure_containment",
+      "moduleName": "Leak Abort And Recovery Safety -> Pressure Structure Containment",
+      "activity": "Verify pressure_boundary interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "pressure_boundary"
+      ],
+      "componentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad",
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug",
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port"
+      ],
+      "rationale": "Leak and over-depth protection must reference the same pressure boundary as the hull design.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "compliance_review:PRESSURE-BOUNDARY-REVIEW",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for PRESSURE-BOUNDARY-REVIEW",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Depth-rated pressure boundary review",
+      "acceptanceCriteria": [
+        "Depth rating calculation, hull material allowables, endcap seal design and proof-pressure plan."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:SUBSEA-LEAK-ABORT-REVIEW",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for SUBSEA-LEAK-ABORT-REVIEW",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Leak detection and abort-state review",
+      "acceptanceCriteria": [
+        "Leak sensor placement, abort state machine, battery isolation and recovery procedure."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:EMC-MARINE-COMMS-REVIEW",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for EMC-MARINE-COMMS-REVIEW",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Marine communications and EMC review",
+      "acceptanceCriteria": [
+        "Acoustic modem integration, antenna/transducer mounting, cable shielding and data-loss behaviour."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:1",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Pressure hull or seal failure at depth",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 120; mitigation: Depth-rated pressure calculation, hydrostatic proof test, leak test and seal inspection workflow.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:2",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Loss of navigation or communications underwater",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 160; mitigation: DVL/INS/depth fusion, acoustic link health monitoring and timed abort behaviour.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:3",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Unable to recover vehicle after abort",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 96; mitigation: Recovery beacon, drop-weight/recovery procedure, deck handling points and mission reserve energy.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    }
+  ]
+}

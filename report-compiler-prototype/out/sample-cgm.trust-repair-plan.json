@@ -1,0 +1,190 @@
+{
+  "summary": {
+    "trustVerdict": "evidence_blocked",
+    "packages": 6,
+    "readyPackages": 6,
+    "waitingPackages": 0,
+    "closureRows": 64,
+    "trustBlockers": 61,
+    "nextPackage": "sourcing_intake"
+  },
+  "packages": [
+    {
+      "id": "sourcing_intake",
+      "sequence": 2,
+      "title": "Admit Source-Backed BoM Claims",
+      "status": "ready",
+      "gateAreas": [
+        "claim_evidence",
+        "bom_provenance"
+      ],
+      "closureRows": 15,
+      "trustBlockers": 52,
+      "requiredInputs": [
+        "Supplier, manufacturer, MPN, unit cost, lead time, retrieved-at timestamp and source reference for critical BoM lines.",
+        "Rejected or duplicate component identities resolved before pricing shared items."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.component-identity.csv"
+      ],
+      "exitCriteria": [
+        "BoM provenance has zero critical missing-source claims.",
+        "Claim Evidence Gate BoM sourcing area is no longer evidence_blocked."
+      ],
+      "topBlockers": [
+        "architecture design has 0 blocked/source-required claim(s) and 40 review-required claim(s).",
+        "engineering math has 2 blocked/source-required claim(s) and 4 review-required claim(s).",
+        "bom sourcing has 60 blocked/source-required claim(s) and 108 review-required claim(s).",
+        "compliance risk has 0 blocked/source-required claim(s) and 8 review-required claim(s).",
+        "skin_patient_interface_adhesive_patch_stack_adhesive_skin_patch/supplier: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.",
+        "skin_patient_interface_adhesive_patch_stack_adhesive_skin_patch/manufacturer: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.",
+        "skin_patient_interface_adhesive_patch_stack_adhesive_skin_patch/mpn: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.",
+        "skin_patient_interface_adhesive_patch_stack_adhesive_skin_patch/unit_cost_gbp: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.",
+        "sensing_instrumentation_glucose_filament_stack_glucose_sensing_filament/supplier: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.",
+        "sensing_instrumentation_glucose_filament_stack_glucose_sensing_filament/manufacturer: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.",
+        "sensing_instrumentation_glucose_filament_stack_glucose_sensing_filament/mpn: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.",
+        "sensing_instrumentation_glucose_filament_stack_glucose_sensing_filament/unit_cost_gbp: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.",
+        "sensing_instrumentation_glucose_filament_stack_enzyme_reagent_membrane/supplier: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.",
+        "sensing_instrumentation_glucose_filament_stack_enzyme_reagent_membrane/manufacturer: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.",
+        "sensing_instrumentation_glucose_filament_stack_enzyme_reagent_membrane/mpn: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass.",
+        "sensing_instrumentation_glucose_filament_stack_enzyme_reagent_membrane/unit_cost_gbp: Admit source-backed supplier/manufacturer/MPN/unit-cost evidence before BoM can pass."
+      ]
+    },
+    {
+      "id": "engineering_review",
+      "sequence": 3,
+      "title": "Resolve Engineering Review Questions",
+      "status": "ready",
+      "gateAreas": [
+        "claim_evidence",
+        "requirement_assurance"
+      ],
+      "closureRows": 11,
+      "trustBlockers": 4,
+      "requiredInputs": [
+        "Accepted/corrected/rejected answers to review-pack questions.",
+        "Calculation and assumption decisions tied to reviewer evidence references."
+      ],
+      "sourceArtifacts": [
+        "*.engineering-review-pack.csv",
+        "*.engineering-assurance-matrix.csv",
+        "*.engineering-assumptions.csv",
+        "*.engineering-calculations.csv"
+      ],
+      "exitCriteria": [
+        "Requirement assurance rows have accepted or explicitly deferred engineering review evidence.",
+        "Generated architecture and calculation claims are accepted, corrected or rejected."
+      ],
+      "topBlockers": [
+        "architecture design has 0 blocked/source-required claim(s) and 40 review-required claim(s).",
+        "engineering math has 2 blocked/source-required claim(s) and 4 review-required claim(s).",
+        "bom sourcing has 60 blocked/source-required claim(s) and 108 review-required claim(s).",
+        "compliance risk has 0 blocked/source-required claim(s) and 8 review-required claim(s)."
+      ]
+    },
+    {
+      "id": "verification_intake",
+      "sequence": 4,
+      "title": "Admit Reviewer Verification Evidence",
+      "status": "ready",
+      "gateAreas": [
+        "reviewer_evidence"
+      ],
+      "closureRows": 37,
+      "trustBlockers": 0,
+      "requiredInputs": [
+        "Accepted, rejected or deferred verification evidence for every non-source verification activity."
+      ],
+      "sourceArtifacts": [
+        "*.verification-intake-template.csv",
+        "*.verification-plan.csv",
+        "*.verification-ledger.csv"
+      ],
+      "exitCriteria": [
+        "Every non-source verification activity has accepted reviewer evidence or an explicit defer decision."
+      ],
+      "topBlockers": []
+    },
+    {
+      "id": "evidence_authenticity_review",
+      "sequence": 5,
+      "title": "Validate Evidence Authenticity",
+      "status": "ready",
+      "gateAreas": [
+        "evidence_authenticity"
+      ],
+      "closureRows": 0,
+      "trustBlockers": 0,
+      "requiredInputs": [
+        "Production supplier/catalogue URLs for BoM source records.",
+        "Named reviewer evidence references that are not protocol fixtures."
+      ],
+      "sourceArtifacts": [
+        "*.evidence-authenticity-gate.csv",
+        "*.sourcing-ledger.csv",
+        "*.verification-ledger.csv",
+        "*.claim-ledger.csv"
+      ],
+      "exitCriteria": [
+        "Evidence Authenticity Gate verdict is production_ready.",
+        "No protocol_fixture, unknown_reference or missing_metadata evidence rows remain."
+      ],
+      "topBlockers": []
+    },
+    {
+      "id": "compliance_risk_review",
+      "sequence": 6,
+      "title": "Review Compliance And Risk Claims",
+      "status": "ready",
+      "gateAreas": [
+        "claim_evidence"
+      ],
+      "closureRows": 0,
+      "trustBlockers": 4,
+      "requiredInputs": [
+        "Compliance-domain review of class-pack standards, hazards and mitigation claims."
+      ],
+      "sourceArtifacts": [
+        "*.claim-ledger.csv",
+        "*.engineering-review-pack.csv"
+      ],
+      "exitCriteria": [
+        "Compliance and risk claims are accepted, corrected or rejected by a domain reviewer."
+      ],
+      "topBlockers": [
+        "architecture design has 0 blocked/source-required claim(s) and 40 review-required claim(s).",
+        "engineering math has 2 blocked/source-required claim(s) and 4 review-required claim(s).",
+        "bom sourcing has 60 blocked/source-required claim(s) and 108 review-required claim(s).",
+        "compliance risk has 0 blocked/source-required claim(s) and 8 review-required claim(s)."
+      ]
+    },
+    {
+      "id": "score_repair",
+      "sequence": 7,
+      "title": "Repair Residual Section Scores",
+      "status": "ready",
+      "gateAreas": [
+        "section_scores"
+      ],
+      "closureRows": 1,
+      "trustBlockers": 1,
+      "requiredInputs": [
+        "A rerun after evidence intake, plus score-ledger fixes for any section still below target."
+      ],
+      "sourceArtifacts": [
+        "*.score-ledger.csv",
+        "*.readiness-gate.csv",
+        "*.document-trust-gate.csv"
+      ],
+      "exitCriteria": [
+        "All scored sections are at or above target and Document Trust Gate is no longer blocked by scoring."
+      ],
+      "topBlockers": [
+        "bom: score 1 below 8"
+      ]
+    }
+  ]
+}

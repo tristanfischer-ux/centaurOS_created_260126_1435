@@ -1,0 +1,104 @@
+{
+  "summary": {
+    "rows": 4,
+    "readyRows": 4,
+    "blockedRows": 0,
+    "architectureRevisionRows": 0,
+    "sourcingIntakeRows": 1,
+    "engineeringReviewRows": 1,
+    "verificationIntakeRows": 2,
+    "nextRowId": "freeze-close:1:module_structure",
+    "freezeVerdict": "architecture_freeze_review_required",
+    "structurallyReadyForSourcing": true,
+    "independentReviewAccepted": false
+  },
+  "rows": [
+    {
+      "id": "freeze-close:1:module_structure",
+      "sequence": 1,
+      "area": "module_structure",
+      "closurePath": "sourcing_intake",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "issue": "Component allocation allocation_ready; module engineering module_engineering_review_required; 0/10 modules pass; 5 modules still have critical sourcing blocks.",
+      "requiredEvidence": "Treat the architecture as review-ready until module review questions and critical sourcing blocks close.",
+      "acceptanceCriteria": [
+        "Module engineering verdict is module_engineering_ready.",
+        "No module has blocked allocation or unresolved critical sourcing blockers.",
+        "Every module review question is accepted, revised or explicitly deferred."
+      ],
+      "inputArtifacts": [
+        "*.module-engineering-gate.csv",
+        "*.component-allocation-gate.csv",
+        "*.engineering-review-pack.csv",
+        "*.sourcing-intake-template.csv"
+      ],
+      "blockedBy": [],
+      "exitVerdict": "module_engineering_ready"
+    },
+    {
+      "id": "freeze-close:2:interface_contracts",
+      "sequence": 2,
+      "area": "interface_contracts",
+      "closurePath": "verification_intake",
+      "priority": "minor",
+      "status": "ready_for_intake",
+      "issue": "Interface verification interface_review_ready; 4/4 required interfaces have carriers; 0 accepted.",
+      "requiredEvidence": "Collect or accept interface-review evidence before calling the architecture fully frozen.",
+      "acceptanceCriteria": [
+        "Interface verification verdict is accepted_interfaces.",
+        "Every required interface has endpoint carriers and accepted reviewer evidence."
+      ],
+      "inputArtifacts": [
+        "*.interface-contracts.json",
+        "*.interface-verification-gate.csv",
+        "*.verification-intake-template.csv"
+      ],
+      "blockedBy": [],
+      "exitVerdict": "accepted_interfaces"
+    },
+    {
+      "id": "freeze-close:3:requirement_coverage",
+      "sequence": 3,
+      "area": "requirement_coverage",
+      "closurePath": "verification_intake",
+      "priority": "minor",
+      "status": "ready_for_intake",
+      "issue": "Requirement coverage coverage_review_ready; 2/2 requirements structurally ready or accepted; accepted ratio 0.",
+      "requiredEvidence": "Requirement coverage is structurally ready; collect accepted reviewer evidence before full freeze.",
+      "acceptanceCriteria": [
+        "Requirement coverage verdict is accepted_evidence.",
+        "Every parsed requirement has architecture links and accepted verification evidence."
+      ],
+      "inputArtifacts": [
+        "*.requirement-coverage-gate.csv",
+        "*.engineering-assurance-matrix.csv",
+        "*.verification-intake-template.csv"
+      ],
+      "blockedBy": [],
+      "exitVerdict": "accepted_evidence"
+    },
+    {
+      "id": "freeze-close:4:engineering_review_state",
+      "sequence": 4,
+      "area": "engineering_review_state",
+      "closurePath": "engineering_review",
+      "priority": "major",
+      "status": "ready_for_intake",
+      "issue": "Pre-BoM engineering engineering_review_ready; 5/6 areas pass; calculations needing review 0; assumptions needing review 18.",
+      "requiredEvidence": "Keep architecture labelled review-ready until calculations, assumptions and verification evidence are accepted.",
+      "acceptanceCriteria": [
+        "Pre-BoM engineering verdict is engineering_accepted.",
+        "Calculations, assumptions and verification activities are accepted or explicitly deferred."
+      ],
+      "inputArtifacts": [
+        "*.pre-bom-engineering-gate.csv",
+        "*.engineering-calculations.csv",
+        "*.engineering-assumptions.csv",
+        "*.verification-plan.csv"
+      ],
+      "blockedBy": [],
+      "exitVerdict": "engineering_accepted"
+    }
+  ]
+}

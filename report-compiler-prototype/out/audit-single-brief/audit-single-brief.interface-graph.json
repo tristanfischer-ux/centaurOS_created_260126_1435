@@ -1,0 +1,946 @@
+{
+  "nodes": [
+    {
+      "id": "power_distribution",
+      "label": "AC Input And DC Output Distribution",
+      "kind": "module"
+    },
+    {
+      "id": "power_distribution.ac_input_switchgear",
+      "label": "AC input switchgear",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.dc_output_switchgear",
+      "label": "DC output switchgear",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "power_distribution.billing_metering_branch",
+      "label": "Billing metering branch",
+      "kind": "submodule",
+      "moduleId": "power_distribution"
+    },
+    {
+      "id": "energy_conversion_transduction",
+      "label": "Power Conversion Stack",
+      "kind": "module"
+    },
+    {
+      "id": "energy_conversion_transduction.rectifier_power_modules",
+      "label": "Rectifier power modules",
+      "kind": "submodule",
+      "moduleId": "energy_conversion_transduction"
+    },
+    {
+      "id": "energy_conversion_transduction.output_filtering",
+      "label": "Output filtering",
+      "kind": "submodule",
+      "moduleId": "energy_conversion_transduction"
+    },
+    {
+      "id": "energy_conversion_transduction.converter_supervision",
+      "label": "Converter supervision",
+      "kind": "submodule",
+      "moduleId": "energy_conversion_transduction"
+    },
+    {
+      "id": "charging_connector_interface",
+      "label": "Vehicle Charging Interface",
+      "kind": "module"
+    },
+    {
+      "id": "charging_connector_interface.ccs2_cable_connector",
+      "label": "CCS2 cable connector",
+      "kind": "submodule",
+      "moduleId": "charging_connector_interface"
+    },
+    {
+      "id": "charging_connector_interface.connector_cooling_coupling",
+      "label": "Connector cooling coupling",
+      "kind": "submodule",
+      "moduleId": "charging_connector_interface"
+    },
+    {
+      "id": "charging_connector_interface.vehicle_communication_frontend",
+      "label": "Vehicle communication frontend",
+      "kind": "submodule",
+      "moduleId": "charging_connector_interface"
+    },
+    {
+      "id": "control_compute_communication",
+      "label": "Control Compute Communication",
+      "kind": "module"
+    },
+    {
+      "id": "control_compute_communication.charge_controller",
+      "label": "Charge controller",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.backend_gateway",
+      "label": "Backend gateway",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "control_compute_communication.protocol_stack",
+      "label": "Vehicle protocol stack",
+      "kind": "submodule",
+      "moduleId": "control_compute_communication"
+    },
+    {
+      "id": "sensing_instrumentation",
+      "label": "Metering And Electrical Sensing",
+      "kind": "module"
+    },
+    {
+      "id": "sensing_instrumentation.energy_metering",
+      "label": "Energy metering",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.insulation_fault_detection",
+      "label": "Insulation fault detection",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "sensing_instrumentation.connector_sensing",
+      "label": "Connector sensing",
+      "kind": "submodule",
+      "moduleId": "sensing_instrumentation"
+    },
+    {
+      "id": "environmental_interface",
+      "label": "Thermal And Environmental Interface",
+      "kind": "module"
+    },
+    {
+      "id": "environmental_interface.liquid_cooling_loop",
+      "label": "Liquid cooling loop",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.thermal_air_path",
+      "label": "Thermal air path",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "environmental_interface.weatherproofing",
+      "label": "Weatherproofing",
+      "kind": "submodule",
+      "moduleId": "environmental_interface"
+    },
+    {
+      "id": "structure_containment",
+      "label": "Cabinet Structure And Containment",
+      "kind": "module"
+    },
+    {
+      "id": "structure_containment.outdoor_cabinet",
+      "label": "Outdoor cabinet",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.cable_holster_boom",
+      "label": "Cable holster and boom",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "structure_containment.internal_compartmentation",
+      "label": "Internal compartmentation",
+      "kind": "submodule",
+      "moduleId": "structure_containment"
+    },
+    {
+      "id": "safety_protection",
+      "label": "Safety Protection",
+      "kind": "module"
+    },
+    {
+      "id": "safety_protection.emergency_stop_chain",
+      "label": "Emergency stop chain",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.dc_fault_protection",
+      "label": "DC fault protection",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "safety_protection.user_access_protection",
+      "label": "User access protection",
+      "kind": "submodule",
+      "moduleId": "safety_protection"
+    },
+    {
+      "id": "maintenance_serviceability",
+      "label": "Maintenance And Commissioning",
+      "kind": "module"
+    },
+    {
+      "id": "maintenance_serviceability.commissioning_access",
+      "label": "Commissioning access",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.replaceable_modules",
+      "label": "Replaceable modules",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "maintenance_serviceability.remote_diagnostics",
+      "label": "Remote diagnostics",
+      "kind": "submodule",
+      "moduleId": "maintenance_serviceability"
+    },
+    {
+      "id": "hmi_ergonomics",
+      "label": "User Payment And HMI",
+      "kind": "module"
+    },
+    {
+      "id": "hmi_ergonomics.user_display_panel",
+      "label": "User display panel",
+      "kind": "submodule",
+      "moduleId": "hmi_ergonomics"
+    },
+    {
+      "id": "hmi_ergonomics.payment_identity",
+      "label": "Payment and identity",
+      "kind": "submodule",
+      "moduleId": "hmi_ergonomics"
+    },
+    {
+      "id": "hmi_ergonomics.user_cable_guidance",
+      "label": "User cable guidance",
+      "kind": "submodule",
+      "moduleId": "hmi_ergonomics"
+    }
+  ],
+  "edges": [
+    {
+      "id": "contains:power_distribution:power_distribution.ac_input_switchgear:ac_input_switchgear",
+      "from": "power_distribution",
+      "to": "power_distribution.ac_input_switchgear",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "AC input switchgear is contained by AC Input And DC Output Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.dc_output_switchgear:dc_output_switchgear",
+      "from": "power_distribution",
+      "to": "power_distribution.dc_output_switchgear",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "DC output switchgear is contained by AC Input And DC Output Distribution."
+    },
+    {
+      "id": "contains:power_distribution:power_distribution.billing_metering_branch:billing_metering_branch",
+      "from": "power_distribution",
+      "to": "power_distribution.billing_metering_branch",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Billing metering branch is contained by AC Input And DC Output Distribution."
+    },
+    {
+      "id": "contains:energy_conversion_transduction:energy_conversion_transduction.rectifier_power_modules:rectifier_power_modules",
+      "from": "energy_conversion_transduction",
+      "to": "energy_conversion_transduction.rectifier_power_modules",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Rectifier power modules is contained by Power Conversion Stack."
+    },
+    {
+      "id": "contains:energy_conversion_transduction:energy_conversion_transduction.output_filtering:output_filtering",
+      "from": "energy_conversion_transduction",
+      "to": "energy_conversion_transduction.output_filtering",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Output filtering is contained by Power Conversion Stack."
+    },
+    {
+      "id": "contains:energy_conversion_transduction:energy_conversion_transduction.converter_supervision:converter_supervision",
+      "from": "energy_conversion_transduction",
+      "to": "energy_conversion_transduction.converter_supervision",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Converter supervision is contained by Power Conversion Stack."
+    },
+    {
+      "id": "contains:charging_connector_interface:charging_connector_interface.ccs2_cable_connector:ccs2_cable_connector",
+      "from": "charging_connector_interface",
+      "to": "charging_connector_interface.ccs2_cable_connector",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "CCS2 cable connector is contained by Vehicle Charging Interface."
+    },
+    {
+      "id": "contains:charging_connector_interface:charging_connector_interface.connector_cooling_coupling:connector_cooling_coupling",
+      "from": "charging_connector_interface",
+      "to": "charging_connector_interface.connector_cooling_coupling",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Connector cooling coupling is contained by Vehicle Charging Interface."
+    },
+    {
+      "id": "contains:charging_connector_interface:charging_connector_interface.vehicle_communication_frontend:vehicle_communication_frontend",
+      "from": "charging_connector_interface",
+      "to": "charging_connector_interface.vehicle_communication_frontend",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Vehicle communication frontend is contained by Vehicle Charging Interface."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.charge_controller:charge_controller",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.charge_controller",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Charge controller is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.backend_gateway:backend_gateway",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.backend_gateway",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Backend gateway is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:control_compute_communication:control_compute_communication.protocol_stack:protocol_stack",
+      "from": "control_compute_communication",
+      "to": "control_compute_communication.protocol_stack",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Vehicle protocol stack is contained by Control Compute Communication."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.energy_metering:energy_metering",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.energy_metering",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Energy metering is contained by Metering And Electrical Sensing."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.insulation_fault_detection:insulation_fault_detection",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.insulation_fault_detection",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Insulation fault detection is contained by Metering And Electrical Sensing."
+    },
+    {
+      "id": "contains:sensing_instrumentation:sensing_instrumentation.connector_sensing:connector_sensing",
+      "from": "sensing_instrumentation",
+      "to": "sensing_instrumentation.connector_sensing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Connector sensing is contained by Metering And Electrical Sensing."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.liquid_cooling_loop:liquid_cooling_loop",
+      "from": "environmental_interface",
+      "to": "environmental_interface.liquid_cooling_loop",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Liquid cooling loop is contained by Thermal And Environmental Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.thermal_air_path:thermal_air_path",
+      "from": "environmental_interface",
+      "to": "environmental_interface.thermal_air_path",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Thermal air path is contained by Thermal And Environmental Interface."
+    },
+    {
+      "id": "contains:environmental_interface:environmental_interface.weatherproofing:weatherproofing",
+      "from": "environmental_interface",
+      "to": "environmental_interface.weatherproofing",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Weatherproofing is contained by Thermal And Environmental Interface."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.outdoor_cabinet:outdoor_cabinet",
+      "from": "structure_containment",
+      "to": "structure_containment.outdoor_cabinet",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Outdoor cabinet is contained by Cabinet Structure And Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.cable_holster_boom:cable_holster_boom",
+      "from": "structure_containment",
+      "to": "structure_containment.cable_holster_boom",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Cable holster and boom is contained by Cabinet Structure And Containment."
+    },
+    {
+      "id": "contains:structure_containment:structure_containment.internal_compartmentation:internal_compartmentation",
+      "from": "structure_containment",
+      "to": "structure_containment.internal_compartmentation",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Internal compartmentation is contained by Cabinet Structure And Containment."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.emergency_stop_chain:emergency_stop_chain",
+      "from": "safety_protection",
+      "to": "safety_protection.emergency_stop_chain",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Emergency stop chain is contained by Safety Protection."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.dc_fault_protection:dc_fault_protection",
+      "from": "safety_protection",
+      "to": "safety_protection.dc_fault_protection",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "DC fault protection is contained by Safety Protection."
+    },
+    {
+      "id": "contains:safety_protection:safety_protection.user_access_protection:user_access_protection",
+      "from": "safety_protection",
+      "to": "safety_protection.user_access_protection",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "User access protection is contained by Safety Protection."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.commissioning_access:commissioning_access",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.commissioning_access",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Commissioning access is contained by Maintenance And Commissioning."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.replaceable_modules:replaceable_modules",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.replaceable_modules",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Replaceable modules is contained by Maintenance And Commissioning."
+    },
+    {
+      "id": "contains:maintenance_serviceability:maintenance_serviceability.remote_diagnostics:remote_diagnostics",
+      "from": "maintenance_serviceability",
+      "to": "maintenance_serviceability.remote_diagnostics",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Remote diagnostics is contained by Maintenance And Commissioning."
+    },
+    {
+      "id": "contains:hmi_ergonomics:hmi_ergonomics.user_display_panel:user_display_panel",
+      "from": "hmi_ergonomics",
+      "to": "hmi_ergonomics.user_display_panel",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "User display panel is contained by User Payment And HMI."
+    },
+    {
+      "id": "contains:hmi_ergonomics:hmi_ergonomics.payment_identity:payment_identity",
+      "from": "hmi_ergonomics",
+      "to": "hmi_ergonomics.payment_identity",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "Payment and identity is contained by User Payment And HMI."
+    },
+    {
+      "id": "contains:hmi_ergonomics:hmi_ergonomics.user_cable_guidance:user_cable_guidance",
+      "from": "hmi_ergonomics",
+      "to": "hmi_ergonomics.user_cable_guidance",
+      "via": "contains",
+      "kind": "contains",
+      "present": true,
+      "rationale": "User cable guidance is contained by User Payment And HMI."
+    },
+    {
+      "id": "shared_interface:power_distribution:energy_conversion_transduction:ac_input_bus",
+      "from": "power_distribution",
+      "to": "energy_conversion_transduction",
+      "via": "ac_input_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare ac_input_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:energy_conversion_transduction:dc_output_bus",
+      "from": "power_distribution",
+      "to": "energy_conversion_transduction",
+      "via": "dc_output_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare dc_output_bus."
+    },
+    {
+      "id": "shared_interface:energy_conversion_transduction:charging_connector_interface:dc_output_bus",
+      "from": "energy_conversion_transduction",
+      "to": "charging_connector_interface",
+      "via": "dc_output_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare dc_output_bus."
+    },
+    {
+      "id": "shared_interface:charging_connector_interface:sensing_instrumentation:dc_output_bus",
+      "from": "charging_connector_interface",
+      "to": "sensing_instrumentation",
+      "via": "dc_output_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare dc_output_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:dc_output_bus",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "dc_output_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare dc_output_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:energy_conversion_transduction:protective_earth",
+      "from": "power_distribution",
+      "to": "energy_conversion_transduction",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:energy_conversion_transduction:charging_connector_interface:protective_earth",
+      "from": "energy_conversion_transduction",
+      "to": "charging_connector_interface",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:charging_connector_interface:environmental_interface:protective_earth",
+      "from": "charging_connector_interface",
+      "to": "environmental_interface",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:environmental_interface:structure_containment:protective_earth",
+      "from": "environmental_interface",
+      "to": "structure_containment",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:structure_containment:safety_protection:protective_earth",
+      "from": "structure_containment",
+      "to": "safety_protection",
+      "via": "protective_earth",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare protective_earth."
+    },
+    {
+      "id": "shared_interface:power_distribution:control_compute_communication:metering_bus",
+      "from": "power_distribution",
+      "to": "control_compute_communication",
+      "via": "metering_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare metering_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:metering_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "metering_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare metering_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:maintenance_serviceability:metering_bus",
+      "from": "sensing_instrumentation",
+      "to": "maintenance_serviceability",
+      "via": "metering_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare metering_bus."
+    },
+    {
+      "id": "shared_interface:power_distribution:charging_connector_interface:service_access",
+      "from": "power_distribution",
+      "to": "charging_connector_interface",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:charging_connector_interface:environmental_interface:service_access",
+      "from": "charging_connector_interface",
+      "to": "environmental_interface",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:environmental_interface:structure_containment:service_access",
+      "from": "environmental_interface",
+      "to": "structure_containment",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:structure_containment:maintenance_serviceability:service_access",
+      "from": "structure_containment",
+      "to": "maintenance_serviceability",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:maintenance_serviceability:hmi_ergonomics:service_access",
+      "from": "maintenance_serviceability",
+      "to": "hmi_ergonomics",
+      "via": "service_access",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_access."
+    },
+    {
+      "id": "shared_interface:energy_conversion_transduction:charging_connector_interface:coolant_loop",
+      "from": "energy_conversion_transduction",
+      "to": "charging_connector_interface",
+      "via": "coolant_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare coolant_loop."
+    },
+    {
+      "id": "shared_interface:charging_connector_interface:environmental_interface:coolant_loop",
+      "from": "charging_connector_interface",
+      "to": "environmental_interface",
+      "via": "coolant_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare coolant_loop."
+    },
+    {
+      "id": "shared_interface:environmental_interface:maintenance_serviceability:coolant_loop",
+      "from": "environmental_interface",
+      "to": "maintenance_serviceability",
+      "via": "coolant_loop",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare coolant_loop."
+    },
+    {
+      "id": "shared_interface:power_distribution:energy_conversion_transduction:control_bus",
+      "from": "power_distribution",
+      "to": "energy_conversion_transduction",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:energy_conversion_transduction:charging_connector_interface:control_bus",
+      "from": "energy_conversion_transduction",
+      "to": "charging_connector_interface",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:charging_connector_interface:control_compute_communication:control_bus",
+      "from": "charging_connector_interface",
+      "to": "control_compute_communication",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:control_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:control_bus",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:safety_protection:maintenance_serviceability:control_bus",
+      "from": "safety_protection",
+      "to": "maintenance_serviceability",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:maintenance_serviceability:hmi_ergonomics:control_bus",
+      "from": "maintenance_serviceability",
+      "to": "hmi_ergonomics",
+      "via": "control_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_bus."
+    },
+    {
+      "id": "shared_interface:charging_connector_interface:sensing_instrumentation:ccs2_vehicle_interface",
+      "from": "charging_connector_interface",
+      "to": "sensing_instrumentation",
+      "via": "ccs2_vehicle_interface",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare ccs2_vehicle_interface."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:structure_containment:ccs2_vehicle_interface",
+      "from": "sensing_instrumentation",
+      "to": "structure_containment",
+      "via": "ccs2_vehicle_interface",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare ccs2_vehicle_interface."
+    },
+    {
+      "id": "shared_interface:structure_containment:safety_protection:ccs2_vehicle_interface",
+      "from": "structure_containment",
+      "to": "safety_protection",
+      "via": "ccs2_vehicle_interface",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare ccs2_vehicle_interface."
+    },
+    {
+      "id": "shared_interface:safety_protection:hmi_ergonomics:ccs2_vehicle_interface",
+      "from": "safety_protection",
+      "to": "hmi_ergonomics",
+      "via": "ccs2_vehicle_interface",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare ccs2_vehicle_interface."
+    },
+    {
+      "id": "shared_interface:charging_connector_interface:control_compute_communication:iso15118_plc",
+      "from": "charging_connector_interface",
+      "to": "control_compute_communication",
+      "via": "iso15118_plc",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare iso15118_plc."
+    },
+    {
+      "id": "shared_interface:charging_connector_interface:sensing_instrumentation:control_pilot",
+      "from": "charging_connector_interface",
+      "to": "sensing_instrumentation",
+      "via": "control_pilot",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare control_pilot."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:maintenance_serviceability:ocpp_network",
+      "from": "control_compute_communication",
+      "to": "maintenance_serviceability",
+      "via": "ocpp_network",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare ocpp_network."
+    },
+    {
+      "id": "shared_interface:maintenance_serviceability:hmi_ergonomics:ocpp_network",
+      "from": "maintenance_serviceability",
+      "to": "hmi_ergonomics",
+      "via": "ocpp_network",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare ocpp_network."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:sensing_instrumentation:alarm_bus",
+      "from": "control_compute_communication",
+      "to": "sensing_instrumentation",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:alarm_bus",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "alarm_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare alarm_bus."
+    },
+    {
+      "id": "shared_interface:control_compute_communication:maintenance_serviceability:service_port",
+      "from": "control_compute_communication",
+      "to": "maintenance_serviceability",
+      "via": "service_port",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare service_port."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:safety_protection:insulation_monitoring",
+      "from": "sensing_instrumentation",
+      "to": "safety_protection",
+      "via": "insulation_monitoring",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare insulation_monitoring."
+    },
+    {
+      "id": "shared_interface:energy_conversion_transduction:sensing_instrumentation:sensor_bus",
+      "from": "energy_conversion_transduction",
+      "to": "sensing_instrumentation",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "shared_interface:sensing_instrumentation:environmental_interface:sensor_bus",
+      "from": "sensing_instrumentation",
+      "to": "environmental_interface",
+      "via": "sensor_bus",
+      "kind": "shared_interface",
+      "present": true,
+      "rationale": "Both modules declare sensor_bus."
+    },
+    {
+      "id": "required_interface:power_distribution:energy_conversion_transduction:ac_input_bus",
+      "from": "power_distribution",
+      "to": "energy_conversion_transduction",
+      "via": "ac_input_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Grid input switchgear must feed the power-conversion stack over a protected AC bus."
+    },
+    {
+      "id": "required_interface:energy_conversion_transduction:charging_connector_interface:dc_output_bus",
+      "from": "energy_conversion_transduction",
+      "to": "charging_connector_interface",
+      "via": "dc_output_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Power modules must feed the CCS2 connector over a protected DC output bus."
+    },
+    {
+      "id": "required_interface:control_compute_communication:charging_connector_interface:iso15118_plc",
+      "from": "control_compute_communication",
+      "to": "charging_connector_interface",
+      "via": "iso15118_plc",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Charge controller must communicate with the vehicle for ISO 15118 / PLC handshakes."
+    },
+    {
+      "id": "required_interface:control_compute_communication:energy_conversion_transduction:control_bus",
+      "from": "control_compute_communication",
+      "to": "energy_conversion_transduction",
+      "via": "control_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Charge controller must command power module output states."
+    },
+    {
+      "id": "required_interface:sensing_instrumentation:control_compute_communication:metering_bus",
+      "from": "sensing_instrumentation",
+      "to": "control_compute_communication",
+      "via": "metering_bus",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Energy and safety measurements must feed session control and billing."
+    },
+    {
+      "id": "required_interface:environmental_interface:energy_conversion_transduction:coolant_loop",
+      "from": "environmental_interface",
+      "to": "energy_conversion_transduction",
+      "via": "coolant_loop",
+      "kind": "required_interface",
+      "present": true,
+      "rationale": "Power conversion heat must couple into the charger cooling loop."
+    }
+  ],
+  "summary": {
+    "moduleNodes": 10,
+    "subModuleNodes": 30,
+    "containsEdges": 30,
+    "sharedInterfaceEdges": 42,
+    "requiredInterfaceEdges": 6,
+    "missingRequiredInterfaceEdges": 0
+  }
+}

@@ -1,0 +1,201 @@
+{
+  "verdict": "interface_review_ready",
+  "summary": {
+    "rows": 4,
+    "acceptedRows": 0,
+    "reviewReadyRows": 4,
+    "pendingEvidenceRows": 0,
+    "deferredRows": 0,
+    "blockedRows": 0,
+    "presentContracts": 4,
+    "missingContracts": 0,
+    "carrierCompleteRows": 4,
+    "verificationActivityRows": 4,
+    "acceptedEvidenceRatio": 0,
+    "structuralPassRatio": 1
+  },
+  "rows": [
+    {
+      "id": "required:environmental_interface:energy_conversion_transduction:refrigerant_loop",
+      "interfaceId": "refrigerant_loop",
+      "fromModuleId": "environmental_interface",
+      "fromModuleName": "Outdoor Air Interface",
+      "toModuleId": "energy_conversion_transduction",
+      "toModuleName": "Refrigerant Energy Conversion",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "outdoor_evaporator"
+      ],
+      "toCarrierSubModules": [
+        "compressor_inverter_stage",
+        "expansion_metering_stage",
+        "refrigerant_manifold",
+        "condenser_coupling_boundary"
+      ],
+      "componentWordIds": [
+        "outdoor_finned_evaporator_coil",
+        "coil_temperature_sensor",
+        "coil_guard_grille",
+        "hydrophilic_fin_coating",
+        "inverter_scroll_compressor",
+        "compressor_inverter_drive",
+        "compressor_mounting_grommet_set",
+        "crankcase_heater_band",
+        "electronic_expansion_valve",
+        "eev_stepper_harness",
+        "liquid_line_filter_drier",
+        "sight_glass_indicator",
+        "copper_refrigerant_tube_set",
+        "service_valve_pair",
+        "brazed_joint_sleeve_set",
+        "refrigerant_charge_label",
+        "refrigerant_stub_out_pair",
+        "hydronic_stub_out_pair",
+        "plate_heat_exchanger_mounting_bracket",
+        "condenser_insulation_sleeve"
+      ],
+      "verificationActivityId": "interface_review:environmental_interface:energy_conversion_transduction:refrigerant_loop",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:energy_conversion_transduction:mass_fluid_transport_process:hydronic_loop",
+      "interfaceId": "hydronic_loop",
+      "fromModuleId": "energy_conversion_transduction",
+      "fromModuleName": "Refrigerant Energy Conversion",
+      "toModuleId": "mass_fluid_transport_process",
+      "toModuleName": "Hydronic Heat Delivery",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "condenser_coupling_boundary"
+      ],
+      "toCarrierSubModules": [
+        "condenser_heat_exchanger",
+        "circulation_pump_group",
+        "hydronic_safety_group"
+      ],
+      "componentWordIds": [
+        "refrigerant_stub_out_pair",
+        "hydronic_stub_out_pair",
+        "plate_heat_exchanger_mounting_bracket",
+        "condenser_insulation_sleeve",
+        "brazed_plate_heat_exchanger",
+        "plate_exchanger_insulation_jacket",
+        "water_outlet_temperature_sensor",
+        "refrigerant_outlet_temperature_sensor",
+        "hydronic_circulation_pump",
+        "pump_isolation_valve_pair",
+        "flow_proving_switch",
+        "strainer_filter",
+        "hydronic_safety_valve_kit",
+        "expansion_vessel",
+        "automatic_air_vent",
+        "fill_and_drain_valve_set"
+      ],
+      "verificationActivityId": "interface_review:energy_conversion_transduction:mass_fluid_transport_process:hydronic_loop",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:control_compute_communication:energy_conversion_transduction:control_bus",
+      "interfaceId": "control_bus",
+      "fromModuleId": "control_compute_communication",
+      "fromModuleName": "Control Compute Communication",
+      "toModuleId": "energy_conversion_transduction",
+      "toModuleName": "Refrigerant Energy Conversion",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "main_controller",
+        "power_driver_io"
+      ],
+      "toCarrierSubModules": [
+        "compressor_inverter_stage",
+        "expansion_metering_stage"
+      ],
+      "componentWordIds": [
+        "heat_pump_controller_pcb",
+        "controller_enclosure",
+        "real_time_clock_module",
+        "non_volatile_fault_memory",
+        "compressor_contactor",
+        "pump_relay_output",
+        "fan_pwm_output_board",
+        "safety_chain_input_terminal",
+        "inverter_scroll_compressor",
+        "compressor_inverter_drive",
+        "compressor_mounting_grommet_set",
+        "crankcase_heater_band",
+        "electronic_expansion_valve",
+        "eev_stepper_harness",
+        "liquid_line_filter_drier",
+        "sight_glass_indicator"
+      ],
+      "verificationActivityId": "interface_review:control_compute_communication:energy_conversion_transduction:control_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "fromModuleId": "sensing_instrumentation",
+      "fromModuleName": "Sensing Instrumentation",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Control Compute Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "refrigerant_sensing",
+        "water_sensing",
+        "ambient_sensing"
+      ],
+      "toCarrierSubModules": [
+        "main_controller",
+        "service_communications"
+      ],
+      "componentWordIds": [
+        "refrigerant_sensor_and_pressure_transducers",
+        "suction_temperature_probe",
+        "discharge_temperature_probe",
+        "refrigerant_leak_sensor",
+        "flow_temperature_sensor",
+        "return_temperature_sensor",
+        "flow_meter_cartridge",
+        "water_pressure_transducer",
+        "ambient_temperature_sensor",
+        "ambient_humidity_sensor",
+        "air_pressure_switch",
+        "rain_ingress_sensor",
+        "heat_pump_controller_pcb",
+        "controller_enclosure",
+        "real_time_clock_module",
+        "non_volatile_fault_memory",
+        "modbus_service_port",
+        "usb_commissioning_adapter",
+        "fault_led_stack",
+        "installer_qr_code_label"
+      ],
+      "verificationActivityId": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Collect named interface-review evidence through verification intake."
+  ]
+}

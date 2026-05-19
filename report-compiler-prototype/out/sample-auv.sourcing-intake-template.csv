@@ -1,0 +1,13 @@
+componentWordId,description,priority,supplierName,manufacturer,mpn,unitCostGbp,leadTimeWeeks,sourceGrade,evidence.ref,evidence.quote,retrievedAt
+pressure_hull,Pressure hull,critical,,,,,,catalogue,,,
+battery_pack,Battery pack,critical,,,,,,catalogue,,,
+wet_mate_connector_set,Wet-mate connector set,critical,,,,,,catalogue,,,
+thruster_set,Thruster set,critical,,,,,,catalogue,,,
+mission_computer,Mission computer,critical,,,,,,catalogue,,,
+acoustic_modem,Acoustic modem,critical,,,,,,catalogue,,,
+dvl,DVL,critical,,,,,,catalogue,,,
+inertial_navigation_unit,Inertial navigation unit,critical,,,,,,catalogue,,,
+depth_and_pressure_sensor,Depth and pressure sensor,critical,,,,,,catalogue,,,
+forward_sonar_payload,Forward sonar payload,critical,,,,,,catalogue,,,
+leak_detection_sensor,Leak detection sensor,critical,,,,,,catalogue,,,
+recovery_beacon,Recovery beacon,critical,,,,,,catalogue,,,

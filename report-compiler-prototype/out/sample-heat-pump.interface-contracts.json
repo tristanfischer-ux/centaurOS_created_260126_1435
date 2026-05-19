@@ -1,0 +1,518 @@
+{
+  "summary": {
+    "requiredContracts": 4,
+    "presentContracts": 4,
+    "missingContracts": 0,
+    "sharedInterfaces": 12,
+    "localOnlyInterfaces": 1
+  },
+  "requiredContracts": [
+    {
+      "id": "required:environmental_interface:energy_conversion_transduction:refrigerant_loop",
+      "interfaceId": "refrigerant_loop",
+      "status": "present",
+      "from": {
+        "moduleId": "environmental_interface",
+        "moduleName": "Outdoor Air Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "outdoor_evaporator",
+            "subModuleName": "Outdoor evaporator",
+            "componentWordIds": [
+              "outdoor_finned_evaporator_coil",
+              "coil_temperature_sensor",
+              "coil_guard_grille",
+              "hydrophilic_fin_coating"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "energy_conversion_transduction",
+        "moduleName": "Refrigerant Energy Conversion",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "compressor_inverter_stage",
+            "subModuleName": "Compressor inverter stage",
+            "componentWordIds": [
+              "inverter_scroll_compressor",
+              "compressor_inverter_drive",
+              "compressor_mounting_grommet_set",
+              "crankcase_heater_band"
+            ]
+          },
+          {
+            "subModuleId": "expansion_metering_stage",
+            "subModuleName": "Expansion metering stage",
+            "componentWordIds": [
+              "electronic_expansion_valve",
+              "eev_stepper_harness",
+              "liquid_line_filter_drier",
+              "sight_glass_indicator"
+            ]
+          },
+          {
+            "subModuleId": "refrigerant_manifold",
+            "subModuleName": "Refrigerant manifold",
+            "componentWordIds": [
+              "copper_refrigerant_tube_set",
+              "service_valve_pair",
+              "brazed_joint_sleeve_set",
+              "refrigerant_charge_label"
+            ]
+          },
+          {
+            "subModuleId": "condenser_coupling_boundary",
+            "subModuleName": "Condenser coupling boundary",
+            "componentWordIds": [
+              "refrigerant_stub_out_pair",
+              "hydronic_stub_out_pair",
+              "plate_heat_exchanger_mounting_bracket",
+              "condenser_insulation_sleeve"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Outdoor evaporator must connect to compressor and expansion circuit over a closed refrigerant loop.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:energy_conversion_transduction:mass_fluid_transport_process:hydronic_loop",
+      "interfaceId": "hydronic_loop",
+      "status": "present",
+      "from": {
+        "moduleId": "energy_conversion_transduction",
+        "moduleName": "Refrigerant Energy Conversion",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "condenser_coupling_boundary",
+            "subModuleName": "Condenser coupling boundary",
+            "componentWordIds": [
+              "refrigerant_stub_out_pair",
+              "hydronic_stub_out_pair",
+              "plate_heat_exchanger_mounting_bracket",
+              "condenser_insulation_sleeve"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "mass_fluid_transport_process",
+        "moduleName": "Hydronic Heat Delivery",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "condenser_heat_exchanger",
+            "subModuleName": "Condenser heat exchanger",
+            "componentWordIds": [
+              "brazed_plate_heat_exchanger",
+              "plate_exchanger_insulation_jacket",
+              "water_outlet_temperature_sensor",
+              "refrigerant_outlet_temperature_sensor"
+            ]
+          },
+          {
+            "subModuleId": "circulation_pump_group",
+            "subModuleName": "Circulation pump group",
+            "componentWordIds": [
+              "hydronic_circulation_pump",
+              "pump_isolation_valve_pair",
+              "flow_proving_switch",
+              "strainer_filter"
+            ]
+          },
+          {
+            "subModuleId": "hydronic_safety_group",
+            "subModuleName": "Hydronic safety group",
+            "componentWordIds": [
+              "hydronic_safety_valve_kit",
+              "expansion_vessel",
+              "automatic_air_vent",
+              "fill_and_drain_valve_set"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Condenser heat must transfer into the hydronic delivery loop.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:control_compute_communication:energy_conversion_transduction:control_bus",
+      "interfaceId": "control_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "main_controller",
+            "subModuleName": "Main controller",
+            "componentWordIds": [
+              "heat_pump_controller_pcb",
+              "controller_enclosure",
+              "real_time_clock_module",
+              "non_volatile_fault_memory"
+            ]
+          },
+          {
+            "subModuleId": "power_driver_io",
+            "subModuleName": "Power driver IO",
+            "componentWordIds": [
+              "compressor_contactor",
+              "pump_relay_output",
+              "fan_pwm_output_board",
+              "safety_chain_input_terminal"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "energy_conversion_transduction",
+        "moduleName": "Refrigerant Energy Conversion",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "compressor_inverter_stage",
+            "subModuleName": "Compressor inverter stage",
+            "componentWordIds": [
+              "inverter_scroll_compressor",
+              "compressor_inverter_drive",
+              "compressor_mounting_grommet_set",
+              "crankcase_heater_band"
+            ]
+          },
+          {
+            "subModuleId": "expansion_metering_stage",
+            "subModuleName": "Expansion metering stage",
+            "componentWordIds": [
+              "electronic_expansion_valve",
+              "eev_stepper_harness",
+              "liquid_line_filter_drier",
+              "sight_glass_indicator"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Controller must command compressor and expansion valve operation.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Sensing Instrumentation",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "refrigerant_sensing",
+            "subModuleName": "Refrigerant sensing",
+            "componentWordIds": [
+              "refrigerant_sensor_and_pressure_transducers",
+              "suction_temperature_probe",
+              "discharge_temperature_probe",
+              "refrigerant_leak_sensor"
+            ]
+          },
+          {
+            "subModuleId": "water_sensing",
+            "subModuleName": "Water sensing",
+            "componentWordIds": [
+              "flow_temperature_sensor",
+              "return_temperature_sensor",
+              "flow_meter_cartridge",
+              "water_pressure_transducer"
+            ]
+          },
+          {
+            "subModuleId": "ambient_sensing",
+            "subModuleName": "Ambient sensing",
+            "componentWordIds": [
+              "ambient_temperature_sensor",
+              "ambient_humidity_sensor",
+              "air_pressure_switch",
+              "rain_ingress_sensor"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "main_controller",
+            "subModuleName": "Main controller",
+            "componentWordIds": [
+              "heat_pump_controller_pcb",
+              "controller_enclosure",
+              "real_time_clock_module",
+              "non_volatile_fault_memory"
+            ]
+          },
+          {
+            "subModuleId": "service_communications",
+            "subModuleName": "Service communications",
+            "componentWordIds": [
+              "modbus_service_port",
+              "usb_commissioning_adapter",
+              "fault_led_stack",
+              "installer_qr_code_label"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Controller must receive pressure and temperature feedback for protection and efficiency.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    }
+  ],
+  "sharedInterfaces": [
+    {
+      "interfaceId": "mechanical_mounts",
+      "status": "local_only",
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "moduleNames": [
+        "Monobloc Structure And Containment"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "airflow_path",
+      "status": "shared",
+      "moduleIds": [
+        "environmental_interface",
+        "sensing_instrumentation",
+        "structure_containment",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Outdoor Air Interface",
+        "Sensing Instrumentation",
+        "Monobloc Structure And Containment",
+        "Maintenance And Commissioning"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "alarm_bus",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "safety_protection",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Control Compute Communication",
+        "Safety Protection",
+        "User And Installer Interface"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "condensate_drain",
+      "status": "shared",
+      "moduleIds": [
+        "environmental_interface",
+        "structure_containment"
+      ],
+      "moduleNames": [
+        "Outdoor Air Interface",
+        "Monobloc Structure And Containment"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "control_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "control_compute_communication",
+        "power_distribution",
+        "safety_protection",
+        "maintenance_serviceability",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Refrigerant Energy Conversion",
+        "Outdoor Air Interface",
+        "Hydronic Heat Delivery",
+        "Control Compute Communication",
+        "Electrical Power Distribution",
+        "Safety Protection",
+        "Maintenance And Commissioning",
+        "User And Installer Interface"
+      ],
+      "carrierSubModuleCount": 12
+    },
+    {
+      "interfaceId": "hydronic_loop",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "mass_fluid_transport_process",
+        "sensing_instrumentation",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Refrigerant Energy Conversion",
+        "Hydronic Heat Delivery",
+        "Sensing Instrumentation",
+        "Safety Protection",
+        "Maintenance And Commissioning"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "mains_supply",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Electrical Power Distribution",
+        "Safety Protection"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "pressure_relief",
+      "status": "shared",
+      "moduleIds": [
+        "mass_fluid_transport_process",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Hydronic Heat Delivery",
+        "Safety Protection"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "protective_earth",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "control_compute_communication",
+        "power_distribution",
+        "structure_containment",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Refrigerant Energy Conversion",
+        "Outdoor Air Interface",
+        "Hydronic Heat Delivery",
+        "Control Compute Communication",
+        "Electrical Power Distribution",
+        "Monobloc Structure And Containment",
+        "Safety Protection"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "refrigerant_loop",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "sensing_instrumentation",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Refrigerant Energy Conversion",
+        "Outdoor Air Interface",
+        "Hydronic Heat Delivery",
+        "Sensing Instrumentation",
+        "Safety Protection",
+        "Maintenance And Commissioning"
+      ],
+      "carrierSubModuleCount": 9
+    },
+    {
+      "interfaceId": "sensor_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "power_distribution",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Refrigerant Energy Conversion",
+        "Outdoor Air Interface",
+        "Hydronic Heat Delivery",
+        "Control Compute Communication",
+        "Sensing Instrumentation",
+        "Electrical Power Distribution",
+        "Safety Protection",
+        "Maintenance And Commissioning"
+      ],
+      "carrierSubModuleCount": 13
+    },
+    {
+      "interfaceId": "service_access",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "environmental_interface",
+        "mass_fluid_transport_process",
+        "power_distribution",
+        "structure_containment",
+        "maintenance_serviceability",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Refrigerant Energy Conversion",
+        "Outdoor Air Interface",
+        "Hydronic Heat Delivery",
+        "Electrical Power Distribution",
+        "Monobloc Structure And Containment",
+        "Maintenance And Commissioning",
+        "User And Installer Interface"
+      ],
+      "carrierSubModuleCount": 12
+    },
+    {
+      "interfaceId": "service_port",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "maintenance_serviceability",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Control Compute Communication",
+        "Maintenance And Commissioning",
+        "User And Installer Interface"
+      ],
+      "carrierSubModuleCount": 5
+    }
+  ]
+}

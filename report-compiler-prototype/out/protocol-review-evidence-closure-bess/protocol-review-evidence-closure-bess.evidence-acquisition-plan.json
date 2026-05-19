@@ -1,0 +1,13 @@
+{
+  "summary": {
+    "rows": 0,
+    "sourcingRows": 0,
+    "verificationRows": 0,
+    "readyRows": 0,
+    "blockedRows": 0,
+    "bomBlockingRows": 0,
+    "publishBlockingRows": 0,
+    "nextRowId": null
+  },
+  "rows": []
+}

@@ -1,0 +1,7 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+brief_intake_clearance,pass,6/6 intake areas pass; class auv (high); 2 quantified requirement(s).,1,,Brief intake is strong enough to admit scratch architecture generation.
+clarification_clearance,pass,"0 clarification question(s): 0 required, 0 recommended, 0 architecture-blocking.",1,,No brief clarification is needed before architecture generation.
+class_grammar_clearance,pass,Product class auv; scratch universal grammar supported: yes.,1,,Route this class through the scratch universal module grammar.
+scratch_stage_clearance,pass,Architecture stage passed; source scratch_universal_architecture; modules 9; submodules 27; components 108.,1,,Architecture was produced by the scratch universal architecture stage.
+architecture_readiness_boundary,pass,Architecture ready for BoM: yes; blocking issues 0; required links 8/8.,1,,Deterministic architecture readiness checks passed; sourcing work may begin only with explicit evidence.
+bom_provenance_hold,pass,"0 admitted sourcing evidence row(s), 0 source-backed BoM claim(s), 0 provenance violation(s).",1,,BoM fields remain behind the explicit sourcing-evidence boundary.

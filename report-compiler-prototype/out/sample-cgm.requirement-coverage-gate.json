@@ -1,0 +1,271 @@
+{
+  "verdict": "coverage_review_ready",
+  "summary": {
+    "rows": 3,
+    "acceptedEvidenceRows": 0,
+    "reviewReadyRows": 3,
+    "needsReviewRows": 0,
+    "blockedRows": 0,
+    "unlinkedRows": 0,
+    "architectureLinkedRows": 3,
+    "subModuleLinkedRows": 3,
+    "componentLinkedRows": 3,
+    "calculationLinkedRows": 3,
+    "reviewQuestionRows": 3,
+    "verificationActivityRows": 3,
+    "structuralCoverageRatio": 1,
+    "acceptedEvidenceRatio": 0
+  },
+  "rows": [
+    {
+      "requirementId": "mard_percent",
+      "label": "MARD target",
+      "value": "9 %",
+      "status": "covered_review_ready",
+      "presentSignals": [
+        "architecture_link",
+        "submodule_link",
+        "component_link",
+        "calculation_link",
+        "review_question",
+        "verification_activity"
+      ],
+      "missingSignals": [
+        "accepted_verification"
+      ],
+      "architectureModuleIds": [
+        "sensing_instrumentation",
+        "environmental_interface",
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "glucose_filament_stack",
+        "temperature_compensation",
+        "mcu_firmware"
+      ],
+      "componentWordIds": [
+        "glucose_sensing_filament",
+        "temperature_sensor",
+        "low_power_microcontroller"
+      ],
+      "calculationIds": [
+        "cgm_mard_margin_to_10_percent"
+      ],
+      "reviewQuestionIds": [
+        "assumption_resolution:component:control_compute_communication_ble_telemetry_ble_radio_module",
+        "assumption_resolution:component:control_compute_communication_mcu_firmware_low_power_microcontroller",
+        "assumption_resolution:component:environmental_interface_temperature_compensation_temperature_sensor",
+        "assumption_resolution:component:sensing_instrumentation_glucose_filament_stack_enzyme_reagent_membrane",
+        "assumption_resolution:component:sensing_instrumentation_glucose_filament_stack_glucose_sensing_filament",
+        "assumption_resolution:component:sensing_instrumentation_glucose_filament_stack_reference_electrode",
+        "assumption_resolution:sanity:cgm_accuracy_target",
+        "assumption_resolution:sanity:cgm_biofluid_signal_closure",
+        "assumption_resolution:sanity:cgm_patch_power_comms_safety",
+        "assumption_resolution:sanity:cgm_reading_interval",
+        "assumption_resolution:sanity:cgm_wear_duration",
+        "calculation_envelope:cgm_total_wear_readings",
+        "calculation_envelope:cgm_mard_margin_to_10_percent",
+        "calculation_envelope:cgm_readings_per_day",
+        "interface_contract:control_compute_communication:safety_protection:alarm_state_bus",
+        "interface_contract:environmental_interface:control_compute_communication:temperature_compensation_bus",
+        "interface_contract:power_distribution:control_compute_communication:low_power_rail",
+        "interface_contract:power_distribution:sensing_instrumentation:analog_power_rail",
+        "interface_contract:sensing_instrumentation:control_compute_communication:calibration_data_bus",
+        "interface_contract:sensing_instrumentation:control_compute_communication:sensor_signal_bus",
+        "interface_contract:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+        "module_allocation:control_compute_communication",
+        "module_allocation:environmental_interface",
+        "module_allocation:sensing_instrumentation",
+        "submodule_allocation:control_compute_communication:ble_telemetry",
+        "submodule_allocation:control_compute_communication:data_buffering",
+        "submodule_allocation:control_compute_communication:mcu_firmware",
+        "submodule_allocation:environmental_interface:motion_pressure",
+        "submodule_allocation:environmental_interface:sweat_water_boundary",
+        "submodule_allocation:environmental_interface:temperature_compensation",
+        "submodule_allocation:sensing_instrumentation:analog_front_end",
+        "submodule_allocation:sensing_instrumentation:calibration_drift_monitoring",
+        "submodule_allocation:sensing_instrumentation:glucose_filament_stack"
+      ],
+      "verificationActivityIds": [
+        "design_review:sensing_instrumentation",
+        "calculation:sensing_instrumentation",
+        "design_review:control_compute_communication",
+        "calculation:control_compute_communication",
+        "design_review:environmental_interface",
+        "calculation:environmental_interface"
+      ],
+      "acceptedVerificationActivityIds": [],
+      "blockers": [],
+      "requiredAction": "Collect accepted reviewer evidence; structural requirement coverage is ready for review."
+    },
+    {
+      "requirementId": "reading_interval_minutes",
+      "label": "Reading interval",
+      "value": "5 minutes",
+      "status": "covered_review_ready",
+      "presentSignals": [
+        "architecture_link",
+        "submodule_link",
+        "component_link",
+        "calculation_link",
+        "review_question",
+        "verification_activity"
+      ],
+      "missingSignals": [
+        "accepted_verification"
+      ],
+      "architectureModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "power_distribution"
+      ],
+      "subModuleIds": [
+        "glucose_filament_stack",
+        "mcu_firmware",
+        "low_power_rails"
+      ],
+      "componentWordIds": [
+        "glucose_sensing_filament",
+        "low_power_microcontroller",
+        "nanoamp_power_switch"
+      ],
+      "calculationIds": [
+        "cgm_readings_per_day",
+        "cgm_total_wear_readings"
+      ],
+      "reviewQuestionIds": [
+        "assumption_resolution:component:control_compute_communication_ble_telemetry_ble_radio_module",
+        "assumption_resolution:component:control_compute_communication_mcu_firmware_low_power_microcontroller",
+        "assumption_resolution:component:sensing_instrumentation_glucose_filament_stack_enzyme_reagent_membrane",
+        "assumption_resolution:component:sensing_instrumentation_glucose_filament_stack_glucose_sensing_filament",
+        "assumption_resolution:component:sensing_instrumentation_glucose_filament_stack_reference_electrode",
+        "assumption_resolution:sanity:cgm_accuracy_target",
+        "assumption_resolution:sanity:cgm_biofluid_signal_closure",
+        "assumption_resolution:sanity:cgm_patch_power_comms_safety",
+        "assumption_resolution:sanity:cgm_reading_interval",
+        "calculation_envelope:cgm_total_wear_readings",
+        "calculation_envelope:cgm_mard_margin_to_10_percent",
+        "calculation_envelope:cgm_readings_per_day",
+        "interface_contract:control_compute_communication:safety_protection:alarm_state_bus",
+        "interface_contract:energy_storage_source:power_distribution:cell_power_bus",
+        "interface_contract:environmental_interface:control_compute_communication:temperature_compensation_bus",
+        "interface_contract:power_distribution:control_compute_communication:low_power_rail",
+        "interface_contract:power_distribution:sensing_instrumentation:analog_power_rail",
+        "interface_contract:sensing_instrumentation:control_compute_communication:calibration_data_bus",
+        "interface_contract:sensing_instrumentation:control_compute_communication:sensor_signal_bus",
+        "interface_contract:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+        "module_allocation:control_compute_communication",
+        "module_allocation:power_distribution",
+        "module_allocation:sensing_instrumentation",
+        "submodule_allocation:control_compute_communication:ble_telemetry",
+        "submodule_allocation:control_compute_communication:data_buffering",
+        "submodule_allocation:control_compute_communication:mcu_firmware",
+        "submodule_allocation:power_distribution:analog_excitation",
+        "submodule_allocation:power_distribution:low_power_rails",
+        "submodule_allocation:power_distribution:power_fault_handling",
+        "submodule_allocation:sensing_instrumentation:analog_front_end",
+        "submodule_allocation:sensing_instrumentation:calibration_drift_monitoring",
+        "submodule_allocation:sensing_instrumentation:glucose_filament_stack"
+      ],
+      "verificationActivityIds": [
+        "design_review:sensing_instrumentation",
+        "calculation:sensing_instrumentation",
+        "design_review:power_distribution",
+        "calculation:power_distribution",
+        "design_review:control_compute_communication",
+        "calculation:control_compute_communication"
+      ],
+      "acceptedVerificationActivityIds": [],
+      "blockers": [],
+      "requiredAction": "Collect accepted reviewer evidence; structural requirement coverage is ready for review."
+    },
+    {
+      "requirementId": "wear_days",
+      "label": "Wear duration",
+      "value": "14 days",
+      "status": "covered_review_ready",
+      "presentSignals": [
+        "architecture_link",
+        "submodule_link",
+        "component_link",
+        "calculation_link",
+        "review_question",
+        "verification_activity"
+      ],
+      "missingSignals": [
+        "accepted_verification"
+      ],
+      "architectureModuleIds": [
+        "skin_patient_interface",
+        "energy_storage_source",
+        "environmental_interface",
+        "safety_protection"
+      ],
+      "subModuleIds": [
+        "adhesive_patch_stack",
+        "battery_cell",
+        "temperature_compensation",
+        "patient_alarm_logic"
+      ],
+      "componentWordIds": [
+        "adhesive_skin_patch",
+        "thin_film_battery",
+        "temperature_sensor",
+        "hypoglycaemia_alarm_state"
+      ],
+      "calculationIds": [
+        "cgm_total_wear_readings"
+      ],
+      "reviewQuestionIds": [
+        "assumption_resolution:component:energy_storage_source_battery_cell_thin_film_battery",
+        "assumption_resolution:component:environmental_interface_temperature_compensation_temperature_sensor",
+        "assumption_resolution:component:skin_patient_interface_adhesive_patch_stack_adhesive_skin_patch",
+        "assumption_resolution:sanity:cgm_accuracy_target",
+        "assumption_resolution:sanity:cgm_biofluid_signal_closure",
+        "assumption_resolution:sanity:cgm_patch_power_comms_safety",
+        "assumption_resolution:sanity:cgm_wear_duration",
+        "calculation_envelope:cgm_total_wear_readings",
+        "calculation_envelope:cgm_mard_margin_to_10_percent",
+        "interface_contract:actuation_kinematics:skin_patient_interface:insertion_path",
+        "interface_contract:control_compute_communication:safety_protection:alarm_state_bus",
+        "interface_contract:energy_storage_source:power_distribution:cell_power_bus",
+        "interface_contract:environmental_interface:control_compute_communication:temperature_compensation_bus",
+        "interface_contract:maintenance_serviceability:skin_patient_interface:sterile_boundary",
+        "interface_contract:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+        "module_allocation:energy_storage_source",
+        "module_allocation:environmental_interface",
+        "module_allocation:safety_protection",
+        "module_allocation:skin_patient_interface",
+        "submodule_allocation:energy_storage_source:battery_cell",
+        "submodule_allocation:energy_storage_source:battery_safety",
+        "submodule_allocation:energy_storage_source:power_reserve",
+        "submodule_allocation:environmental_interface:motion_pressure",
+        "submodule_allocation:environmental_interface:sweat_water_boundary",
+        "submodule_allocation:environmental_interface:temperature_compensation",
+        "submodule_allocation:safety_protection:biocompatibility_controls",
+        "submodule_allocation:safety_protection:patient_alarm_logic",
+        "submodule_allocation:safety_protection:sterile_sharps_safety",
+        "submodule_allocation:skin_patient_interface:adhesive_patch_stack",
+        "submodule_allocation:skin_patient_interface:cannula_skin_contact",
+        "submodule_allocation:skin_patient_interface:wear_comfort_retention"
+      ],
+      "verificationActivityIds": [
+        "design_review:skin_patient_interface",
+        "calculation:skin_patient_interface",
+        "design_review:energy_storage_source",
+        "calculation:energy_storage_source",
+        "design_review:environmental_interface",
+        "calculation:environmental_interface",
+        "design_review:safety_protection",
+        "calculation:safety_protection"
+      ],
+      "acceptedVerificationActivityIds": [],
+      "blockers": [],
+      "requiredAction": "Collect accepted reviewer evidence; structural requirement coverage is ready for review."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Collect accepted reviewer evidence; structural requirement coverage is ready for review."
+  ]
+}

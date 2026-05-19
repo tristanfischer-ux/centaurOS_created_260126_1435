@@ -1,0 +1,18 @@
+flowchart LR
+  power_distribution["AC Input And DC Output Distribution"]
+  energy_conversion_transduction["Power Conversion Stack"]
+  charging_connector_interface["Vehicle Charging Interface"]
+  control_compute_communication["Control Compute Communication"]
+  sensing_instrumentation["Metering And Electrical Sensing"]
+  environmental_interface["Thermal And Environmental Interface"]
+  structure_containment["Cabinet Structure And Containment"]
+  safety_protection["Safety Protection"]
+  maintenance_serviceability["Maintenance And Commissioning"]
+  hmi_ergonomics["User Payment And HMI"]
+  power_distribution -->|"ac_input_bus"| energy_conversion_transduction
+  energy_conversion_transduction -->|"dc_output_bus"| charging_connector_interface
+  control_compute_communication -->|"iso15118_plc"| charging_connector_interface
+  control_compute_communication -->|"control_bus"| energy_conversion_transduction
+  sensing_instrumentation -->|"metering_bus"| control_compute_communication
+  environmental_interface -->|"coolant_loop"| energy_conversion_transduction
+  classDef missing stroke:#a32626,stroke-width:3px,color:#a32626;

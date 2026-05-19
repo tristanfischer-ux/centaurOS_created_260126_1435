@@ -1,0 +1,10 @@
+componentWordId,description,priority,supplierName,manufacturer,mpn,unitCostGbp,leadTimeWeeks,sourceGrade,evidence.ref,evidence.quote,retrievedAt
+inverter_scroll_compressor,Inverter scroll compressor,critical,,,,,,catalogue,,,
+electronic_expansion_valve,Electronic expansion valve,critical,,,,,,catalogue,,,
+outdoor_finned_evaporator_coil,Outdoor finned evaporator coil,critical,,,,,,catalogue,,,
+variable_speed_fan_assembly,Variable-speed fan assembly,critical,,,,,,catalogue,,,
+brazed_plate_heat_exchanger,Brazed plate heat exchanger,critical,,,,,,catalogue,,,
+hydronic_circulation_pump,Hydronic circulation pump,critical,,,,,,catalogue,,,
+hydronic_safety_valve_kit,Hydronic safety valve kit,critical,,,,,,catalogue,,,
+heat_pump_controller_pcb,Heat pump controller PCB,critical,,,,,,catalogue,,,
+refrigerant_sensor_and_pressure_transducers,Refrigerant sensor and pressure transducers,critical,,,,,,catalogue,,,

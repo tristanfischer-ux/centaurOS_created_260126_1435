@@ -624,6 +624,14 @@ export interface DimensionSheetPA extends DimensionSheet {
   clearanceNotes?: string
   /** Tight-margin warning text for ActionCallout, or null when margin is acceptable */
   massMarginNote?: string | null
+  /**
+   * The canonical shipping / racking / pallet / cabinet envelope that this
+   * product deploys into.  Populated by the deployment-envelopes registry in
+   * Stage 3 via suggestEnvelope (size-constrained) or defaultEnvelopeForClass
+   * (class-slug fallback).  Undefined when neither helper returns a result
+   * (e.g. AUV, HAPS, wearables — the device IS the envelope).
+   */
+  deploymentEnvelope?: import('./deployment-envelopes').DeploymentEnvelope
 }
 // === end PA Stage 7a Sizing extended fields ===
 

@@ -1,0 +1,14 @@
+{
+  "source": "/Users/tristanfischer/Downloads/bess-iter/iter-49d-all-fixes-bess/container/state.json",
+  "analysis": {
+    "moduleCount": 11,
+    "subModuleCount": 48,
+    "wordCount": 241,
+    "moduleGrammarLinkCount": 35,
+    "crossModuleLinkCount": 19,
+    "pricedWordCount": 207,
+    "pricedWordRatio": 0.8589211618257261,
+    "estimatedBomTotalGbp": 322183.2,
+    "issues": []
+  }
+}

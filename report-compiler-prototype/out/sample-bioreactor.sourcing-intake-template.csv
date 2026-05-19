@@ -1,0 +1,12 @@
+componentWordId,description,priority,supplierName,manufacturer,mpn,unitCostGbp,leadTimeWeeks,sourceGrade,evidence.ref,evidence.quote,retrievedAt
+single_use_bioreactor_bag,Single-use bioreactor bag,critical,,,,,,catalogue,,,
+sterile_tubing_and_connector_set,Sterile tubing and connector set,critical,,,,,,catalogue,,,
+agitation_drive,Agitation drive,critical,,,,,,catalogue,,,
+peristaltic_feed_pump,Peristaltic feed pump,critical,,,,,,catalogue,,,
+sparger_and_gas_mix_manifold,Sparger and gas-mix manifold,critical,,,,,,catalogue,,,
+temperature_control_loop,Temperature control loop,critical,,,,,,catalogue,,,
+exhaust_filter_and_pressure_relief_set,Exhaust filter and pressure relief set,critical,,,,,,catalogue,,,
+dissolved_oxygen_optical_sensor,Dissolved oxygen optical sensor,critical,,,,,,catalogue,,,
+single_use_ph_sensor,Single-use pH sensor,critical,,,,,,catalogue,,,
+load_cell_set,Load cell set,critical,,,,,,catalogue,,,
+bioreactor_controller,Bioreactor controller,critical,,,,,,catalogue,,,

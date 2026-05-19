@@ -1,0 +1,2879 @@
+{
+  "summary": {
+    "rows": 81,
+    "accepted": 0,
+    "readyForReview": 50,
+    "needsReview": 31,
+    "blocked": 0,
+    "moduleQuestions": 10,
+    "subModuleQuestions": 30,
+    "interfaceQuestions": 8,
+    "calculationQuestions": 2,
+    "assumptionQuestions": 31
+  },
+  "questions": [
+    {
+      "id": "assumption_resolution:compliance:CE-EMC",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "CE-EMC",
+      "reviewerQuestion": "Can the CE-EMC assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "EMC design review, pre-compliance or test evidence for rack appliance.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:IEC-62368-1",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "IEC-62368-1",
+      "reviewerQuestion": "Can the IEC-62368-1 assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Electrical safety, enclosure, temperature and abnormal-operation evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:SECURE-BOOT-REVIEW",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "SECURE-BOOT-REVIEW",
+      "reviewerQuestion": "Can the SECURE-BOOT-REVIEW assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "TPM, measured boot, firmware signing, recovery and management-access evidence.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:compute_acceleration_accelerator_module_ai_accelerator_module",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "AI accelerator module",
+      "reviewerQuestion": "Can the AI accelerator module assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:compute_acceleration_cpu_memory_complex_cpu_module",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "CPU module",
+      "reviewerQuestion": "Can the CPU module assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "cpu_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:compute_acceleration_cpu_memory_complex_ecc_memory",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "ECC memory",
+      "reviewerQuestion": "Can the ECC memory assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "ecc_memory"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:compute_acceleration_cpu_memory_complex_system_motherboard",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "System motherboard",
+      "reviewerQuestion": "Can the System motherboard assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "system_motherboard"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_host_control_bmc_management_controller",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "BMC management controller",
+      "reviewerQuestion": "Can the BMC management controller assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "bmc_management_controller"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:data_storage_nvme_storage_nvme_ssd",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "NVMe SSD",
+      "reviewerQuestion": "Can the NVMe SSD assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "nvme_ssd"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_forced_air_cooling_fan_wall_assembly",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Fan wall assembly",
+      "reviewerQuestion": "Can the Fan wall assembly assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "fan_wall_assembly"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:environmental_interface_heat_transfer_heatsink_cold_plate",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Heatsink cold plate",
+      "reviewerQuestion": "Can the Heatsink cold plate assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "heatsink_cold_plate"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:network_io_high_speed_network_high_speed_nic",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "High-speed NIC",
+      "reviewerQuestion": "Can the High-speed NIC assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "high_speed_nic"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:power_distribution_ac_input_conversion_redundant_power_supply",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Redundant power supply",
+      "reviewerQuestion": "Can the Redundant power supply assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "redundant_power_supply"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:safety_protection_secure_boot_tpm_security_module",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "TPM security module",
+      "reviewerQuestion": "Can the TPM security module assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "tpm_security_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:structure_containment_rack_chassis_1u_rack_chassis",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "1U rack chassis",
+      "reviewerQuestion": "Can the 1U rack chassis assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:compute_acceleration:pcie_fabric",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> compute_acceleration",
+      "reviewerQuestion": "Can the control_compute_communication -> compute_acceleration assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "pcie_fabric"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:data_storage:control_compute_communication:storage_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "data_storage -> control_compute_communication",
+      "reviewerQuestion": "Can the data_storage -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "storage_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:environmental_interface:compute_acceleration:thermal_path",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "environmental_interface -> compute_acceleration",
+      "reviewerQuestion": "Can the environmental_interface -> compute_acceleration assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:network_io:control_compute_communication:inference_network",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "network_io -> control_compute_communication",
+      "reviewerQuestion": "Can the network_io -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "inference_network"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:power_distribution:compute_acceleration:gpu_power_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "power_distribution -> compute_acceleration",
+      "reviewerQuestion": "Can the power_distribution -> compute_acceleration assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "gpu_power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:safety_protection:power_distribution:hardwired_trip",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "safety_protection -> power_distribution",
+      "reviewerQuestion": "Can the safety_protection -> power_distribution assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "hardwired_trip"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "reviewerQuestion": "Can the sensing_instrumentation -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:structure_containment:environmental_interface:airflow_path",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "structure_containment -> environmental_interface",
+      "reviewerQuestion": "Can the structure_containment -> environmental_interface assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "airflow_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:capex_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated CAPEX",
+      "reviewerQuestion": "Can the Estimated CAPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:headline_output",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Inference throughput",
+      "reviewerQuestion": "Can the Inference throughput assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:opex_annual_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated annual OPEX",
+      "reviewerQuestion": "Can the Estimated annual OPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:edgeai_compute_throughput",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Inference Throughput",
+      "reviewerQuestion": "Can the Inference Throughput assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration",
+        "environmental_interface",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:edgeai_data_compute_closure",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Data/Compute Closure",
+      "reviewerQuestion": "Can the Data/Compute Closure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration",
+        "environmental_interface",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:edgeai_power_density",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Rack Power Density",
+      "reviewerQuestion": "Can the Rack Power Density assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "maintenance_serviceability",
+        "power_distribution",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:edgeai_secure_management",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Secure Management",
+      "reviewerQuestion": "Can the Secure Management assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:edgeai_thermal_power_safety",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Thermal/Power Safety",
+      "reviewerQuestion": "Can the Thermal/Power Safety assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration",
+        "environmental_interface",
+        "control_compute_communication",
+        "structure_containment",
+        "maintenance_serviceability",
+        "power_distribution",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:edge_ai_power_density_w_per_u",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Rack power density",
+      "reviewerQuestion": "Does the Rack power density calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm inlet temperature, airflow, fan curve, acoustic limit, PSU derating and service clearance.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "maintenance_serviceability",
+        "power_distribution",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "power_budget_w",
+        "rack_units"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "edge_ai_power_density_w_per_u"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:edge_ai_tops_per_watt",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Edge AI accelerator efficiency",
+      "reviewerQuestion": "Does the Edge AI accelerator efficiency calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm workload precision, sustained throughput, accelerator SKU, thermal derating and host overhead.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration",
+        "environmental_interface",
+        "control_compute_communication",
+        "power_distribution",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "edge_ai_tops_per_watt"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_contract:control_compute_communication:compute_acceleration:pcie_fabric",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication -> Compute Acceleration via pcie_fabric",
+      "reviewerQuestion": "Is the pcie_fabric interface between Control Compute Communication and Compute Acceleration correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "compute_acceleration"
+      ],
+      "linkedSubModuleIds": [
+        "host_control",
+        "runtime_orchestration",
+        "accelerator_module",
+        "cpu_memory_complex",
+        "signal_power_integrity"
+      ],
+      "linkedComponentWordIds": [
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest",
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard",
+        "boot_flash_device",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "pcie_fabric"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:data_storage:control_compute_communication:storage_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Data Storage -> Control Compute Communication via storage_bus",
+      "reviewerQuestion": "Is the storage_bus interface between Data Storage and Control Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "data_storage",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "nvme_storage",
+        "model_cache",
+        "log_buffer",
+        "host_control",
+        "runtime_orchestration"
+      ],
+      "linkedComponentWordIds": [
+        "nvme_ssd",
+        "m_2_carrier_tray",
+        "drive_thermal_pad",
+        "drive_retention_screw_set",
+        "model_cache_partition",
+        "storage_health_monitor",
+        "secure_erase_controller",
+        "firmware_recovery_image",
+        "event_log_partition",
+        "write_endurance_counter",
+        "crash_dump_region",
+        "log_export_port",
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "storage_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:environmental_interface:compute_acceleration:thermal_path",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal Airflow Interface -> Compute Acceleration via thermal_path",
+      "reviewerQuestion": "Is the thermal_path interface between Thermal Airflow Interface and Compute Acceleration correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface",
+        "compute_acceleration"
+      ],
+      "linkedSubModuleIds": [
+        "heat_transfer",
+        "accelerator_module",
+        "signal_power_integrity"
+      ],
+      "linkedComponentWordIds": [
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct",
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thermal_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:network_io:control_compute_communication:inference_network",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Network IO -> Control Compute Communication via inference_network",
+      "reviewerQuestion": "Is the inference_network interface between Network IO and Control Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "network_io",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "high_speed_network",
+        "timing_ingest",
+        "io_isolation_routing",
+        "runtime_orchestration"
+      ],
+      "linkedComponentWordIds": [
+        "high_speed_nic",
+        "optical_transceiver_cage",
+        "nic_heatsink",
+        "network_link_led_board",
+        "ptp_timing_module",
+        "gpio_trigger_input",
+        "data_ingest_connector",
+        "network_bypass_relay",
+        "emi_gasket_strip",
+        "shielded_io_bracket",
+        "cable_strain_relief_comb",
+        "service_loop_tie_set",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "inference_network"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:power_distribution:compute_acceleration:gpu_power_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Distribution -> Compute Acceleration via gpu_power_bus",
+      "reviewerQuestion": "Is the gpu_power_bus interface between Power Distribution and Compute Acceleration correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "compute_acceleration"
+      ],
+      "linkedSubModuleIds": [
+        "dc_rail_distribution",
+        "accelerator_module",
+        "signal_power_integrity"
+      ],
+      "linkedComponentWordIds": [
+        "12_v_busbar",
+        "accelerator_power_harness",
+        "hot_swap_controller",
+        "fan_power_distribution_loom",
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "gpu_power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:safety_protection:power_distribution:hardwired_trip",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Security And Safety Protection -> Power Distribution via hardwired_trip",
+      "reviewerQuestion": "Is the hardwired_trip interface between Security And Safety Protection and Power Distribution correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "safety_protection",
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_shutdown",
+        "electrical_safety",
+        "hold_up_protection"
+      ],
+      "linkedComponentWordIds": [
+        "thermal_trip_relay",
+        "overtemperature_latch",
+        "fan_failure_interlock",
+        "hardwired_shutdown_line",
+        "protective_earth_stud",
+        "insulation_barrier_sheet",
+        "finger_safe_psu_cover",
+        "warning_label_set",
+        "hold_up_capacitor_module",
+        "brownout_detector",
+        "current_shunt_module",
+        "efuse_channel_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "hardwired_trip"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Telemetry Instrumentation -> Control Compute Communication via sensor_bus",
+      "reviewerQuestion": "Is the sensor_bus interface between Telemetry Instrumentation and Control Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_sensors",
+        "power_fan_telemetry",
+        "front_panel_status",
+        "host_control"
+      ],
+      "linkedComponentWordIds": [
+        "inlet_temperature_sensor",
+        "accelerator_hotspot_sensor",
+        "exhaust_temperature_sensor",
+        "board_humidity_sensor",
+        "psu_pmbus_monitor",
+        "rail_current_monitor",
+        "fan_tachometer_hub",
+        "chassis_intrusion_switch",
+        "front_status_led_board",
+        "uid_button",
+        "alarm_buzzer",
+        "lcd_status_panel",
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:structure_containment:environmental_interface:airflow_path",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Rack Structure Containment -> Thermal Airflow Interface via airflow_path",
+      "reviewerQuestion": "Is the airflow_path interface between Rack Structure Containment and Thermal Airflow Interface correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "rack_chassis",
+        "accelerator_mounting",
+        "forced_air_cooling",
+        "heat_transfer",
+        "inlet_outlet_management"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis",
+        "slide_rail_kit",
+        "internal_divider_panel",
+        "front_bezel_assembly",
+        "accelerator_retention_bracket",
+        "pcie_riser_support",
+        "card_stiffener_rail",
+        "gpu_airflow_baffle",
+        "fan_wall_assembly",
+        "pwm_fan_controller",
+        "airflow_straightener",
+        "replaceable_dust_filter",
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct",
+        "front_inlet_grille",
+        "rear_exhaust_grille",
+        "air_seal_foam_kit",
+        "rack_pressure_map_label"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "airflow_path"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "module_allocation:compute_acceleration",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Compute Acceleration",
+      "reviewerQuestion": "Does Compute Acceleration have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedSubModuleIds": [
+        "accelerator_module",
+        "cpu_memory_complex",
+        "signal_power_integrity"
+      ],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard",
+        "boot_flash_device",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedInterfaceIds": [
+        "pcie_fabric",
+        "memory_bus",
+        "gpu_power_bus",
+        "thermal_path",
+        "sensor_bus",
+        "low_voltage_rail"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication",
+      "reviewerQuestion": "Does Control Compute Communication have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "host_control",
+        "runtime_orchestration",
+        "remote_management"
+      ],
+      "linkedComponentWordIds": [
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest",
+        "out_of_band_management_port",
+        "serial_console_header",
+        "debug_access_lockout",
+        "firmware_signing_key_slot"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedInterfaceIds": [
+        "pcie_fabric",
+        "storage_bus",
+        "management_network",
+        "inference_network",
+        "sensor_bus",
+        "thermal_alarm_bus",
+        "secure_boot_chain",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:data_storage",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Data Storage",
+      "reviewerQuestion": "Does Data Storage have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedSubModuleIds": [
+        "nvme_storage",
+        "model_cache",
+        "log_buffer"
+      ],
+      "linkedComponentWordIds": [
+        "nvme_ssd",
+        "m_2_carrier_tray",
+        "drive_thermal_pad",
+        "drive_retention_screw_set",
+        "model_cache_partition",
+        "storage_health_monitor",
+        "secure_erase_controller",
+        "firmware_recovery_image",
+        "event_log_partition",
+        "write_endurance_counter",
+        "crash_dump_region",
+        "log_export_port"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "storage_bus",
+        "pcie_fabric",
+        "service_access",
+        "secure_boot_chain",
+        "management_network"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal Airflow Interface",
+      "reviewerQuestion": "Does Thermal Airflow Interface have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "forced_air_cooling",
+        "heat_transfer",
+        "inlet_outlet_management"
+      ],
+      "linkedComponentWordIds": [
+        "fan_wall_assembly",
+        "pwm_fan_controller",
+        "airflow_straightener",
+        "replaceable_dust_filter",
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct",
+        "front_inlet_grille",
+        "rear_exhaust_grille",
+        "air_seal_foam_kit",
+        "rack_pressure_map_label"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "airflow_path",
+        "thermal_path",
+        "fan_control_bus",
+        "sensor_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety",
+        "edgeai_power_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Field Maintenance Serviceability",
+      "reviewerQuestion": "Does Field Maintenance Serviceability have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "field_replaceable_units",
+        "rack_installation",
+        "service_workflow"
+      ],
+      "linkedComponentWordIds": [
+        "hot_swap_fan_carrier",
+        "drive_service_handle",
+        "psu_latch_mechanism",
+        "accelerator_extraction_handle",
+        "rack_rail_kit",
+        "rear_support_bracket",
+        "cable_retention_comb",
+        "airflow_blanking_panel",
+        "service_checklist_card",
+        "firmware_version_label",
+        "spare_screw_kit",
+        "diagnostics_usb_key"
+      ],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "rack_mount",
+        "management_network",
+        "airflow_path",
+        "secure_boot_chain"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:network_io",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Network IO",
+      "reviewerQuestion": "Does Network IO have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedSubModuleIds": [
+        "high_speed_network",
+        "timing_ingest",
+        "io_isolation_routing"
+      ],
+      "linkedComponentWordIds": [
+        "high_speed_nic",
+        "optical_transceiver_cage",
+        "nic_heatsink",
+        "network_link_led_board",
+        "ptp_timing_module",
+        "gpio_trigger_input",
+        "data_ingest_connector",
+        "network_bypass_relay",
+        "emi_gasket_strip",
+        "shielded_io_bracket",
+        "cable_strain_relief_comb",
+        "service_loop_tie_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "inference_network",
+        "management_network",
+        "pcie_fabric",
+        "service_access",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Distribution",
+      "reviewerQuestion": "Does Power Distribution have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "ac_input_conversion",
+        "dc_rail_distribution",
+        "hold_up_protection"
+      ],
+      "linkedComponentWordIds": [
+        "redundant_power_supply",
+        "ac_inlet_filter",
+        "input_fuse_holder",
+        "power_good_signal_harness",
+        "12_v_busbar",
+        "accelerator_power_harness",
+        "hot_swap_controller",
+        "fan_power_distribution_loom",
+        "hold_up_capacitor_module",
+        "brownout_detector",
+        "current_shunt_module",
+        "efuse_channel_set"
+      ],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "ac_input_bus",
+        "low_voltage_rail",
+        "gpu_power_bus",
+        "protective_earth",
+        "hardwired_trip",
+        "sensor_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Security And Safety Protection",
+      "reviewerQuestion": "Does Security And Safety Protection have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "secure_boot",
+        "thermal_shutdown",
+        "electrical_safety"
+      ],
+      "linkedComponentWordIds": [
+        "tpm_security_module",
+        "secure_boot_policy",
+        "chassis_tamper_switch",
+        "recovery_jumper_cover",
+        "thermal_trip_relay",
+        "overtemperature_latch",
+        "fan_failure_interlock",
+        "hardwired_shutdown_line",
+        "protective_earth_stud",
+        "insulation_barrier_sheet",
+        "finger_safe_psu_cover",
+        "warning_label_set"
+      ],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "secure_boot_chain",
+        "thermal_alarm_bus",
+        "hardwired_trip",
+        "protective_earth",
+        "service_access",
+        "management_network",
+        "fan_control_bus"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Telemetry Instrumentation",
+      "reviewerQuestion": "Does Telemetry Instrumentation have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_sensors",
+        "power_fan_telemetry",
+        "front_panel_status"
+      ],
+      "linkedComponentWordIds": [
+        "inlet_temperature_sensor",
+        "accelerator_hotspot_sensor",
+        "exhaust_temperature_sensor",
+        "board_humidity_sensor",
+        "psu_pmbus_monitor",
+        "rail_current_monitor",
+        "fan_tachometer_hub",
+        "chassis_intrusion_switch",
+        "front_status_led_board",
+        "uid_button",
+        "alarm_buzzer",
+        "lcd_status_panel"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "management_network",
+        "thermal_alarm_bus",
+        "fan_control_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Rack Structure Containment",
+      "reviewerQuestion": "Does Rack Structure Containment have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "rack_chassis",
+        "accelerator_mounting",
+        "service_labelling"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis",
+        "slide_rail_kit",
+        "internal_divider_panel",
+        "front_bezel_assembly",
+        "accelerator_retention_bracket",
+        "pcie_riser_support",
+        "card_stiffener_rail",
+        "gpu_airflow_baffle",
+        "asset_label_plate",
+        "airflow_direction_label",
+        "rack_ear_set",
+        "cable_management_arm"
+      ],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedInterfaceIds": [
+        "rack_mount",
+        "airflow_path",
+        "service_access",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:compute_acceleration:accelerator_module",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Compute Acceleration / Accelerator module",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Accelerator module make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedSubModuleIds": [
+        "accelerator_module"
+      ],
+      "linkedComponentWordIds": [
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedInterfaceIds": [
+        "pcie_fabric",
+        "gpu_power_bus",
+        "thermal_path",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:compute_acceleration:cpu_memory_complex",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Compute Acceleration / CPU and memory complex",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to CPU and memory complex make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedSubModuleIds": [
+        "cpu_memory_complex"
+      ],
+      "linkedComponentWordIds": [
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard",
+        "boot_flash_device"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedInterfaceIds": [
+        "memory_bus",
+        "pcie_fabric",
+        "low_voltage_rail",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:compute_acceleration:signal_power_integrity",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Compute Acceleration / Signal and power integrity",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Signal and power integrity make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "compute_acceleration"
+      ],
+      "linkedSubModuleIds": [
+        "signal_power_integrity"
+      ],
+      "linkedComponentWordIds": [
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedInterfaceIds": [
+        "pcie_fabric",
+        "gpu_power_bus",
+        "thermal_path"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:host_control",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Host control",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Host control make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "host_control"
+      ],
+      "linkedComponentWordIds": [
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedInterfaceIds": [
+        "pcie_fabric",
+        "storage_bus",
+        "management_network",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:remote_management",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Remote management",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Remote management make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "remote_management"
+      ],
+      "linkedComponentWordIds": [
+        "out_of_band_management_port",
+        "serial_console_header",
+        "debug_access_lockout",
+        "firmware_signing_key_slot"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedInterfaceIds": [
+        "management_network",
+        "service_access",
+        "secure_boot_chain"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:runtime_orchestration",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Control Compute Communication / Runtime orchestration",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Runtime orchestration make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "runtime_orchestration"
+      ],
+      "linkedComponentWordIds": [
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops"
+      ],
+      "linkedInterfaceIds": [
+        "pcie_fabric",
+        "storage_bus",
+        "inference_network",
+        "secure_boot_chain"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:data_storage:log_buffer",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Data Storage / Log and evidence buffer",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Log and evidence buffer make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedSubModuleIds": [
+        "log_buffer"
+      ],
+      "linkedComponentWordIds": [
+        "event_log_partition",
+        "write_endurance_counter",
+        "crash_dump_region",
+        "log_export_port"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "storage_bus",
+        "management_network",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:data_storage:model_cache",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Data Storage / Model cache and recovery",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Model cache and recovery make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedSubModuleIds": [
+        "model_cache"
+      ],
+      "linkedComponentWordIds": [
+        "model_cache_partition",
+        "storage_health_monitor",
+        "secure_erase_controller",
+        "firmware_recovery_image"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "storage_bus",
+        "secure_boot_chain",
+        "management_network"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:data_storage:nvme_storage",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Data Storage / NVMe storage",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to NVMe storage make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "data_storage"
+      ],
+      "linkedSubModuleIds": [
+        "nvme_storage"
+      ],
+      "linkedComponentWordIds": [
+        "nvme_ssd",
+        "m_2_carrier_tray",
+        "drive_thermal_pad",
+        "drive_retention_screw_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "storage_bus",
+        "pcie_fabric",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:forced_air_cooling",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal Airflow Interface / Forced-air cooling",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Forced-air cooling make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "forced_air_cooling"
+      ],
+      "linkedComponentWordIds": [
+        "fan_wall_assembly",
+        "pwm_fan_controller",
+        "airflow_straightener",
+        "replaceable_dust_filter"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "airflow_path",
+        "fan_control_bus",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety",
+        "edgeai_power_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:heat_transfer",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal Airflow Interface / Heat transfer path",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Heat transfer path make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "heat_transfer"
+      ],
+      "linkedComponentWordIds": [
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "thermal_path",
+        "airflow_path",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety",
+        "edgeai_power_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:inlet_outlet_management",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thermal Airflow Interface / Inlet and outlet management",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Inlet and outlet management make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "inlet_outlet_management"
+      ],
+      "linkedComponentWordIds": [
+        "front_inlet_grille",
+        "rear_exhaust_grille",
+        "air_seal_foam_kit",
+        "rack_pressure_map_label"
+      ],
+      "linkedRequirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "airflow_path",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety",
+        "edgeai_power_density"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:field_replaceable_units",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Field Maintenance Serviceability / Field-replaceable units",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Field-replaceable units make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "field_replaceable_units"
+      ],
+      "linkedComponentWordIds": [
+        "hot_swap_fan_carrier",
+        "drive_service_handle",
+        "psu_latch_mechanism",
+        "accelerator_extraction_handle"
+      ],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "airflow_path"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:rack_installation",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Field Maintenance Serviceability / Rack installation",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Rack installation make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "rack_installation"
+      ],
+      "linkedComponentWordIds": [
+        "rack_rail_kit",
+        "rear_support_bracket",
+        "cable_retention_comb",
+        "airflow_blanking_panel"
+      ],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedInterfaceIds": [
+        "rack_mount",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:service_workflow",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Field Maintenance Serviceability / Service workflow",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Service workflow make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "service_workflow"
+      ],
+      "linkedComponentWordIds": [
+        "service_checklist_card",
+        "firmware_version_label",
+        "spare_screw_kit",
+        "diagnostics_usb_key"
+      ],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "management_network",
+        "secure_boot_chain"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:network_io:high_speed_network",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Network IO / High-speed network",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to High-speed network make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedSubModuleIds": [
+        "high_speed_network"
+      ],
+      "linkedComponentWordIds": [
+        "high_speed_nic",
+        "optical_transceiver_cage",
+        "nic_heatsink",
+        "network_link_led_board"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "inference_network",
+        "pcie_fabric",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:network_io:io_isolation_routing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Network IO / IO isolation and routing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to IO isolation and routing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedSubModuleIds": [
+        "io_isolation_routing"
+      ],
+      "linkedComponentWordIds": [
+        "emi_gasket_strip",
+        "shielded_io_bracket",
+        "cable_strain_relief_comb",
+        "service_loop_tie_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "inference_network",
+        "service_access",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:network_io:timing_ingest",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Network IO / Timing and ingest",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Timing and ingest make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "network_io"
+      ],
+      "linkedSubModuleIds": [
+        "timing_ingest"
+      ],
+      "linkedComponentWordIds": [
+        "ptp_timing_module",
+        "gpio_trigger_input",
+        "data_ingest_connector",
+        "network_bypass_relay"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "inference_network",
+        "management_network",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:ac_input_conversion",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Distribution / AC input conversion",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to AC input conversion make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "ac_input_conversion"
+      ],
+      "linkedComponentWordIds": [
+        "redundant_power_supply",
+        "ac_inlet_filter",
+        "input_fuse_holder",
+        "power_good_signal_harness"
+      ],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "ac_input_bus",
+        "protective_earth",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:dc_rail_distribution",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Distribution / DC rail distribution",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to DC rail distribution make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "dc_rail_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "12_v_busbar",
+        "accelerator_power_harness",
+        "hot_swap_controller",
+        "fan_power_distribution_loom"
+      ],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "low_voltage_rail",
+        "gpu_power_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:hold_up_protection",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Power Distribution / Hold-up and protection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Hold-up and protection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "hold_up_protection"
+      ],
+      "linkedComponentWordIds": [
+        "hold_up_capacitor_module",
+        "brownout_detector",
+        "current_shunt_module",
+        "efuse_channel_set"
+      ],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "low_voltage_rail",
+        "hardwired_trip",
+        "sensor_bus"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:electrical_safety",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Security And Safety Protection / Electrical safety",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Electrical safety make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "electrical_safety"
+      ],
+      "linkedComponentWordIds": [
+        "protective_earth_stud",
+        "insulation_barrier_sheet",
+        "finger_safe_psu_cover",
+        "warning_label_set"
+      ],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "protective_earth",
+        "service_access",
+        "hardwired_trip"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:secure_boot",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Security And Safety Protection / Secure boot",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Secure boot make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "secure_boot"
+      ],
+      "linkedComponentWordIds": [
+        "tpm_security_module",
+        "secure_boot_policy",
+        "chassis_tamper_switch",
+        "recovery_jumper_cover"
+      ],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "secure_boot_chain",
+        "management_network",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:thermal_shutdown",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Security And Safety Protection / Thermal shutdown",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Thermal shutdown make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_shutdown"
+      ],
+      "linkedComponentWordIds": [
+        "thermal_trip_relay",
+        "overtemperature_latch",
+        "fan_failure_interlock",
+        "hardwired_shutdown_line"
+      ],
+      "linkedRequirementIds": [
+        "power_budget_w"
+      ],
+      "linkedInterfaceIds": [
+        "thermal_alarm_bus",
+        "hardwired_trip",
+        "fan_control_bus"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:front_panel_status",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Telemetry Instrumentation / Front panel status",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Front panel status make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "front_panel_status"
+      ],
+      "linkedComponentWordIds": [
+        "front_status_led_board",
+        "uid_button",
+        "alarm_buzzer",
+        "lcd_status_panel"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "management_network",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:power_fan_telemetry",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Telemetry Instrumentation / Power and fan telemetry",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Power and fan telemetry make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "power_fan_telemetry"
+      ],
+      "linkedComponentWordIds": [
+        "psu_pmbus_monitor",
+        "rail_current_monitor",
+        "fan_tachometer_hub",
+        "chassis_intrusion_switch"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "fan_control_bus",
+        "management_network"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:thermal_sensors",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Telemetry Instrumentation / Thermal sensors",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Thermal sensors make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_sensors"
+      ],
+      "linkedComponentWordIds": [
+        "inlet_temperature_sensor",
+        "accelerator_hotspot_sensor",
+        "exhaust_temperature_sensor",
+        "board_humidity_sensor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "sensor_bus",
+        "thermal_alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:accelerator_mounting",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Rack Structure Containment / Accelerator mounting",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Accelerator mounting make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "accelerator_mounting"
+      ],
+      "linkedComponentWordIds": [
+        "accelerator_retention_bracket",
+        "pcie_riser_support",
+        "card_stiffener_rail",
+        "gpu_airflow_baffle"
+      ],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedInterfaceIds": [
+        "rack_mount",
+        "airflow_path",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:rack_chassis",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Rack Structure Containment / Rack chassis",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Rack chassis make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "rack_chassis"
+      ],
+      "linkedComponentWordIds": [
+        "1u_rack_chassis",
+        "slide_rail_kit",
+        "internal_divider_panel",
+        "front_bezel_assembly"
+      ],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedInterfaceIds": [
+        "rack_mount",
+        "airflow_path",
+        "service_access",
+        "protective_earth"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:service_labelling",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Rack Structure Containment / Service labelling",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Service labelling make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "service_labelling"
+      ],
+      "linkedComponentWordIds": [
+        "asset_label_plate",
+        "airflow_direction_label",
+        "rack_ear_set",
+        "cable_management_arm"
+      ],
+      "linkedRequirementIds": [
+        "rack_units"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "rack_mount"
+      ],
+      "linkedCalculationIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "blockers": []
+    }
+  ]
+}

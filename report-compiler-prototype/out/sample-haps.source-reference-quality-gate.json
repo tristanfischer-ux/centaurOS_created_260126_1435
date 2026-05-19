@@ -1,0 +1,22 @@
+{
+  "verdict": "no_sourcing_evidence",
+  "summary": {
+    "rows": 0,
+    "passRows": 0,
+    "reviewRows": 0,
+    "blockedRows": 0,
+    "passRatio": 0,
+    "candidateExternalUrlRows": 0,
+    "placeholderUrlRows": 0,
+    "protocolFixtureRows": 0,
+    "localOrInternalRows": 0,
+    "unknownReferenceRows": 0,
+    "httpsRows": 0,
+    "completeMetadataRows": 0,
+    "quoteAnchoredRows": 0,
+    "freshTimestampRows": 0
+  },
+  "rows": [],
+  "blockers": [],
+  "nextActions": []
+}

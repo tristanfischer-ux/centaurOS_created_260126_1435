@@ -1,0 +1,850 @@
+{
+  "summary": {
+    "requiredContracts": 10,
+    "presentContracts": 10,
+    "missingContracts": 0,
+    "sharedInterfaces": 16,
+    "localOnlyInterfaces": 3
+  },
+  "requiredContracts": [
+    {
+      "id": "required:skin_patient_interface:sensing_instrumentation:interstitial_fluid_path",
+      "interfaceId": "interstitial_fluid_path",
+      "status": "present",
+      "from": {
+        "moduleId": "skin_patient_interface",
+        "moduleName": "Skin Patient Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "adhesive_patch_stack",
+            "subModuleName": "Adhesive patch stack",
+            "componentWordIds": [
+              "adhesive_skin_patch",
+              "hydrocolloid_edge_seal",
+              "breathable_backing_film",
+              "pull_tab_liner"
+            ]
+          },
+          {
+            "subModuleId": "cannula_skin_contact",
+            "subModuleName": "Sensor skin contact",
+            "componentWordIds": [
+              "skin_contact_gasket",
+              "filament_entry_seal",
+              "antimicrobial_contact_pad",
+              "insertion_site_spacing_ring"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Glucose Sensing Instrumentation",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "glucose_filament_stack",
+            "subModuleName": "Glucose filament stack",
+            "componentWordIds": [
+              "glucose_sensing_filament",
+              "enzyme_reagent_membrane",
+              "reference_electrode",
+              "diffusion_limiting_membrane"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Sensor chemistry must access interstitial fluid through a declared patient interface.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:actuation_kinematics:skin_patient_interface:insertion_path",
+      "interfaceId": "insertion_path",
+      "status": "present",
+      "from": {
+        "moduleId": "actuation_kinematics",
+        "moduleName": "Applicator Insertion Mechanism",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "disposable_applicator",
+            "subModuleName": "Disposable applicator",
+            "componentWordIds": [
+              "disposable_applicator",
+              "spring_insertion_driver",
+              "trigger_button",
+              "safety_cap"
+            ]
+          },
+          {
+            "subModuleId": "insertion_mechanism",
+            "subModuleName": "Insertion mechanism",
+            "componentWordIds": [
+              "introducer_needle",
+              "filament_deployment_shuttle",
+              "depth_stop_collar",
+              "retraction_latch"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "skin_patient_interface",
+        "moduleName": "Skin Patient Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "cannula_skin_contact",
+            "subModuleName": "Sensor skin contact",
+            "componentWordIds": [
+              "skin_contact_gasket",
+              "filament_entry_seal",
+              "antimicrobial_contact_pad",
+              "insertion_site_spacing_ring"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Applicator insertion path must align with the adhesive patch and skin boundary.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:sensor_signal_bus",
+      "interfaceId": "sensor_signal_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Glucose Sensing Instrumentation",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "analog_front_end",
+            "subModuleName": "Analog front end",
+            "componentWordIds": [
+              "potentiostat_afe",
+              "low_leakage_input_guard",
+              "electrode_flex_tail",
+              "sensor_bias_resistor_network"
+            ]
+          },
+          {
+            "subModuleId": "calibration_drift_monitoring",
+            "subModuleName": "Calibration and drift monitoring",
+            "componentWordIds": [
+              "calibration_data_eeprom",
+              "drift_estimator_firmware_table",
+              "factory_calibration_code",
+              "signal_integrity_test_pad"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "mcu_firmware",
+            "subModuleName": "MCU firmware",
+            "componentWordIds": [
+              "low_power_microcontroller",
+              "firmware_image",
+              "secure_boot_key_store",
+              "real_time_clock"
+            ]
+          },
+          {
+            "subModuleId": "data_buffering",
+            "subModuleName": "Data buffering",
+            "componentWordIds": [
+              "glucose_trend_buffer_flash",
+              "event_log_memory",
+              "calibration_data_bus_bridge",
+              "clock_drift_compensator"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Analog sensing output must feed the processing and telemetry stack.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:calibration_data_bus",
+      "interfaceId": "calibration_data_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Glucose Sensing Instrumentation",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "calibration_drift_monitoring",
+            "subModuleName": "Calibration and drift monitoring",
+            "componentWordIds": [
+              "calibration_data_eeprom",
+              "drift_estimator_firmware_table",
+              "factory_calibration_code",
+              "signal_integrity_test_pad"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "mcu_firmware",
+            "subModuleName": "MCU firmware",
+            "componentWordIds": [
+              "low_power_microcontroller",
+              "firmware_image",
+              "secure_boot_key_store",
+              "real_time_clock"
+            ]
+          },
+          {
+            "subModuleId": "data_buffering",
+            "subModuleName": "Data buffering",
+            "componentWordIds": [
+              "glucose_trend_buffer_flash",
+              "event_log_memory",
+              "calibration_data_bus_bridge",
+              "clock_drift_compensator"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Factory calibration and drift state must be visible to the reader algorithm.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:energy_storage_source:power_distribution:cell_power_bus",
+      "interfaceId": "cell_power_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "energy_storage_source",
+        "moduleName": "Wearable Energy Source",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "battery_cell",
+            "subModuleName": "Battery cell",
+            "componentWordIds": [
+              "thin_film_battery",
+              "battery_weld_tab",
+              "battery_pouch_insulator",
+              "state_of_charge_witness_pad"
+            ]
+          },
+          {
+            "subModuleId": "power_reserve",
+            "subModuleName": "Power reserve",
+            "componentWordIds": [
+              "brownout_hold_up_capacitor",
+              "battery_cut_off_tab",
+              "shelf_life_isolation_film",
+              "activation_pull_strip"
+            ]
+          },
+          {
+            "subModuleId": "battery_safety",
+            "subModuleName": "Battery safety",
+            "componentWordIds": [
+              "battery_vent_clearance",
+              "reverse_polarity_fuse",
+              "pack_temperature_dot",
+              "battery_lot_barcode"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "power_distribution",
+        "moduleName": "Low-Power Distribution",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "low_power_rails",
+            "subModuleName": "Low-power rails",
+            "componentWordIds": [
+              "nanoamp_power_switch",
+              "digital_buck_regulator",
+              "rail_measurement_divider",
+              "wake_timer_oscillator"
+            ]
+          },
+          {
+            "subModuleId": "analog_excitation",
+            "subModuleName": "Analog excitation",
+            "componentWordIds": [
+              "sensor_excitation_mux",
+              "analog_power_filter",
+              "electrode_guard_driver",
+              "afe_wake_timer"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Battery output must feed protected low-power rails.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:power_distribution:sensing_instrumentation:analog_power_rail",
+      "interfaceId": "analog_power_rail",
+      "status": "present",
+      "from": {
+        "moduleId": "power_distribution",
+        "moduleName": "Low-Power Distribution",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "analog_excitation",
+            "subModuleName": "Analog excitation",
+            "componentWordIds": [
+              "sensor_excitation_mux",
+              "analog_power_filter",
+              "electrode_guard_driver",
+              "afe_wake_timer"
+            ]
+          },
+          {
+            "subModuleId": "power_fault_handling",
+            "subModuleName": "Power fault handling",
+            "componentWordIds": [
+              "hardwired_reset_supervisor",
+              "overcurrent_limiter",
+              "load_gate_transistor",
+              "fault_latch"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Glucose Sensing Instrumentation",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "glucose_filament_stack",
+            "subModuleName": "Glucose filament stack",
+            "componentWordIds": [
+              "glucose_sensing_filament",
+              "enzyme_reagent_membrane",
+              "reference_electrode",
+              "diffusion_limiting_membrane"
+            ]
+          },
+          {
+            "subModuleId": "analog_front_end",
+            "subModuleName": "Analog front end",
+            "componentWordIds": [
+              "potentiostat_afe",
+              "low_leakage_input_guard",
+              "electrode_flex_tail",
+              "sensor_bias_resistor_network"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Electrochemical analog front-end needs a low-noise supply path.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:power_distribution:control_compute_communication:low_power_rail",
+      "interfaceId": "low_power_rail",
+      "status": "present",
+      "from": {
+        "moduleId": "power_distribution",
+        "moduleName": "Low-Power Distribution",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "low_power_rails",
+            "subModuleName": "Low-power rails",
+            "componentWordIds": [
+              "nanoamp_power_switch",
+              "digital_buck_regulator",
+              "rail_measurement_divider",
+              "wake_timer_oscillator"
+            ]
+          },
+          {
+            "subModuleId": "power_fault_handling",
+            "subModuleName": "Power fault handling",
+            "componentWordIds": [
+              "hardwired_reset_supervisor",
+              "overcurrent_limiter",
+              "load_gate_transistor",
+              "fault_latch"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "mcu_firmware",
+            "subModuleName": "MCU firmware",
+            "componentWordIds": [
+              "low_power_microcontroller",
+              "firmware_image",
+              "secure_boot_key_store",
+              "real_time_clock"
+            ]
+          },
+          {
+            "subModuleId": "ble_telemetry",
+            "subModuleName": "BLE telemetry",
+            "componentWordIds": [
+              "ble_radio_module",
+              "printed_antenna",
+              "pairing_button_pad",
+              "encrypted_session_counter"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "MCU and BLE telemetry need duty-cycled digital power.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:environmental_interface:control_compute_communication:temperature_compensation_bus",
+      "interfaceId": "temperature_compensation_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "environmental_interface",
+        "moduleName": "Wear Environment Compensation",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "temperature_compensation",
+            "subModuleName": "Temperature compensation",
+            "componentWordIds": [
+              "temperature_sensor",
+              "thermal_model_table",
+              "skin_temperature_flex_tail",
+              "cold_start_delay_flag"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "mcu_firmware",
+            "subModuleName": "MCU firmware",
+            "componentWordIds": [
+              "low_power_microcontroller",
+              "firmware_image",
+              "secure_boot_key_store",
+              "real_time_clock"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Body-temperature context must feed the glucose compensation algorithm.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:control_compute_communication:safety_protection:alarm_state_bus",
+      "interfaceId": "alarm_state_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "ble_telemetry",
+            "subModuleName": "BLE telemetry",
+            "componentWordIds": [
+              "ble_radio_module",
+              "printed_antenna",
+              "pairing_button_pad",
+              "encrypted_session_counter"
+            ]
+          },
+          {
+            "subModuleId": "data_buffering",
+            "subModuleName": "Data buffering",
+            "componentWordIds": [
+              "glucose_trend_buffer_flash",
+              "event_log_memory",
+              "calibration_data_bus_bridge",
+              "clock_drift_compensator"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "safety_protection",
+        "moduleName": "Patient Safety Protection",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "patient_alarm_logic",
+            "subModuleName": "Patient alarm logic",
+            "componentWordIds": [
+              "hypoglycaemia_alarm_state",
+              "hyperglycaemia_alarm_state",
+              "sensor_fault_classifier",
+              "stale_data_lockout"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Patient alarm and stale-data states must route through safety logic.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:maintenance_serviceability:skin_patient_interface:sterile_boundary",
+      "interfaceId": "sterile_boundary",
+      "status": "present",
+      "from": {
+        "moduleId": "maintenance_serviceability",
+        "moduleName": "Packaging Traceability Serviceability",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "sterile_packaging",
+            "subModuleName": "Sterile packaging",
+            "componentWordIds": [
+              "sterile_barrier_pouch",
+              "desiccant_sachet",
+              "pouch_seal_indicator",
+              "expiry_date_label"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "skin_patient_interface",
+        "moduleName": "Skin Patient Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "adhesive_patch_stack",
+            "subModuleName": "Adhesive patch stack",
+            "componentWordIds": [
+              "adhesive_skin_patch",
+              "hydrocolloid_edge_seal",
+              "breathable_backing_film",
+              "pull_tab_liner"
+            ]
+          },
+          {
+            "subModuleId": "cannula_skin_contact",
+            "subModuleName": "Sensor skin contact",
+            "componentWordIds": [
+              "skin_contact_gasket",
+              "filament_entry_seal",
+              "antimicrobial_contact_pad",
+              "insertion_site_spacing_ring"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Sterile packaging evidence must connect to the patient-contact boundary.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    }
+  ],
+  "sharedInterfaces": [
+    {
+      "interfaceId": "electrode_signal_path",
+      "status": "local_only",
+      "moduleIds": [
+        "sensing_instrumentation"
+      ],
+      "moduleNames": [
+        "Glucose Sensing Instrumentation"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "electronics_mount",
+      "status": "local_only",
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "moduleNames": [
+        "Transmitter Housing Structure"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "user_trigger",
+      "status": "local_only",
+      "moduleIds": [
+        "actuation_kinematics"
+      ],
+      "moduleNames": [
+        "Applicator Insertion Mechanism"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "adhesive_skin_boundary",
+      "status": "shared",
+      "moduleIds": [
+        "skin_patient_interface",
+        "structure_containment",
+        "environmental_interface",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Skin Patient Interface",
+        "Transmitter Housing Structure",
+        "Wear Environment Compensation",
+        "Patient Safety Protection"
+      ],
+      "carrierSubModuleCount": 7
+    },
+    {
+      "interfaceId": "alarm_state_bus",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Control Compute Communication",
+        "Patient Safety Protection"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "analog_power_rail",
+      "status": "shared",
+      "moduleIds": [
+        "sensing_instrumentation",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Glucose Sensing Instrumentation",
+        "Low-Power Distribution"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "ble_link",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Control Compute Communication",
+        "Packaging Traceability Serviceability"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "calibration_data_bus",
+      "status": "shared",
+      "moduleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Glucose Sensing Instrumentation",
+        "Control Compute Communication"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "cell_power_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Wearable Energy Source",
+        "Low-Power Distribution"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "hardwired_trip",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Low-Power Distribution",
+        "Patient Safety Protection"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "ingress_boundary",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Transmitter Housing Structure",
+        "Wear Environment Compensation"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "insertion_path",
+      "status": "shared",
+      "moduleIds": [
+        "skin_patient_interface",
+        "actuation_kinematics",
+        "structure_containment"
+      ],
+      "moduleNames": [
+        "Skin Patient Interface",
+        "Applicator Insertion Mechanism",
+        "Transmitter Housing Structure"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "interstitial_fluid_path",
+      "status": "shared",
+      "moduleIds": [
+        "skin_patient_interface",
+        "sensing_instrumentation"
+      ],
+      "moduleNames": [
+        "Skin Patient Interface",
+        "Glucose Sensing Instrumentation"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "lot_traceability",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Wearable Energy Source",
+        "Packaging Traceability Serviceability"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "low_power_rail",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Low-Power Distribution",
+        "Control Compute Communication"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "sensor_signal_bus",
+      "status": "shared",
+      "moduleIds": [
+        "sensing_instrumentation",
+        "power_distribution",
+        "control_compute_communication",
+        "environmental_interface",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Glucose Sensing Instrumentation",
+        "Low-Power Distribution",
+        "Control Compute Communication",
+        "Wear Environment Compensation",
+        "Patient Safety Protection"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "service_access",
+      "status": "shared",
+      "moduleIds": [
+        "skin_patient_interface",
+        "actuation_kinematics",
+        "structure_containment",
+        "energy_storage_source",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Skin Patient Interface",
+        "Applicator Insertion Mechanism",
+        "Transmitter Housing Structure",
+        "Wearable Energy Source",
+        "Patient Safety Protection",
+        "Packaging Traceability Serviceability"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "sterile_boundary",
+      "status": "shared",
+      "moduleIds": [
+        "skin_patient_interface",
+        "actuation_kinematics",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Skin Patient Interface",
+        "Applicator Insertion Mechanism",
+        "Patient Safety Protection",
+        "Packaging Traceability Serviceability"
+      ],
+      "carrierSubModuleCount": 6
+    },
+    {
+      "interfaceId": "temperature_compensation_bus",
+      "status": "shared",
+      "moduleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication",
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Glucose Sensing Instrumentation",
+        "Control Compute Communication",
+        "Wear Environment Compensation"
+      ],
+      "carrierSubModuleCount": 3
+    }
+  ]
+}

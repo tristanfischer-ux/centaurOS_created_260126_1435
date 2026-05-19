@@ -1,0 +1,205 @@
+{
+  "summary": {
+    "modules": 9,
+    "readyModules": 4,
+    "sourcingBlockedModules": 5,
+    "attentionModules": 0,
+    "criticalUnpricedLines": 8,
+    "issueCount": 0
+  },
+  "modules": [
+    {
+      "moduleId": "structure_containment",
+      "moduleName": "Airframe Structure And Payload Mounting",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 13,
+      "interfaceCount": 6,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "carbon_airframe"
+      ],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "energy_storage_source",
+      "moduleName": "Flight Energy Storage",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 13,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "criticalUnpricedLines": [
+        "flight_battery_pack"
+      ],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Flight Actuation",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 13,
+      "interfaceCount": 4,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "criticalUnpricedLines": [
+        "brushless_motors",
+        "esc",
+        "propeller_set"
+      ],
+      "candidateUnpricedLines": 10,
+      "issueCodes": [],
+      "notes": [
+        "3 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "control_compute_communication",
+      "moduleName": "Flight Control Compute And Communications",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 14,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 2,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "criticalUnpricedLines": [
+        "flight_controller",
+        "radio_and_gnss_link"
+      ],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "2 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Cinematography Sensing",
+      "status": "sourcing_blocked",
+      "subModuleCount": 3,
+      "componentCount": 13,
+      "interfaceCount": 3,
+      "requiredInterfaceEdges": 1,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [
+        "4k_camera_payload"
+      ],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "1 critical line(s) need source-backed evidence before BoM pass."
+      ]
+    },
+    {
+      "moduleId": "power_distribution",
+      "moduleName": "Aircraft Power Distribution",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Containment",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 5,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance And Serviceability",
+      "status": "ready",
+      "subModuleCount": 3,
+      "componentCount": 12,
+      "interfaceCount": 3,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 12,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 12 candidate line(s) remain for later sourcing."
+      ]
+    },
+    {
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Ground Operator Interface",
+      "status": "ready",
+      "subModuleCount": 2,
+      "componentCount": 8,
+      "interfaceCount": 3,
+      "requiredInterfaceEdges": 0,
+      "missingRequiredInterfaceEdges": 0,
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "criticalUnpricedLines": [],
+      "candidateUnpricedLines": 8,
+      "issueCodes": [],
+      "notes": [
+        "No critical blockers; 8 candidate line(s) remain for later sourcing."
+      ]
+    }
+  ]
+}

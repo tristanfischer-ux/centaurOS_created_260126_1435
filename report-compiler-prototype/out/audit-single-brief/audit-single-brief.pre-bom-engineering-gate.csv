@@ -1,0 +1,7 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+architecture_readiness,pass,"10 modules, 30 submodules and 120 component words pass architecture readiness.",1,,Architecture is structurally ready for engineering review.
+component_allocation,review,24/30 submodules ready; 10/10 critical parts allocated; 3 duplicate component groups.,1,,"Resolve duplicate component identity before sourcing: mid_energy_meter. Resolve duplicate component identity before sourcing: iso_15118_plc_modem. Resolve duplicate component identity before sourcing: insulation_monitoring_device. Resolve whether these allocations are one shared physical item or separate install locations before sourcing, costing or deduplicating."
+interface_verification,pass,6/6 required interfaces have endpoint carriers; 0 accepted with evidence.,1,,Required interfaces are structurally ready for reviewer evidence.
+requirement_coverage,pass,1/1 requirements are structurally ready or accepted; accepted evidence ratio 0.,1,,Requirements are structurally ready for reviewer evidence.
+calculation_envelope,review,1/2 calculations are within envelope; 1 need review; 0 block.,0.5,,Attach reviewer evidence to calculations marked needs_review.
+engineering_assumptions,review,7/30 assumptions are brief-supported or model-present; 23 need review/source evidence; 0 block architecture.,0.23,,Review assumptions and keep BoM/source-required assumptions out of trusted claims until evidence is admitted.

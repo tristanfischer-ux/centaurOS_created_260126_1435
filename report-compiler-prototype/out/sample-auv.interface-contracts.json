@@ -1,0 +1,732 @@
+{
+  "summary": {
+    "requiredContracts": 8,
+    "presentContracts": 8,
+    "missingContracts": 0,
+    "sharedInterfaces": 13,
+    "localOnlyInterfaces": 4
+  },
+  "requiredContracts": [
+    {
+      "id": "required:energy_storage_source:power_distribution:dc_power_bus",
+      "interfaceId": "dc_power_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "energy_storage_source",
+        "moduleName": "Subsea Energy Storage",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "subsea_battery_pack",
+            "subModuleName": "Subsea battery pack",
+            "componentWordIds": [
+              "battery_pack",
+              "battery_management_board",
+              "pack_isolation_fuse",
+              "pressure_rated_battery_enclosure"
+            ]
+          },
+          {
+            "subModuleId": "charging_interface",
+            "subModuleName": "Charging interface",
+            "componentWordIds": [
+              "charge_interlock_plug",
+              "shore_charger_adapter",
+              "state_of_charge_display_puck",
+              "battery_vent_inspection_plug"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "power_distribution",
+        "moduleName": "Subsea Power Distribution",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "dc_distribution",
+            "subModuleName": "DC distribution",
+            "componentWordIds": [
+              "fused_dc_distribution_board",
+              "wet_mate_connector_set",
+              "main_power_enable_relay",
+              "bus_voltage_monitor"
+            ]
+          },
+          {
+            "subModuleId": "isolation_grounding",
+            "subModuleName": "Isolation and grounding",
+            "componentWordIds": [
+              "ground_fault_monitor",
+              "chassis_bonding_strap",
+              "service_isolation_key",
+              "fault_annunciator_module"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Battery energy must enter protected DC distribution through an explicit bus.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:power_distribution:actuation_kinematics:thruster_power_bus",
+      "interfaceId": "thruster_power_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "power_distribution",
+        "moduleName": "Subsea Power Distribution",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "dc_distribution",
+            "subModuleName": "DC distribution",
+            "componentWordIds": [
+              "fused_dc_distribution_board",
+              "wet_mate_connector_set",
+              "main_power_enable_relay",
+              "bus_voltage_monitor"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "actuation_kinematics",
+        "moduleName": "Thruster Actuation Kinematics",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "thruster_array",
+            "subModuleName": "Thruster array",
+            "componentWordIds": [
+              "thruster_set",
+              "thruster_nozzle_guard",
+              "thruster_mounting_bracket",
+              "motor_phase_harness"
+            ]
+          },
+          {
+            "subModuleId": "drive_electronics",
+            "subModuleName": "Drive electronics",
+            "componentWordIds": [
+              "thruster_motor_controller_stack",
+              "current_sensor_channel_set",
+              "controller_heat_spreader",
+              "thrust_calibration_table"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Thrusters must receive protected power separately from avionics and payload rails.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "interfaceId": "thrust_command_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Autonomy Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "mission_computer_stack",
+            "subModuleName": "Mission computer stack",
+            "componentWordIds": [
+              "mission_computer",
+              "real_time_control_board",
+              "watchdog_supervisor_module",
+              "mission_data_recorder"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "actuation_kinematics",
+        "moduleName": "Thruster Actuation Kinematics",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "thruster_array",
+            "subModuleName": "Thruster array",
+            "componentWordIds": [
+              "thruster_set",
+              "thruster_nozzle_guard",
+              "thruster_mounting_bracket",
+              "motor_phase_harness"
+            ]
+          },
+          {
+            "subModuleId": "drive_electronics",
+            "subModuleName": "Drive electronics",
+            "componentWordIds": [
+              "thruster_motor_controller_stack",
+              "current_sensor_channel_set",
+              "controller_heat_spreader",
+              "thrust_calibration_table"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Mission control must command thruster drive states over a declared control interface.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "interfaceId": "navigation_sensor_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Navigation And Payload Sensing",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "navigation_sensor_suite",
+            "subModuleName": "Navigation sensor suite",
+            "componentWordIds": [
+              "dvl",
+              "inertial_navigation_unit",
+              "magnetic_compass_module",
+              "gnss_surface_receiver"
+            ]
+          },
+          {
+            "subModuleId": "depth_environment_sensors",
+            "subModuleName": "Depth and environment sensors",
+            "componentWordIds": [
+              "depth_and_pressure_sensor",
+              "water_temperature_probe",
+              "conductivity_sensor",
+              "internal_humidity_sensor"
+            ]
+          },
+          {
+            "subModuleId": "payload_sensor_bay",
+            "subModuleName": "Payload sensor bay",
+            "componentWordIds": [
+              "forward_sonar_payload",
+              "camera_viewport_window",
+              "payload_sync_trigger",
+              "payload_data_link_module"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Autonomy Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "mission_computer_stack",
+            "subModuleName": "Mission computer stack",
+            "componentWordIds": [
+              "mission_computer",
+              "real_time_control_board",
+              "watchdog_supervisor_module",
+              "mission_data_recorder"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "DVL, INS and depth data must feed navigation fusion before mission autonomy is credible.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "interfaceId": "payload_data_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Navigation And Payload Sensing",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "payload_sensor_bay",
+            "subModuleName": "Payload sensor bay",
+            "componentWordIds": [
+              "forward_sonar_payload",
+              "camera_viewport_window",
+              "payload_sync_trigger",
+              "payload_data_link_module"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Autonomy Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "mission_computer_stack",
+            "subModuleName": "Mission computer stack",
+            "componentWordIds": [
+              "mission_computer",
+              "real_time_control_board",
+              "watchdog_supervisor_module",
+              "mission_data_recorder"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Inspection payload data must be logged or acted on by the mission computer.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:environmental_interface:structure_containment:pressure_boundary",
+      "interfaceId": "pressure_boundary",
+      "status": "present",
+      "from": {
+        "moduleId": "environmental_interface",
+        "moduleName": "Pressure Thermal Buoyancy Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "pressure_boundary_management",
+            "subModuleName": "Pressure boundary management",
+            "componentWordIds": [
+              "cable_penetrator_seal",
+              "pressure_compensation_bladder",
+              "oil_fill_service_port",
+              "pressure_equalisation_valve"
+            ]
+          },
+          {
+            "subModuleId": "thermal_path",
+            "subModuleName": "Thermal path",
+            "componentWordIds": [
+              "electronics_thermal_bridge",
+              "hull_heat_spreader_plate",
+              "battery_thermal_pad",
+              "thruster_heat_sink_collar"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "structure_containment",
+        "moduleName": "Pressure Structure Containment",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "pressure_hull_shell",
+            "subModuleName": "Pressure hull shell",
+            "componentWordIds": [
+              "pressure_hull",
+              "endcap_clamp_ring",
+              "double_o_ring_gland_set",
+              "hull_proof_test_port"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Hull, penetrators, thermal path and buoyancy hardware must share one depth-rated boundary model.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:safety_protection:control_compute_communication:alarm_bus",
+      "interfaceId": "alarm_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "safety_protection",
+        "moduleName": "Leak Abort And Recovery Safety",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "leak_detection",
+            "subModuleName": "Leak detection",
+            "componentWordIds": [
+              "leak_detection_sensor",
+              "bilge_moisture_strip",
+              "leak_alarm_relay",
+              "absorbent_witness_pad"
+            ]
+          },
+          {
+            "subModuleId": "abort_recovery",
+            "subModuleName": "Abort and recovery",
+            "componentWordIds": [
+              "recovery_beacon",
+              "drop_weight_release",
+              "emergency_strobe",
+              "surface_flag_float"
+            ]
+          },
+          {
+            "subModuleId": "pressure_fail_safe",
+            "subModuleName": "Pressure fail-safe",
+            "componentWordIds": [
+              "over_depth_abort_switch",
+              "watchdog_kill_relay",
+              "battery_isolation_contactor",
+              "pressure_relief_service_plug"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Autonomy Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "mission_computer_stack",
+            "subModuleName": "Mission computer stack",
+            "componentWordIds": [
+              "mission_computer",
+              "real_time_control_board",
+              "watchdog_supervisor_module",
+              "mission_data_recorder"
+            ]
+          },
+          {
+            "subModuleId": "acoustic_communications",
+            "subModuleName": "Acoustic communications",
+            "componentWordIds": [
+              "acoustic_modem",
+              "acoustic_transducer_mount",
+              "acoustic_isolation_pad",
+              "surface_command_protocol_adapter"
+            ]
+          },
+          {
+            "subModuleId": "software_health_management",
+            "subModuleName": "Software health management",
+            "componentWordIds": [
+              "failsafe_state_machine",
+              "time_sync_module",
+              "configuration_backup_storage",
+              "debug_service_port"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Leak, over-depth and recovery alarms must drive fail-safe mission states.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:safety_protection:structure_containment:pressure_boundary",
+      "interfaceId": "pressure_boundary",
+      "status": "present",
+      "from": {
+        "moduleId": "safety_protection",
+        "moduleName": "Leak Abort And Recovery Safety",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "leak_detection",
+            "subModuleName": "Leak detection",
+            "componentWordIds": [
+              "leak_detection_sensor",
+              "bilge_moisture_strip",
+              "leak_alarm_relay",
+              "absorbent_witness_pad"
+            ]
+          },
+          {
+            "subModuleId": "pressure_fail_safe",
+            "subModuleName": "Pressure fail-safe",
+            "componentWordIds": [
+              "over_depth_abort_switch",
+              "watchdog_kill_relay",
+              "battery_isolation_contactor",
+              "pressure_relief_service_plug"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "structure_containment",
+        "moduleName": "Pressure Structure Containment",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "pressure_hull_shell",
+            "subModuleName": "Pressure hull shell",
+            "componentWordIds": [
+              "pressure_hull",
+              "endcap_clamp_ring",
+              "double_o_ring_gland_set",
+              "hull_proof_test_port"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Leak and over-depth protection must reference the same pressure boundary as the hull design.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    }
+  ],
+  "sharedInterfaces": [
+    {
+      "interfaceId": "buoyancy_trim",
+      "status": "local_only",
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Pressure Thermal Buoyancy Interface"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "leak_alarm_bus",
+      "status": "local_only",
+      "moduleIds": [
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Leak Abort And Recovery Safety"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "low_voltage_rail",
+      "status": "local_only",
+      "moduleIds": [
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Subsea Power Distribution"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "payload_power_bus",
+      "status": "local_only",
+      "moduleIds": [
+        "power_distribution"
+      ],
+      "moduleNames": [
+        "Subsea Power Distribution"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "acoustic_link",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Autonomy Compute Communication",
+        "Navigation And Payload Sensing",
+        "Leak Abort And Recovery Safety"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "alarm_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "power_distribution",
+        "actuation_kinematics",
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Subsea Energy Storage",
+        "Subsea Power Distribution",
+        "Thruster Actuation Kinematics",
+        "Autonomy Compute Communication",
+        "Navigation And Payload Sensing",
+        "Leak Abort And Recovery Safety"
+      ],
+      "carrierSubModuleCount": 10
+    },
+    {
+      "interfaceId": "battery_monitor_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Subsea Energy Storage",
+        "Autonomy Compute Communication"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "dc_power_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "power_distribution",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Subsea Energy Storage",
+        "Subsea Power Distribution",
+        "Leak Abort And Recovery Safety",
+        "Deck Recovery And Service"
+      ],
+      "carrierSubModuleCount": 6
+    },
+    {
+      "interfaceId": "hydrodynamic_shell",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "actuation_kinematics",
+        "environmental_interface",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Pressure Structure Containment",
+        "Thruster Actuation Kinematics",
+        "Pressure Thermal Buoyancy Interface",
+        "Deck Recovery And Service"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "mechanical_mounts",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "actuation_kinematics",
+        "environmental_interface",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Pressure Structure Containment",
+        "Thruster Actuation Kinematics",
+        "Pressure Thermal Buoyancy Interface",
+        "Deck Recovery And Service"
+      ],
+      "carrierSubModuleCount": 7
+    },
+    {
+      "interfaceId": "navigation_sensor_bus",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "sensing_instrumentation"
+      ],
+      "moduleNames": [
+        "Autonomy Compute Communication",
+        "Navigation And Payload Sensing"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "payload_data_bus",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "sensing_instrumentation"
+      ],
+      "moduleNames": [
+        "Autonomy Compute Communication",
+        "Navigation And Payload Sensing"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "pressure_boundary",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "sensing_instrumentation",
+        "environmental_interface",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Pressure Structure Containment",
+        "Navigation And Payload Sensing",
+        "Pressure Thermal Buoyancy Interface",
+        "Leak Abort And Recovery Safety",
+        "Deck Recovery And Service"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "service_access",
+      "status": "shared",
+      "moduleIds": [
+        "structure_containment",
+        "energy_storage_source",
+        "power_distribution",
+        "actuation_kinematics",
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "environmental_interface",
+        "safety_protection",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Pressure Structure Containment",
+        "Subsea Energy Storage",
+        "Subsea Power Distribution",
+        "Thruster Actuation Kinematics",
+        "Autonomy Compute Communication",
+        "Navigation And Payload Sensing",
+        "Pressure Thermal Buoyancy Interface",
+        "Leak Abort And Recovery Safety",
+        "Deck Recovery And Service"
+      ],
+      "carrierSubModuleCount": 16
+    },
+    {
+      "interfaceId": "thermal_path",
+      "status": "shared",
+      "moduleIds": [
+        "energy_storage_source",
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Subsea Energy Storage",
+        "Pressure Thermal Buoyancy Interface"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "thrust_command_bus",
+      "status": "shared",
+      "moduleIds": [
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Thruster Actuation Kinematics",
+        "Autonomy Compute Communication"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "thruster_power_bus",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "actuation_kinematics"
+      ],
+      "moduleNames": [
+        "Subsea Power Distribution",
+        "Thruster Actuation Kinematics"
+      ],
+      "carrierSubModuleCount": 3
+    }
+  ]
+}

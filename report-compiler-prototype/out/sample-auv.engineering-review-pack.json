@@ -1,0 +1,2669 @@
+{
+  "summary": {
+    "rows": 76,
+    "accepted": 0,
+    "readyForReview": 45,
+    "needsReview": 31,
+    "blocked": 0,
+    "moduleQuestions": 9,
+    "subModuleQuestions": 27,
+    "interfaceQuestions": 8,
+    "calculationQuestions": 2,
+    "assumptionQuestions": 30
+  },
+  "questions": [
+    {
+      "id": "assumption_resolution:compliance:EMC-MARINE-COMMS-REVIEW",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "EMC-MARINE-COMMS-REVIEW",
+      "reviewerQuestion": "Can the EMC-MARINE-COMMS-REVIEW assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Acoustic modem integration, antenna/transducer mounting, cable shielding and data-loss behaviour.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:PRESSURE-BOUNDARY-REVIEW",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "PRESSURE-BOUNDARY-REVIEW",
+      "reviewerQuestion": "Can the PRESSURE-BOUNDARY-REVIEW assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Depth rating calculation, hull material allowables, endcap seal design and proof-pressure plan.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:compliance:SUBSEA-LEAK-ABORT-REVIEW",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "SUBSEA-LEAK-ABORT-REVIEW",
+      "reviewerQuestion": "Can the SUBSEA-LEAK-ABORT-REVIEW assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Leak sensor placement, abort state machine, battery isolation and recovery procedure.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:actuation_kinematics_thruster_array_thruster_set",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Thruster set",
+      "reviewerQuestion": "Can the Thruster set assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "thruster_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_acoustic_communications_acoustic_modem",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Acoustic modem",
+      "reviewerQuestion": "Can the Acoustic modem assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "acoustic_modem"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:control_compute_communication_mission_computer_stack_mission_computer",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Mission computer",
+      "reviewerQuestion": "Can the Mission computer assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "mission_computer"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:energy_storage_source_subsea_battery_pack_battery_pack",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Battery pack",
+      "reviewerQuestion": "Can the Battery pack assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "battery_pack"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:power_distribution_dc_distribution_wet_mate_connector_set",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Wet-mate connector set",
+      "reviewerQuestion": "Can the Wet-mate connector set assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "wet_mate_connector_set"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:safety_protection_abort_recovery_recovery_beacon",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Recovery beacon",
+      "reviewerQuestion": "Can the Recovery beacon assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "recovery_beacon"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:safety_protection_leak_detection_leak_detection_sensor",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Leak detection sensor",
+      "reviewerQuestion": "Can the Leak detection sensor assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_depth_environment_sensors_depth_and_pressure_sensor",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Depth and pressure sensor",
+      "reviewerQuestion": "Can the Depth and pressure sensor assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "depth_and_pressure_sensor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_navigation_sensor_suite_dvl",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "DVL",
+      "reviewerQuestion": "Can the DVL assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "dvl"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_navigation_sensor_suite_inertial_navigation_unit",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Inertial navigation unit",
+      "reviewerQuestion": "Can the Inertial navigation unit assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "inertial_navigation_unit"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:sensing_instrumentation_payload_sensor_bay_forward_sonar_payload",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Forward sonar payload",
+      "reviewerQuestion": "Can the Forward sonar payload assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "forward_sonar_payload"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:component:structure_containment_pressure_hull_shell_pressure_hull",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Pressure hull",
+      "reviewerQuestion": "Can the Pressure hull assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [
+        "pressure_hull"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "control_compute_communication -> actuation_kinematics",
+      "reviewerQuestion": "Can the control_compute_communication -> actuation_kinematics assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thrust_command_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:energy_storage_source:power_distribution:dc_power_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "energy_storage_source -> power_distribution",
+      "reviewerQuestion": "Can the energy_storage_source -> power_distribution assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "dc_power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:environmental_interface:structure_containment:pressure_boundary",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "environmental_interface -> structure_containment",
+      "reviewerQuestion": "Can the environmental_interface -> structure_containment assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "pressure_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:power_distribution:actuation_kinematics:thruster_power_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "power_distribution -> actuation_kinematics",
+      "reviewerQuestion": "Can the power_distribution -> actuation_kinematics assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thruster_power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:safety_protection:control_compute_communication:alarm_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "safety_protection -> control_compute_communication",
+      "reviewerQuestion": "Can the safety_protection -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:safety_protection:structure_containment:pressure_boundary",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "safety_protection -> structure_containment",
+      "reviewerQuestion": "Can the safety_protection -> structure_containment assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "pressure_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "reviewerQuestion": "Can the sensing_instrumentation -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "navigation_sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:interface:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "reviewerQuestion": "Can the sensing_instrumentation -> control_compute_communication assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "payload_data_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:capex_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated CAPEX",
+      "reviewerQuestion": "Can the Estimated CAPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:headline_output",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Survey endurance",
+      "reviewerQuestion": "Can the Survey endurance assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:metric:opex_annual_gbp",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Estimated annual OPEX",
+      "reviewerQuestion": "Can the Estimated annual OPEX assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:auv_depth_rating",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Depth Rating",
+      "reviewerQuestion": "Can the Depth Rating assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:auv_endurance_target",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Survey Endurance Target",
+      "reviewerQuestion": "Can the Survey Endurance Target assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "power_distribution",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:auv_navigation_control_closure",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Navigation/Control Closure",
+      "reviewerQuestion": "Can the Navigation/Control Closure assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "power_distribution",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "assumption_resolution:sanity:auv_pressure_power_recovery_safety",
+      "kind": "assumption_resolution",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "Pressure/Power/Recovery Safety",
+      "reviewerQuestion": "Can the Pressure/Power/Recovery Safety assumption be accepted for architecture review, or must it be replaced with evidence?",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope.",
+      "acceptanceCriteria": [
+        "Assumption is explicitly accepted, corrected or rejected by an engineering reviewer.",
+        "Any rejected assumption creates a design-change action before BoM or cost review.",
+        "Any sourcing-only assumption remains outside engineering sign-off until source evidence is admitted."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "power_distribution",
+        "actuation_kinematics",
+        "control_compute_communication",
+        "structure_containment",
+        "environmental_interface",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "endurance_hours",
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:auv_endurance_minutes",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "needs_review",
+      "scope": "AUV endurance minutes",
+      "reviewerQuestion": "Does the AUV endurance minutes calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm speed profile, payload load, reserve margin, battery derating and recovery scenario.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "power_distribution",
+        "actuation_kinematics",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "auv_endurance_minutes"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation_envelope:auv_hydrostatic_pressure_bar",
+      "kind": "calculation_envelope",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "AUV hydrostatic pressure",
+      "reviewerQuestion": "Does the AUV hydrostatic pressure calculation support the architecture envelope, or does the concept need revision?",
+      "evidenceRequired": "Confirm hull material, safety factor, penetrators, seals, buckling margin and test pressure.",
+      "acceptanceCriteria": [
+        "Inputs match the parsed brief or a named assumption.",
+        "Formula is appropriate for a first-pass engineering screen.",
+        "Reviewer either accepts the envelope, supplies corrected inputs or marks the concept for revision."
+      ],
+      "linkedModuleIds": [
+        "structure_containment",
+        "environmental_interface",
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [],
+      "linkedComponentWordIds": [],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [],
+      "linkedCalculationIds": [
+        "auv_hydrostatic_pressure_bar"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_contract:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Autonomy Compute Communication -> Thruster Actuation Kinematics via thrust_command_bus",
+      "reviewerQuestion": "Is the thrust_command_bus interface between Autonomy Compute Communication and Thruster Actuation Kinematics correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication",
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "mission_computer_stack",
+        "thruster_array",
+        "drive_electronics"
+      ],
+      "linkedComponentWordIds": [
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder",
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness",
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thrust_command_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:energy_storage_source:power_distribution:dc_power_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Subsea Energy Storage -> Subsea Power Distribution via dc_power_bus",
+      "reviewerQuestion": "Is the dc_power_bus interface between Subsea Energy Storage and Subsea Power Distribution correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source",
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "subsea_battery_pack",
+        "charging_interface",
+        "dc_distribution",
+        "isolation_grounding"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack",
+        "battery_management_board",
+        "pack_isolation_fuse",
+        "pressure_rated_battery_enclosure",
+        "charge_interlock_plug",
+        "shore_charger_adapter",
+        "state_of_charge_display_puck",
+        "battery_vent_inspection_plug",
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor",
+        "ground_fault_monitor",
+        "chassis_bonding_strap",
+        "service_isolation_key",
+        "fault_annunciator_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "dc_power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:environmental_interface:structure_containment:pressure_boundary",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Pressure Thermal Buoyancy Interface -> Pressure Structure Containment via pressure_boundary",
+      "reviewerQuestion": "Is the pressure_boundary interface between Pressure Thermal Buoyancy Interface and Pressure Structure Containment correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface",
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "pressure_boundary_management",
+        "thermal_path",
+        "pressure_hull_shell"
+      ],
+      "linkedComponentWordIds": [
+        "cable_penetrator_seal",
+        "pressure_compensation_bladder",
+        "oil_fill_service_port",
+        "pressure_equalisation_valve",
+        "electronics_thermal_bridge",
+        "hull_heat_spreader_plate",
+        "battery_thermal_pad",
+        "thruster_heat_sink_collar",
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "pressure_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:power_distribution:actuation_kinematics:thruster_power_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Subsea Power Distribution -> Thruster Actuation Kinematics via thruster_power_bus",
+      "reviewerQuestion": "Is the thruster_power_bus interface between Subsea Power Distribution and Thruster Actuation Kinematics correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "power_distribution",
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "dc_distribution",
+        "thruster_array",
+        "drive_electronics"
+      ],
+      "linkedComponentWordIds": [
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor",
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness",
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "thruster_power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:safety_protection:control_compute_communication:alarm_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Leak Abort And Recovery Safety -> Autonomy Compute Communication via alarm_bus",
+      "reviewerQuestion": "Is the alarm_bus interface between Leak Abort And Recovery Safety and Autonomy Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "safety_protection",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "leak_detection",
+        "abort_recovery",
+        "pressure_fail_safe",
+        "mission_computer_stack",
+        "acoustic_communications",
+        "software_health_management"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad",
+        "recovery_beacon",
+        "drop_weight_release",
+        "emergency_strobe",
+        "surface_flag_float",
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug",
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder",
+        "acoustic_modem",
+        "acoustic_transducer_mount",
+        "acoustic_isolation_pad",
+        "surface_command_protocol_adapter",
+        "failsafe_state_machine",
+        "time_sync_module",
+        "configuration_backup_storage",
+        "debug_service_port"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:safety_protection:structure_containment:pressure_boundary",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Leak Abort And Recovery Safety -> Pressure Structure Containment via pressure_boundary",
+      "reviewerQuestion": "Is the pressure_boundary interface between Leak Abort And Recovery Safety and Pressure Structure Containment correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "safety_protection",
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "leak_detection",
+        "pressure_fail_safe",
+        "pressure_hull_shell"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad",
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug",
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "pressure_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Payload Sensing -> Autonomy Compute Communication via navigation_sensor_bus",
+      "reviewerQuestion": "Is the navigation_sensor_bus interface between Navigation And Payload Sensing and Autonomy Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "navigation_sensor_suite",
+        "depth_environment_sensors",
+        "payload_sensor_bay",
+        "mission_computer_stack"
+      ],
+      "linkedComponentWordIds": [
+        "dvl",
+        "inertial_navigation_unit",
+        "magnetic_compass_module",
+        "gnss_surface_receiver",
+        "depth_and_pressure_sensor",
+        "water_temperature_probe",
+        "conductivity_sensor",
+        "internal_humidity_sensor",
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module",
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "navigation_sensor_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "interface_contract:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "kind": "interface_contract",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Payload Sensing -> Autonomy Compute Communication via payload_data_bus",
+      "reviewerQuestion": "Is the payload_data_bus interface between Navigation And Payload Sensing and Autonomy Compute Communication correctly owned and physically carried?",
+      "evidenceRequired": "Interface-review evidence naming both endpoint owners, carrier submodules, capacity limits and any deferred checks.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one carrier submodule is named on each endpoint.",
+        "Capacity, media, protocol or mechanical constraints are identified for the next design pass."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation",
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "payload_sensor_bay",
+        "mission_computer_stack"
+      ],
+      "linkedComponentWordIds": [
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module",
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "payload_data_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "module_allocation:actuation_kinematics",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thruster Actuation Kinematics",
+      "reviewerQuestion": "Does Thruster Actuation Kinematics have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "thruster_array",
+        "drive_electronics",
+        "trim_surfaces"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness",
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table",
+        "adjustable_trim_fin",
+        "ballast_trim_block",
+        "roll_trim_screw_set",
+        "tow_tank_trim_mark"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "thruster_power_bus",
+        "thrust_command_bus",
+        "mechanical_mounts",
+        "hydrodynamic_shell",
+        "alarm_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:control_compute_communication",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Autonomy Compute Communication",
+      "reviewerQuestion": "Does Autonomy Compute Communication have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "mission_computer_stack",
+        "acoustic_communications",
+        "software_health_management"
+      ],
+      "linkedComponentWordIds": [
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder",
+        "acoustic_modem",
+        "acoustic_transducer_mount",
+        "acoustic_isolation_pad",
+        "surface_command_protocol_adapter",
+        "failsafe_state_machine",
+        "time_sync_module",
+        "configuration_backup_storage",
+        "debug_service_port"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "navigation_sensor_bus",
+        "payload_data_bus",
+        "thrust_command_bus",
+        "acoustic_link",
+        "alarm_bus",
+        "service_access",
+        "battery_monitor_bus"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:energy_storage_source",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Subsea Energy Storage",
+      "reviewerQuestion": "Does Subsea Energy Storage have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "subsea_battery_pack",
+        "charging_interface",
+        "energy_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack",
+        "battery_management_board",
+        "pack_isolation_fuse",
+        "pressure_rated_battery_enclosure",
+        "charge_interlock_plug",
+        "shore_charger_adapter",
+        "state_of_charge_display_puck",
+        "battery_vent_inspection_plug",
+        "coulomb_counter_module",
+        "pack_temperature_sensor_strip",
+        "energy_reserve_indicator",
+        "battery_telemetry_isolator"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "dc_power_bus",
+        "battery_monitor_bus",
+        "service_access",
+        "thermal_path",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:environmental_interface",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Pressure Thermal Buoyancy Interface",
+      "reviewerQuestion": "Does Pressure Thermal Buoyancy Interface have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "pressure_boundary_management",
+        "thermal_path",
+        "buoyancy_trim"
+      ],
+      "linkedComponentWordIds": [
+        "cable_penetrator_seal",
+        "pressure_compensation_bladder",
+        "oil_fill_service_port",
+        "pressure_equalisation_valve",
+        "electronics_thermal_bridge",
+        "hull_heat_spreader_plate",
+        "battery_thermal_pad",
+        "thruster_heat_sink_collar",
+        "syntactic_foam_block_set",
+        "ballast_rail",
+        "buoyancy_calibration_tag",
+        "field_trim_worksheet"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "pressure_boundary",
+        "thermal_path",
+        "buoyancy_trim",
+        "service_access",
+        "hydrodynamic_shell",
+        "mechanical_mounts"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:maintenance_serviceability",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Deck Recovery And Service",
+      "reviewerQuestion": "Does Deck Recovery And Service have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "deck_recovery",
+        "service_access",
+        "field_transport"
+      ],
+      "linkedComponentWordIds": [
+        "lifting_bridle",
+        "deck_recovery_handle",
+        "launch_cradle_interface",
+        "tow_point_fitting",
+        "o_ring_grease_kit",
+        "vacuum_leak_test_port",
+        "diagnostic_connector",
+        "service_checklist_card",
+        "transport_cradle",
+        "protective_nose_cover",
+        "desiccant_cartridge",
+        "maintenance_log_tag"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "mechanical_mounts",
+        "pressure_boundary",
+        "dc_power_bus",
+        "hydrodynamic_shell"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:power_distribution",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Subsea Power Distribution",
+      "reviewerQuestion": "Does Subsea Power Distribution have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "dc_distribution",
+        "low_voltage_rails",
+        "isolation_grounding"
+      ],
+      "linkedComponentWordIds": [
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor",
+        "24_v_dc_converter",
+        "12_v_payload_converter",
+        "5_v_avionics_converter",
+        "emi_power_filter",
+        "ground_fault_monitor",
+        "chassis_bonding_strap",
+        "service_isolation_key",
+        "fault_annunciator_module"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "dc_power_bus",
+        "thruster_power_bus",
+        "payload_power_bus",
+        "low_voltage_rail",
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:safety_protection",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Leak Abort And Recovery Safety",
+      "reviewerQuestion": "Does Leak Abort And Recovery Safety have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "leak_detection",
+        "abort_recovery",
+        "pressure_fail_safe"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad",
+        "recovery_beacon",
+        "drop_weight_release",
+        "emergency_strobe",
+        "surface_flag_float",
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "leak_alarm_bus",
+        "alarm_bus",
+        "pressure_boundary",
+        "dc_power_bus",
+        "service_access",
+        "acoustic_link"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:sensing_instrumentation",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Payload Sensing",
+      "reviewerQuestion": "Does Navigation And Payload Sensing have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "navigation_sensor_suite",
+        "depth_environment_sensors",
+        "payload_sensor_bay"
+      ],
+      "linkedComponentWordIds": [
+        "dvl",
+        "inertial_navigation_unit",
+        "magnetic_compass_module",
+        "gnss_surface_receiver",
+        "depth_and_pressure_sensor",
+        "water_temperature_probe",
+        "conductivity_sensor",
+        "internal_humidity_sensor",
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "navigation_sensor_bus",
+        "payload_data_bus",
+        "pressure_boundary",
+        "acoustic_link",
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "module_allocation:structure_containment",
+      "kind": "module_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Pressure Structure Containment",
+      "reviewerQuestion": "Does Pressure Structure Containment have the right responsibility boundary, submodule split and interface ownership for this concept?",
+      "evidenceRequired": "Named engineering reviewer sign-off, change request or deferral note against the module allocation.",
+      "acceptanceCriteria": [
+        "Module purpose is coherent and not duplicating another module.",
+        "All submodules have a clear engineering role.",
+        "Required interfaces are owned by the module or explicitly delegated to submodules."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "pressure_hull_shell",
+        "internal_mounting_frame",
+        "hydrodynamic_fairing"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port",
+        "electronics_tray_rail",
+        "battery_cradle_frame",
+        "payload_mounting_rail",
+        "trim_weight_pocket",
+        "nose_fairing",
+        "tail_cone_fairing",
+        "stabilising_fin_set",
+        "access_hatch_latch_set"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "pressure_boundary",
+        "mechanical_mounts",
+        "service_access",
+        "hydrodynamic_shell"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:drive_electronics",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thruster Actuation Kinematics / Drive electronics",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Drive electronics make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "drive_electronics"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_motor_controller_stack",
+        "current_sensor_channel_set",
+        "controller_heat_spreader",
+        "thrust_calibration_table"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "thruster_power_bus",
+        "thrust_command_bus",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:thruster_array",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thruster Actuation Kinematics / Thruster array",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Thruster array make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "thruster_array"
+      ],
+      "linkedComponentWordIds": [
+        "thruster_set",
+        "thruster_nozzle_guard",
+        "thruster_mounting_bracket",
+        "motor_phase_harness"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "thruster_power_bus",
+        "thrust_command_bus",
+        "mechanical_mounts"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:actuation_kinematics:trim_surfaces",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Thruster Actuation Kinematics / Trim and stability surfaces",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Trim and stability surfaces make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "actuation_kinematics"
+      ],
+      "linkedSubModuleIds": [
+        "trim_surfaces"
+      ],
+      "linkedComponentWordIds": [
+        "adjustable_trim_fin",
+        "ballast_trim_block",
+        "roll_trim_screw_set",
+        "tow_tank_trim_mark"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "hydrodynamic_shell",
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:acoustic_communications",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Autonomy Compute Communication / Acoustic communications",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Acoustic communications make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "acoustic_communications"
+      ],
+      "linkedComponentWordIds": [
+        "acoustic_modem",
+        "acoustic_transducer_mount",
+        "acoustic_isolation_pad",
+        "surface_command_protocol_adapter"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "acoustic_link",
+        "service_access",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:mission_computer_stack",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Autonomy Compute Communication / Mission computer stack",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Mission computer stack make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "mission_computer_stack"
+      ],
+      "linkedComponentWordIds": [
+        "mission_computer",
+        "real_time_control_board",
+        "watchdog_supervisor_module",
+        "mission_data_recorder"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "navigation_sensor_bus",
+        "payload_data_bus",
+        "thrust_command_bus",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:control_compute_communication:software_health_management",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Autonomy Compute Communication / Software health management",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Software health management make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "control_compute_communication"
+      ],
+      "linkedSubModuleIds": [
+        "software_health_management"
+      ],
+      "linkedComponentWordIds": [
+        "failsafe_state_machine",
+        "time_sync_module",
+        "configuration_backup_storage",
+        "debug_service_port"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "alarm_bus",
+        "battery_monitor_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:charging_interface",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Subsea Energy Storage / Charging interface",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Charging interface make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "charging_interface"
+      ],
+      "linkedComponentWordIds": [
+        "charge_interlock_plug",
+        "shore_charger_adapter",
+        "state_of_charge_display_puck",
+        "battery_vent_inspection_plug"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "service_access",
+        "dc_power_bus",
+        "battery_monitor_bus"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:energy_monitoring",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Subsea Energy Storage / Energy monitoring",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Energy monitoring make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "energy_monitoring"
+      ],
+      "linkedComponentWordIds": [
+        "coulomb_counter_module",
+        "pack_temperature_sensor_strip",
+        "energy_reserve_indicator",
+        "battery_telemetry_isolator"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "battery_monitor_bus",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:energy_storage_source:subsea_battery_pack",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Subsea Energy Storage / Subsea battery pack",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Subsea battery pack make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "energy_storage_source"
+      ],
+      "linkedSubModuleIds": [
+        "subsea_battery_pack"
+      ],
+      "linkedComponentWordIds": [
+        "battery_pack",
+        "battery_management_board",
+        "pack_isolation_fuse",
+        "pressure_rated_battery_enclosure"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "dc_power_bus",
+        "battery_monitor_bus",
+        "thermal_path"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:buoyancy_trim",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Pressure Thermal Buoyancy Interface / Buoyancy and trim",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Buoyancy and trim make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "buoyancy_trim"
+      ],
+      "linkedComponentWordIds": [
+        "syntactic_foam_block_set",
+        "ballast_rail",
+        "buoyancy_calibration_tag",
+        "field_trim_worksheet"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "buoyancy_trim",
+        "hydrodynamic_shell",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:pressure_boundary_management",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Pressure Thermal Buoyancy Interface / Pressure boundary management",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Pressure boundary management make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "pressure_boundary_management"
+      ],
+      "linkedComponentWordIds": [
+        "cable_penetrator_seal",
+        "pressure_compensation_bladder",
+        "oil_fill_service_port",
+        "pressure_equalisation_valve"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "pressure_boundary",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:environmental_interface:thermal_path",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Pressure Thermal Buoyancy Interface / Thermal path",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Thermal path make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "environmental_interface"
+      ],
+      "linkedSubModuleIds": [
+        "thermal_path"
+      ],
+      "linkedComponentWordIds": [
+        "electronics_thermal_bridge",
+        "hull_heat_spreader_plate",
+        "battery_thermal_pad",
+        "thruster_heat_sink_collar"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "thermal_path",
+        "pressure_boundary",
+        "mechanical_mounts"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:deck_recovery",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Deck Recovery And Service / Deck recovery",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Deck recovery make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "deck_recovery"
+      ],
+      "linkedComponentWordIds": [
+        "lifting_bridle",
+        "deck_recovery_handle",
+        "launch_cradle_interface",
+        "tow_point_fitting"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:field_transport",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Deck Recovery And Service / Field transport",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Field transport make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "field_transport"
+      ],
+      "linkedComponentWordIds": [
+        "transport_cradle",
+        "protective_nose_cover",
+        "desiccant_cartridge",
+        "maintenance_log_tag"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "hydrodynamic_shell"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:maintenance_serviceability:service_access",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Deck Recovery And Service / Service access",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Service access make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "maintenance_serviceability"
+      ],
+      "linkedSubModuleIds": [
+        "service_access"
+      ],
+      "linkedComponentWordIds": [
+        "o_ring_grease_kit",
+        "vacuum_leak_test_port",
+        "diagnostic_connector",
+        "service_checklist_card"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "service_access",
+        "pressure_boundary",
+        "dc_power_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:dc_distribution",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Subsea Power Distribution / DC distribution",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to DC distribution make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "dc_distribution"
+      ],
+      "linkedComponentWordIds": [
+        "fused_dc_distribution_board",
+        "wet_mate_connector_set",
+        "main_power_enable_relay",
+        "bus_voltage_monitor"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "dc_power_bus",
+        "thruster_power_bus",
+        "payload_power_bus"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:isolation_grounding",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Subsea Power Distribution / Isolation and grounding",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Isolation and grounding make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "isolation_grounding"
+      ],
+      "linkedComponentWordIds": [
+        "ground_fault_monitor",
+        "chassis_bonding_strap",
+        "service_isolation_key",
+        "fault_annunciator_module"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "dc_power_bus",
+        "alarm_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:power_distribution:low_voltage_rails",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Subsea Power Distribution / Low-voltage rails",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Low-voltage rails make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "power_distribution"
+      ],
+      "linkedSubModuleIds": [
+        "low_voltage_rails"
+      ],
+      "linkedComponentWordIds": [
+        "24_v_dc_converter",
+        "12_v_payload_converter",
+        "5_v_avionics_converter",
+        "emi_power_filter"
+      ],
+      "linkedRequirementIds": [
+        "endurance_hours"
+      ],
+      "linkedInterfaceIds": [
+        "low_voltage_rail",
+        "payload_power_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "auv_endurance_target",
+        "auv_navigation_control_closure",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:abort_recovery",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Leak Abort And Recovery Safety / Abort and recovery",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Abort and recovery make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "abort_recovery"
+      ],
+      "linkedComponentWordIds": [
+        "recovery_beacon",
+        "drop_weight_release",
+        "emergency_strobe",
+        "surface_flag_float"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "alarm_bus",
+        "service_access",
+        "acoustic_link"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:leak_detection",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Leak Abort And Recovery Safety / Leak detection",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Leak detection make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "leak_detection"
+      ],
+      "linkedComponentWordIds": [
+        "leak_detection_sensor",
+        "bilge_moisture_strip",
+        "leak_alarm_relay",
+        "absorbent_witness_pad"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "leak_alarm_bus",
+        "alarm_bus",
+        "pressure_boundary"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:safety_protection:pressure_fail_safe",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Leak Abort And Recovery Safety / Pressure fail-safe",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Pressure fail-safe make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "safety_protection"
+      ],
+      "linkedSubModuleIds": [
+        "pressure_fail_safe"
+      ],
+      "linkedComponentWordIds": [
+        "over_depth_abort_switch",
+        "watchdog_kill_relay",
+        "battery_isolation_contactor",
+        "pressure_relief_service_plug"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "pressure_boundary",
+        "dc_power_bus",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:depth_environment_sensors",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Payload Sensing / Depth and environment sensors",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Depth and environment sensors make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "depth_environment_sensors"
+      ],
+      "linkedComponentWordIds": [
+        "depth_and_pressure_sensor",
+        "water_temperature_probe",
+        "conductivity_sensor",
+        "internal_humidity_sensor"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "navigation_sensor_bus",
+        "pressure_boundary",
+        "alarm_bus"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:navigation_sensor_suite",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Payload Sensing / Navigation sensor suite",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Navigation sensor suite make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "navigation_sensor_suite"
+      ],
+      "linkedComponentWordIds": [
+        "dvl",
+        "inertial_navigation_unit",
+        "magnetic_compass_module",
+        "gnss_surface_receiver"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "navigation_sensor_bus",
+        "service_access"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:sensing_instrumentation:payload_sensor_bay",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Navigation And Payload Sensing / Payload sensor bay",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Payload sensor bay make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "sensing_instrumentation"
+      ],
+      "linkedSubModuleIds": [
+        "payload_sensor_bay"
+      ],
+      "linkedComponentWordIds": [
+        "forward_sonar_payload",
+        "camera_viewport_window",
+        "payload_sync_trigger",
+        "payload_data_link_module"
+      ],
+      "linkedRequirementIds": [],
+      "linkedInterfaceIds": [
+        "payload_data_bus",
+        "navigation_sensor_bus",
+        "pressure_boundary"
+      ],
+      "linkedCalculationIds": [],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:hydrodynamic_fairing",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Pressure Structure Containment / Hydrodynamic fairing",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Hydrodynamic fairing make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "hydrodynamic_fairing"
+      ],
+      "linkedComponentWordIds": [
+        "nose_fairing",
+        "tail_cone_fairing",
+        "stabilising_fin_set",
+        "access_hatch_latch_set"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "hydrodynamic_shell",
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:internal_mounting_frame",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Pressure Structure Containment / Internal mounting frame",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Internal mounting frame make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "internal_mounting_frame"
+      ],
+      "linkedComponentWordIds": [
+        "electronics_tray_rail",
+        "battery_cradle_frame",
+        "payload_mounting_rail",
+        "trim_weight_pocket"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    },
+    {
+      "id": "submodule_allocation:structure_containment:pressure_hull_shell",
+      "kind": "submodule_allocation",
+      "priority": "major",
+      "status": "ready_for_review",
+      "scope": "Pressure Structure Containment / Pressure hull shell",
+      "reviewerQuestion": "Do the component candidates and interfaces assigned to Pressure hull shell make engineering sense for its stated purpose?",
+      "evidenceRequired": "Reviewer note confirming the submodule role, component allocation and any missing carriers or capacity checks.",
+      "acceptanceCriteria": [
+        "Submodule purpose is specific enough to guide detailed design.",
+        "At least one component candidate is allocated where the submodule represents physical design content.",
+        "Interface declarations match the component candidates that would carry them."
+      ],
+      "linkedModuleIds": [
+        "structure_containment"
+      ],
+      "linkedSubModuleIds": [
+        "pressure_hull_shell"
+      ],
+      "linkedComponentWordIds": [
+        "pressure_hull",
+        "endcap_clamp_ring",
+        "double_o_ring_gland_set",
+        "hull_proof_test_port"
+      ],
+      "linkedRequirementIds": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaceIds": [
+        "pressure_boundary",
+        "mechanical_mounts",
+        "service_access"
+      ],
+      "linkedCalculationIds": [
+        "auv_depth_rating",
+        "auv_pressure_power_recovery_safety"
+      ],
+      "blockers": []
+    }
+  ]
+}

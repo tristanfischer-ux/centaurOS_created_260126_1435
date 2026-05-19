@@ -1,0 +1,51 @@
+{
+  "verdict": "protocol_only",
+  "summary": {
+    "rows": 2,
+    "sourcingRows": 1,
+    "verificationRows": 1,
+    "productionReadyRows": 0,
+    "protocolFixtureRows": 2,
+    "reviewRequiredRows": 0,
+    "missingMetadataRows": 0,
+    "externalUrlRows": 0,
+    "internalReferenceRows": 0,
+    "localFileRows": 0,
+    "unknownReferenceRows": 0,
+    "passRatio": 0
+  },
+  "rows": [
+    {
+      "id": "sourcing:1:lfp_prismatic_cells",
+      "kind": "sourcing",
+      "subjectId": "lfp_prismatic_cells",
+      "ref": "test-fixture://csv-sourcing/lfp_prismatic_cells",
+      "referenceClass": "protocol_fixture",
+      "status": "protocol_fixture",
+      "timestamp": "2026-05-17T00:00:00.000+01:00",
+      "sourceGrade": "priced",
+      "reason": "source evidence is a protocol fixture and proves mechanics only.",
+      "requiredAction": "Replace protocol or non-external BoM evidence with a retrievable supplier/catalogue URL and refreshed timestamp."
+    },
+    {
+      "id": "verification:1:design_review:energy_storage_source",
+      "kind": "verification",
+      "subjectId": "design_review:energy_storage_source",
+      "ref": "test-fixture://csv-verification/design_review:energy_storage_source",
+      "referenceClass": "protocol_fixture",
+      "status": "protocol_fixture",
+      "reviewerName": "Protocol CSV Reviewer",
+      "timestamp": "2026-05-17T00:00:00.000+01:00",
+      "reason": "reviewer evidence is a protocol fixture and proves mechanics only.",
+      "requiredAction": "Replace protocol reviewer fixtures with named reviewer signoff evidence and a retrievable evidence reference."
+    }
+  ],
+  "promotionBlockers": [
+    "sourcing:1:lfp_prismatic_cells: source evidence is a protocol fixture and proves mechanics only.",
+    "verification:1:design_review:energy_storage_source: reviewer evidence is a protocol fixture and proves mechanics only."
+  ],
+  "nextActions": [
+    "Replace protocol or non-external BoM evidence with a retrievable supplier/catalogue URL and refreshed timestamp.",
+    "Replace protocol reviewer fixtures with named reviewer signoff evidence and a retrievable evidence reference."
+  ]
+}

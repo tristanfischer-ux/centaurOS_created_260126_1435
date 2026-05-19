@@ -1,0 +1,359 @@
+{
+  "verdict": "interface_review_ready",
+  "summary": {
+    "rows": 8,
+    "acceptedRows": 0,
+    "reviewReadyRows": 8,
+    "pendingEvidenceRows": 0,
+    "deferredRows": 0,
+    "blockedRows": 0,
+    "presentContracts": 8,
+    "missingContracts": 0,
+    "carrierCompleteRows": 8,
+    "verificationActivityRows": 8,
+    "acceptedEvidenceRatio": 0,
+    "structuralPassRatio": 1
+  },
+  "rows": [
+    {
+      "id": "required:control_compute_communication:compute_acceleration:pcie_fabric",
+      "interfaceId": "pcie_fabric",
+      "fromModuleId": "control_compute_communication",
+      "fromModuleName": "Control Compute Communication",
+      "toModuleId": "compute_acceleration",
+      "toModuleName": "Compute Acceleration",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "host_control",
+        "runtime_orchestration"
+      ],
+      "toCarrierSubModules": [
+        "accelerator_module",
+        "cpu_memory_complex",
+        "signal_power_integrity"
+      ],
+      "componentWordIds": [
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest",
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard",
+        "boot_flash_device",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "verificationActivityId": "interface_review:control_compute_communication:compute_acceleration:pcie_fabric",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:power_distribution:compute_acceleration:gpu_power_bus",
+      "interfaceId": "gpu_power_bus",
+      "fromModuleId": "power_distribution",
+      "fromModuleName": "Power Distribution",
+      "toModuleId": "compute_acceleration",
+      "toModuleName": "Compute Acceleration",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "dc_rail_distribution"
+      ],
+      "toCarrierSubModules": [
+        "accelerator_module",
+        "signal_power_integrity"
+      ],
+      "componentWordIds": [
+        "12_v_busbar",
+        "accelerator_power_harness",
+        "hot_swap_controller",
+        "fan_power_distribution_loom",
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "verificationActivityId": "interface_review:power_distribution:compute_acceleration:gpu_power_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:network_io:control_compute_communication:inference_network",
+      "interfaceId": "inference_network",
+      "fromModuleId": "network_io",
+      "fromModuleName": "Network IO",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Control Compute Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "high_speed_network",
+        "timing_ingest",
+        "io_isolation_routing"
+      ],
+      "toCarrierSubModules": [
+        "runtime_orchestration"
+      ],
+      "componentWordIds": [
+        "high_speed_nic",
+        "optical_transceiver_cage",
+        "nic_heatsink",
+        "network_link_led_board",
+        "ptp_timing_module",
+        "gpio_trigger_input",
+        "data_ingest_connector",
+        "network_bypass_relay",
+        "emi_gasket_strip",
+        "shielded_io_bracket",
+        "cable_strain_relief_comb",
+        "service_loop_tie_set",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest"
+      ],
+      "verificationActivityId": "interface_review:network_io:control_compute_communication:inference_network",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:data_storage:control_compute_communication:storage_bus",
+      "interfaceId": "storage_bus",
+      "fromModuleId": "data_storage",
+      "fromModuleName": "Data Storage",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Control Compute Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "nvme_storage",
+        "model_cache",
+        "log_buffer"
+      ],
+      "toCarrierSubModules": [
+        "host_control",
+        "runtime_orchestration"
+      ],
+      "componentWordIds": [
+        "nvme_ssd",
+        "m_2_carrier_tray",
+        "drive_thermal_pad",
+        "drive_retention_screw_set",
+        "model_cache_partition",
+        "storage_health_monitor",
+        "secure_erase_controller",
+        "firmware_recovery_image",
+        "event_log_partition",
+        "write_endurance_counter",
+        "crash_dump_region",
+        "log_export_port",
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest"
+      ],
+      "verificationActivityId": "interface_review:data_storage:control_compute_communication:storage_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:environmental_interface:compute_acceleration:thermal_path",
+      "interfaceId": "thermal_path",
+      "fromModuleId": "environmental_interface",
+      "fromModuleName": "Thermal Airflow Interface",
+      "toModuleId": "compute_acceleration",
+      "toModuleName": "Compute Acceleration",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "heat_transfer"
+      ],
+      "toCarrierSubModules": [
+        "accelerator_module",
+        "signal_power_integrity"
+      ],
+      "componentWordIds": [
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct",
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "verificationActivityId": "interface_review:environmental_interface:compute_acceleration:thermal_path",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "interfaceId": "sensor_bus",
+      "fromModuleId": "sensing_instrumentation",
+      "fromModuleName": "Telemetry Instrumentation",
+      "toModuleId": "control_compute_communication",
+      "toModuleName": "Control Compute Communication",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "thermal_sensors",
+        "power_fan_telemetry",
+        "front_panel_status"
+      ],
+      "toCarrierSubModules": [
+        "host_control"
+      ],
+      "componentWordIds": [
+        "inlet_temperature_sensor",
+        "accelerator_hotspot_sensor",
+        "exhaust_temperature_sensor",
+        "board_humidity_sensor",
+        "psu_pmbus_monitor",
+        "rail_current_monitor",
+        "fan_tachometer_hub",
+        "chassis_intrusion_switch",
+        "front_status_led_board",
+        "uid_button",
+        "alarm_buzzer",
+        "lcd_status_panel",
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom"
+      ],
+      "verificationActivityId": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:safety_protection:power_distribution:hardwired_trip",
+      "interfaceId": "hardwired_trip",
+      "fromModuleId": "safety_protection",
+      "fromModuleName": "Security And Safety Protection",
+      "toModuleId": "power_distribution",
+      "toModuleName": "Power Distribution",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "thermal_shutdown",
+        "electrical_safety"
+      ],
+      "toCarrierSubModules": [
+        "hold_up_protection"
+      ],
+      "componentWordIds": [
+        "thermal_trip_relay",
+        "overtemperature_latch",
+        "fan_failure_interlock",
+        "hardwired_shutdown_line",
+        "protective_earth_stud",
+        "insulation_barrier_sheet",
+        "finger_safe_psu_cover",
+        "warning_label_set",
+        "hold_up_capacitor_module",
+        "brownout_detector",
+        "current_shunt_module",
+        "efuse_channel_set"
+      ],
+      "verificationActivityId": "interface_review:safety_protection:power_distribution:hardwired_trip",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    },
+    {
+      "id": "required:structure_containment:environmental_interface:airflow_path",
+      "interfaceId": "airflow_path",
+      "fromModuleId": "structure_containment",
+      "fromModuleName": "Rack Structure Containment",
+      "toModuleId": "environmental_interface",
+      "toModuleName": "Thermal Airflow Interface",
+      "contractStatus": "present",
+      "carrierStatus": "both_endpoints_carried",
+      "fromCarrierSubModules": [
+        "rack_chassis",
+        "accelerator_mounting"
+      ],
+      "toCarrierSubModules": [
+        "forced_air_cooling",
+        "heat_transfer",
+        "inlet_outlet_management"
+      ],
+      "componentWordIds": [
+        "1u_rack_chassis",
+        "slide_rail_kit",
+        "internal_divider_panel",
+        "front_bezel_assembly",
+        "accelerator_retention_bracket",
+        "pcie_riser_support",
+        "card_stiffener_rail",
+        "gpu_airflow_baffle",
+        "fan_wall_assembly",
+        "pwm_fan_controller",
+        "airflow_straightener",
+        "replaceable_dust_filter",
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct",
+        "front_inlet_grille",
+        "rear_exhaust_grille",
+        "air_seal_foam_kit",
+        "rack_pressure_map_label"
+      ],
+      "verificationActivityId": "interface_review:structure_containment:environmental_interface:airflow_path",
+      "plannedStatus": "ready_for_review",
+      "ledgerStatus": "pending",
+      "status": "review_ready",
+      "blockers": [],
+      "requiredAction": "Collect named interface-review evidence through verification intake."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Collect named interface-review evidence through verification intake."
+  ]
+}

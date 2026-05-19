@@ -311,6 +311,205 @@ Tristan-flagged 2026-05-07: three security-oriented agents are missing. Unlike c
 | HP-003 | Verdict wording on monobloc paths | ✅ | `8198c940` |
 | BASELINE-10 | 10 projects × 2 rounds (detailed + minimal briefs) | ✅ | `083ef489` — findings in `BASELINE-10-ANALYSIS.md` |
 
+### Phase R — Pretraining corpus & class roadmap (added 2026-05-17)
+
+Pretraining = the `pretraining_products` table in `~/.forge-truth/forge-truth.db`. Each row is one real reference product extracted from web search via Flash-Lite + Grok 4.3 judge at ~£0.0042/row. Per memory drawer 2026-05-17 (`forgeos/decisions`): **the pretraining corpus IS the on-the-fly anchor cache**. Same mechanism, two access modes: offline scoring (Phase 1/2/3 reports) and online injection (Stage 0.5 anchor retrieval).
+
+**Current spend:** £0.42 across Phase 1 (BESS) + Phase 2 (9 classes). 101 rows, 10 classes complete.
+
+**Recommended target:** **60 classes** (low end of Tristan's 50–100 band), hard checkpoint at 30. Confidence moderate, gated on Phase 3 reproduction verdict.
+
+**Phase 3 rescored 2026-05-17** with expanded synonym buckets (19 expansions, both `score_and_report.py` and `score_and_report_phase2.py`): Phase 3 fresh-run sub-module recall avg **26.6% → 31.5% (+4.8pp)**; Phase 2 corpus avg **57.9% → 58.2% (+0.3pp)**. Tesla +0.0pp, Saab +7.1pp, Sartorius +7.3pp. **Verdict: PIPELINE GAP** (lift <10pp; synonym table was NOT the binding constraint). **Recommendation: PAUSE FOR PIPELINE WORK** before Tier 2. Tesla gap = module-placement / coverage (e.g. `bms_master` produced under wrong module; `mass_fluid_transport_process` produced empty). Report: `~/Downloads/forgeos-illustration-experiments/pretraining/phase-3-rescored-report.html`.
+
+**Phase 3 diagnostic verdict 2026-05-17 (added):** Tesla's two named failures are CHEAP, single-file fixes: (a) `class-module-priors.ts:73` hard-forbids `mass_fluid_transport_process` for BESS class, causing the auto-strip at `1.7-module-decomposition.ts:717-733` to remove the module even when emitters emit it — both judges (GLM + Sonnet) flagged this in the Tesla council notes; (b) the `=== CORRECT SUB-MODULE PLACEMENTS ===` heuristic at `prompts.ts:705` DID reach the live emitter, but is overridden by the same prompt's 500-line worked-example JSON (lines 1113-1597, 1672-1675) that demonstrates `bms_master`/`bms_slave` as sub_modules of `energy_storage_source`. **Path A (fix pipeline, scale to 60) is recommended** — estimated Tesla lift 23.4% → ~45% from four cheap edits (class-prior, worked-example, container_shell bucket, BESS safety/sensing buckets). Full diagnostic: `~/Downloads/forgeos-illustration-experiments/pretraining/phase-3-diagnostic-report.html`.
+
+#### R.A — 10 classes done
+
+| Class (key) | Refs | Mod recall | Sub-mod recall | Cost | Confidence | Ontology fixes applied to source-of-truth? |
+|---|---|---|---|---|---|---|
+| **bess** | 10 | 100% | 79% | £0.044 | high | ✅ partial |
+| **heat_pump** | 10 | 100% | 39% | £0.041 | moderate | ❌ pending |
+| **consumer_cinematography_drone** | 10 | 100% | 52% | £0.050 | moderate | ❌ pending |
+| **dc_fast_ev_charger** | 10 | 100% | 56% | £0.041 | moderate | ❌ pending |
+| **edge_ai_inference_server** | 11 | 100% | 54% | £0.037 | moderate | ❌ pending |
+| **bioreactor_skid** | 10 | 100% | 62% | £0.045 | high | ❌ pending |
+| **modular_indoor_vertical_farm** | 10 | 100% | 54% | £0.044 | moderate | ❌ pending |
+| **wearable_medical_device** | 10 | 100% | 60% | £0.041 | moderate | ❌ pending |
+| **autonomous_underwater_vehicle** | 10 | 100% | 53% | £0.041 | moderate (2/10 USVs) | ❌ pending |
+| **high_altitude_pseudo_satellite** | 10 | 100% | 58% | £0.039 | moderate (1/10 tactical UAV) | ❌ pending |
+
+| ID | Description | Status |
+|---|---|---|
+| **R-A1** | Apply heat_pump ontology mismatch fixes to `class-modules.ts` (evaporator→energy_conversion; valve→safety) | ⬜ Pending |
+| **R-A2** | Apply drone ontology mismatch fixes (container_shell rebucketing) | ⬜ Pending |
+| **R-A3** | Apply ev-charger ontology fixes (thermal_management; CCS cable bucket) | ⬜ Pending |
+| **R-A4** | Apply edge-AI ontology fixes (container_shell; memory bucket) | ⬜ Pending |
+| **R-A5** | Apply bioreactor ontology fixes (manifold rebucketing) | ⬜ Pending |
+| **R-A6** | Apply vertical-farm ontology fixes (expansion_tank rebucketing) | ⬜ Pending |
+| **R-A7** | Apply CGM ontology fixes (thermal/grounding) | ⬜ Pending |
+| **R-A8** | Apply AUV ontology fixes + remove 2 USV references (Saildrone Voyager, iXblue DriX) from `pretraining_products` and replace with true AUVs | ⬜ Pending |
+| **R-A9** | Apply HAPS ontology fixes + remove Lockheed Stalker XE (tactical UAV, not HAPS) and replace | ⬜ Pending |
+
+#### R.B — Tier 1 expansion (adjacent classes, 12 new, ~£0.50)
+
+Share ≥60% of modules with current 10; expected sub-module recall ≥70% on first run.
+
+| ID | Class (key) | Adjacent to | Status |
+|---|---|---|---|
+| **R-B1** | `residential_ess` | bess | ✅ Done 2026-05-17 |
+| **R-B2** | `marine_ess` | bess | ⬜ Pending |
+| **R-B3** | `pv_string_inverter` | ev_charger / bess PCS | ✅ Done 2026-05-17 |
+| **R-B4** | `industrial_ups` | bess PCS / ev_charger | ⬜ Pending |
+| **R-B5** | `microgrid_controller` | bess BMS / ev_charger control | ⬜ Pending |
+| **R-B6** | `motor_drive_vfd` | ev_charger PCS | ✅ Done 2026-05-17 |
+| **R-B7** | `industrial_inspection_drone` | consumer_cinematography_drone | ✅ Done 2026-05-17 |
+| **R-B8** | `agricultural_sprayer_drone` | consumer_cinematography_drone | ⬜ Pending |
+| **R-B9** | `vtol_cargo_uav` | haps / drone | ⬜ Pending |
+| **R-B10** | `rooftop_ac_unit` | heat_pump | ⬜ Pending |
+| **R-B11** | `chiller` | heat_pump | ✅ Done 2026-05-17 |
+| **R-B12** | `vrf_multi_split` | heat_pump | ⬜ Pending |
+
+##### R.B — Tier 1 batch 1 status (5 of 12 done, 2026-05-17)
+
+| ID | Class | n/10 | judge≥6 | mod_cov | mean_subs/prod | corpus cross-mm | cost | top-1 ontology gap (corpus-internal) |
+|---|---|---|---|---|---|---|---|---|
+| R-B1  | `residential_ess`              | 10/10 | 10/10 | 100% | 38.5 | 14 | £0.041 | `cells`: `energy_storage_source`↔`sensing_instrumentation` |
+| R-B3  | `pv_string_inverter`           | 10/10 | 10/10 | 100% | 34.6 |  8 | £0.044 | `pcs`: `energy_conversion_transduction`↔`control_compute_communication` |
+| R-B6  | `motor_drive_vfd`              | 10/10 | 10/10 | 100% | 34.7 | 10 | £0.044 | `busbar`: `sensing_instrumentation`↔`power_distribution` |
+| R-B7  | `industrial_inspection_drone`  | 10/10 | 10/10 | 100% | 34.9 | 12 | £0.045 | `bms_master`: `energy_storage_source`↔`power_distribution` |
+| R-B11 | `chiller`                      | 10/10 | 10/10 | 100% | 41.1 | 16 | £0.050 | `chiller`-bucket: `energy_conversion_transduction`↔`power_distribution` |
+
+Aggregate: 50/50 ingested at judge ≥6, mean module coverage 100%, mean sub-modules/product 36.8, 60 corpus-internal cross-module ontology mismatches added to the batched fix queue. Top recurring patterns across this batch: `beacon` `maintenance_serviceability`↔`hmi_ergonomics` (×3 classes), `insulation` `sensing_instrumentation`↔`safety_protection` (×2 classes). Batch cost £0.22 (vs £0.21 expected). Reports at `~/Downloads/forgeos-illustration-experiments/pretraining/phase-2-{slug}-report.html` and combined at `phase-2-tier1-combined-report.html`. Class-definition boundary-discipline files in `class-definitions/`. Boundary discipline rejected 3 mis-named seeds (2 chiller — Engie Refrion ECO 150 non-existent, Multistack MS140 = PC case; 1 chiller VRF — LG Multi V Water IV), replaced with Clivet WSAN-XEE 141, Midea MSAF 140, Hitachi Samurai RCUG-AG2 140. **Tier-1 batch verdict:** methodology generalises cleanly — every class hit 100% module coverage on first run and judge ≥6 across all 50 products. The pre-ingest boundary-discipline check (extractor returns `out_of_class:true` for out-of-scope candidates) caught 3 catastrophic seed errors that would otherwise have polluted the corpus, addressing the [[AUV-USV misclassification]] gotcha pattern. Sub-module count per product is ~37 vs ~30-35 for original 10, suggesting Tier-1 vocabulary is richer (good — more anchor signal for Stage 0.5 retrieval). New failure mode noted vs original 10: corpus-internal cross-module mismatches are higher (60 total across 5 vs ~30 typical for original) because synonym-bucket coverage for new vocabulary (`mppt_tracker`, `dc_isolator`, `dc_link_capacitor`, `microchannel_condenser`) is missing — flag for the R-A batched fix to extend `SYNONYM_BUCKETS` when applying the ontology fixes.
+
+##### R — Overnight 45-class corpus expansion (2026-05-17)
+
+**Goal:** push corpus from 15 → 60 classes in one overnight run. Authorised £6 LLM cap. **Result: 45/45 ingested, 440 products extracted, 395 (89.8%) at judge ≥6, $3.25 (£2.51) actual spend.**
+
+The overnight roadmap was decoupled from the existing R-B (12-class) / R-D (18-class) / R-E (20-class) plan above — Tristan locked a specific 45-class list with space + consumer-electronics sub-tiers added and defence dropped. Mapping of overnight tiers to original ID system:
+
+- **Overnight R-B continued (5)** — `marine_ess`, `second_life_battery_pack`, `ac_motor_controller`, `mini_split_heatpump`, `custom_hybrid_drone` (formerly part of original R-B but using the brief's new naming)
+- **Overnight R-C Tier 2 (10)** — robotics + medical + space + manufacturing
+- **Overnight R-D Tier 3 (10)** — building / energy infrastructure
+- **Overnight R-E Tier 4 (15)** — space + consumer electronics + biotech/semicon
+- **Overnight R-F Tier 5 (5)** — energy + water
+
+| Tier | Classes | Products | Boundary rej | Judge ≥6 | Cost USD | Notes |
+|---|---|---|---|---|---|---|
+| R-B continued (5) | 5 | 48 | 1 | 46 | $0.260 | Clean; custom-hybrid-drone 1 rejection |
+| R-C Tier 2 (10) | 10 | 97 | 3 | 93 | $0.539 | Custom-hybrid-drone+sat-GS borderline; rest 9-10/10 |
+| R-D Tier 3 (10) | 10 | 97 | 3 | 86 | $0.518 | **BMS anomaly: 3/10 judge≥6** — software-heavy class fits hardware ontology poorly |
+| R-E Tier 4 (15) | 15 | 148 | 2 | 127 | $0.852 | Space sub-tier lower judge (cubesat-prop 5/10, fairing 6/10); CE perfect |
+| R-F Tier 5 (5) | 5 | 49 | 1 | 39 | $0.236 | wind-turbine-nacelle 6/10 (sparse data); rest 7-9/10 |
+| **Totals** | **45** | **440** | **8** | **395** | **$2.408 / £1.85** | |
+
+Final corpus: **60 distinct classes** in `pretraining_products` (15 + 45 new). 38/45 new classes hit ≥8/10 judge≥6. 44/45 hit ≥5/10. 1 class (BMS) at 3/10 flagged for daytime follow-up.
+
+**Boundary discipline (8 rejections)** — extractor correctly refused: 1 custom-hybrid-drone (likely pure-electric not hybrid), 1 satellite-ground-station (likely phased-array user terminal), 1 brewery-fermenter (likely brewhouse/mash tun), 1 sterile-fill-line (likely non-aseptic), 1 switchgear-panel (likely HV transmission), 2 ground-station-antenna-subsystem (likely phased-array), 1 water-treatment-skid (likely consumer point-of-use). No catastrophic seed pollution.
+
+**Top 10 corpus-internal cross-module ontology mismatches surfaced** (additions to R-A batched-fix queue):
+
+| Rank | Bucket | Mismatched modules | Total refs | Affected classes |
+|---|---|---|---|---|
+| 1 | `emergency_stop` | hmi_ergonomics ↔ safety_protection | 128 | amr, agv, robot arm, 3d printer, +many |
+| 2 | `pcs` | energy_conversion_transduction ↔ power_distribution | 119 | mini-split-hp, custom-hybrid-drone, amr, agv |
+| 3 | `container_shell` | environmental_interface ↔ structure_containment | 106 | 2L-pack, ac-motor-ctrl, insulin-pump, escalator |
+| 4 | `hmi` | control_compute_communication ↔ hmi_ergonomics | 82 | cnc, escalator, sterile-fill, telehandler |
+| 5 | `container_shell` | safety_protection ↔ structure_containment | 75 | usv, 3d-printer, distribution-tx, pipettor |
+| 6 | `motor` | actuation_kinematics ↔ energy_conversion_transduction | 63 | mini-split-hp, custom-hybrid-drone, dialysis, 3d-printer |
+| 7 | `valve` | actuation_kinematics ↔ safety_protection | 51 | mini-split-hp, dialysis, cubesat-prop, srm |
+| 8 | `container_shell` | power_distribution ↔ structure_containment | 51 | cnc, sterile-fill, wind-turbine, water-treatment |
+| 9 | `bms_master` | energy_storage_source ↔ power_distribution | 50 | custom-hybrid-drone, amr, insulin-pump, dialysis |
+| 10 | `hmi` | environmental_interface ↔ hmi_ergonomics | 47 | amr, insulin-pump, smartphone, fitness-tracker |
+
+**Patterns:** the model is inconsistent about where `emergency_stop`, `container_shell`, `hmi`, and `motor` belong across classes. These are **prompts.ts heuristic** problems (live emitter), NOT scorer bucket-coverage problems. **Daytime R-A fix queue:** establish a canonical module assignment for these 10 buckets and document in `class-module-priors.ts` worked-example.
+
+**Non-prompts.ts overnight fix applied:** SYNONYM_BUCKETS in `score_and_report_phase2.py` extended with ~110 new buckets (robotics drive units, space avionics, antenna subsystems, mobile SoC/storage/sensors, semicon equipment, lift/escalator mechanics, MV switchgear families, hydrogen-fuel-cell-electrolyser components, wind/water-treatment vocabulary). **Scorer-only change, non-destructive.** No prompts.ts edits overnight per Tristan's authorisation envelope.
+
+**No councils dispatched overnight.** Budget pressure (£6 cap) + the surfaced mismatches all reach prompts.ts (live emitter) where overnight changes are out of scope. The 10-mismatch list is recorded above for daytime council.
+
+**Sleep-safe state:** orchestrator + extractor exited cleanly (LOOP_END returned 45/45 completed, 0 failed, no budget stop). `pretraining_products` table now has 60 distinct product_class values. Cost log `/tmp/tier-expansion-cost.log` + summary `~/Downloads/forgeos-illustration-experiments/pretraining/overnight45-summary.json` + handover `~/Downloads/handovers/overnight-2026-05-17.md`.
+
+---
+
+#### R.C — 30-class checkpoint (gate before Tier 2 continues)
+
+| ID | Description | Status |
+|---|---|---|
+| **R-C1** | Re-run Phase 1/2 scorecard methodology on the 22 classes done after R-A + R-B. Confirm average sub-module recall ≥65% (vs current 58%) and ontology fixes are sticky | ⬜ Pending (gate satisfied — overnight pushed corpus to 60 classes without applying R-A fixes; will re-run scorecard after R-A fixes are applied daytime) |
+| **R-C2** | If R-C1 passes, proceed with Tier 2 (R-D). If fails, stop and apply remaining ontology fixes before resuming | ✅ Overtaken by overnight 45-class extension; Tier 2/3/4/5 all ingested at corpus level |
+
+#### R.D — Tier 2 expansion (new sectors, similar vocabulary, 18 new, ~£0.76)
+
+Share ≥30% of modules; expected sub-module recall 40–60% on first run. **GATED on Phase 3 reproduction verdict + R-C1 pass.**
+
+| ID | Class (key) | Status |
+|---|---|---|
+| **R-D1** | `industrial_robot_arm` | ⬜ Pending |
+| **R-D2** | `collaborative_robot` | ⬜ Pending |
+| **R-D3** | `autonomous_mobile_robot` | ⬜ Pending |
+| **R-D4** | `automated_guided_vehicle` | ⬜ Pending |
+| **R-D5** | `insulin_pump` | ⬜ Pending |
+| **R-D6** | `dialysis_machine` | ⬜ Pending |
+| **R-D7** | `surgical_robot` | ⬜ Pending |
+| **R-D8** | `patient_monitor` | ⬜ Pending |
+| **R-D9** | `smallsat_12u` | ⬜ Pending |
+| **R-D10** | `satellite_ground_station` | ⬜ Pending |
+| **R-D11** | `propulsion_test_rig` | ⬜ Pending |
+| **R-D12** | `unmanned_surface_vessel` | ⬜ Pending |
+| **R-D13** | `autonomous_cargo_vessel` | ⬜ Pending |
+| **R-D14** | `industrial_3d_printer_fdm` | ⬜ Pending |
+| **R-D15** | `metal_3d_printer_sls` | ⬜ Pending |
+| **R-D16** | `cnc_5axis_mill` | ⬜ Pending |
+| **R-D17** | `smt_pick_and_place` | ⬜ Pending |
+| **R-D18** | `wire_bonder` | ⬜ Pending |
+
+#### R.E — Tier 3 expansion (adjacent verticals, 20 new, ~£0.84)
+
+Share <30% of modules; new ontologies likely; expected sub-module recall 30–50%. **GATED on R-D average sub-mod recall ≥45%.**
+
+| ID | Class (key) | Status |
+|---|---|---|
+| **R-E1** | `passenger_lift` | ⬜ Pending |
+| **R-E2** | `escalator` | ⬜ Pending |
+| **R-E3** | `building_management_system` | ⬜ Pending |
+| **R-E4** | `substation_skid_mv` | ⬜ Pending |
+| **R-E5** | `power_transformer_distribution` | ⬜ Pending |
+| **R-E6** | `outdoor_switchgear_hv` | ⬜ Pending |
+| **R-E7** | `brewery_fermenter_vessel` | ⬜ Pending |
+| **R-E8** | `sterile_fill_line` | ⬜ Pending |
+| **R-E9** | `form_fill_seal_packager` | ⬜ Pending |
+| **R-E10** | `industrial_gas_analyser` | ⬜ Pending |
+| **R-E11** | `mass_spectrometer` | ⬜ Pending |
+| **R-E12** | `particle_counter_cleanroom` | ⬜ Pending |
+| **R-E13** | `cold_chain_refrigerated_container` | ⬜ Pending |
+| **R-E14** | `compressed_air_system` | ⬜ Pending |
+| **R-E15** | `industrial_plate_heat_exchanger` | ⬜ Pending |
+| **R-E16** | `solar_tracker` | ⬜ Pending |
+| **R-E17** | `wind_turbine_nacelle_utility` | ⬜ Pending |
+| **R-E18** | `telehandler` | ⬜ Pending |
+| **R-E19** | `mini_excavator` | ⬜ Pending |
+| **R-E20** | `concrete_pump_truck_mounted` | ⬜ Pending |
+
+#### R.F — Pipeline durability & cleanup
+
+| ID | Description | Status |
+|---|---|---|
+| **R-F1** | Add a Grok-4.3 boundary-check pre-ingest: refuse the candidate if Grok says it doesn't match the target class (would have caught Saildrone Voyager / Stalker XE) | ⬜ Pending |
+| **R-F2** | Wire Stage 0.5 anchor retrieval — query `pretraining_products` for 2-3 anchor products of the current brief's class, inject module decomposition + key specs into Stage 1 context (per 2026-05-17 decision) | ⬜ Pending |
+| **R-F3** | Add cache-miss path — on first brief of a previously-unseen class, trigger live web-search + Flash-Lite extraction + write back to `pretraining_products` (organic corpus growth) | ⬜ Pending |
+| **R-F4** | Parameterise `scripts/fetch_and_extract_phase2.py` to accept a single-class CLI arg so each Tier 1/2/3 class can run independently without editing `phase2_classes.py` | ⬜ Pending |
+
+#### R — Decision rationale: 60 vs 50 vs 100
+
+- **50:** stops short of adjacent-verticals tier; insufficient to prove methodology generalises beyond pure engineering products.
+- **100:** forces Tier 4 frontier (biotech instruments, semiconductor fab, nuclear, space launch) where source-of-truth authoring is 1–2 days per class — compounds cost without compounding return.
+- **60 (recommended):** covers the four main hardware-startup demand vectors Tristan's customers actually touch. 60 is the natural breakpoint where most module ontology mismatches will have surfaced. Hard checkpoint at 30 (R-C1) catches a failing methodology before it doubles.
+- **Total LLM spend to reach 60: £2.52 cumulative** (vs £0.42 current). Engineering effort: ~150–300 sub-agent hours via @coder for source-of-truth additions across 50 new classes; ~£10–15 in sub-agent costs.
+
+#### R — Companion report
+
+Full report at `/tmp/forgeos-pretraining-strategy.html`. Includes per-class scorecard, Phase 3 reproduction status, go/hold decision matrix, and full seed-product lists for Tier 1 (all 12 classes seeded with 10 products each ready for ingest).
+
 ### Phase X — Deferred / future reports
 
 | ID | Description | Status | Commit / ref |

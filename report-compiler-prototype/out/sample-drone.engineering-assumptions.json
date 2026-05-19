@@ -1,0 +1,324 @@
+{
+  "summary": {
+    "rows": 20,
+    "briefSupported": 1,
+    "modelPresent": 3,
+    "reviewRequired": 6,
+    "sourceRequired": 10,
+    "blocked": 0,
+    "architectureBlockers": 0,
+    "bomBlockers": 10
+  },
+  "rows": [
+    {
+      "linkedRequirements": [
+        "duration_minutes"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:duration_minutes",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Duration",
+      "assumption": "Duration = 40 minutes is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "metric:headline_output",
+      "category": "derived_metric",
+      "status": "review_required",
+      "scope": "Flight endurance",
+      "assumption": "Flight endurance uses duration_minutes with medium confidence.",
+      "basis": "class_pack:drone.class_pack; formula:duration_minutes",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:capex_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated CAPEX",
+      "assumption": "Estimated CAPEX uses an implicit model with low confidence.",
+      "basis": "formula:capex=sum(bom.totalCostGbp); class_pack:drone.class_pack",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:opex_annual_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated annual OPEX",
+      "assumption": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "basis": "formula:opex=capex*0.04",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [
+        "duration_minutes"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:drone_endurance_target",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Endurance Target",
+      "assumption": "Endurance Target currently evaluates as warn against <=30 min typical, 30-45 min aggressive, >45 min high-risk without mass/power budget.",
+      "basis": "brief:input.brief; model:engineering_sanity.drone; model:engineering_sanity.drone",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "duration_minutes"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:drone_propulsion_quads",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Quad Propulsion Allocation",
+      "assumption": "Quad Propulsion Allocation currently evaluates as pass against four motors and four ESCs allocated for quadcopter layout.",
+      "basis": "model:engineering_sanity.drone; model:engineering_sanity.drone",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "duration_minutes"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:drone_control_power_chain",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Control/Power/Actuation Chain",
+      "assumption": "Control/Power/Actuation Chain currently evaluates as pass against power bus, motor drive, sensor bus and radio link all present.",
+      "basis": "model:engineering_sanity.drone; model:engineering_sanity.drone",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "power_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:energy_storage_source:actuation_kinematics:power_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "energy_storage_source -> actuation_kinematics",
+      "assumption": "power_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Flight battery must feed propulsion loads through an explicit power bus.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "motor_drive"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:actuation_kinematics:motor_drive",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> actuation_kinematics",
+      "assumption": "motor_drive is named on both endpoint modules in the generated architecture.",
+      "basis": "Flight controller must command ESC/motor drive outputs.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "sensor_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:sensing_instrumentation:sensor_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> sensing_instrumentation",
+      "assumption": "sensor_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Flight controller must receive navigation and payload state.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "carbon_airframe"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:structure_containment_carbon_airframe_carbon_airframe",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Carbon airframe",
+      "assumption": "Carbon airframe is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.drone",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "flight_battery_pack"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_storage_source_flight_battery_pack_flight_battery_pack",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Flight battery pack",
+      "assumption": "Flight battery pack is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.drone",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "brushless_motors"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:actuation_kinematics_motor_sets_brushless_motors",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Brushless motors",
+      "assumption": "Brushless motors is a critical architecture-derived component candidate with quantity 4 each.",
+      "basis": "model:scratch_universal_architecture.drone",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "esc"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:actuation_kinematics_esc_stack_esc",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "ESC",
+      "assumption": "ESC is a critical architecture-derived component candidate with quantity 4 each.",
+      "basis": "model:scratch_universal_architecture.drone",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "propeller_set"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:actuation_kinematics_propeller_sets_propeller_set",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Propeller set",
+      "assumption": "Propeller set is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.drone",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "flight_controller"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_flight_controller_stack_flight_controller",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Flight controller",
+      "assumption": "Flight controller is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.drone",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "radio_and_gnss_link"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_radio_navigation_link_radio_and_gnss_link",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Radio and GNSS link",
+      "assumption": "Radio and GNSS link is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.drone",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "4k_camera_payload"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_camera_payload_4k_camera_payload",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "4K camera payload",
+      "assumption": "4K camera payload is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.drone",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:UK-UAS",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "UK-UAS",
+      "assumption": "UK unmanned aircraft operating rules is relevant to this product class in UK.",
+      "basis": "class_pack:drone.class_pack",
+      "evidenceRequired": "Mass, geofencing and operating-category evidence."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:CE-EMC",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "CE-EMC",
+      "assumption": "CE electromagnetic compatibility is relevant to this product class in UK/EU.",
+      "basis": "class_pack:drone.class_pack",
+      "evidenceRequired": "EMC test plan and declarations."
+    }
+  ]
+}

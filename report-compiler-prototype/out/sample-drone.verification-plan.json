@@ -1,0 +1,775 @@
+{
+  "summary": {
+    "activities": 24,
+    "readyForReview": 12,
+    "open": 7,
+    "blocked": 5,
+    "designReviewActivities": 9,
+    "calculationActivities": 3,
+    "interfaceReviewActivities": 3,
+    "sourceEvidenceActivities": 5,
+    "complianceReviewActivities": 4
+  },
+  "activities": [
+    {
+      "id": "design_review:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Airframe Structure And Payload Mounting",
+      "activity": "Review Airframe Structure And Payload Mounting architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "motor_mounts",
+        "payload_mount",
+        "battery_mount",
+        "service_access",
+        "video_link",
+        "power_bus"
+      ],
+      "componentWordIds": [
+        "carbon_airframe",
+        "carbon_fibre_arm_tube",
+        "centre_plate_pair",
+        "arm_folding_hinge",
+        "landing_gear_strut",
+        "camera_gimbal_mount_plate",
+        "rubber_vibration_damper",
+        "payload_quick_release_latch",
+        "payload_cg_adjustment_rail",
+        "battery_tray",
+        "battery_retention_strap",
+        "anti_slip_battery_pad",
+        "pack_latch_sensor"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Airframe Structure And Payload Mounting",
+      "activity": "Collect source-backed evidence for Airframe Structure And Payload Mounting critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "carbon_airframe"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "carbon_airframe"
+      ]
+    },
+    {
+      "id": "design_review:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Flight Energy Storage",
+      "activity": "Review Flight Energy Storage architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "interfaceIds": [
+        "power_bus",
+        "charger_interface",
+        "battery_mount",
+        "sensor_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "flight_battery_pack",
+        "high_discharge_cell_group",
+        "battery_management_pcb",
+        "xt90_anti_spark_connector",
+        "pack_temperature_sensor",
+        "power_module_shunt",
+        "voltage_divider_board",
+        "low_voltage_alarm_output",
+        "battery_telemetry_connector",
+        "balance_charge_harness",
+        "charging_cradle",
+        "pack_id_label",
+        "transport_storage_case_insert"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Flight Energy Storage",
+      "activity": "Verify Flight Energy Storage requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "open",
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": [
+        "drone_endurance_target: 40 minutes is an aggressive cinematography-drone target and needs a mass, propeller and battery energy budget before design freeze."
+      ]
+    },
+    {
+      "id": "source_evidence:energy_storage_source",
+      "moduleId": "energy_storage_source",
+      "moduleName": "Flight Energy Storage",
+      "activity": "Collect source-backed evidence for Flight Energy Storage critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "flight_battery_pack"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "flight_battery_pack"
+      ]
+    },
+    {
+      "id": "design_review:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Flight Actuation",
+      "activity": "Review Propulsion And Flight Actuation architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "interfaceIds": [
+        "power_bus",
+        "motor_drive",
+        "motor_mounts",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "brushless_motors",
+        "motor_mounting_screw_set",
+        "motor_phase_lead_set",
+        "motor_bearing_shield",
+        "esc",
+        "esc_cooling_plate",
+        "pwm_signal_harness",
+        "current_telemetry_line",
+        "esc_conformal_coating",
+        "propeller_set",
+        "propeller_hub_adapter",
+        "propeller_lock_nut",
+        "spare_propeller_pouch"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Flight Actuation",
+      "activity": "Verify Propulsion And Flight Actuation requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "open",
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": [
+        "drone_endurance_target: 40 minutes is an aggressive cinematography-drone target and needs a mass, propeller and battery energy budget before design freeze."
+      ]
+    },
+    {
+      "id": "source_evidence:actuation_kinematics",
+      "moduleId": "actuation_kinematics",
+      "moduleName": "Propulsion And Flight Actuation",
+      "activity": "Collect source-backed evidence for Propulsion And Flight Actuation critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "brushless_motors",
+        "esc",
+        "propeller_set"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "brushless_motors",
+        "esc",
+        "propeller_set"
+      ]
+    },
+    {
+      "id": "design_review:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Flight Control Compute And Communications",
+      "activity": "Review Flight Control Compute And Communications architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "interfaceIds": [
+        "sensor_bus",
+        "motor_drive",
+        "radio_link",
+        "video_link",
+        "power_bus"
+      ],
+      "componentWordIds": [
+        "flight_controller",
+        "imu_vibration_isolation_mount",
+        "barometer_foam_cover",
+        "sd_card_flight_logger",
+        "failsafe_firmware_profile",
+        "radio_and_gnss_link",
+        "gnss_antenna_mast",
+        "rc_receiver",
+        "telemetry_radio_module",
+        "antenna_diversity_mount",
+        "low_latency_video_transmitter",
+        "video_antenna_pair",
+        "hdmi_micro_cable",
+        "video_power_filter"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Flight Control Compute And Communications",
+      "activity": "Verify Flight Control Compute And Communications requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "open",
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [
+        "drone_endurance_target",
+        "drone_propulsion_quads",
+        "drone_control_power_chain"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": [
+        "drone_endurance_target: 40 minutes is an aggressive cinematography-drone target and needs a mass, propeller and battery energy budget before design freeze."
+      ]
+    },
+    {
+      "id": "source_evidence:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Flight Control Compute And Communications",
+      "activity": "Collect source-backed evidence for Flight Control Compute And Communications critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "duration_minutes"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "flight_controller",
+        "radio_and_gnss_link"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "flight_controller",
+        "radio_and_gnss_link"
+      ]
+    },
+    {
+      "id": "design_review:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Cinematography Sensing",
+      "activity": "Review Navigation And Cinematography Sensing architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_bus",
+        "video_link",
+        "payload_mount"
+      ],
+      "componentWordIds": [
+        "4k_camera_payload",
+        "three_axis_gimbal",
+        "camera_control_cable",
+        "lens_protection_hood",
+        "microsd_media_card",
+        "magnetometer_module",
+        "rangefinder_altimeter",
+        "optical_flow_sensor",
+        "airspeed_estimate_port",
+        "vibration_monitor_pad",
+        "payload_presence_switch",
+        "avionics_temperature_probe",
+        "landing_contact_switch"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Navigation And Cinematography Sensing",
+      "activity": "Collect source-backed evidence for Navigation And Cinematography Sensing critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "4k_camera_payload"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "4k_camera_payload"
+      ]
+    },
+    {
+      "id": "design_review:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Aircraft Power Distribution",
+      "activity": "Review Aircraft Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "power_bus",
+        "protective_earth",
+        "motor_drive",
+        "video_link",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "power_distribution_pcb",
+        "copper_bus_plane",
+        "main_fuse_link",
+        "anti_spark_loop_key",
+        "5_v_bec_regulator",
+        "12_v_payload_regulator",
+        "lc_noise_filter",
+        "rail_status_led",
+        "silicone_power_lead_set",
+        "jst_signal_harness",
+        "braided_cable_sleeve",
+        "strain_relief_clip_set"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Flight Safety And Containment",
+      "activity": "Review Flight Safety And Containment architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "radio_link",
+        "power_bus",
+        "service_access",
+        "alarm_bus",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "arming_switch",
+        "status_buzzer",
+        "motor_inhibit_logic",
+        "preflight_checklist_tag",
+        "return_to_home_failsafe",
+        "geofence_configuration",
+        "low_battery_landing_logic",
+        "flight_termination_setting",
+        "fire_resistant_battery_pouch",
+        "pack_swelling_gauge",
+        "charge_log_sheet",
+        "thermal_warning_label"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance And Serviceability",
+      "activity": "Review Field Maintenance And Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "service_access",
+        "motor_mounts",
+        "payload_mount"
+      ],
+      "componentWordIds": [
+        "spare_arm_clamp",
+        "motor_alignment_gauge",
+        "propeller_torque_tool",
+        "field_fastener_kit",
+        "crack_inspection_marker",
+        "fastener_witness_paint",
+        "battery_cycle_counter_label",
+        "payload_latch_witness_mark",
+        "foam_transport_case",
+        "propeller_guard_sleeve",
+        "gimbal_transport_lock",
+        "desiccant_storage_pouch"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:hmi_ergonomics",
+      "moduleId": "hmi_ergonomics",
+      "moduleName": "Ground Operator Interface",
+      "activity": "Review Ground Operator Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "radio_link",
+        "video_link",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "handheld_transmitter",
+        "ground_station_tablet",
+        "sun_hood",
+        "controller_neck_strap",
+        "aircraft_id_label",
+        "propeller_rotation_label",
+        "payload_mass_placard",
+        "preflight_checklist_card"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:energy_storage_source:actuation_kinematics:power_bus",
+      "moduleId": "energy_storage_source:actuation_kinematics",
+      "moduleName": "Flight Energy Storage -> Propulsion And Flight Actuation",
+      "activity": "Verify power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "power_bus"
+      ],
+      "componentWordIds": [
+        "flight_battery_pack",
+        "high_discharge_cell_group",
+        "battery_management_pcb",
+        "xt90_anti_spark_connector",
+        "pack_temperature_sensor",
+        "power_module_shunt",
+        "voltage_divider_board",
+        "low_voltage_alarm_output",
+        "battery_telemetry_connector",
+        "brushless_motors",
+        "motor_mounting_screw_set",
+        "motor_phase_lead_set",
+        "motor_bearing_shield",
+        "esc",
+        "esc_cooling_plate",
+        "pwm_signal_harness",
+        "current_telemetry_line",
+        "esc_conformal_coating"
+      ],
+      "rationale": "Flight battery must feed propulsion loads through an explicit power bus.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:control_compute_communication:actuation_kinematics:motor_drive",
+      "moduleId": "control_compute_communication:actuation_kinematics",
+      "moduleName": "Flight Control Compute And Communications -> Propulsion And Flight Actuation",
+      "activity": "Verify motor_drive interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "motor_drive"
+      ],
+      "componentWordIds": [
+        "flight_controller",
+        "imu_vibration_isolation_mount",
+        "barometer_foam_cover",
+        "sd_card_flight_logger",
+        "failsafe_firmware_profile",
+        "brushless_motors",
+        "motor_mounting_screw_set",
+        "motor_phase_lead_set",
+        "motor_bearing_shield",
+        "esc",
+        "esc_cooling_plate",
+        "pwm_signal_harness",
+        "current_telemetry_line",
+        "esc_conformal_coating"
+      ],
+      "rationale": "Flight controller must command ESC/motor drive outputs.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:control_compute_communication:sensing_instrumentation:sensor_bus",
+      "moduleId": "control_compute_communication:sensing_instrumentation",
+      "moduleName": "Flight Control Compute And Communications -> Navigation And Cinematography Sensing",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "flight_controller",
+        "imu_vibration_isolation_mount",
+        "barometer_foam_cover",
+        "sd_card_flight_logger",
+        "failsafe_firmware_profile",
+        "radio_and_gnss_link",
+        "gnss_antenna_mast",
+        "rc_receiver",
+        "telemetry_radio_module",
+        "antenna_diversity_mount",
+        "magnetometer_module",
+        "rangefinder_altimeter",
+        "optical_flow_sensor",
+        "airspeed_estimate_port",
+        "vibration_monitor_pad",
+        "payload_presence_switch",
+        "avionics_temperature_probe",
+        "landing_contact_switch"
+      ],
+      "rationale": "Flight controller must receive navigation and payload state.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "compliance_review:UK-UAS",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for UK-UAS",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "UK unmanned aircraft operating rules",
+      "acceptanceCriteria": [
+        "Mass, geofencing and operating-category evidence."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:CE-EMC",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for CE-EMC",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "CE electromagnetic compatibility",
+      "acceptanceCriteria": [
+        "EMC test plan and declarations."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:1",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Loss of propulsion",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 135; mitigation: Motor health monitoring and conservative payload limits.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:2",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Battery thermal event",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 96; mitigation: Pack protection, charging limits and enclosure venting.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    }
+  ]
+}

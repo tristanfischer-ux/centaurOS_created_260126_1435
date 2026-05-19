@@ -110,6 +110,37 @@ export async function parseJsonFromLlm(raw: string, opts: ParseOpts = {}): Promi
     }
   }
 
+  // Step 5.5 (2026-05-18): deterministic bracket-imbalance repair.
+  //
+  // Grok 4.3 (and intermittently other models) emit a stray extra `]` or `}`
+  // mid-stream in deeply nested JSON patches. This is not truncation — the
+  // JSON is otherwise complete — so the existing LLM-repair fallback can be
+  // unreliable on 100+ KB inputs. Try a cheap deterministic strip of stray
+  // top-level closing brackets/braces first (free, no tokens, no latency).
+  const stripped = stripStrayTopLevelClosers(str)
+  if (stripped !== null) {
+    try {
+      const parsed = JSON.parse(stripped)
+      console.warn(
+        `[${stage}] ${model} JSON had stray top-level closer(s); deterministic strip SUCCEEDED.`,
+      )
+      return parsed
+    } catch { /* fall through */ }
+    // Also retry the first-to-last-brace slice on the stripped string —
+    // a stray `]` between two `}` blocks can disrupt step-4 lastIndexOf logic.
+    const sFirstBrace = stripped.indexOf('{')
+    const sLastBrace = stripped.lastIndexOf('}')
+    if (sFirstBrace >= 0 && sLastBrace > sFirstBrace) {
+      try {
+        const parsed = JSON.parse(stripped.slice(sFirstBrace, sLastBrace + 1))
+        console.warn(
+          `[${stage}] ${model} JSON had stray top-level closer(s); deterministic strip + slice SUCCEEDED.`,
+        )
+        return parsed
+      } catch { /* fall through */ }
+    }
+  }
+
   // Step 6 (Piece 8, 2026-05-13): optional LLM-based repair pass.
   //
   // When the caller has opted in via `enableLlmRepair: true`, dispatch a
@@ -161,6 +192,51 @@ export async function parseJsonFromLlm(raw: string, opts: ParseOpts = {}): Promi
     )
   } catch { /* ignore dump failures */ }
   throw originalErr
+}
+
+/**
+ * Strip stray top-level `]` or `}` characters that appear when overall
+ * bracket/brace depth would go negative — i.e. mid-stream extras emitted by
+ * the LLM that have no matching opener. Returns the cleaned string, or null
+ * if no stray top-level closer was found (i.e. nothing to do).
+ *
+ * Walks the string respecting string boundaries (so closers inside quoted
+ * values are never touched). Tracks depth for `{`/`}` and `[`/`]` separately;
+ * a `]` at brace-aware depth 0 with no matching `[` opener is dropped, and
+ * vice versa for `}`.
+ *
+ * Why this exists: Grok 4.3 emits mid-stream stray closers (typically a
+ * single extra `]`) in large nested JSON patches. The LLM repair fallback
+ * can be unreliable on 100+ KB raw input, so try a cheap deterministic strip
+ * first.
+ */
+function stripStrayTopLevelClosers(str: string): string | null {
+  let curlyDepth = 0
+  let squareDepth = 0
+  let inString = false
+  let escaped = false
+  const dropIdx: number[] = []
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i]
+    if (escaped) { escaped = false; continue }
+    if (ch === '\\') { escaped = true; continue }
+    if (ch === '"' && !escaped) { inString = !inString; continue }
+    if (inString) continue
+    if (ch === '{') curlyDepth++
+    else if (ch === '}') {
+      if (curlyDepth === 0) dropIdx.push(i)
+      else curlyDepth--
+    } else if (ch === '[') squareDepth++
+    else if (ch === ']') {
+      if (squareDepth === 0) dropIdx.push(i)
+      else squareDepth--
+    }
+  }
+  if (dropIdx.length === 0) return null
+  // Rebuild without dropped indices. Iterate from end so indices stay valid.
+  const chars = str.split('')
+  for (let k = dropIdx.length - 1; k >= 0; k--) chars.splice(dropIdx[k], 1)
+  return chars.join('')
 }
 
 /**

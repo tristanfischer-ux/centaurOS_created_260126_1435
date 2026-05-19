@@ -1,0 +1,80 @@
+{
+  "verdict": "engineering_review_ready",
+  "summary": {
+    "rows": 6,
+    "passRows": 3,
+    "reviewRows": 3,
+    "blockedRows": 0,
+    "passRatio": 0.5,
+    "modules": 10,
+    "subModules": 30,
+    "componentWords": 120,
+    "componentAllocationVerdict": "allocation_review_required",
+    "interfaceVerificationVerdict": "interface_review_ready",
+    "requirementCoverageVerdict": "coverage_review_ready",
+    "calculationRows": 2,
+    "calculationsWithinEnvelope": 1,
+    "calculationsNeedingReview": 1,
+    "calculationBlockers": 0,
+    "assumptionRows": 30,
+    "assumptionsNeedingReview": 23,
+    "assumptionArchitectureBlockers": 0,
+    "assumptionBomBlockers": 15
+  },
+  "rows": [
+    {
+      "area": "architecture_readiness",
+      "verdict": "pass",
+      "signal": "10 modules, 30 submodules and 120 component words pass architecture readiness.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Architecture is structurally ready for engineering review."
+    },
+    {
+      "area": "component_allocation",
+      "verdict": "review",
+      "signal": "24/30 submodules ready; 10/10 critical parts allocated; 3 duplicate component groups.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Resolve duplicate component identity before sourcing: mid_energy_meter. Resolve duplicate component identity before sourcing: iso_15118_plc_modem. Resolve duplicate component identity before sourcing: insulation_monitoring_device. Resolve whether these allocations are one shared physical item or separate install locations before sourcing, costing or deduplicating."
+    },
+    {
+      "area": "interface_verification",
+      "verdict": "pass",
+      "signal": "6/6 required interfaces have endpoint carriers; 0 accepted with evidence.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Required interfaces are structurally ready for reviewer evidence."
+    },
+    {
+      "area": "requirement_coverage",
+      "verdict": "pass",
+      "signal": "1/1 requirements are structurally ready or accepted; accepted evidence ratio 0.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Requirements are structurally ready for reviewer evidence."
+    },
+    {
+      "area": "calculation_envelope",
+      "verdict": "review",
+      "signal": "1/2 calculations are within envelope; 1 need review; 0 block.",
+      "passRatio": 0.5,
+      "blockers": [],
+      "requiredAction": "Attach reviewer evidence to calculations marked needs_review."
+    },
+    {
+      "area": "engineering_assumptions",
+      "verdict": "review",
+      "signal": "7/30 assumptions are brief-supported or model-present; 23 need review/source evidence; 0 block architecture.",
+      "passRatio": 0.23,
+      "blockers": [],
+      "requiredAction": "Review assumptions and keep BoM/source-required assumptions out of trusted claims until evidence is admitted."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Resolve duplicate component identity before sourcing: mid_energy_meter. Resolve duplicate component identity before sourcing: iso_15118_plc_modem. Resolve duplicate component identity before sourcing: insulation_monitoring_device. Resolve whether these allocations are one shared physical item or separate install locations before sourcing, costing or deduplicating.",
+    "Attach reviewer evidence to calculations marked needs_review.",
+    "Review assumptions and keep BoM/source-required assumptions out of trusted claims until evidence is admitted."
+  ]
+}

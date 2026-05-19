@@ -1,0 +1,515 @@
+{
+  "summary": {
+    "rows": 32,
+    "briefSupported": 2,
+    "modelPresent": 8,
+    "reviewRequired": 8,
+    "sourceRequired": 14,
+    "blocked": 0,
+    "architectureBlockers": 0,
+    "bomBlockers": 14
+  },
+  "rows": [
+    {
+      "linkedRequirements": [
+        "endurance_hours"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:endurance_hours",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Endurance",
+      "assumption": "Endurance = 8 hours is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:depth_rating_m",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Depth rating",
+      "assumption": "Depth rating = 300 m is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "metric:headline_output",
+      "category": "derived_metric",
+      "status": "review_required",
+      "scope": "Survey endurance",
+      "assumption": "Survey endurance uses endurance_hours with medium confidence.",
+      "basis": "class_pack:auv.class_pack; formula:endurance_hours",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:capex_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated CAPEX",
+      "assumption": "Estimated CAPEX uses an implicit model with low confidence.",
+      "basis": "formula:capex=sum(bom.totalCostGbp); class_pack:auv.class_pack",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:opex_annual_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated annual OPEX",
+      "assumption": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "basis": "formula:opex=capex*0.04",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [
+        "depth_rating_m"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:auv_depth_rating",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Depth Rating",
+      "assumption": "Depth Rating currently evaluates as pass against 10 to 600 m for inspection-class AUV prototypes; deeper missions need dedicated pressure-vessel, seal and recovery evidence.",
+      "basis": "brief:input.brief; model:engineering_sanity.auv; model:engineering_sanity.auv",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "endurance_hours"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:auv_endurance_target",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Survey Endurance Target",
+      "assumption": "Survey Endurance Target currently evaluates as pass against <=12 h plausible for compact inspection AUV concept, 12-24 h needs battery/drag budget, >24 h is high risk without a detailed energy model.",
+      "basis": "brief:input.brief; model:engineering_sanity.auv; model:engineering_sanity.auv",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "endurance_hours"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:auv_navigation_control_closure",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Navigation/Control Closure",
+      "assumption": "Navigation/Control Closure currently evaluates as pass against navigation sensor bus, payload data bus, acoustic link and thrust command bus present.",
+      "basis": "model:engineering_sanity.auv; model:engineering_sanity.auv",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "endurance_hours",
+        "depth_rating_m"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:auv_pressure_power_recovery_safety",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Pressure/Power/Recovery Safety",
+      "assumption": "Pressure/Power/Recovery Safety currently evaluates as pass against pressure boundary, leak alarm, alarm bus, DC power, service access and recovery beacon present.",
+      "basis": "model:engineering_sanity.auv; model:engineering_sanity.auv",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "dc_power_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:energy_storage_source:power_distribution:dc_power_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "energy_storage_source -> power_distribution",
+      "assumption": "dc_power_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Battery energy must enter protected DC distribution through an explicit bus.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "thruster_power_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:power_distribution:actuation_kinematics:thruster_power_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "power_distribution -> actuation_kinematics",
+      "assumption": "thruster_power_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Thrusters must receive protected power separately from avionics and payload rails.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "thrust_command_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:control_compute_communication:actuation_kinematics:thrust_command_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "control_compute_communication -> actuation_kinematics",
+      "assumption": "thrust_command_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Mission control must command thruster drive states over a declared control interface.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "navigation_sensor_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:sensing_instrumentation:control_compute_communication:navigation_sensor_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "assumption": "navigation_sensor_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "DVL, INS and depth data must feed navigation fusion before mission autonomy is credible.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "payload_data_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:sensing_instrumentation:control_compute_communication:payload_data_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "sensing_instrumentation -> control_compute_communication",
+      "assumption": "payload_data_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Inspection payload data must be logged or acted on by the mission computer.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "pressure_boundary"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:environmental_interface:structure_containment:pressure_boundary",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "environmental_interface -> structure_containment",
+      "assumption": "pressure_boundary is named on both endpoint modules in the generated architecture.",
+      "basis": "Hull, penetrators, thermal path and buoyancy hardware must share one depth-rated boundary model.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "alarm_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:safety_protection:control_compute_communication:alarm_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "safety_protection -> control_compute_communication",
+      "assumption": "alarm_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Leak, over-depth and recovery alarms must drive fail-safe mission states.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "pressure_boundary"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:safety_protection:structure_containment:pressure_boundary",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "safety_protection -> structure_containment",
+      "assumption": "pressure_boundary is named on both endpoint modules in the generated architecture.",
+      "basis": "Leak and over-depth protection must reference the same pressure boundary as the hull design.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "pressure_hull"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:structure_containment_pressure_hull_shell_pressure_hull",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Pressure hull",
+      "assumption": "Pressure hull is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "battery_pack"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_storage_source_subsea_battery_pack_battery_pack",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Battery pack",
+      "assumption": "Battery pack is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "wet_mate_connector_set"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:power_distribution_dc_distribution_wet_mate_connector_set",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Wet-mate connector set",
+      "assumption": "Wet-mate connector set is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "thruster_set"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:actuation_kinematics_thruster_array_thruster_set",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Thruster set",
+      "assumption": "Thruster set is a critical architecture-derived component candidate with quantity 6 each.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "mission_computer"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_mission_computer_stack_mission_computer",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Mission computer",
+      "assumption": "Mission computer is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "acoustic_modem"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_acoustic_communications_acoustic_modem",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Acoustic modem",
+      "assumption": "Acoustic modem is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "dvl"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_navigation_sensor_suite_dvl",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "DVL",
+      "assumption": "DVL is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "inertial_navigation_unit"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_navigation_sensor_suite_inertial_navigation_unit",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Inertial navigation unit",
+      "assumption": "Inertial navigation unit is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "depth_and_pressure_sensor"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_depth_environment_sensors_depth_and_pressure_sensor",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Depth and pressure sensor",
+      "assumption": "Depth and pressure sensor is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "forward_sonar_payload"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:sensing_instrumentation_payload_sensor_bay_forward_sonar_payload",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Forward sonar payload",
+      "assumption": "Forward sonar payload is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "leak_detection_sensor"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:safety_protection_leak_detection_leak_detection_sensor",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Leak detection sensor",
+      "assumption": "Leak detection sensor is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "recovery_beacon"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:safety_protection_abort_recovery_recovery_beacon",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Recovery beacon",
+      "assumption": "Recovery beacon is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.auv",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:PRESSURE-BOUNDARY-REVIEW",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "PRESSURE-BOUNDARY-REVIEW",
+      "assumption": "Depth-rated pressure boundary review is relevant to this product class in Project engineering gate.",
+      "basis": "class_pack:auv.class_pack",
+      "evidenceRequired": "Depth rating calculation, hull material allowables, endcap seal design and proof-pressure plan."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:SUBSEA-LEAK-ABORT-REVIEW",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "SUBSEA-LEAK-ABORT-REVIEW",
+      "assumption": "Leak detection and abort-state review is relevant to this product class in Project engineering gate.",
+      "basis": "class_pack:auv.class_pack",
+      "evidenceRequired": "Leak sensor placement, abort state machine, battery isolation and recovery procedure."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:EMC-MARINE-COMMS-REVIEW",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "EMC-MARINE-COMMS-REVIEW",
+      "assumption": "Marine communications and EMC review is relevant to this product class in Project engineering gate.",
+      "basis": "class_pack:auv.class_pack",
+      "evidenceRequired": "Acoustic modem integration, antenna/transducer mounting, cable shielding and data-loss behaviour."
+    }
+  ]
+}

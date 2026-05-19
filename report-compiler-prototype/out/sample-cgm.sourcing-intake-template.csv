@@ -1,0 +1,13 @@
+componentWordId,description,priority,supplierName,manufacturer,mpn,unitCostGbp,leadTimeWeeks,sourceGrade,evidence.ref,evidence.quote,retrievedAt
+adhesive_skin_patch,Adhesive skin patch,critical,,,,,,catalogue,,,
+glucose_sensing_filament,Glucose sensing filament,critical,,,,,,catalogue,,,
+enzyme_reagent_membrane,Enzyme reagent membrane,critical,,,,,,catalogue,,,
+reference_electrode,Reference electrode,critical,,,,,,catalogue,,,
+disposable_applicator,Disposable applicator,critical,,,,,,catalogue,,,
+protective_transmitter_housing,Protective transmitter housing,critical,,,,,,catalogue,,,
+thin_film_battery,Thin-film battery,critical,,,,,,catalogue,,,
+low_power_microcontroller,Low-power microcontroller,critical,,,,,,catalogue,,,
+ble_radio_module,BLE radio module,critical,,,,,,catalogue,,,
+temperature_sensor,Temperature sensor,critical,,,,,,catalogue,,,
+sterile_barrier_pouch,Sterile barrier pouch,critical,,,,,,catalogue,,,
+udi_label_set,UDI label set,critical,,,,,,catalogue,,,

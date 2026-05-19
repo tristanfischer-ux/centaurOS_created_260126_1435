@@ -1,0 +1,49 @@
+{
+  "summary": {
+    "rows": 2,
+    "withinEnvelope": 1,
+    "needsReview": 1,
+    "outsideEnvelope": 0,
+    "blocked": 0
+  },
+  "rows": [
+    {
+      "id": "farm_footprint_check_m2",
+      "status": "within_envelope",
+      "label": "Vertical farm footprint check",
+      "formula": "envelope_length_m * envelope_width_m",
+      "inputs": {
+        "envelope_length_m": 2.4,
+        "envelope_width_m": 1.4,
+        "footprint_m2": 3.36
+      },
+      "result": 3.36,
+      "unit": "m2",
+      "envelope": "Calculated footprint should match parsed footprint within 1%.",
+      "interpretation": "3.36 m2 calculated from dimensions versus 3.36 m2 parsed footprint.",
+      "evidenceRequired": "Confirm whether the envelope includes aisle, service clearance, reservoir and electrical cabinet space.",
+      "linkedRequirements": [
+        "envelope_length_m",
+        "envelope_width_m",
+        "footprint_m2"
+      ]
+    },
+    {
+      "id": "farm_service_clearance_area_m2",
+      "status": "needs_review",
+      "label": "Indicative service-clearance footprint",
+      "formula": "footprint_m2 * 1.25",
+      "inputs": {
+        "footprint_m2": 3.36
+      },
+      "result": 4.2,
+      "unit": "m2",
+      "envelope": "Planning allowance only; layout needs crop tower count and operator-access review.",
+      "interpretation": "4.2 m2 allows a provisional 25% service envelope around the parsed footprint.",
+      "evidenceRequired": "Review maintenance access, nutrient tank access, airflow paths and electrical service clearances.",
+      "linkedRequirements": [
+        "footprint_m2"
+      ]
+    }
+  ]
+}

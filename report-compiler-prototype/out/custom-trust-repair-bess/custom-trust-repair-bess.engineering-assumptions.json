@@ -1,0 +1,341 @@
+{
+  "summary": {
+    "rows": 21,
+    "briefSupported": 3,
+    "modelPresent": 3,
+    "reviewRequired": 7,
+    "sourceRequired": 8,
+    "blocked": 0,
+    "architectureBlockers": 0,
+    "bomBlockers": 8
+  },
+  "rows": [
+    {
+      "linkedRequirements": [
+        "capacity_mwh"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:capacity_mwh",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Energy capacity",
+      "assumption": "Energy capacity = 3.5 MWh is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "power_mw"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:power_mw",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Power rating",
+      "assumption": "Power rating = 1 MW is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [
+        "mass_kg"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "brief:mass_kg",
+      "category": "brief_requirement",
+      "status": "brief_supported",
+      "scope": "Mass constraint",
+      "assumption": "Mass constraint = 28000 kg is treated as a design input, not as independently verified truth.",
+      "basis": "input.brief",
+      "evidenceRequired": "Confirm the requirement value, tolerance, duty cycle, environment and acceptance test with the project owner."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "metric:headline_output",
+      "category": "derived_metric",
+      "status": "review_required",
+      "scope": "Annual MWh delivered",
+      "assumption": "Annual MWh delivered uses capacity_mwh * cycles_per_year * efficiency with medium confidence.",
+      "basis": "class_pack:energy_storage.class_pack; formula:capacity_mwh * cycles_per_year * efficiency",
+      "evidenceRequired": "Review the formula, input values and operating envelope before treating this metric as a performance claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:capex_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated CAPEX",
+      "assumption": "Estimated CAPEX uses an implicit model with low confidence.",
+      "basis": "formula:capex=sum(bom.totalCostGbp); class_pack:energy_storage.class_pack",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "metric:opex_annual_gbp",
+      "category": "derived_metric",
+      "status": "source_required",
+      "scope": "Estimated annual OPEX",
+      "assumption": "Estimated annual OPEX uses an implicit model with low confidence.",
+      "basis": "formula:opex=capex*0.04",
+      "evidenceRequired": "Admit source-backed BoM pricing before treating this cost metric as a claim."
+    },
+    {
+      "linkedRequirements": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:bess_c_rate",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "BESS C-Rate",
+      "assumption": "BESS C-Rate currently evaluates as pass against 0.1C to 1.0C for typical grid-storage duration systems.",
+      "basis": "brief:input.brief; formula:power_mw / capacity_mwh; model:engineering_sanity.energy_storage; model:engineering_sanity.energy_storage",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "capacity_mwh",
+        "power_mw"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:bess_duration",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Rated Duration",
+      "assumption": "Rated Duration currently evaluates as pass against 1 to 6 hours for common containerised BESS applications.",
+      "basis": "brief:input.brief; formula:capacity_mwh / power_mw; model:engineering_sanity.energy_storage; model:engineering_sanity.energy_storage",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [
+        "capacity_mwh",
+        "mass_kg"
+      ],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "sanity:bess_container_energy_density",
+      "category": "sanity_envelope",
+      "status": "review_required",
+      "scope": "Container-Level Energy Density",
+      "assumption": "Container-Level Energy Density currently evaluates as pass against 50 to 200 Wh/kg at container/system level before detailed structural mass review.",
+      "basis": "brief:input.brief; formula:(capacity_mwh * 1000000) / mass_kg; model:engineering_sanity.energy_storage; model:engineering_sanity.energy_storage",
+      "evidenceRequired": "Supply an engineering calculation, reviewer note, test plan or datasheet-backed rationale for this envelope."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "dc_bus"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:energy_storage_source:energy_conversion_transduction:dc_bus",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "energy_storage_source -> energy_conversion_transduction",
+      "assumption": "dc_bus is named on both endpoint modules in the generated architecture.",
+      "basis": "Battery racks must feed the PCS over a declared DC bus.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "thermal_loop"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:energy_storage_source:environmental_interface:thermal_loop",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "energy_storage_source -> environmental_interface",
+      "assumption": "thermal_loop is named on both endpoint modules in the generated architecture.",
+      "basis": "Cell heat must be coupled to the thermal management loop.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [
+        "bms_network"
+      ],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "interface:energy_storage_source:control_compute_communication:bms_network",
+      "category": "interface_closure",
+      "status": "model_present",
+      "scope": "energy_storage_source -> control_compute_communication",
+      "assumption": "bms_network is named on both endpoint modules in the generated architecture.",
+      "basis": "Cell/rack state must be visible to BMS and EMS supervision.",
+      "evidenceRequired": "Review the interface carrier, direction, capacity, safety margin and failure mode before detailed design or sourcing."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "lfp_prismatic_cells"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_storage_source_cell_string_lfp_prismatic_cells",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "LFP prismatic cells",
+      "assumption": "LFP prismatic cells is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.energy_storage",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "dc_contactor_or_breaker"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_storage_source_dc_string_output_dc_contactor_or_breaker",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "DC contactor or breaker",
+      "assumption": "DC contactor or breaker is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.energy_storage",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "pcs_inverter"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:energy_conversion_transduction_pcs_inverter_pcs_inverter",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "PCS inverter",
+      "assumption": "PCS inverter is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.energy_storage",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "bms_master_controller"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:control_compute_communication_bms_master_bms_master_controller",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "BMS master controller",
+      "assumption": "BMS master controller is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.energy_storage",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "fire_detection_suppression"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:safety_protection_fire_suppression_fire_detection_suppression",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Fire detection/suppression",
+      "assumption": "Fire detection/suppression is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.energy_storage",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [
+        "thermal_management_loop"
+      ],
+      "blocksArchitecture": false,
+      "blocksBom": true,
+      "id": "component:mass_fluid_transport_process_pump_station_thermal_management_loop",
+      "category": "critical_component",
+      "status": "source_required",
+      "scope": "Thermal management loop",
+      "assumption": "Thermal management loop is a critical architecture-derived component candidate with quantity 1 candidate.",
+      "basis": "model:scratch_universal_architecture.energy_storage",
+      "evidenceRequired": "Admit supplier, manufacturer, MPN where applicable, unit cost, lead time and evidence reference through sourcing intake."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:IEC-62619",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "IEC-62619",
+      "assumption": "Industrial lithium battery safety is relevant to this product class in Global / UK-adopted.",
+      "basis": "class_pack:energy_storage.class_pack",
+      "evidenceRequired": "Cell certificates and pack-level safety validation."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:UL-9540A",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "UL-9540A",
+      "assumption": "Thermal runaway fire propagation test is relevant to this product class in US / investor diligence.",
+      "basis": "class_pack:energy_storage.class_pack",
+      "evidenceRequired": "Cell, module and unit-level propagation evidence."
+    },
+    {
+      "linkedRequirements": [],
+      "linkedInterfaces": [],
+      "linkedComponents": [],
+      "blocksArchitecture": false,
+      "blocksBom": false,
+      "id": "compliance:G99",
+      "category": "compliance_evidence",
+      "status": "review_required",
+      "scope": "G99",
+      "assumption": "UK grid connection requirements is relevant to this product class in UK.",
+      "basis": "class_pack:energy_storage.class_pack",
+      "evidenceRequired": "Protection settings, relay test certificates and commissioning records."
+    }
+  ]
+}

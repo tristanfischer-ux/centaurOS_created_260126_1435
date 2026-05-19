@@ -1,0 +1,3399 @@
+{
+  "summary": {
+    "closureRows": 124,
+    "batches": 2,
+    "activeBatches": 1,
+    "waitingBatches": 0,
+    "deferredBatches": 1,
+    "activeRows": 9,
+    "waitingRows": 0,
+    "deferredRows": 115,
+    "procurementBlockingRows": 9,
+    "criticalSourceRows": 9,
+    "repairRows": 0,
+    "protocolReplacementRows": 0,
+    "identityRows": 0,
+    "candidateDeferredRows": 115,
+    "nextBatchId": "sourcing-batch:2:critical_source_collection",
+    "nextItemId": "critical_source_collection:1:heat_pump_controller_pcb",
+    "canUseForProcurement": false
+  },
+  "batches": [
+    {
+      "id": "sourcing-batch:2:critical_source_collection",
+      "sequence": 2,
+      "kind": "critical_source_collection",
+      "title": "Collect Critical Source Evidence",
+      "status": "active",
+      "rowCount": 9,
+      "readyRows": 9,
+      "blockedRows": 0,
+      "deferredRows": 0,
+      "procurementBlockingRows": 9,
+      "entryCriteria": [
+        "Architecture has identified critical BoM lines that are not source-backed."
+      ],
+      "exitCriteria": [
+        "Every critical line has admitted supplier/manufacturer/MPN/unit-cost evidence."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-intake-template.csv",
+        "*.sourcing-pack.csv",
+        "*.sourcing-ledger.csv",
+        "*.bom-provenance-manifest.csv",
+        "*.source-reference-quality-gate.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "critical_source_collection:1:heat_pump_controller_pcb",
+          "closureRowId": "bom-close:control_compute_communication_main_controller_heat_pump_controller_pcb",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "heat_pump_controller_pcb",
+          "description": "Heat pump controller PCB",
+          "searchTerms": [
+            "Heat pump controller PCB",
+            "Heat pump controller PCB manufacturer part number",
+            "Heat pump controller PCB catalogue price GBP",
+            "Heat pump controller PCB datasheet"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:2:inverter_scroll_compressor",
+          "closureRowId": "bom-close:energy_conversion_transduction_compressor_inverter_stage_inverter_scroll_compressor",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "inverter_scroll_compressor",
+          "description": "Inverter scroll compressor",
+          "searchTerms": [
+            "Inverter scroll compressor",
+            "Inverter scroll compressor manufacturer part number",
+            "Inverter scroll compressor catalogue price GBP",
+            "Inverter scroll compressor datasheet"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:3:electronic_expansion_valve",
+          "closureRowId": "bom-close:energy_conversion_transduction_expansion_metering_stage_electronic_expansion_valve",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "electronic_expansion_valve",
+          "description": "Electronic expansion valve",
+          "searchTerms": [
+            "Electronic expansion valve",
+            "Electronic expansion valve manufacturer part number",
+            "Electronic expansion valve catalogue price GBP",
+            "Electronic expansion valve datasheet"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:4:variable_speed_fan_assembly",
+          "closureRowId": "bom-close:environmental_interface_fan_air_path_variable_speed_fan_assembly",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "variable_speed_fan_assembly",
+          "description": "Variable-speed fan assembly",
+          "searchTerms": [
+            "Variable-speed fan assembly",
+            "Variable-speed fan assembly manufacturer part number",
+            "Variable-speed fan assembly catalogue price GBP",
+            "Variable-speed fan assembly datasheet"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:5:outdoor_finned_evaporator_coil",
+          "closureRowId": "bom-close:environmental_interface_outdoor_evaporator_outdoor_finned_evaporator_coil",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "outdoor_finned_evaporator_coil",
+          "description": "Outdoor finned evaporator coil",
+          "searchTerms": [
+            "Outdoor finned evaporator coil",
+            "Outdoor finned evaporator coil manufacturer part number",
+            "Outdoor finned evaporator coil catalogue price GBP",
+            "Outdoor finned evaporator coil datasheet"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:6:hydronic_circulation_pump",
+          "closureRowId": "bom-close:mass_fluid_transport_process_circulation_pump_group_hydronic_circulation_pump",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "hydronic_circulation_pump",
+          "description": "Hydronic circulation pump",
+          "searchTerms": [
+            "Hydronic circulation pump",
+            "Hydronic circulation pump manufacturer part number",
+            "Hydronic circulation pump catalogue price GBP",
+            "Hydronic circulation pump datasheet"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:7:brazed_plate_heat_exchanger",
+          "closureRowId": "bom-close:mass_fluid_transport_process_condenser_heat_exchanger_brazed_plate_heat_exchanger",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "brazed_plate_heat_exchanger",
+          "description": "Brazed plate heat exchanger",
+          "searchTerms": [
+            "Brazed plate heat exchanger",
+            "Brazed plate heat exchanger manufacturer part number",
+            "Brazed plate heat exchanger catalogue price GBP",
+            "Brazed plate heat exchanger datasheet"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:8:hydronic_safety_valve_kit",
+          "closureRowId": "bom-close:mass_fluid_transport_process_hydronic_safety_group_hydronic_safety_valve_kit",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "hydronic_safety_valve_kit",
+          "description": "Hydronic safety valve kit",
+          "searchTerms": [
+            "Hydronic safety valve kit",
+            "Hydronic safety valve kit manufacturer part number",
+            "Hydronic safety valve kit catalogue price GBP",
+            "Hydronic safety valve kit datasheet"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        },
+        {
+          "id": "critical_source_collection:9:refrigerant_sensor_and_pressure_transducers",
+          "closureRowId": "bom-close:sensing_instrumentation_refrigerant_sensing_refrigerant_sensor_and_pressure_transducers",
+          "action": "collect_source_evidence",
+          "priority": "blocker",
+          "status": "ready",
+          "componentWordId": "refrigerant_sensor_and_pressure_transducers",
+          "description": "Refrigerant sensor and pressure transducers",
+          "searchTerms": [
+            "Refrigerant sensor and pressure transducers",
+            "Refrigerant sensor and pressure transducers manufacturer part number",
+            "Refrigerant sensor and pressure transducers catalogue price GBP",
+            "Refrigerant sensor and pressure transducers datasheet"
+          ],
+          "requiredEvidence": [
+            "supplierName",
+            "manufacturer",
+            "mpn",
+            "unitCostGbp",
+            "evidence.ref",
+            "evidence.quote",
+            "retrievedAt"
+          ],
+          "acceptanceCriteria": [
+            "Sourcing admission accepts the row.",
+            "BoM provenance manifest shows supplier, manufacturer, MPN and unit cost as source_backed.",
+            "BoM evidence trace leaves critical_unsourced/rejected_evidence for this line."
+          ],
+          "rejectionCriteria": [
+            "LLM-estimated supplier/manufacturer/MPN/cost.",
+            "benchmark average without source evidence.",
+            "test-fixture:// source used as production evidence.",
+            "placeholder URL or stale retrieval timestamp."
+          ],
+          "targetOutcome": "source evidence admitted",
+          "blocksProcurement": true
+        }
+      ]
+    },
+    {
+      "id": "sourcing-batch:6:candidate_sourcing_deferred",
+      "sequence": 6,
+      "kind": "candidate_sourcing_deferred",
+      "title": "Defer Candidate-Only Sourcing",
+      "status": "deferred",
+      "rowCount": 115,
+      "readyRows": 0,
+      "blockedRows": 0,
+      "deferredRows": 115,
+      "procurementBlockingRows": 0,
+      "entryCriteria": [
+        "Candidate lines remain outside immediate procurement scope."
+      ],
+      "exitCriteria": [
+        "Candidate lines are either still explicitly deferred or promoted to critical sourcing scope."
+      ],
+      "sourceArtifacts": [
+        "*.sourcing-pack.csv",
+        "*.bom-evidence-trace.csv",
+        "*.bom-evidence-closure-plan.csv"
+      ],
+      "items": [
+        {
+          "id": "candidate_sourcing_deferred:1:controller_enclosure",
+          "closureRowId": "bom-close:control_compute_communication_main_controller_controller_enclosure",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "controller_enclosure",
+          "description": "controller enclosure",
+          "searchTerms": [
+            "controller enclosure",
+            "controller enclosure manufacturer part number",
+            "controller enclosure catalogue price GBP",
+            "controller enclosure datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:2:non_volatile_fault_memory",
+          "closureRowId": "bom-close:control_compute_communication_main_controller_non_volatile_fault_memory",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "non_volatile_fault_memory",
+          "description": "non-volatile fault memory",
+          "searchTerms": [
+            "non-volatile fault memory",
+            "non-volatile fault memory manufacturer part number",
+            "non-volatile fault memory catalogue price GBP",
+            "non-volatile fault memory datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:3:real_time_clock_module",
+          "closureRowId": "bom-close:control_compute_communication_main_controller_real_time_clock_module",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "real_time_clock_module",
+          "description": "real-time clock module",
+          "searchTerms": [
+            "real-time clock module",
+            "real-time clock module manufacturer part number",
+            "real-time clock module catalogue price GBP",
+            "real-time clock module datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:4:compressor_contactor",
+          "closureRowId": "bom-close:control_compute_communication_power_driver_io_compressor_contactor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "compressor_contactor",
+          "description": "compressor contactor",
+          "searchTerms": [
+            "compressor contactor",
+            "compressor contactor manufacturer part number",
+            "compressor contactor catalogue price GBP",
+            "compressor contactor datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:5:fan_pwm_output_board",
+          "closureRowId": "bom-close:control_compute_communication_power_driver_io_fan_pwm_output_board",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fan_pwm_output_board",
+          "description": "fan PWM output board",
+          "searchTerms": [
+            "fan PWM output board",
+            "fan PWM output board manufacturer part number",
+            "fan PWM output board catalogue price GBP",
+            "fan PWM output board datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:6:pump_relay_output",
+          "closureRowId": "bom-close:control_compute_communication_power_driver_io_pump_relay_output",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pump_relay_output",
+          "description": "pump relay output",
+          "searchTerms": [
+            "pump relay output",
+            "pump relay output manufacturer part number",
+            "pump relay output catalogue price GBP",
+            "pump relay output datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:7:safety_chain_input_terminal",
+          "closureRowId": "bom-close:control_compute_communication_power_driver_io_safety_chain_input_terminal",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "safety_chain_input_terminal",
+          "description": "safety chain input terminal",
+          "searchTerms": [
+            "safety chain input terminal",
+            "safety chain input terminal manufacturer part number",
+            "safety chain input terminal catalogue price GBP",
+            "safety chain input terminal datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:8:fault_led_stack",
+          "closureRowId": "bom-close:control_compute_communication_service_communications_fault_led_stack",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fault_led_stack",
+          "description": "fault LED stack",
+          "searchTerms": [
+            "fault LED stack",
+            "fault LED stack manufacturer part number",
+            "fault LED stack catalogue price GBP",
+            "fault LED stack datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:9:installer_qr_code_label",
+          "closureRowId": "bom-close:control_compute_communication_service_communications_installer_qr_code_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "installer_qr_code_label",
+          "description": "installer QR code label",
+          "searchTerms": [
+            "installer QR code label",
+            "installer QR code label manufacturer part number",
+            "installer QR code label catalogue price GBP",
+            "installer QR code label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:10:modbus_service_port",
+          "closureRowId": "bom-close:control_compute_communication_service_communications_modbus_service_port",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "modbus_service_port",
+          "description": "Modbus service port",
+          "searchTerms": [
+            "Modbus service port",
+            "Modbus service port manufacturer part number",
+            "Modbus service port catalogue price GBP",
+            "Modbus service port datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:11:usb_commissioning_adapter",
+          "closureRowId": "bom-close:control_compute_communication_service_communications_usb_commissioning_adapter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "usb_commissioning_adapter",
+          "description": "USB commissioning adapter",
+          "searchTerms": [
+            "USB commissioning adapter",
+            "USB commissioning adapter manufacturer part number",
+            "USB commissioning adapter catalogue price GBP",
+            "USB commissioning adapter datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:12:compressor_inverter_drive",
+          "closureRowId": "bom-close:energy_conversion_transduction_compressor_inverter_stage_compressor_inverter_drive",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "compressor_inverter_drive",
+          "description": "compressor inverter drive",
+          "searchTerms": [
+            "compressor inverter drive",
+            "compressor inverter drive manufacturer part number",
+            "compressor inverter drive catalogue price GBP",
+            "compressor inverter drive datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:13:compressor_mounting_grommet_set",
+          "closureRowId": "bom-close:energy_conversion_transduction_compressor_inverter_stage_compressor_mounting_grommet_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "compressor_mounting_grommet_set",
+          "description": "compressor mounting grommet set",
+          "searchTerms": [
+            "compressor mounting grommet set",
+            "compressor mounting grommet set manufacturer part number",
+            "compressor mounting grommet set catalogue price GBP",
+            "compressor mounting grommet set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:14:crankcase_heater_band",
+          "closureRowId": "bom-close:energy_conversion_transduction_compressor_inverter_stage_crankcase_heater_band",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "crankcase_heater_band",
+          "description": "crankcase heater band",
+          "searchTerms": [
+            "crankcase heater band",
+            "crankcase heater band manufacturer part number",
+            "crankcase heater band catalogue price GBP",
+            "crankcase heater band datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:15:condenser_insulation_sleeve",
+          "closureRowId": "bom-close:energy_conversion_transduction_condenser_coupling_boundary_condenser_insulation_sleeve",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "condenser_insulation_sleeve",
+          "description": "condenser insulation sleeve",
+          "searchTerms": [
+            "condenser insulation sleeve",
+            "condenser insulation sleeve manufacturer part number",
+            "condenser insulation sleeve catalogue price GBP",
+            "condenser insulation sleeve datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:16:hydronic_stub_out_pair",
+          "closureRowId": "bom-close:energy_conversion_transduction_condenser_coupling_boundary_hydronic_stub_out_pair",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hydronic_stub_out_pair",
+          "description": "hydronic stub-out pair",
+          "searchTerms": [
+            "hydronic stub-out pair",
+            "hydronic stub-out pair manufacturer part number",
+            "hydronic stub-out pair catalogue price GBP",
+            "hydronic stub-out pair datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:17:plate_heat_exchanger_mounting_bracket",
+          "closureRowId": "bom-close:energy_conversion_transduction_condenser_coupling_boundary_plate_heat_exchanger_mounting_bracket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "plate_heat_exchanger_mounting_bracket",
+          "description": "plate heat exchanger mounting bracket",
+          "searchTerms": [
+            "plate heat exchanger mounting bracket",
+            "plate heat exchanger mounting bracket manufacturer part number",
+            "plate heat exchanger mounting bracket catalogue price GBP",
+            "plate heat exchanger mounting bracket datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:18:refrigerant_stub_out_pair",
+          "closureRowId": "bom-close:energy_conversion_transduction_condenser_coupling_boundary_refrigerant_stub_out_pair",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "refrigerant_stub_out_pair",
+          "description": "refrigerant stub-out pair",
+          "searchTerms": [
+            "refrigerant stub-out pair",
+            "refrigerant stub-out pair manufacturer part number",
+            "refrigerant stub-out pair catalogue price GBP",
+            "refrigerant stub-out pair datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:19:eev_stepper_harness",
+          "closureRowId": "bom-close:energy_conversion_transduction_expansion_metering_stage_eev_stepper_harness",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "eev_stepper_harness",
+          "description": "EEV stepper harness",
+          "searchTerms": [
+            "EEV stepper harness",
+            "EEV stepper harness manufacturer part number",
+            "EEV stepper harness catalogue price GBP",
+            "EEV stepper harness datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:20:liquid_line_filter_drier",
+          "closureRowId": "bom-close:energy_conversion_transduction_expansion_metering_stage_liquid_line_filter_drier",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "liquid_line_filter_drier",
+          "description": "liquid-line filter drier",
+          "searchTerms": [
+            "liquid-line filter drier",
+            "liquid-line filter drier manufacturer part number",
+            "liquid-line filter drier catalogue price GBP",
+            "liquid-line filter drier datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:21:sight_glass_indicator",
+          "closureRowId": "bom-close:energy_conversion_transduction_expansion_metering_stage_sight_glass_indicator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "sight_glass_indicator",
+          "description": "sight glass indicator",
+          "searchTerms": [
+            "sight glass indicator",
+            "sight glass indicator manufacturer part number",
+            "sight glass indicator catalogue price GBP",
+            "sight glass indicator datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:22:brazed_joint_sleeve_set",
+          "closureRowId": "bom-close:energy_conversion_transduction_refrigerant_manifold_brazed_joint_sleeve_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "brazed_joint_sleeve_set",
+          "description": "brazed joint sleeve set",
+          "searchTerms": [
+            "brazed joint sleeve set",
+            "brazed joint sleeve set manufacturer part number",
+            "brazed joint sleeve set catalogue price GBP",
+            "brazed joint sleeve set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:23:copper_refrigerant_tube_set",
+          "closureRowId": "bom-close:energy_conversion_transduction_refrigerant_manifold_copper_refrigerant_tube_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "copper_refrigerant_tube_set",
+          "description": "copper refrigerant tube set",
+          "searchTerms": [
+            "copper refrigerant tube set",
+            "copper refrigerant tube set manufacturer part number",
+            "copper refrigerant tube set catalogue price GBP",
+            "copper refrigerant tube set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:24:refrigerant_charge_label",
+          "closureRowId": "bom-close:energy_conversion_transduction_refrigerant_manifold_refrigerant_charge_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "refrigerant_charge_label",
+          "description": "refrigerant charge label",
+          "searchTerms": [
+            "refrigerant charge label",
+            "refrigerant charge label manufacturer part number",
+            "refrigerant charge label catalogue price GBP",
+            "refrigerant charge label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:25:service_valve_pair",
+          "closureRowId": "bom-close:energy_conversion_transduction_refrigerant_manifold_service_valve_pair",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "service_valve_pair",
+          "description": "service valve pair",
+          "searchTerms": [
+            "service valve pair",
+            "service valve pair manufacturer part number",
+            "service valve pair catalogue price GBP",
+            "service valve pair datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:26:condensate_drain_tray",
+          "closureRowId": "bom-close:environmental_interface_defrost_condensate_condensate_drain_tray",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "condensate_drain_tray",
+          "description": "condensate drain tray",
+          "searchTerms": [
+            "condensate drain tray",
+            "condensate drain tray manufacturer part number",
+            "condensate drain tray catalogue price GBP",
+            "condensate drain tray datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:27:defrost_temperature_probe",
+          "closureRowId": "bom-close:environmental_interface_defrost_condensate_defrost_temperature_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "defrost_temperature_probe",
+          "description": "defrost temperature probe",
+          "searchTerms": [
+            "defrost temperature probe",
+            "defrost temperature probe manufacturer part number",
+            "defrost temperature probe catalogue price GBP",
+            "defrost temperature probe datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:28:drain_hose_barb",
+          "closureRowId": "bom-close:environmental_interface_defrost_condensate_drain_hose_barb",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "drain_hose_barb",
+          "description": "drain hose barb",
+          "searchTerms": [
+            "drain hose barb",
+            "drain hose barb manufacturer part number",
+            "drain hose barb catalogue price GBP",
+            "drain hose barb datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:29:trace_heater_cable",
+          "closureRowId": "bom-close:environmental_interface_defrost_condensate_trace_heater_cable",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "trace_heater_cable",
+          "description": "trace heater cable",
+          "searchTerms": [
+            "trace heater cable",
+            "trace heater cable manufacturer part number",
+            "trace heater cable catalogue price GBP",
+            "trace heater cable datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:30:ec_fan_motor_controller",
+          "closureRowId": "bom-close:environmental_interface_fan_air_path_ec_fan_motor_controller",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ec_fan_motor_controller",
+          "description": "EC fan motor controller",
+          "searchTerms": [
+            "EC fan motor controller",
+            "EC fan motor controller manufacturer part number",
+            "EC fan motor controller catalogue price GBP",
+            "EC fan motor controller datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:31:fan_shroud",
+          "closureRowId": "bom-close:environmental_interface_fan_air_path_fan_shroud",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fan_shroud",
+          "description": "fan shroud",
+          "searchTerms": [
+            "fan shroud",
+            "fan shroud manufacturer part number",
+            "fan shroud catalogue price GBP",
+            "fan shroud datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:32:inlet_debris_screen",
+          "closureRowId": "bom-close:environmental_interface_fan_air_path_inlet_debris_screen",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "inlet_debris_screen",
+          "description": "inlet debris screen",
+          "searchTerms": [
+            "inlet debris screen",
+            "inlet debris screen manufacturer part number",
+            "inlet debris screen catalogue price GBP",
+            "inlet debris screen datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:33:coil_guard_grille",
+          "closureRowId": "bom-close:environmental_interface_outdoor_evaporator_coil_guard_grille",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "coil_guard_grille",
+          "description": "coil guard grille",
+          "searchTerms": [
+            "coil guard grille",
+            "coil guard grille manufacturer part number",
+            "coil guard grille catalogue price GBP",
+            "coil guard grille datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:34:coil_temperature_sensor",
+          "closureRowId": "bom-close:environmental_interface_outdoor_evaporator_coil_temperature_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "coil_temperature_sensor",
+          "description": "coil temperature sensor",
+          "searchTerms": [
+            "coil temperature sensor",
+            "coil temperature sensor manufacturer part number",
+            "coil temperature sensor catalogue price GBP",
+            "coil temperature sensor datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:35:hydrophilic_fin_coating",
+          "closureRowId": "bom-close:environmental_interface_outdoor_evaporator_hydrophilic_fin_coating",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hydrophilic_fin_coating",
+          "description": "hydrophilic fin coating",
+          "searchTerms": [
+            "hydrophilic fin coating",
+            "hydrophilic fin coating manufacturer part number",
+            "hydrophilic fin coating catalogue price GBP",
+            "hydrophilic fin coating datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:36:alarm_relay_output",
+          "closureRowId": "bom-close:hmi_ergonomics_alarm_and_user_guidance_alarm_relay_output",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "alarm_relay_output",
+          "description": "alarm relay output",
+          "searchTerms": [
+            "alarm relay output",
+            "alarm relay output manufacturer part number",
+            "alarm relay output catalogue price GBP",
+            "alarm relay output datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:37:fault_reset_button",
+          "closureRowId": "bom-close:hmi_ergonomics_alarm_and_user_guidance_fault_reset_button",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fault_reset_button",
+          "description": "fault reset button",
+          "searchTerms": [
+            "fault reset button",
+            "fault reset button manufacturer part number",
+            "fault reset button catalogue price GBP",
+            "fault reset button datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:38:qr_service_documentation_label",
+          "closureRowId": "bom-close:hmi_ergonomics_alarm_and_user_guidance_qr_service_documentation_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "qr_service_documentation_label",
+          "description": "QR service documentation label",
+          "searchTerms": [
+            "QR service documentation label",
+            "QR service documentation label manufacturer part number",
+            "QR service documentation label catalogue price GBP",
+            "QR service documentation label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:39:user_quick_start_label",
+          "closureRowId": "bom-close:hmi_ergonomics_alarm_and_user_guidance_user_quick_start_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "user_quick_start_label",
+          "description": "user quick-start label",
+          "searchTerms": [
+            "user quick-start label",
+            "user quick-start label manufacturer part number",
+            "user quick-start label catalogue price GBP",
+            "user quick-start label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:40:lcd_status_display",
+          "closureRowId": "bom-close:hmi_ergonomics_local_display_lcd_status_display",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lcd_status_display",
+          "description": "LCD status display",
+          "searchTerms": [
+            "LCD status display",
+            "LCD status display manufacturer part number",
+            "LCD status display catalogue price GBP",
+            "LCD status display datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:41:menu_button_membrane",
+          "closureRowId": "bom-close:hmi_ergonomics_local_display_menu_button_membrane",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "menu_button_membrane",
+          "description": "menu button membrane",
+          "searchTerms": [
+            "menu button membrane",
+            "menu button membrane manufacturer part number",
+            "menu button membrane catalogue price GBP",
+            "menu button membrane datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:42:mode_indicator_led_set",
+          "closureRowId": "bom-close:hmi_ergonomics_local_display_mode_indicator_led_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "mode_indicator_led_set",
+          "description": "mode indicator LED set",
+          "searchTerms": [
+            "mode indicator LED set",
+            "mode indicator LED set manufacturer part number",
+            "mode indicator LED set catalogue price GBP",
+            "mode indicator LED set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:43:weatherproof_display_window",
+          "closureRowId": "bom-close:hmi_ergonomics_local_display_weatherproof_display_window",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "weatherproof_display_window",
+          "description": "weatherproof display window",
+          "searchTerms": [
+            "weatherproof display window",
+            "weatherproof display window manufacturer part number",
+            "weatherproof display window catalogue price GBP",
+            "weatherproof display window datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:44:demand_signal_opto_isolator",
+          "closureRowId": "bom-close:hmi_ergonomics_remote_thermostat_interface_demand_signal_opto_isolator",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "demand_signal_opto_isolator",
+          "description": "demand signal opto-isolator",
+          "searchTerms": [
+            "demand signal opto-isolator",
+            "demand signal opto-isolator manufacturer part number",
+            "demand signal opto-isolator catalogue price GBP",
+            "demand signal opto-isolator datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:45:installer_wiring_label",
+          "closureRowId": "bom-close:hmi_ergonomics_remote_thermostat_interface_installer_wiring_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "installer_wiring_label",
+          "description": "installer wiring label",
+          "searchTerms": [
+            "installer wiring label",
+            "installer wiring label manufacturer part number",
+            "installer wiring label catalogue price GBP",
+            "installer wiring label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:46:modbus_room_controller_link",
+          "closureRowId": "bom-close:hmi_ergonomics_remote_thermostat_interface_modbus_room_controller_link",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "modbus_room_controller_link",
+          "description": "Modbus room controller link",
+          "searchTerms": [
+            "Modbus room controller link",
+            "Modbus room controller link manufacturer part number",
+            "Modbus room controller link catalogue price GBP",
+            "Modbus room controller link datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:47:thermostat_input_terminal",
+          "closureRowId": "bom-close:hmi_ergonomics_remote_thermostat_interface_thermostat_input_terminal",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "thermostat_input_terminal",
+          "description": "thermostat input terminal",
+          "searchTerms": [
+            "thermostat input terminal",
+            "thermostat input terminal manufacturer part number",
+            "thermostat input terminal catalogue price GBP",
+            "thermostat input terminal datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:48:commissioning_checklist_card",
+          "closureRowId": "bom-close:maintenance_serviceability_commissioning_ports_commissioning_checklist_card",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "commissioning_checklist_card",
+          "description": "commissioning checklist card",
+          "searchTerms": [
+            "commissioning checklist card",
+            "commissioning checklist card manufacturer part number",
+            "commissioning checklist card catalogue price GBP",
+            "commissioning checklist card datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:49:hydronic_drain_cock",
+          "closureRowId": "bom-close:maintenance_serviceability_commissioning_ports_hydronic_drain_cock",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hydronic_drain_cock",
+          "description": "hydronic drain cock",
+          "searchTerms": [
+            "hydronic drain cock",
+            "hydronic drain cock manufacturer part number",
+            "hydronic drain cock catalogue price GBP",
+            "hydronic drain cock datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:50:pressure_gauge_pocket",
+          "closureRowId": "bom-close:maintenance_serviceability_commissioning_ports_pressure_gauge_pocket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pressure_gauge_pocket",
+          "description": "pressure gauge pocket",
+          "searchTerms": [
+            "pressure gauge pocket",
+            "pressure gauge pocket manufacturer part number",
+            "pressure gauge pocket catalogue price GBP",
+            "pressure gauge pocket datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:51:refrigerant_service_port_cap_set",
+          "closureRowId": "bom-close:maintenance_serviceability_commissioning_ports_refrigerant_service_port_cap_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "refrigerant_service_port_cap_set",
+          "description": "refrigerant service port cap set",
+          "searchTerms": [
+            "refrigerant service port cap set",
+            "refrigerant service port cap set manufacturer part number",
+            "refrigerant service port cap set catalogue price GBP",
+            "refrigerant service port cap set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:52:data_log_export_button",
+          "closureRowId": "bom-close:maintenance_serviceability_diagnostic_access_data_log_export_button",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "data_log_export_button",
+          "description": "data log export button",
+          "searchTerms": [
+            "data log export button",
+            "data log export button manufacturer part number",
+            "data log export button catalogue price GBP",
+            "data log export button datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:53:diagnostic_test_header",
+          "closureRowId": "bom-close:maintenance_serviceability_diagnostic_access_diagnostic_test_header",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "diagnostic_test_header",
+          "description": "diagnostic test header",
+          "searchTerms": [
+            "diagnostic test header",
+            "diagnostic test header manufacturer part number",
+            "diagnostic test header catalogue price GBP",
+            "diagnostic test header datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:54:fault_code_label",
+          "closureRowId": "bom-close:maintenance_serviceability_diagnostic_access_fault_code_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fault_code_label",
+          "description": "fault code label",
+          "searchTerms": [
+            "fault code label",
+            "fault code label manufacturer part number",
+            "fault code label catalogue price GBP",
+            "fault code label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:55:installer_handover_record",
+          "closureRowId": "bom-close:maintenance_serviceability_diagnostic_access_installer_handover_record",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "installer_handover_record",
+          "description": "installer handover record",
+          "searchTerms": [
+            "installer handover record",
+            "installer handover record manufacturer part number",
+            "installer handover record catalogue price GBP",
+            "installer handover record datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:56:cleanable_y_strainer_basket",
+          "closureRowId": "bom-close:maintenance_serviceability_filter_service_cleanable_y_strainer_basket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "cleanable_y_strainer_basket",
+          "description": "cleanable Y-strainer basket",
+          "searchTerms": [
+            "cleanable Y-strainer basket",
+            "cleanable Y-strainer basket manufacturer part number",
+            "cleanable Y-strainer basket catalogue price GBP",
+            "cleanable Y-strainer basket datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:57:coil_cleaning_access_cover",
+          "closureRowId": "bom-close:maintenance_serviceability_filter_service_coil_cleaning_access_cover",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "coil_cleaning_access_cover",
+          "description": "coil cleaning access cover",
+          "searchTerms": [
+            "coil cleaning access cover",
+            "coil cleaning access cover manufacturer part number",
+            "coil cleaning access cover catalogue price GBP",
+            "coil cleaning access cover datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:58:service_interval_label",
+          "closureRowId": "bom-close:maintenance_serviceability_filter_service_service_interval_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "service_interval_label",
+          "description": "service interval label",
+          "searchTerms": [
+            "service interval label",
+            "service interval label manufacturer part number",
+            "service interval label catalogue price GBP",
+            "service interval label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:59:spare_gasket_kit",
+          "closureRowId": "bom-close:maintenance_serviceability_filter_service_spare_gasket_kit",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "spare_gasket_kit",
+          "description": "spare gasket kit",
+          "searchTerms": [
+            "spare gasket kit",
+            "spare gasket kit manufacturer part number",
+            "spare gasket kit catalogue price GBP",
+            "spare gasket kit datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:60:flow_proving_switch",
+          "closureRowId": "bom-close:mass_fluid_transport_process_circulation_pump_group_flow_proving_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "flow_proving_switch",
+          "description": "flow proving switch",
+          "searchTerms": [
+            "flow proving switch",
+            "flow proving switch manufacturer part number",
+            "flow proving switch catalogue price GBP",
+            "flow proving switch datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:61:pump_isolation_valve_pair",
+          "closureRowId": "bom-close:mass_fluid_transport_process_circulation_pump_group_pump_isolation_valve_pair",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "pump_isolation_valve_pair",
+          "description": "pump isolation valve pair",
+          "searchTerms": [
+            "pump isolation valve pair",
+            "pump isolation valve pair manufacturer part number",
+            "pump isolation valve pair catalogue price GBP",
+            "pump isolation valve pair datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:62:strainer_filter",
+          "closureRowId": "bom-close:mass_fluid_transport_process_circulation_pump_group_strainer_filter",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "strainer_filter",
+          "description": "strainer filter",
+          "searchTerms": [
+            "strainer filter",
+            "strainer filter manufacturer part number",
+            "strainer filter catalogue price GBP",
+            "strainer filter datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:63:plate_exchanger_insulation_jacket",
+          "closureRowId": "bom-close:mass_fluid_transport_process_condenser_heat_exchanger_plate_exchanger_insulation_jacket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "plate_exchanger_insulation_jacket",
+          "description": "plate exchanger insulation jacket",
+          "searchTerms": [
+            "plate exchanger insulation jacket",
+            "plate exchanger insulation jacket manufacturer part number",
+            "plate exchanger insulation jacket catalogue price GBP",
+            "plate exchanger insulation jacket datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:64:refrigerant_outlet_temperature_sensor",
+          "closureRowId": "bom-close:mass_fluid_transport_process_condenser_heat_exchanger_refrigerant_outlet_temperature_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "refrigerant_outlet_temperature_sensor",
+          "description": "refrigerant outlet temperature sensor",
+          "searchTerms": [
+            "refrigerant outlet temperature sensor",
+            "refrigerant outlet temperature sensor manufacturer part number",
+            "refrigerant outlet temperature sensor catalogue price GBP",
+            "refrigerant outlet temperature sensor datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:65:water_outlet_temperature_sensor",
+          "closureRowId": "bom-close:mass_fluid_transport_process_condenser_heat_exchanger_water_outlet_temperature_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "water_outlet_temperature_sensor",
+          "description": "water outlet temperature sensor",
+          "searchTerms": [
+            "water outlet temperature sensor",
+            "water outlet temperature sensor manufacturer part number",
+            "water outlet temperature sensor catalogue price GBP",
+            "water outlet temperature sensor datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:66:automatic_air_vent",
+          "closureRowId": "bom-close:mass_fluid_transport_process_hydronic_safety_group_automatic_air_vent",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "automatic_air_vent",
+          "description": "automatic air vent",
+          "searchTerms": [
+            "automatic air vent",
+            "automatic air vent manufacturer part number",
+            "automatic air vent catalogue price GBP",
+            "automatic air vent datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:67:expansion_vessel",
+          "closureRowId": "bom-close:mass_fluid_transport_process_hydronic_safety_group_expansion_vessel",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "expansion_vessel",
+          "description": "expansion vessel",
+          "searchTerms": [
+            "expansion vessel",
+            "expansion vessel manufacturer part number",
+            "expansion vessel catalogue price GBP",
+            "expansion vessel datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:68:fill_and_drain_valve_set",
+          "closureRowId": "bom-close:mass_fluid_transport_process_hydronic_safety_group_fill_and_drain_valve_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fill_and_drain_valve_set",
+          "description": "fill and drain valve set",
+          "searchTerms": [
+            "fill and drain valve set",
+            "fill and drain valve set manufacturer part number",
+            "fill and drain valve set catalogue price GBP",
+            "fill and drain valve set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:69:emc_ferrite_clamp_set",
+          "closureRowId": "bom-close:power_distribution_cable_management_emc_ferrite_clamp_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "emc_ferrite_clamp_set",
+          "description": "EMC ferrite clamp set",
+          "searchTerms": [
+            "EMC ferrite clamp set",
+            "EMC ferrite clamp set manufacturer part number",
+            "EMC ferrite clamp set catalogue price GBP",
+            "EMC ferrite clamp set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:70:ip_rated_cable_gland_set",
+          "closureRowId": "bom-close:power_distribution_cable_management_ip_rated_cable_gland_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ip_rated_cable_gland_set",
+          "description": "IP-rated cable gland set",
+          "searchTerms": [
+            "IP-rated cable gland set",
+            "IP-rated cable gland set manufacturer part number",
+            "IP-rated cable gland set catalogue price GBP",
+            "IP-rated cable gland set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:71:segregated_cable_duct",
+          "closureRowId": "bom-close:power_distribution_cable_management_segregated_cable_duct",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "segregated_cable_duct",
+          "description": "segregated cable duct",
+          "searchTerms": [
+            "segregated cable duct",
+            "segregated cable duct manufacturer part number",
+            "segregated cable duct catalogue price GBP",
+            "segregated cable duct datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:72:wiring_diagram_label",
+          "closureRowId": "bom-close:power_distribution_cable_management_wiring_diagram_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "wiring_diagram_label",
+          "description": "wiring diagram label",
+          "searchTerms": [
+            "wiring diagram label",
+            "wiring diagram label manufacturer part number",
+            "wiring diagram label catalogue price GBP",
+            "wiring diagram label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:73:24_v_dc_power_supply",
+          "closureRowId": "bom-close:power_distribution_internal_power_rails_24_v_dc_power_supply",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "24_v_dc_power_supply",
+          "description": "24 V DC power supply",
+          "searchTerms": [
+            "24 V DC power supply",
+            "24 V DC power supply manufacturer part number",
+            "24 V DC power supply catalogue price GBP",
+            "24 V DC power supply datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:74:fused_auxiliary_terminal",
+          "closureRowId": "bom-close:power_distribution_internal_power_rails_fused_auxiliary_terminal",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "fused_auxiliary_terminal",
+          "description": "fused auxiliary terminal",
+          "searchTerms": [
+            "fused auxiliary terminal",
+            "fused auxiliary terminal manufacturer part number",
+            "fused auxiliary terminal catalogue price GBP",
+            "fused auxiliary terminal datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:75:protective_earth_bar",
+          "closureRowId": "bom-close:power_distribution_internal_power_rails_protective_earth_bar",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "protective_earth_bar",
+          "description": "protective earth bar",
+          "searchTerms": [
+            "protective earth bar",
+            "protective earth bar manufacturer part number",
+            "protective earth bar catalogue price GBP",
+            "protective earth bar datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:76:terminal_rail_assembly",
+          "closureRowId": "bom-close:power_distribution_internal_power_rails_terminal_rail_assembly",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "terminal_rail_assembly",
+          "description": "terminal rail assembly",
+          "searchTerms": [
+            "terminal rail assembly",
+            "terminal rail assembly manufacturer part number",
+            "terminal rail assembly catalogue price GBP",
+            "terminal rail assembly datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:77:lockable_isolator_switch",
+          "closureRowId": "bom-close:power_distribution_mains_input_protection_lockable_isolator_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lockable_isolator_switch",
+          "description": "lockable isolator switch",
+          "searchTerms": [
+            "lockable isolator switch",
+            "lockable isolator switch manufacturer part number",
+            "lockable isolator switch catalogue price GBP",
+            "lockable isolator switch datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:78:mcb_breaker_set",
+          "closureRowId": "bom-close:power_distribution_mains_input_protection_mcb_breaker_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "mcb_breaker_set",
+          "description": "MCB breaker set",
+          "searchTerms": [
+            "MCB breaker set",
+            "MCB breaker set manufacturer part number",
+            "MCB breaker set catalogue price GBP",
+            "MCB breaker set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:79:rcd_protection_device",
+          "closureRowId": "bom-close:power_distribution_mains_input_protection_rcd_protection_device",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "rcd_protection_device",
+          "description": "RCD protection device",
+          "searchTerms": [
+            "RCD protection device",
+            "RCD protection device manufacturer part number",
+            "RCD protection device catalogue price GBP",
+            "RCD protection device datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:80:surge_protection_device",
+          "closureRowId": "bom-close:power_distribution_mains_input_protection_surge_protection_device",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "surge_protection_device",
+          "description": "surge protection device",
+          "searchTerms": [
+            "surge protection device",
+            "surge protection device manufacturer part number",
+            "surge protection device catalogue price GBP",
+            "surge protection device datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:81:earth_continuity_test_point",
+          "closureRowId": "bom-close:safety_protection_electrical_safety_earth_continuity_test_point",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "earth_continuity_test_point",
+          "description": "earth continuity test point",
+          "searchTerms": [
+            "earth continuity test point",
+            "earth continuity test point manufacturer part number",
+            "earth continuity test point catalogue price GBP",
+            "earth continuity test point datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:82:over_temperature_cut_out",
+          "closureRowId": "bom-close:safety_protection_electrical_safety_over_temperature_cut_out",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "over_temperature_cut_out",
+          "description": "over-temperature cut-out",
+          "searchTerms": [
+            "over-temperature cut-out",
+            "over-temperature cut-out manufacturer part number",
+            "over-temperature cut-out catalogue price GBP",
+            "over-temperature cut-out datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:83:safety_compliance_label",
+          "closureRowId": "bom-close:safety_protection_electrical_safety_safety_compliance_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "safety_compliance_label",
+          "description": "safety compliance label",
+          "searchTerms": [
+            "safety compliance label",
+            "safety compliance label manufacturer part number",
+            "safety compliance label catalogue price GBP",
+            "safety compliance label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:84:touch_safe_terminal_cover",
+          "closureRowId": "bom-close:safety_protection_electrical_safety_touch_safe_terminal_cover",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "touch_safe_terminal_cover",
+          "description": "touch-safe terminal cover",
+          "searchTerms": [
+            "touch-safe terminal cover",
+            "touch-safe terminal cover manufacturer part number",
+            "touch-safe terminal cover catalogue price GBP",
+            "touch-safe terminal cover datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:85:anti_freeze_thermostat",
+          "closureRowId": "bom-close:safety_protection_hydronic_freeze_protection_anti_freeze_thermostat",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "anti_freeze_thermostat",
+          "description": "anti-freeze thermostat",
+          "searchTerms": [
+            "anti-freeze thermostat",
+            "anti-freeze thermostat manufacturer part number",
+            "anti-freeze thermostat catalogue price GBP",
+            "anti-freeze thermostat datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:86:backup_immersion_heater_relay",
+          "closureRowId": "bom-close:safety_protection_hydronic_freeze_protection_backup_immersion_heater_relay",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "backup_immersion_heater_relay",
+          "description": "backup immersion heater relay",
+          "searchTerms": [
+            "backup immersion heater relay",
+            "backup immersion heater relay manufacturer part number",
+            "backup immersion heater relay catalogue price GBP",
+            "backup immersion heater relay datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:87:drain_down_instruction_label",
+          "closureRowId": "bom-close:safety_protection_hydronic_freeze_protection_drain_down_instruction_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "drain_down_instruction_label",
+          "description": "drain-down instruction label",
+          "searchTerms": [
+            "drain-down instruction label",
+            "drain-down instruction label manufacturer part number",
+            "drain-down instruction label catalogue price GBP",
+            "drain-down instruction label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:88:glycol_compatibility_tag",
+          "closureRowId": "bom-close:safety_protection_hydronic_freeze_protection_glycol_compatibility_tag",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "glycol_compatibility_tag",
+          "description": "glycol compatibility tag",
+          "searchTerms": [
+            "glycol compatibility tag",
+            "glycol compatibility tag manufacturer part number",
+            "glycol compatibility tag catalogue price GBP",
+            "glycol compatibility tag datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:89:high_pressure_cut_out_switch",
+          "closureRowId": "bom-close:safety_protection_refrigerant_safety_high_pressure_cut_out_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "high_pressure_cut_out_switch",
+          "description": "high-pressure cut-out switch",
+          "searchTerms": [
+            "high-pressure cut-out switch",
+            "high-pressure cut-out switch manufacturer part number",
+            "high-pressure cut-out switch catalogue price GBP",
+            "high-pressure cut-out switch datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:90:low_pressure_cut_out_switch",
+          "closureRowId": "bom-close:safety_protection_refrigerant_safety_low_pressure_cut_out_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "low_pressure_cut_out_switch",
+          "description": "low-pressure cut-out switch",
+          "searchTerms": [
+            "low-pressure cut-out switch",
+            "low-pressure cut-out switch manufacturer part number",
+            "low-pressure cut-out switch catalogue price GBP",
+            "low-pressure cut-out switch datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:91:refrigerant_leak_alarm_output",
+          "closureRowId": "bom-close:safety_protection_refrigerant_safety_refrigerant_leak_alarm_output",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "refrigerant_leak_alarm_output",
+          "description": "refrigerant leak alarm output",
+          "searchTerms": [
+            "refrigerant leak alarm output",
+            "refrigerant leak alarm output manufacturer part number",
+            "refrigerant leak alarm output catalogue price GBP",
+            "refrigerant leak alarm output datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:92:refrigerant_warning_label",
+          "closureRowId": "bom-close:safety_protection_refrigerant_safety_refrigerant_warning_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "refrigerant_warning_label",
+          "description": "refrigerant warning label",
+          "searchTerms": [
+            "refrigerant warning label",
+            "refrigerant warning label manufacturer part number",
+            "refrigerant warning label catalogue price GBP",
+            "refrigerant warning label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:93:air_pressure_switch",
+          "closureRowId": "bom-close:sensing_instrumentation_ambient_sensing_air_pressure_switch",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "air_pressure_switch",
+          "description": "air pressure switch",
+          "searchTerms": [
+            "air pressure switch",
+            "air pressure switch manufacturer part number",
+            "air pressure switch catalogue price GBP",
+            "air pressure switch datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:94:ambient_humidity_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_ambient_sensing_ambient_humidity_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ambient_humidity_sensor",
+          "description": "ambient humidity sensor",
+          "searchTerms": [
+            "ambient humidity sensor",
+            "ambient humidity sensor manufacturer part number",
+            "ambient humidity sensor catalogue price GBP",
+            "ambient humidity sensor datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:95:ambient_temperature_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_ambient_sensing_ambient_temperature_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ambient_temperature_sensor",
+          "description": "ambient temperature sensor",
+          "searchTerms": [
+            "ambient temperature sensor",
+            "ambient temperature sensor manufacturer part number",
+            "ambient temperature sensor catalogue price GBP",
+            "ambient temperature sensor datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:96:rain_ingress_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_ambient_sensing_rain_ingress_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "rain_ingress_sensor",
+          "description": "rain ingress sensor",
+          "searchTerms": [
+            "rain ingress sensor",
+            "rain ingress sensor manufacturer part number",
+            "rain ingress sensor catalogue price GBP",
+            "rain ingress sensor datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:97:discharge_temperature_probe",
+          "closureRowId": "bom-close:sensing_instrumentation_refrigerant_sensing_discharge_temperature_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "discharge_temperature_probe",
+          "description": "discharge temperature probe",
+          "searchTerms": [
+            "discharge temperature probe",
+            "discharge temperature probe manufacturer part number",
+            "discharge temperature probe catalogue price GBP",
+            "discharge temperature probe datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:98:refrigerant_leak_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_refrigerant_sensing_refrigerant_leak_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "refrigerant_leak_sensor",
+          "description": "refrigerant leak sensor",
+          "searchTerms": [
+            "refrigerant leak sensor",
+            "refrigerant leak sensor manufacturer part number",
+            "refrigerant leak sensor catalogue price GBP",
+            "refrigerant leak sensor datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:99:suction_temperature_probe",
+          "closureRowId": "bom-close:sensing_instrumentation_refrigerant_sensing_suction_temperature_probe",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "suction_temperature_probe",
+          "description": "suction temperature probe",
+          "searchTerms": [
+            "suction temperature probe",
+            "suction temperature probe manufacturer part number",
+            "suction temperature probe catalogue price GBP",
+            "suction temperature probe datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:100:flow_meter_cartridge",
+          "closureRowId": "bom-close:sensing_instrumentation_water_sensing_flow_meter_cartridge",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "flow_meter_cartridge",
+          "description": "flow meter cartridge",
+          "searchTerms": [
+            "flow meter cartridge",
+            "flow meter cartridge manufacturer part number",
+            "flow meter cartridge catalogue price GBP",
+            "flow meter cartridge datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:101:flow_temperature_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_water_sensing_flow_temperature_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "flow_temperature_sensor",
+          "description": "flow temperature sensor",
+          "searchTerms": [
+            "flow temperature sensor",
+            "flow temperature sensor manufacturer part number",
+            "flow temperature sensor catalogue price GBP",
+            "flow temperature sensor datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:102:return_temperature_sensor",
+          "closureRowId": "bom-close:sensing_instrumentation_water_sensing_return_temperature_sensor",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "return_temperature_sensor",
+          "description": "return temperature sensor",
+          "searchTerms": [
+            "return temperature sensor",
+            "return temperature sensor manufacturer part number",
+            "return temperature sensor catalogue price GBP",
+            "return temperature sensor datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:103:water_pressure_transducer",
+          "closureRowId": "bom-close:sensing_instrumentation_water_sensing_water_pressure_transducer",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "water_pressure_transducer",
+          "description": "water pressure transducer",
+          "searchTerms": [
+            "water pressure transducer",
+            "water pressure transducer manufacturer part number",
+            "water pressure transducer catalogue price GBP",
+            "water pressure transducer datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:104:anti_vibration_foot_set",
+          "closureRowId": "bom-close:structure_containment_mounting_base_anti_vibration_foot_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "anti_vibration_foot_set",
+          "description": "anti-vibration foot set",
+          "searchTerms": [
+            "anti-vibration foot set",
+            "anti-vibration foot set manufacturer part number",
+            "anti-vibration foot set catalogue price GBP",
+            "anti-vibration foot set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:105:base_rail_pair",
+          "closureRowId": "bom-close:structure_containment_mounting_base_base_rail_pair",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "base_rail_pair",
+          "description": "base rail pair",
+          "searchTerms": [
+            "base rail pair",
+            "base rail pair manufacturer part number",
+            "base rail pair catalogue price GBP",
+            "base rail pair datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:106:condensate_fall_spacer",
+          "closureRowId": "bom-close:structure_containment_mounting_base_condensate_fall_spacer",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "condensate_fall_spacer",
+          "description": "condensate fall spacer",
+          "searchTerms": [
+            "condensate fall spacer",
+            "condensate fall spacer manufacturer part number",
+            "condensate fall spacer catalogue price GBP",
+            "condensate fall spacer datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:107:lifting_lug_set",
+          "closureRowId": "bom-close:structure_containment_mounting_base_lifting_lug_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "lifting_lug_set",
+          "description": "lifting lug set",
+          "searchTerms": [
+            "lifting lug set",
+            "lifting lug set manufacturer part number",
+            "lifting lug set catalogue price GBP",
+            "lifting lug set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:108:hinged_controller_cover",
+          "closureRowId": "bom-close:structure_containment_service_access_panels_hinged_controller_cover",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "hinged_controller_cover",
+          "description": "hinged controller cover",
+          "searchTerms": [
+            "hinged controller cover",
+            "hinged controller cover manufacturer part number",
+            "hinged controller cover catalogue price GBP",
+            "hinged controller cover datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:109:quarter_turn_latch_set",
+          "closureRowId": "bom-close:structure_containment_service_access_panels_quarter_turn_latch_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "quarter_turn_latch_set",
+          "description": "quarter-turn latch set",
+          "searchTerms": [
+            "quarter-turn latch set",
+            "quarter-turn latch set manufacturer part number",
+            "quarter-turn latch set catalogue price GBP",
+            "quarter-turn latch set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:110:removable_service_panel",
+          "closureRowId": "bom-close:structure_containment_service_access_panels_removable_service_panel",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "removable_service_panel",
+          "description": "removable service panel",
+          "searchTerms": [
+            "removable service panel",
+            "removable service panel manufacturer part number",
+            "removable service panel catalogue price GBP",
+            "removable service panel datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:111:service_clearance_label",
+          "closureRowId": "bom-close:structure_containment_service_access_panels_service_clearance_label",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "service_clearance_label",
+          "description": "service clearance label",
+          "searchTerms": [
+            "service clearance label",
+            "service clearance label manufacturer part number",
+            "service clearance label catalogue price GBP",
+            "service clearance label datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:112:epdm_door_gasket",
+          "closureRowId": "bom-close:structure_containment_weatherproof_cabinet_epdm_door_gasket",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "epdm_door_gasket",
+          "description": "EPDM door gasket",
+          "searchTerms": [
+            "EPDM door gasket",
+            "EPDM door gasket manufacturer part number",
+            "EPDM door gasket catalogue price GBP",
+            "EPDM door gasket datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:113:galvanised_steel_cabinet",
+          "closureRowId": "bom-close:structure_containment_weatherproof_cabinet_galvanised_steel_cabinet",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "galvanised_steel_cabinet",
+          "description": "galvanised steel cabinet",
+          "searchTerms": [
+            "galvanised steel cabinet",
+            "galvanised steel cabinet manufacturer part number",
+            "galvanised steel cabinet catalogue price GBP",
+            "galvanised steel cabinet datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:114:ip_rated_fastener_set",
+          "closureRowId": "bom-close:structure_containment_weatherproof_cabinet_ip_rated_fastener_set",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "ip_rated_fastener_set",
+          "description": "IP-rated fastener set",
+          "searchTerms": [
+            "IP-rated fastener set",
+            "IP-rated fastener set manufacturer part number",
+            "IP-rated fastener set catalogue price GBP",
+            "IP-rated fastener set datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        },
+        {
+          "id": "candidate_sourcing_deferred:115:powder_coated_access_panel",
+          "closureRowId": "bom-close:structure_containment_weatherproof_cabinet_powder_coated_access_panel",
+          "action": "defer_candidate_sourcing",
+          "priority": "minor",
+          "status": "deferred",
+          "componentWordId": "powder_coated_access_panel",
+          "description": "powder-coated access panel",
+          "searchTerms": [
+            "powder-coated access panel",
+            "powder-coated access panel manufacturer part number",
+            "powder-coated access panel catalogue price GBP",
+            "powder-coated access panel datasheet"
+          ],
+          "requiredEvidence": [
+            "no immediate evidence required unless this candidate is promoted to procurement scope"
+          ],
+          "acceptanceCriteria": [
+            "Candidate remains candidate-only, or is promoted to sourcing intake with explicit procurement scope."
+          ],
+          "rejectionCriteria": [
+            "Candidate is used in procurement totals without source-backed evidence."
+          ],
+          "targetOutcome": "candidate remains out of procurement totals",
+          "blocksProcurement": false
+        }
+      ]
+    }
+  ]
+}

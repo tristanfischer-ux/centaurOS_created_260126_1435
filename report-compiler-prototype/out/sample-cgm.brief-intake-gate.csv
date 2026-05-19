@@ -1,0 +1,7 @@
+area,verdict,signal,passRatio,blockers,requiredAction
+brief_text,pass,310 non-whitespace character(s) in the source brief.,1,,Brief text is present.
+requirement_quantification,pass,"3 quantified requirement(s), 3 numeric fact(s).",1,,Quantified requirements are sufficient for a first architecture pass.
+product_class_selection,pass,Selected cgm with high confidence.,1,,Product class selection is strong enough for scratch architecture.
+scratch_design_support,pass,cgm has a deep scratch architecture grammar.,1,,Use scratch universal architecture flow for this brief.
+requirement_trace_seed,pass,"3 covered, 0 partial, 0 uncovered requirement trace row(s).",1,,Extracted requirements have trace seeds into the architecture.
+assumption_boundary,pass,1 brief assumption note(s); no-quantified-default path: no.,1,,Assumption boundary is explicit enough for first-pass architecture.

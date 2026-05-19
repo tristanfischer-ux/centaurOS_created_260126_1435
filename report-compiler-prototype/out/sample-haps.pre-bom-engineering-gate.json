@@ -1,0 +1,79 @@
+{
+  "verdict": "engineering_review_ready",
+  "summary": {
+    "rows": 6,
+    "passRows": 4,
+    "reviewRows": 2,
+    "blockedRows": 0,
+    "passRatio": 0.67,
+    "modules": 11,
+    "subModules": 33,
+    "componentWords": 132,
+    "componentAllocationVerdict": "allocation_ready",
+    "interfaceVerificationVerdict": "interface_review_ready",
+    "requirementCoverageVerdict": "coverage_review_ready",
+    "calculationRows": 3,
+    "calculationsWithinEnvelope": 1,
+    "calculationsNeedingReview": 2,
+    "calculationBlockers": 0,
+    "assumptionRows": 34,
+    "assumptionsNeedingReview": 23,
+    "assumptionArchitectureBlockers": 0,
+    "assumptionBomBlockers": 14
+  },
+  "rows": [
+    {
+      "area": "architecture_readiness",
+      "verdict": "pass",
+      "signal": "11 modules, 33 submodules and 132 component words pass architecture readiness.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Architecture is structurally ready for engineering review."
+    },
+    {
+      "area": "component_allocation",
+      "verdict": "pass",
+      "signal": "33/33 submodules ready; 12/12 critical parts allocated; 0 duplicate component groups.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Component candidates are allocated well enough for engineering review."
+    },
+    {
+      "area": "interface_verification",
+      "verdict": "pass",
+      "signal": "8/8 required interfaces have endpoint carriers; 0 accepted with evidence.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Required interfaces are structurally ready for reviewer evidence."
+    },
+    {
+      "area": "requirement_coverage",
+      "verdict": "pass",
+      "signal": "3/3 requirements are structurally ready or accepted; accepted evidence ratio 0.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Requirements are structurally ready for reviewer evidence."
+    },
+    {
+      "area": "calculation_envelope",
+      "verdict": "review",
+      "signal": "1/3 calculations are within envelope; 2 need review; 0 block.",
+      "passRatio": 0.33,
+      "blockers": [],
+      "requiredAction": "Attach reviewer evidence to calculations marked needs_review."
+    },
+    {
+      "area": "engineering_assumptions",
+      "verdict": "review",
+      "signal": "11/34 assumptions are brief-supported or model-present; 23 need review/source evidence; 0 block architecture.",
+      "passRatio": 0.32,
+      "blockers": [],
+      "requiredAction": "Review assumptions and keep BoM/source-required assumptions out of trusted claims until evidence is admitted."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "Attach reviewer evidence to calculations marked needs_review.",
+    "Review assumptions and keep BoM/source-required assumptions out of trusted claims until evidence is admitted."
+  ]
+}

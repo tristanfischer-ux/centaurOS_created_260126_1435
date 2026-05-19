@@ -1,0 +1,94 @@
+{
+  "verdict": "candidate_bom_authorized",
+  "summary": {
+    "rows": 7,
+    "passRows": 2,
+    "reviewRows": 5,
+    "blockedRows": 0,
+    "passRatio": 0.29,
+    "displayMode": "candidate_only",
+    "bomLines": 132,
+    "criticalBomLines": 12,
+    "pricedLines": 0,
+    "pricedCriticalLines": 0,
+    "unpricedCriticalLines": 12,
+    "sourceBackedClaims": 0,
+    "criticalMissingSourceClaims": 48,
+    "provenanceViolations": 0,
+    "sourcingAuthorizationVerdict": "sourcing_authorized",
+    "bomCostingVerdict": "costing_not_started",
+    "sourceQualityVerdict": "no_sourcing_evidence",
+    "productionReadySourcingEvidenceRows": 0,
+    "protocolSourcingEvidenceRows": 0,
+    "canRenderCandidateBom": true,
+    "canRenderPricedBom": false,
+    "canUseForProcurement": false,
+    "nextAction": "No source rows are admitted; keep this as a candidate-only BoM."
+  },
+  "rows": [
+    {
+      "area": "sourcing_authorization",
+      "verdict": "pass",
+      "signal": "sourcing_authorized; authorized yes; 6/6 areas pass.",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Sourcing is authorized, so the BoM may be shown as a candidate sourcing queue."
+    },
+    {
+      "area": "candidate_bom_scope",
+      "verdict": "pass",
+      "signal": "132 candidate BoM line(s), 12 critical line(s).",
+      "passRatio": 1,
+      "blockers": [],
+      "requiredAction": "Candidate BoM scope exists for sourcing and evidence collection."
+    },
+    {
+      "area": "source_admission_state",
+      "verdict": "review",
+      "signal": "0 admitted source row(s), 0 rejected source row(s), 0/132 priced line(s).",
+      "passRatio": 0,
+      "blockers": [],
+      "requiredAction": "No source rows are admitted; keep this as a candidate-only BoM."
+    },
+    {
+      "area": "critical_bom_admission",
+      "verdict": "review",
+      "signal": "0/12 critical line(s) have admitted unit costs; 12 critical line(s) remain unpriced.",
+      "passRatio": 0,
+      "blockers": [],
+      "requiredAction": "Start with critical sourcing intake before treating any BoM cost as admitted."
+    },
+    {
+      "area": "source_reference_quality",
+      "verdict": "review",
+      "signal": "no_sourcing_evidence; 0/0 source-quality rows pass; 0 protocol fixture row(s).",
+      "passRatio": 0,
+      "blockers": [],
+      "requiredAction": "No source evidence is present; keep the BoM candidate-only."
+    },
+    {
+      "area": "provenance_boundary",
+      "verdict": "review",
+      "signal": "0 source-backed claim(s), 48 critical missing-source claim(s), 0 provenance violation(s).",
+      "passRatio": 0.93,
+      "blockers": [],
+      "requiredAction": "Missing critical source claims are acceptable only in candidate-only mode; collect evidence before priced BoM use."
+    },
+    {
+      "area": "display_mode",
+      "verdict": "review",
+      "signal": "Display mode will be candidate_only.",
+      "passRatio": 0.25,
+      "blockers": [],
+      "requiredAction": "Show candidate BoM as a sourcing queue with supplier, MPN and cost fields empty."
+    }
+  ],
+  "blockers": [],
+  "nextActions": [
+    "No source rows are admitted; keep this as a candidate-only BoM.",
+    "Start with critical sourcing intake before treating any BoM cost as admitted.",
+    "No source evidence is present; keep the BoM candidate-only.",
+    "Missing critical source claims are acceptable only in candidate-only mode; collect evidence before priced BoM use.",
+    "Show candidate BoM as a sourcing queue with supplier, MPN and cost fields empty."
+  ]
+}

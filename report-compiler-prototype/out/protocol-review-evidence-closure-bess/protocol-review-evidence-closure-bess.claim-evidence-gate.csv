@@ -1,0 +1,6 @@
+area,verdict,rows,passedClaims,reviewRequiredClaims,blockedClaims,sourceRequiredClaims,generatedNeedsReviewClaims,calculatedNeedsReviewClaims,acceptedClaims,sourceBackedClaims,briefSuppliedClaims,bomBlockingClaims,publishBlockingClaims,passRatio,requiredAction
+brief_requirements,claim_evidence_complete,3,3,0,0,0,0,0,0,0,3,0,0,1,No claim-evidence action required for this area.
+architecture_design,claim_evidence_complete,57,57,0,0,0,0,0,57,0,0,0,0,1,No claim-evidence action required for this area.
+engineering_math,claim_evidence_complete,6,6,0,0,0,0,0,4,2,0,0,0,1,No claim-evidence action required for this area.
+bom_sourcing,claim_evidence_complete,1224,1224,0,0,0,0,0,204,1020,0,0,0,1,No claim-evidence action required for this area.
+compliance_risk,claim_evidence_complete,5,5,0,0,0,0,0,5,0,0,0,0,1,No claim-evidence action required for this area.

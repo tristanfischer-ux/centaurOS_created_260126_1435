@@ -1,0 +1,15 @@
+{
+  "summary": {
+    "authenticityVerdict": "no_evidence",
+    "rows": 0,
+    "sourcingRows": 0,
+    "verificationRows": 0,
+    "protocolRows": 0,
+    "reviewRequiredRows": 0,
+    "missingMetadataRows": 0,
+    "blocksBomRows": 0,
+    "blocksPublishRows": 0,
+    "nextRowId": null
+  },
+  "rows": []
+}

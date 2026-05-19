@@ -1,0 +1,1137 @@
+{
+  "verdict": "allocation_ready",
+  "summary": {
+    "modules": 10,
+    "subModules": 30,
+    "componentWords": 120,
+    "readySubModules": 30,
+    "reviewSubModules": 0,
+    "blockedSubModules": 0,
+    "interfaceCarrierSubModules": 30,
+    "interfaceCarrierWithoutComponents": 0,
+    "requiredCriticalParts": 12,
+    "allocatedCriticalParts": 12,
+    "missingCriticalParts": 0,
+    "bomLines": 120,
+    "criticalBomLines": 12,
+    "duplicateComponentGroups": 0,
+    "duplicateCriticalComponentGroups": 0,
+    "allocationRatio": 1,
+    "criticalAllocationRatio": 1
+  },
+  "subModules": [
+    {
+      "id": "structure_containment:rack_chassis",
+      "moduleId": "structure_containment",
+      "moduleName": "Rack Structure Containment",
+      "subModuleId": "rack_chassis",
+      "subModuleName": "Rack chassis",
+      "purpose": "Carries appliance boards, power supplies and front-to-back airflow features.",
+      "interfaces": [
+        "rack_mount",
+        "airflow_path",
+        "service_access",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "1u_rack_chassis",
+        "slide_rail_kit",
+        "internal_divider_panel",
+        "front_bezel_assembly"
+      ],
+      "componentNames": [
+        "1U rack chassis",
+        "slide rail kit",
+        "internal divider panel",
+        "front bezel assembly"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "1u_rack_chassis"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:accelerator_mounting",
+      "moduleId": "structure_containment",
+      "moduleName": "Rack Structure Containment",
+      "subModuleId": "accelerator_mounting",
+      "subModuleName": "Accelerator mounting",
+      "purpose": "Restrains high-power cards and maintains airflow clearance.",
+      "interfaces": [
+        "rack_mount",
+        "airflow_path",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "accelerator_retention_bracket",
+        "pcie_riser_support",
+        "card_stiffener_rail",
+        "gpu_airflow_baffle"
+      ],
+      "componentNames": [
+        "accelerator retention bracket",
+        "PCIe riser support",
+        "card stiffener rail",
+        "GPU airflow baffle"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "structure_containment:service_labelling",
+      "moduleId": "structure_containment",
+      "moduleName": "Rack Structure Containment",
+      "subModuleId": "service_labelling",
+      "subModuleName": "Service labelling",
+      "purpose": "Marks rack identity, airflow direction and field-replaceable units.",
+      "interfaces": [
+        "service_access",
+        "rack_mount"
+      ],
+      "componentWordIds": [
+        "asset_label_plate",
+        "airflow_direction_label",
+        "rack_ear_set",
+        "cable_management_arm"
+      ],
+      "componentNames": [
+        "asset label plate",
+        "airflow direction label",
+        "rack ear set",
+        "cable management arm"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "compute_acceleration:accelerator_module",
+      "moduleId": "compute_acceleration",
+      "moduleName": "Compute Acceleration",
+      "subModuleId": "accelerator_module",
+      "subModuleName": "Accelerator module",
+      "purpose": "Runs neural-network inference workloads at the edge.",
+      "interfaces": [
+        "pcie_fabric",
+        "gpu_power_bus",
+        "thermal_path",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch"
+      ],
+      "componentNames": [
+        "AI accelerator module",
+        "accelerator carrier board",
+        "PCIe edge connector",
+        "accelerator retention latch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "ai_accelerator_module"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "compute_acceleration:cpu_memory_complex",
+      "moduleId": "compute_acceleration",
+      "moduleName": "Compute Acceleration",
+      "subModuleId": "cpu_memory_complex",
+      "subModuleName": "CPU and memory complex",
+      "purpose": "Hosts preprocessing, runtime orchestration and memory-resident model state.",
+      "interfaces": [
+        "memory_bus",
+        "pcie_fabric",
+        "low_voltage_rail",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard",
+        "boot_flash_device"
+      ],
+      "componentNames": [
+        "CPU module",
+        "ECC memory",
+        "System motherboard",
+        "boot flash device"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "compute_acceleration:signal_power_integrity",
+      "moduleId": "compute_acceleration",
+      "moduleName": "Compute Acceleration",
+      "subModuleId": "signal_power_integrity",
+      "subModuleName": "Signal and power integrity",
+      "purpose": "Stabilises accelerator clocks, high-speed lanes and transient power demand.",
+      "interfaces": [
+        "pcie_fabric",
+        "gpu_power_bus",
+        "thermal_path"
+      ],
+      "componentWordIds": [
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "componentNames": [
+        "high-current VRM module",
+        "PCIe retimer set",
+        "clock distribution device",
+        "power integrity capacitor bank"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "network_io:high_speed_network",
+      "moduleId": "network_io",
+      "moduleName": "Network IO",
+      "subModuleId": "high_speed_network",
+      "subModuleName": "High-speed network",
+      "purpose": "Terminates production inference traffic.",
+      "interfaces": [
+        "inference_network",
+        "pcie_fabric",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "high_speed_nic",
+        "optical_transceiver_cage",
+        "nic_heatsink",
+        "network_link_led_board"
+      ],
+      "componentNames": [
+        "High-speed NIC",
+        "optical transceiver cage",
+        "NIC heatsink",
+        "network link LED board"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "high_speed_nic"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "network_io:timing_ingest",
+      "moduleId": "network_io",
+      "moduleName": "Network IO",
+      "subModuleId": "timing_ingest",
+      "subModuleName": "Timing and ingest",
+      "purpose": "Synchronises inference streams and accepts trigger inputs where needed.",
+      "interfaces": [
+        "inference_network",
+        "management_network",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "ptp_timing_module",
+        "gpio_trigger_input",
+        "data_ingest_connector",
+        "network_bypass_relay"
+      ],
+      "componentNames": [
+        "PTP timing module",
+        "GPIO trigger input",
+        "data ingest connector",
+        "network bypass relay"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "network_io:io_isolation_routing",
+      "moduleId": "network_io",
+      "moduleName": "Network IO",
+      "subModuleId": "io_isolation_routing",
+      "subModuleName": "IO isolation and routing",
+      "purpose": "Controls EMC, strain relief and service routing at high-speed ports.",
+      "interfaces": [
+        "inference_network",
+        "service_access",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "emi_gasket_strip",
+        "shielded_io_bracket",
+        "cable_strain_relief_comb",
+        "service_loop_tie_set"
+      ],
+      "componentNames": [
+        "EMI gasket strip",
+        "shielded IO bracket",
+        "cable strain relief comb",
+        "service loop tie set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "data_storage:nvme_storage",
+      "moduleId": "data_storage",
+      "moduleName": "Data Storage",
+      "subModuleId": "nvme_storage",
+      "subModuleName": "NVMe storage",
+      "purpose": "Provides local high-throughput storage for models and telemetry.",
+      "interfaces": [
+        "storage_bus",
+        "pcie_fabric",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "nvme_ssd",
+        "m_2_carrier_tray",
+        "drive_thermal_pad",
+        "drive_retention_screw_set"
+      ],
+      "componentNames": [
+        "NVMe SSD",
+        "M.2 carrier tray",
+        "drive thermal pad",
+        "drive retention screw set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "nvme_ssd"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "data_storage:model_cache",
+      "moduleId": "data_storage",
+      "moduleName": "Data Storage",
+      "subModuleId": "model_cache",
+      "subModuleName": "Model cache and recovery",
+      "purpose": "Keeps model versions, rollback images and erase functions controlled.",
+      "interfaces": [
+        "storage_bus",
+        "secure_boot_chain",
+        "management_network"
+      ],
+      "componentWordIds": [
+        "model_cache_partition",
+        "storage_health_monitor",
+        "secure_erase_controller",
+        "firmware_recovery_image"
+      ],
+      "componentNames": [
+        "model cache partition",
+        "storage health monitor",
+        "secure erase controller",
+        "firmware recovery image"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "data_storage:log_buffer",
+      "moduleId": "data_storage",
+      "moduleName": "Data Storage",
+      "subModuleId": "log_buffer",
+      "subModuleName": "Log and evidence buffer",
+      "purpose": "Captures operational evidence for debugging and compliance review.",
+      "interfaces": [
+        "storage_bus",
+        "management_network",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "event_log_partition",
+        "write_endurance_counter",
+        "crash_dump_region",
+        "log_export_port"
+      ],
+      "componentNames": [
+        "event log partition",
+        "write endurance counter",
+        "crash dump region",
+        "log export port"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:host_control",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "host_control",
+      "subModuleName": "Host control",
+      "purpose": "Coordinates CPU, accelerator, storage and management functions.",
+      "interfaces": [
+        "pcie_fabric",
+        "storage_bus",
+        "management_network",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom"
+      ],
+      "componentNames": [
+        "BMC management controller",
+        "management Ethernet PHY",
+        "BIOS firmware image",
+        "platform configuration EEPROM"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "bmc_management_controller"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:runtime_orchestration",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "runtime_orchestration",
+      "subModuleName": "Runtime orchestration",
+      "purpose": "Loads inference runtime, accelerator drivers and service policy.",
+      "interfaces": [
+        "pcie_fabric",
+        "storage_bus",
+        "inference_network",
+        "secure_boot_chain"
+      ],
+      "componentWordIds": [
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest"
+      ],
+      "componentNames": [
+        "inference runtime image",
+        "accelerator driver bundle",
+        "watchdog service",
+        "configuration manifest"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "control_compute_communication:remote_management",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "subModuleId": "remote_management",
+      "subModuleName": "Remote management",
+      "purpose": "Supports controlled diagnostics and firmware maintenance.",
+      "interfaces": [
+        "management_network",
+        "service_access",
+        "secure_boot_chain"
+      ],
+      "componentWordIds": [
+        "out_of_band_management_port",
+        "serial_console_header",
+        "debug_access_lockout",
+        "firmware_signing_key_slot"
+      ],
+      "componentNames": [
+        "out-of-band management port",
+        "serial console header",
+        "debug access lockout",
+        "firmware signing key slot"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:ac_input_conversion",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "subModuleId": "ac_input_conversion",
+      "subModuleName": "AC input conversion",
+      "purpose": "Accepts rack AC input and provides redundant conversion.",
+      "interfaces": [
+        "ac_input_bus",
+        "protective_earth",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "redundant_power_supply",
+        "ac_inlet_filter",
+        "input_fuse_holder",
+        "power_good_signal_harness"
+      ],
+      "componentNames": [
+        "Redundant power supply",
+        "AC inlet filter",
+        "input fuse holder",
+        "power-good signal harness"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "redundant_power_supply"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:dc_rail_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "subModuleId": "dc_rail_distribution",
+      "subModuleName": "DC rail distribution",
+      "purpose": "Distributes 12 V and accelerator rails to boards and fans.",
+      "interfaces": [
+        "low_voltage_rail",
+        "gpu_power_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "12_v_busbar",
+        "accelerator_power_harness",
+        "hot_swap_controller",
+        "fan_power_distribution_loom"
+      ],
+      "componentNames": [
+        "12 V busbar",
+        "accelerator power harness",
+        "hot-swap controller",
+        "fan power distribution loom"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "power_distribution:hold_up_protection",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "subModuleId": "hold_up_protection",
+      "subModuleName": "Hold-up and protection",
+      "purpose": "Survives short dips and trips unsafe rail faults.",
+      "interfaces": [
+        "low_voltage_rail",
+        "hardwired_trip",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "hold_up_capacitor_module",
+        "brownout_detector",
+        "current_shunt_module",
+        "efuse_channel_set"
+      ],
+      "componentNames": [
+        "hold-up capacitor module",
+        "brownout detector",
+        "current shunt module",
+        "eFuse channel set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:forced_air_cooling",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Airflow Interface",
+      "subModuleId": "forced_air_cooling",
+      "subModuleName": "Forced-air cooling",
+      "purpose": "Maintains rack airflow through compute and power zones.",
+      "interfaces": [
+        "airflow_path",
+        "fan_control_bus",
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "fan_wall_assembly",
+        "pwm_fan_controller",
+        "airflow_straightener",
+        "replaceable_dust_filter"
+      ],
+      "componentNames": [
+        "Fan wall assembly",
+        "PWM fan controller",
+        "airflow straightener",
+        "replaceable dust filter"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "fan_wall_assembly"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:heat_transfer",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Airflow Interface",
+      "subModuleId": "heat_transfer",
+      "subModuleName": "Heat transfer path",
+      "purpose": "Couples accelerator and CPU losses into chassis airflow.",
+      "interfaces": [
+        "thermal_path",
+        "airflow_path",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct"
+      ],
+      "componentNames": [
+        "Heatsink cold plate",
+        "thermal interface material set",
+        "heatpipe assembly",
+        "rear exhaust duct"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "heatsink_cold_plate"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "environmental_interface:inlet_outlet_management",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Airflow Interface",
+      "subModuleId": "inlet_outlet_management",
+      "subModuleName": "Inlet and outlet management",
+      "purpose": "Protects rack pressure and prevents hot-air recirculation.",
+      "interfaces": [
+        "airflow_path",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "front_inlet_grille",
+        "rear_exhaust_grille",
+        "air_seal_foam_kit",
+        "rack_pressure_map_label"
+      ],
+      "componentNames": [
+        "front inlet grille",
+        "rear exhaust grille",
+        "air seal foam kit",
+        "rack pressure map label"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:thermal_sensors",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Telemetry Instrumentation",
+      "subModuleId": "thermal_sensors",
+      "subModuleName": "Thermal sensors",
+      "purpose": "Measures inlet, accelerator, exhaust and board climate state.",
+      "interfaces": [
+        "sensor_bus",
+        "thermal_alarm_bus"
+      ],
+      "componentWordIds": [
+        "inlet_temperature_sensor",
+        "accelerator_hotspot_sensor",
+        "exhaust_temperature_sensor",
+        "board_humidity_sensor"
+      ],
+      "componentNames": [
+        "inlet temperature sensor",
+        "accelerator hotspot sensor",
+        "exhaust temperature sensor",
+        "board humidity sensor"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:power_fan_telemetry",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Telemetry Instrumentation",
+      "subModuleId": "power_fan_telemetry",
+      "subModuleName": "Power and fan telemetry",
+      "purpose": "Feeds PSU, rail and airflow state into BMC management.",
+      "interfaces": [
+        "sensor_bus",
+        "fan_control_bus",
+        "management_network"
+      ],
+      "componentWordIds": [
+        "psu_pmbus_monitor",
+        "rail_current_monitor",
+        "fan_tachometer_hub",
+        "chassis_intrusion_switch"
+      ],
+      "componentNames": [
+        "PSU PMBus monitor",
+        "rail current monitor",
+        "fan tachometer hub",
+        "chassis intrusion switch"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "sensing_instrumentation:front_panel_status",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Telemetry Instrumentation",
+      "subModuleId": "front_panel_status",
+      "subModuleName": "Front panel status",
+      "purpose": "Exposes health and service state to rack technicians.",
+      "interfaces": [
+        "sensor_bus",
+        "management_network",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "front_status_led_board",
+        "uid_button",
+        "alarm_buzzer",
+        "lcd_status_panel"
+      ],
+      "componentNames": [
+        "front status LED board",
+        "UID button",
+        "alarm buzzer",
+        "LCD status panel"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:secure_boot",
+      "moduleId": "safety_protection",
+      "moduleName": "Security And Safety Protection",
+      "subModuleId": "secure_boot",
+      "subModuleName": "Secure boot",
+      "purpose": "Anchors platform identity and firmware trust.",
+      "interfaces": [
+        "secure_boot_chain",
+        "management_network",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "tpm_security_module",
+        "secure_boot_policy",
+        "chassis_tamper_switch",
+        "recovery_jumper_cover"
+      ],
+      "componentNames": [
+        "TPM security module",
+        "secure boot policy",
+        "chassis tamper switch",
+        "recovery jumper cover"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [
+        "tpm_security_module"
+      ],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:thermal_shutdown",
+      "moduleId": "safety_protection",
+      "moduleName": "Security And Safety Protection",
+      "subModuleId": "thermal_shutdown",
+      "subModuleName": "Thermal shutdown",
+      "purpose": "Trips unsafe thermal or fan-failure states.",
+      "interfaces": [
+        "thermal_alarm_bus",
+        "hardwired_trip",
+        "fan_control_bus"
+      ],
+      "componentWordIds": [
+        "thermal_trip_relay",
+        "overtemperature_latch",
+        "fan_failure_interlock",
+        "hardwired_shutdown_line"
+      ],
+      "componentNames": [
+        "thermal trip relay",
+        "overtemperature latch",
+        "fan failure interlock",
+        "hardwired shutdown line"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "safety_protection:electrical_safety",
+      "moduleId": "safety_protection",
+      "moduleName": "Security And Safety Protection",
+      "subModuleId": "electrical_safety",
+      "subModuleName": "Electrical safety",
+      "purpose": "Maintains operator protection and safe service boundaries.",
+      "interfaces": [
+        "protective_earth",
+        "service_access",
+        "hardwired_trip"
+      ],
+      "componentWordIds": [
+        "protective_earth_stud",
+        "insulation_barrier_sheet",
+        "finger_safe_psu_cover",
+        "warning_label_set"
+      ],
+      "componentNames": [
+        "protective earth stud",
+        "insulation barrier sheet",
+        "finger-safe PSU cover",
+        "warning label set"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:field_replaceable_units",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance Serviceability",
+      "subModuleId": "field_replaceable_units",
+      "subModuleName": "Field-replaceable units",
+      "purpose": "Makes high-wear parts replaceable without removing the whole appliance.",
+      "interfaces": [
+        "service_access",
+        "airflow_path"
+      ],
+      "componentWordIds": [
+        "hot_swap_fan_carrier",
+        "drive_service_handle",
+        "psu_latch_mechanism",
+        "accelerator_extraction_handle"
+      ],
+      "componentNames": [
+        "hot-swap fan carrier",
+        "drive service handle",
+        "PSU latch mechanism",
+        "accelerator extraction handle"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:rack_installation",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance Serviceability",
+      "subModuleId": "rack_installation",
+      "subModuleName": "Rack installation",
+      "purpose": "Maintains mechanical support and cabling in edge racks.",
+      "interfaces": [
+        "rack_mount",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "rack_rail_kit",
+        "rear_support_bracket",
+        "cable_retention_comb",
+        "airflow_blanking_panel"
+      ],
+      "componentNames": [
+        "rack rail kit",
+        "rear support bracket",
+        "cable retention comb",
+        "airflow blanking panel"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    },
+    {
+      "id": "maintenance_serviceability:service_workflow",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance Serviceability",
+      "subModuleId": "service_workflow",
+      "subModuleName": "Service workflow",
+      "purpose": "Captures field diagnostics and controlled recovery evidence.",
+      "interfaces": [
+        "service_access",
+        "management_network",
+        "secure_boot_chain"
+      ],
+      "componentWordIds": [
+        "service_checklist_card",
+        "firmware_version_label",
+        "spare_screw_kit",
+        "diagnostics_usb_key"
+      ],
+      "componentNames": [
+        "service checklist card",
+        "firmware version label",
+        "spare screw kit",
+        "diagnostics USB key"
+      ],
+      "componentCount": 4,
+      "criticalComponentWordIds": [],
+      "duplicateComponentWordIds": [],
+      "status": "ready",
+      "blockers": [],
+      "requiredAction": "Submodule has component candidates and no allocation blocker."
+    }
+  ],
+  "criticalParts": [
+    {
+      "componentWordId": "ai_accelerator_module",
+      "label": "AI accelerator module",
+      "allocated": true,
+      "moduleIds": [
+        "compute_acceleration"
+      ],
+      "subModuleIds": [
+        "accelerator_module"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "cpu_module",
+      "label": "CPU module",
+      "allocated": true,
+      "moduleIds": [
+        "compute_acceleration"
+      ],
+      "subModuleIds": [
+        "cpu_memory_complex"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "system_motherboard",
+      "label": "System motherboard",
+      "allocated": true,
+      "moduleIds": [
+        "compute_acceleration"
+      ],
+      "subModuleIds": [
+        "cpu_memory_complex"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "ecc_memory",
+      "label": "ECC memory",
+      "allocated": true,
+      "moduleIds": [
+        "compute_acceleration"
+      ],
+      "subModuleIds": [
+        "cpu_memory_complex"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "nvme_ssd",
+      "label": "NVMe SSD",
+      "allocated": true,
+      "moduleIds": [
+        "data_storage"
+      ],
+      "subModuleIds": [
+        "nvme_storage"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "redundant_power_supply",
+      "label": "Redundant power supply",
+      "allocated": true,
+      "moduleIds": [
+        "power_distribution"
+      ],
+      "subModuleIds": [
+        "ac_input_conversion"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "fan_wall_assembly",
+      "label": "Fan wall assembly",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "forced_air_cooling"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "heatsink_cold_plate",
+      "label": "Heatsink cold plate",
+      "allocated": true,
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "subModuleIds": [
+        "heat_transfer"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "high_speed_nic",
+      "label": "High-speed NIC",
+      "allocated": true,
+      "moduleIds": [
+        "network_io"
+      ],
+      "subModuleIds": [
+        "high_speed_network"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "bmc_management_controller",
+      "label": "BMC management controller",
+      "allocated": true,
+      "moduleIds": [
+        "control_compute_communication"
+      ],
+      "subModuleIds": [
+        "host_control"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "tpm_security_module",
+      "label": "TPM security module",
+      "allocated": true,
+      "moduleIds": [
+        "safety_protection"
+      ],
+      "subModuleIds": [
+        "secure_boot"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    },
+    {
+      "componentWordId": "1u_rack_chassis",
+      "label": "1U rack chassis",
+      "allocated": true,
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "subModuleIds": [
+        "rack_chassis"
+      ],
+      "status": "allocated",
+      "requiredAction": "Critical part is allocated to at least one architecture submodule."
+    }
+  ],
+  "duplicateGroups": [],
+  "blockers": [],
+  "nextActions": []
+}

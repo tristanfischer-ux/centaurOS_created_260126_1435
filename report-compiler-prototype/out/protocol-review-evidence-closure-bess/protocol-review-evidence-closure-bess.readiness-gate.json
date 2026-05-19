@@ -1,0 +1,108 @@
+{
+  "targetSectionScore": 8,
+  "verdict": "publishable",
+  "summary": {
+    "sections": 6,
+    "sectionsAtOrAboveTarget": 6,
+    "sectionsBelowTarget": 0,
+    "meanScore": 9,
+    "architectureReadyForBom": true,
+    "verificationBlockedActivities": 0,
+    "verificationOpenActivities": 5,
+    "verificationEvidenceEligibleActivities": 25,
+    "verificationAcceptedActivities": 25,
+    "verificationRejectedActivities": 0,
+    "verificationDeferredActivities": 0,
+    "verificationPendingActivities": 0,
+    "verificationUnacceptedActivities": 0,
+    "verificationReviewCoverageRatio": 1,
+    "verificationAcceptanceRatio": 1,
+    "sourcingAdmissionStatus": "complete",
+    "unpricedCriticalLines": 0,
+    "blockerIssues": 0,
+    "majorIssues": 0,
+    "minorIssues": 0
+  },
+  "sections": [
+    {
+      "section": "executive_summary",
+      "score": 9,
+      "targetScore": 8,
+      "passesTarget": true,
+      "issueCount": 0,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "actions": [
+        "No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending."
+      ]
+    },
+    {
+      "section": "brief_requirements",
+      "score": 9,
+      "targetScore": 8,
+      "passesTarget": true,
+      "issueCount": 0,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "actions": [
+        "No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending."
+      ]
+    },
+    {
+      "section": "design_modules",
+      "score": 9,
+      "targetScore": 8,
+      "passesTarget": true,
+      "issueCount": 0,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "actions": [
+        "No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending."
+      ]
+    },
+    {
+      "section": "bom",
+      "score": 9,
+      "targetScore": 8,
+      "passesTarget": true,
+      "issueCount": 0,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "actions": [
+        "No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending."
+      ]
+    },
+    {
+      "section": "feasibility_notes",
+      "score": 9,
+      "targetScore": 8,
+      "passesTarget": true,
+      "issueCount": 0,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "actions": [
+        "No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending."
+      ]
+    },
+    {
+      "section": "sources_references",
+      "score": 9,
+      "targetScore": 8,
+      "passesTarget": true,
+      "issueCount": 0,
+      "blockerCount": 0,
+      "majorCount": 0,
+      "minorCount": 0,
+      "actions": [
+        "No deterministic issue currently blocks this section from the target score; external verification evidence may still be pending."
+      ]
+    }
+  ],
+  "promotionBlockers": [],
+  "nextActions": []
+}

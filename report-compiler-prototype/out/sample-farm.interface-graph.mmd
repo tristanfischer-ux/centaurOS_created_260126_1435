@@ -1,0 +1,14 @@
+flowchart LR
+  structure_containment["Growing Structure And Containment"]
+  environmental_interface["Light Climate And Gas Environment"]
+  mass_fluid_transport_process["Nutrient And Water Transport Process"]
+  sensing_instrumentation["Crop And Process Instrumentation"]
+  control_compute_communication["Recipe Control And Communications"]
+  power_distribution["Wet-Zone Power Distribution"]
+  safety_protection["Food-Safe Safety And Protection"]
+  maintenance_serviceability["Harvest Cleaning And Serviceability"]
+  hmi_ergonomics["Operator HMI And Labelling"]
+  control_compute_communication -->|"actuator_bus"| environmental_interface
+  control_compute_communication -->|"actuator_bus"| mass_fluid_transport_process
+  environmental_interface -->|"sensor_bus"| mass_fluid_transport_process
+  classDef missing stroke:#a32626,stroke-width:3px,color:#a32626;

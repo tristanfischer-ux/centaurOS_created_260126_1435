@@ -14,6 +14,7 @@
 import type { Module, RiskRow, StageResult } from '../types'
 import { sanitiseLlmOutput } from '../sanitiser'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
+import { getActionLogger } from '../lib/action-logger'
 
 // ─── FMEA prompt ──────────────────────────────────────────────────────────────
 
@@ -74,6 +75,7 @@ async function callFmeaLlm(systemPrompt: string, userContent: string): Promise<a
   for (const model of models) {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 180_000)
+    const t0 = Date.now()
 
     try {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -98,10 +100,20 @@ async function callFmeaLlm(systemPrompt: string, userContent: string): Promise<a
       clearTimeout(timeout)
 
       if (!response.ok) {
+        getActionLogger().logLlm({ step_name: 'fmea_generation', model, latency_ms: Date.now() - t0, ok: false, error: `OpenRouter ${response.status}` })
         throw new Error(`OpenRouter API returned status: ${response.status}`)
       }
 
       const json = await response.json()
+      getActionLogger().logLlm({
+        step_name: 'fmea_generation',
+        model,
+        prompt_tokens: json?.usage?.prompt_tokens,
+        completion_tokens: json?.usage?.completion_tokens,
+        latency_ms: Date.now() - t0,
+        finish_reason: json?.choices?.[0]?.finish_reason,
+        ok: true,
+      })
       const msg = json.choices?.[0]?.message
       let raw = msg?.content || msg?.reasoning || ''
       if (!raw && msg?.reasoning_details?.length) {

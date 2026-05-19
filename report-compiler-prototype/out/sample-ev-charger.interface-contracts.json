@@ -1,0 +1,624 @@
+{
+  "summary": {
+    "requiredContracts": 6,
+    "presentContracts": 6,
+    "missingContracts": 0,
+    "sharedInterfaces": 15,
+    "localOnlyInterfaces": 4
+  },
+  "requiredContracts": [
+    {
+      "id": "required:power_distribution:energy_conversion_transduction:ac_input_bus",
+      "interfaceId": "ac_input_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "power_distribution",
+        "moduleName": "AC Input And DC Output Distribution",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "ac_input_switchgear",
+            "subModuleName": "AC input switchgear",
+            "componentWordIds": [
+              "ac_input_breaker_and_spd",
+              "lockable_ac_isolator",
+              "surge_arrestor_cartridge",
+              "input_terminal_shroud"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "energy_conversion_transduction",
+        "moduleName": "Power Conversion Stack",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "rectifier_power_modules",
+            "subModuleName": "Rectifier power modules",
+            "componentWordIds": [
+              "power_module_stack",
+              "power_module_backplane",
+              "module_locking_rail",
+              "dc_link_capacitor_bank"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Grid input switchgear must feed the power-conversion stack over a protected AC bus.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:energy_conversion_transduction:charging_connector_interface:dc_output_bus",
+      "interfaceId": "dc_output_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "energy_conversion_transduction",
+        "moduleName": "Power Conversion Stack",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "rectifier_power_modules",
+            "subModuleName": "Rectifier power modules",
+            "componentWordIds": [
+              "power_module_stack",
+              "power_module_backplane",
+              "module_locking_rail",
+              "dc_link_capacitor_bank"
+            ]
+          },
+          {
+            "subModuleId": "output_filtering",
+            "subModuleName": "Output filtering",
+            "componentWordIds": [
+              "dc_output_choke",
+              "emi_filter_assembly",
+              "snubber_network_board",
+              "thermal_interface_pad_set"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "charging_connector_interface",
+        "moduleName": "Vehicle Charging Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "ccs2_cable_connector",
+            "subModuleName": "CCS2 cable connector",
+            "componentWordIds": [
+              "ccs2_liquid_cooled_cable_and_connector",
+              "connector_temperature_sensor_pair",
+              "proximity_pilot_resistor_set",
+              "cable_strain_relief_boot"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Power modules must feed the CCS2 connector over a protected DC output bus.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:control_compute_communication:charging_connector_interface:iso15118_plc",
+      "interfaceId": "iso15118_plc",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "protocol_stack",
+            "subModuleName": "Vehicle protocol stack",
+            "componentWordIds": [
+              "iso_15118_plc_modem",
+              "plug_and_charge_certificate_store",
+              "charging_session_firmware_image",
+              "protocol_debug_header"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "charging_connector_interface",
+        "moduleName": "Vehicle Charging Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "vehicle_communication_frontend",
+            "subModuleName": "Vehicle communication frontend",
+            "componentWordIds": [
+              "iso_15118_plc_modem",
+              "control_pilot_interface_board",
+              "proximity_detection_input",
+              "vehicle_comms_isolation_transformer"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Charge controller must communicate with the vehicle for ISO 15118 / PLC handshakes.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:control_compute_communication:energy_conversion_transduction:control_bus",
+      "interfaceId": "control_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "charge_controller",
+            "subModuleName": "Charge controller",
+            "componentWordIds": [
+              "charge_controller_pcb",
+              "safety_io_terminal_block",
+              "real_time_clock_module",
+              "nonvolatile_event_log_memory"
+            ]
+          },
+          {
+            "subModuleId": "protocol_stack",
+            "subModuleName": "Vehicle protocol stack",
+            "componentWordIds": [
+              "iso_15118_plc_modem",
+              "plug_and_charge_certificate_store",
+              "charging_session_firmware_image",
+              "protocol_debug_header"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "energy_conversion_transduction",
+        "moduleName": "Power Conversion Stack",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "rectifier_power_modules",
+            "subModuleName": "Rectifier power modules",
+            "componentWordIds": [
+              "power_module_stack",
+              "power_module_backplane",
+              "module_locking_rail",
+              "dc_link_capacitor_bank"
+            ]
+          },
+          {
+            "subModuleId": "converter_supervision",
+            "subModuleName": "Converter supervision",
+            "componentWordIds": [
+              "module_health_monitor_board",
+              "heatsink_temperature_probe",
+              "fan_coolant_derating_table",
+              "firmware_recovery_jumper"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Charge controller must command power module output states.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:sensing_instrumentation:control_compute_communication:metering_bus",
+      "interfaceId": "metering_bus",
+      "status": "present",
+      "from": {
+        "moduleId": "sensing_instrumentation",
+        "moduleName": "Metering And Electrical Sensing",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "energy_metering",
+            "subModuleName": "Energy metering",
+            "componentWordIds": [
+              "mid_energy_meter",
+              "dc_voltage_transducer",
+              "dc_current_shunt",
+              "meter_pulse_output_isolator"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "control_compute_communication",
+        "moduleName": "Control Compute Communication",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "charge_controller",
+            "subModuleName": "Charge controller",
+            "componentWordIds": [
+              "charge_controller_pcb",
+              "safety_io_terminal_block",
+              "real_time_clock_module",
+              "nonvolatile_event_log_memory"
+            ]
+          },
+          {
+            "subModuleId": "protocol_stack",
+            "subModuleName": "Vehicle protocol stack",
+            "componentWordIds": [
+              "iso_15118_plc_modem",
+              "plug_and_charge_certificate_store",
+              "charging_session_firmware_image",
+              "protocol_debug_header"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Energy and safety measurements must feed session control and billing.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    },
+    {
+      "id": "required:environmental_interface:energy_conversion_transduction:coolant_loop",
+      "interfaceId": "coolant_loop",
+      "status": "present",
+      "from": {
+        "moduleId": "environmental_interface",
+        "moduleName": "Thermal And Environmental Interface",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "liquid_cooling_loop",
+            "subModuleName": "Liquid cooling loop",
+            "componentWordIds": [
+              "cooling_loop_assembly",
+              "coolant_pump",
+              "plate_radiator",
+              "coolant_reservoir"
+            ]
+          },
+          {
+            "subModuleId": "thermal_air_path",
+            "subModuleName": "Thermal air path",
+            "componentWordIds": [
+              "cabinet_fan_tray",
+              "inlet_filter_mat",
+              "exhaust_louvre_assembly",
+              "airflow_proving_switch"
+            ]
+          }
+        ]
+      },
+      "to": {
+        "moduleId": "energy_conversion_transduction",
+        "moduleName": "Power Conversion Stack",
+        "moduleDeclaresInterface": true,
+        "carrierSubModules": [
+          {
+            "subModuleId": "rectifier_power_modules",
+            "subModuleName": "Rectifier power modules",
+            "componentWordIds": [
+              "power_module_stack",
+              "power_module_backplane",
+              "module_locking_rail",
+              "dc_link_capacitor_bank"
+            ]
+          },
+          {
+            "subModuleId": "converter_supervision",
+            "subModuleName": "Converter supervision",
+            "componentWordIds": [
+              "module_health_monitor_board",
+              "heatsink_temperature_probe",
+              "fan_coolant_derating_table",
+              "firmware_recovery_jumper"
+            ]
+          }
+        ]
+      },
+      "engineeringReason": "Power conversion heat must couple into the charger cooling loop.",
+      "notes": [
+        "Both endpoints expose the required interface through at least one submodule carrier."
+      ]
+    }
+  ],
+  "sharedInterfaces": [
+    {
+      "interfaceId": "airflow_path",
+      "status": "local_only",
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Thermal And Environmental Interface"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "condensate_drain",
+      "status": "local_only",
+      "moduleIds": [
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Thermal And Environmental Interface"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "emergency_stop",
+      "status": "local_only",
+      "moduleIds": [
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Safety Protection"
+      ],
+      "carrierSubModuleCount": 1
+    },
+    {
+      "interfaceId": "mechanical_mounts",
+      "status": "local_only",
+      "moduleIds": [
+        "structure_containment"
+      ],
+      "moduleNames": [
+        "Cabinet Structure And Containment"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "ac_input_bus",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "energy_conversion_transduction"
+      ],
+      "moduleNames": [
+        "AC Input And DC Output Distribution",
+        "Power Conversion Stack"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "alarm_bus",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Control Compute Communication",
+        "Metering And Electrical Sensing",
+        "Safety Protection"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "ccs2_vehicle_interface",
+      "status": "shared",
+      "moduleIds": [
+        "charging_connector_interface",
+        "sensing_instrumentation",
+        "structure_containment",
+        "safety_protection",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Vehicle Charging Interface",
+        "Metering And Electrical Sensing",
+        "Cabinet Structure And Containment",
+        "Safety Protection",
+        "User Payment And HMI"
+      ],
+      "carrierSubModuleCount": 6
+    },
+    {
+      "interfaceId": "control_bus",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "energy_conversion_transduction",
+        "charging_connector_interface",
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "safety_protection",
+        "maintenance_serviceability",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "AC Input And DC Output Distribution",
+        "Power Conversion Stack",
+        "Vehicle Charging Interface",
+        "Control Compute Communication",
+        "Metering And Electrical Sensing",
+        "Safety Protection",
+        "Maintenance And Commissioning",
+        "User Payment And HMI"
+      ],
+      "carrierSubModuleCount": 11
+    },
+    {
+      "interfaceId": "control_pilot",
+      "status": "shared",
+      "moduleIds": [
+        "charging_connector_interface",
+        "sensing_instrumentation"
+      ],
+      "moduleNames": [
+        "Vehicle Charging Interface",
+        "Metering And Electrical Sensing"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "coolant_loop",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "charging_connector_interface",
+        "environmental_interface",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Power Conversion Stack",
+        "Vehicle Charging Interface",
+        "Thermal And Environmental Interface",
+        "Maintenance And Commissioning"
+      ],
+      "carrierSubModuleCount": 6
+    },
+    {
+      "interfaceId": "dc_output_bus",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "energy_conversion_transduction",
+        "charging_connector_interface",
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "AC Input And DC Output Distribution",
+        "Power Conversion Stack",
+        "Vehicle Charging Interface",
+        "Metering And Electrical Sensing",
+        "Safety Protection"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "insulation_monitoring",
+      "status": "shared",
+      "moduleIds": [
+        "sensing_instrumentation",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "Metering And Electrical Sensing",
+        "Safety Protection"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "iso15118_plc",
+      "status": "shared",
+      "moduleIds": [
+        "charging_connector_interface",
+        "control_compute_communication"
+      ],
+      "moduleNames": [
+        "Vehicle Charging Interface",
+        "Control Compute Communication"
+      ],
+      "carrierSubModuleCount": 2
+    },
+    {
+      "interfaceId": "metering_bus",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "control_compute_communication",
+        "sensing_instrumentation",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "AC Input And DC Output Distribution",
+        "Control Compute Communication",
+        "Metering And Electrical Sensing",
+        "Maintenance And Commissioning"
+      ],
+      "carrierSubModuleCount": 5
+    },
+    {
+      "interfaceId": "ocpp_network",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "maintenance_serviceability",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "Control Compute Communication",
+        "Maintenance And Commissioning",
+        "User Payment And HMI"
+      ],
+      "carrierSubModuleCount": 4
+    },
+    {
+      "interfaceId": "protective_earth",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "energy_conversion_transduction",
+        "charging_connector_interface",
+        "environmental_interface",
+        "structure_containment",
+        "safety_protection"
+      ],
+      "moduleNames": [
+        "AC Input And DC Output Distribution",
+        "Power Conversion Stack",
+        "Vehicle Charging Interface",
+        "Thermal And Environmental Interface",
+        "Cabinet Structure And Containment",
+        "Safety Protection"
+      ],
+      "carrierSubModuleCount": 8
+    },
+    {
+      "interfaceId": "sensor_bus",
+      "status": "shared",
+      "moduleIds": [
+        "energy_conversion_transduction",
+        "sensing_instrumentation",
+        "environmental_interface"
+      ],
+      "moduleNames": [
+        "Power Conversion Stack",
+        "Metering And Electrical Sensing",
+        "Thermal And Environmental Interface"
+      ],
+      "carrierSubModuleCount": 3
+    },
+    {
+      "interfaceId": "service_access",
+      "status": "shared",
+      "moduleIds": [
+        "power_distribution",
+        "charging_connector_interface",
+        "environmental_interface",
+        "structure_containment",
+        "maintenance_serviceability",
+        "hmi_ergonomics"
+      ],
+      "moduleNames": [
+        "AC Input And DC Output Distribution",
+        "Vehicle Charging Interface",
+        "Thermal And Environmental Interface",
+        "Cabinet Structure And Containment",
+        "Maintenance And Commissioning",
+        "User Payment And HMI"
+      ],
+      "carrierSubModuleCount": 10
+    },
+    {
+      "interfaceId": "service_port",
+      "status": "shared",
+      "moduleIds": [
+        "control_compute_communication",
+        "maintenance_serviceability"
+      ],
+      "moduleNames": [
+        "Control Compute Communication",
+        "Maintenance And Commissioning"
+      ],
+      "carrierSubModuleCount": 3
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "summary": {
+    "rows": 2,
+    "withinEnvelope": 1,
+    "needsReview": 1,
+    "outsideEnvelope": 0,
+    "blocked": 0
+  },
+  "rows": [
+    {
+      "id": "drone_endurance_hours",
+      "status": "within_envelope",
+      "label": "Drone endurance hours",
+      "formula": "duration_minutes / 60",
+      "inputs": {
+        "duration_minutes": 40
+      },
+      "result": 0.67,
+      "unit": "h",
+      "envelope": "0.25 to 1.0 h is plausible for prosumer multirotor concepts before battery and payload proof.",
+      "interpretation": "0.67 h endurance converted from minutes.",
+      "evidenceRequired": "Confirm payload mass, hover power, battery usable energy, reserve margin, wind and take-off weight.",
+      "linkedRequirements": [
+        "duration_minutes"
+      ]
+    },
+    {
+      "id": "drone_reserve_time_minutes",
+      "status": "needs_review",
+      "label": "Drone 20% reserve time",
+      "formula": "duration_minutes * 0.2",
+      "inputs": {
+        "duration_minutes": 40,
+        "reserve_fraction": 0.2
+      },
+      "result": 8,
+      "unit": "minutes",
+      "envelope": "Reserve planning marker only; flight controller failsafe needs detailed energy budget.",
+      "interpretation": "8 minutes reserved at 20% of stated endurance.",
+      "evidenceRequired": "Confirm return-to-home reserve, hover reserve, battery ageing, wind case and payload power.",
+      "linkedRequirements": [
+        "duration_minutes"
+      ]
+    }
+  ]
+}

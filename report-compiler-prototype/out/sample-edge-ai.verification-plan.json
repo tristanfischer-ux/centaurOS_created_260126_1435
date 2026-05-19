@@ -1,0 +1,1247 @@
+{
+  "summary": {
+    "activities": 39,
+    "readyForReview": 25,
+    "open": 6,
+    "blocked": 8,
+    "designReviewActivities": 10,
+    "calculationActivities": 7,
+    "interfaceReviewActivities": 8,
+    "sourceEvidenceActivities": 8,
+    "complianceReviewActivities": 6
+  },
+  "activities": [
+    {
+      "id": "design_review:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Rack Structure Containment",
+      "activity": "Review Rack Structure Containment architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "rack_units"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [
+        "rack_mount",
+        "airflow_path",
+        "service_access",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "1u_rack_chassis",
+        "slide_rail_kit",
+        "internal_divider_panel",
+        "front_bezel_assembly",
+        "accelerator_retention_bracket",
+        "pcie_riser_support",
+        "card_stiffener_rail",
+        "gpu_airflow_baffle",
+        "asset_label_plate",
+        "airflow_direction_label",
+        "rack_ear_set",
+        "cable_management_arm"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Rack Structure Containment",
+      "activity": "Verify Rack Structure Containment requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "rack_units"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:structure_containment",
+      "moduleId": "structure_containment",
+      "moduleName": "Rack Structure Containment",
+      "activity": "Collect source-backed evidence for Rack Structure Containment critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "rack_units"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "1u_rack_chassis"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "1u_rack_chassis"
+      ]
+    },
+    {
+      "id": "design_review:compute_acceleration",
+      "moduleId": "compute_acceleration",
+      "moduleName": "Compute Acceleration",
+      "activity": "Review Compute Acceleration architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "compute_tops"
+      ],
+      "sanityCheckIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [
+        "pcie_fabric",
+        "memory_bus",
+        "gpu_power_bus",
+        "thermal_path",
+        "sensor_bus",
+        "low_voltage_rail"
+      ],
+      "componentWordIds": [
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard",
+        "boot_flash_device",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:compute_acceleration",
+      "moduleId": "compute_acceleration",
+      "moduleName": "Compute Acceleration",
+      "activity": "Verify Compute Acceleration requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "compute_tops"
+      ],
+      "sanityCheckIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:compute_acceleration",
+      "moduleId": "compute_acceleration",
+      "moduleName": "Compute Acceleration",
+      "activity": "Collect source-backed evidence for Compute Acceleration critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "compute_tops"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "ai_accelerator_module",
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "ai_accelerator_module",
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard"
+      ]
+    },
+    {
+      "id": "design_review:network_io",
+      "moduleId": "network_io",
+      "moduleName": "Network IO",
+      "activity": "Review Network IO architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "inference_network",
+        "management_network",
+        "pcie_fabric",
+        "service_access",
+        "protective_earth"
+      ],
+      "componentWordIds": [
+        "high_speed_nic",
+        "optical_transceiver_cage",
+        "nic_heatsink",
+        "network_link_led_board",
+        "ptp_timing_module",
+        "gpio_trigger_input",
+        "data_ingest_connector",
+        "network_bypass_relay",
+        "emi_gasket_strip",
+        "shielded_io_bracket",
+        "cable_strain_relief_comb",
+        "service_loop_tie_set"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:network_io",
+      "moduleId": "network_io",
+      "moduleName": "Network IO",
+      "activity": "Collect source-backed evidence for Network IO critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "high_speed_nic"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "high_speed_nic"
+      ]
+    },
+    {
+      "id": "design_review:data_storage",
+      "moduleId": "data_storage",
+      "moduleName": "Data Storage",
+      "activity": "Review Data Storage architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "storage_bus",
+        "pcie_fabric",
+        "service_access",
+        "secure_boot_chain",
+        "management_network"
+      ],
+      "componentWordIds": [
+        "nvme_ssd",
+        "m_2_carrier_tray",
+        "drive_thermal_pad",
+        "drive_retention_screw_set",
+        "model_cache_partition",
+        "storage_health_monitor",
+        "secure_erase_controller",
+        "firmware_recovery_image",
+        "event_log_partition",
+        "write_endurance_counter",
+        "crash_dump_region",
+        "log_export_port"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:data_storage",
+      "moduleId": "data_storage",
+      "moduleName": "Data Storage",
+      "activity": "Collect source-backed evidence for Data Storage critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "nvme_ssd"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "nvme_ssd"
+      ]
+    },
+    {
+      "id": "design_review:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "activity": "Review Control Compute Communication architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "compute_tops"
+      ],
+      "sanityCheckIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [
+        "pcie_fabric",
+        "storage_bus",
+        "management_network",
+        "inference_network",
+        "sensor_bus",
+        "thermal_alarm_bus",
+        "secure_boot_chain",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest",
+        "out_of_band_management_port",
+        "serial_console_header",
+        "debug_access_lockout",
+        "firmware_signing_key_slot"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "activity": "Verify Control Compute Communication requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "compute_tops"
+      ],
+      "sanityCheckIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:control_compute_communication",
+      "moduleId": "control_compute_communication",
+      "moduleName": "Control Compute Communication",
+      "activity": "Collect source-backed evidence for Control Compute Communication critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "compute_tops"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "bmc_management_controller"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "bmc_management_controller"
+      ]
+    },
+    {
+      "id": "design_review:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "activity": "Review Power Distribution architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [
+        "ac_input_bus",
+        "low_voltage_rail",
+        "gpu_power_bus",
+        "protective_earth",
+        "hardwired_trip",
+        "sensor_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "redundant_power_supply",
+        "ac_inlet_filter",
+        "input_fuse_holder",
+        "power_good_signal_harness",
+        "12_v_busbar",
+        "accelerator_power_harness",
+        "hot_swap_controller",
+        "fan_power_distribution_loom",
+        "hold_up_capacitor_module",
+        "brownout_detector",
+        "current_shunt_module",
+        "efuse_channel_set"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "activity": "Verify Power Distribution requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:power_distribution",
+      "moduleId": "power_distribution",
+      "moduleName": "Power Distribution",
+      "activity": "Collect source-backed evidence for Power Distribution critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "redundant_power_supply"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "redundant_power_supply"
+      ]
+    },
+    {
+      "id": "design_review:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Airflow Interface",
+      "activity": "Review Thermal Airflow Interface architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety",
+        "edgeai_power_density"
+      ],
+      "interfaceIds": [
+        "airflow_path",
+        "thermal_path",
+        "fan_control_bus",
+        "sensor_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "fan_wall_assembly",
+        "pwm_fan_controller",
+        "airflow_straightener",
+        "replaceable_dust_filter",
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct",
+        "front_inlet_grille",
+        "rear_exhaust_grille",
+        "air_seal_foam_kit",
+        "rack_pressure_map_label"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Airflow Interface",
+      "activity": "Verify Thermal Airflow Interface requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [
+        "edgeai_compute_throughput",
+        "edgeai_data_compute_closure",
+        "edgeai_thermal_power_safety",
+        "edgeai_power_density"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:environmental_interface",
+      "moduleId": "environmental_interface",
+      "moduleName": "Thermal Airflow Interface",
+      "activity": "Collect source-backed evidence for Thermal Airflow Interface critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "compute_tops",
+        "rack_units",
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "fan_wall_assembly",
+        "heatsink_cold_plate"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "fan_wall_assembly",
+        "heatsink_cold_plate"
+      ]
+    },
+    {
+      "id": "design_review:sensing_instrumentation",
+      "moduleId": "sensing_instrumentation",
+      "moduleName": "Telemetry Instrumentation",
+      "activity": "Review Telemetry Instrumentation architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_bus",
+        "management_network",
+        "thermal_alarm_bus",
+        "fan_control_bus",
+        "service_access"
+      ],
+      "componentWordIds": [
+        "inlet_temperature_sensor",
+        "accelerator_hotspot_sensor",
+        "exhaust_temperature_sensor",
+        "board_humidity_sensor",
+        "psu_pmbus_monitor",
+        "rail_current_monitor",
+        "fan_tachometer_hub",
+        "chassis_intrusion_switch",
+        "front_status_led_board",
+        "uid_button",
+        "alarm_buzzer",
+        "lcd_status_panel"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "design_review:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Security And Safety Protection",
+      "activity": "Review Security And Safety Protection architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [
+        "secure_boot_chain",
+        "thermal_alarm_bus",
+        "hardwired_trip",
+        "protective_earth",
+        "service_access",
+        "management_network",
+        "fan_control_bus"
+      ],
+      "componentWordIds": [
+        "tpm_security_module",
+        "secure_boot_policy",
+        "chassis_tamper_switch",
+        "recovery_jumper_cover",
+        "thermal_trip_relay",
+        "overtemperature_latch",
+        "fan_failure_interlock",
+        "hardwired_shutdown_line",
+        "protective_earth_stud",
+        "insulation_barrier_sheet",
+        "finger_safe_psu_cover",
+        "warning_label_set"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Security And Safety Protection",
+      "activity": "Verify Security And Safety Protection requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "source_evidence:safety_protection",
+      "moduleId": "safety_protection",
+      "moduleName": "Security And Safety Protection",
+      "activity": "Collect source-backed evidence for Security And Safety Protection critical components",
+      "evidenceKind": "source_evidence",
+      "status": "blocked",
+      "requirementIds": [
+        "power_budget_w"
+      ],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [
+        "tpm_security_module"
+      ],
+      "rationale": "Critical component candidates may support architecture review, but BoM cost/manufacturer/MPN claims are blocked until source-backed evidence is admitted.",
+      "acceptanceCriteria": [
+        "Supplier name, manufacturer or equivalent, MPN where applicable, unit cost and source URL/reference are present.",
+        "Evidence is explicitly retrieved and admissible under the sourcing admission protocol.",
+        "Claimed quantity and component identity match the architecture candidate line."
+      ],
+      "blockers": [
+        "tpm_security_module"
+      ]
+    },
+    {
+      "id": "design_review:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance Serviceability",
+      "activity": "Review Field Maintenance Serviceability architecture allocation",
+      "evidenceKind": "design_review",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "rack_units"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [
+        "service_access",
+        "rack_mount",
+        "management_network",
+        "airflow_path",
+        "secure_boot_chain"
+      ],
+      "componentWordIds": [
+        "hot_swap_fan_carrier",
+        "drive_service_handle",
+        "psu_latch_mechanism",
+        "accelerator_extraction_handle",
+        "rack_rail_kit",
+        "rear_support_bracket",
+        "cable_retention_comb",
+        "airflow_blanking_panel",
+        "service_checklist_card",
+        "firmware_version_label",
+        "spare_screw_kit",
+        "diagnostics_usb_key"
+      ],
+      "rationale": "Confirm the module has a coherent purpose, submodule breakdown, interfaces and component allocation before any procurement work.",
+      "acceptanceCriteria": [
+        "Every submodule has a stated purpose and at least one component candidate.",
+        "Interfaces named on the module are carried by the responsible submodule where the design depends on that interface.",
+        "No blocker or major architecture issue is attached to the module."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "calculation:maintenance_serviceability",
+      "moduleId": "maintenance_serviceability",
+      "moduleName": "Field Maintenance Serviceability",
+      "activity": "Verify Field Maintenance Serviceability requirement calculations",
+      "evidenceKind": "calculation",
+      "status": "ready_for_review",
+      "requirementIds": [
+        "rack_units"
+      ],
+      "sanityCheckIds": [
+        "edgeai_power_density",
+        "edgeai_thermal_power_safety"
+      ],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Tie parsed brief requirements to explicit engineering calculations or sanity checks before accepting the design envelope.",
+      "acceptanceCriteria": [
+        "Each linked requirement has a calculation, sanity check or clearly stated deferred validation path.",
+        "No linked sanity check is failing.",
+        "Warnings have named follow-up calculations or test evidence."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:control_compute_communication:compute_acceleration:pcie_fabric",
+      "moduleId": "control_compute_communication:compute_acceleration",
+      "moduleName": "Control Compute Communication -> Compute Acceleration",
+      "activity": "Verify pcie_fabric interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "pcie_fabric"
+      ],
+      "componentWordIds": [
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest",
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "cpu_module",
+        "ecc_memory",
+        "system_motherboard",
+        "boot_flash_device",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "rationale": "Host control must enumerate and command the accelerator over a declared PCIe fabric.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:power_distribution:compute_acceleration:gpu_power_bus",
+      "moduleId": "power_distribution:compute_acceleration",
+      "moduleName": "Power Distribution -> Compute Acceleration",
+      "activity": "Verify gpu_power_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "gpu_power_bus"
+      ],
+      "componentWordIds": [
+        "12_v_busbar",
+        "accelerator_power_harness",
+        "hot_swap_controller",
+        "fan_power_distribution_loom",
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "rationale": "Accelerator power must be isolated from lower-power appliance rails.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:network_io:control_compute_communication:inference_network",
+      "moduleId": "network_io:control_compute_communication",
+      "moduleName": "Network IO -> Control Compute Communication",
+      "activity": "Verify inference_network interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "inference_network"
+      ],
+      "componentWordIds": [
+        "high_speed_nic",
+        "optical_transceiver_cage",
+        "nic_heatsink",
+        "network_link_led_board",
+        "ptp_timing_module",
+        "gpio_trigger_input",
+        "data_ingest_connector",
+        "network_bypass_relay",
+        "emi_gasket_strip",
+        "shielded_io_bracket",
+        "cable_strain_relief_comb",
+        "service_loop_tie_set",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest"
+      ],
+      "rationale": "Inference traffic must reach host software and runtime orchestration.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:data_storage:control_compute_communication:storage_bus",
+      "moduleId": "data_storage:control_compute_communication",
+      "moduleName": "Data Storage -> Control Compute Communication",
+      "activity": "Verify storage_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "storage_bus"
+      ],
+      "componentWordIds": [
+        "nvme_ssd",
+        "m_2_carrier_tray",
+        "drive_thermal_pad",
+        "drive_retention_screw_set",
+        "model_cache_partition",
+        "storage_health_monitor",
+        "secure_erase_controller",
+        "firmware_recovery_image",
+        "event_log_partition",
+        "write_endurance_counter",
+        "crash_dump_region",
+        "log_export_port",
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom",
+        "inference_runtime_image",
+        "accelerator_driver_bundle",
+        "watchdog_service",
+        "configuration_manifest"
+      ],
+      "rationale": "Model cache and logs must be visible to host software.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:environmental_interface:compute_acceleration:thermal_path",
+      "moduleId": "environmental_interface:compute_acceleration",
+      "moduleName": "Thermal Airflow Interface -> Compute Acceleration",
+      "activity": "Verify thermal_path interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "thermal_path"
+      ],
+      "componentWordIds": [
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct",
+        "ai_accelerator_module",
+        "accelerator_carrier_board",
+        "pcie_edge_connector",
+        "accelerator_retention_latch",
+        "high_current_vrm_module",
+        "pcie_retimer_set",
+        "clock_distribution_device",
+        "power_integrity_capacitor_bank"
+      ],
+      "rationale": "Accelerator and CPU heat must couple into the cooling path.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:sensing_instrumentation:control_compute_communication:sensor_bus",
+      "moduleId": "sensing_instrumentation:control_compute_communication",
+      "moduleName": "Telemetry Instrumentation -> Control Compute Communication",
+      "activity": "Verify sensor_bus interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "sensor_bus"
+      ],
+      "componentWordIds": [
+        "inlet_temperature_sensor",
+        "accelerator_hotspot_sensor",
+        "exhaust_temperature_sensor",
+        "board_humidity_sensor",
+        "psu_pmbus_monitor",
+        "rail_current_monitor",
+        "fan_tachometer_hub",
+        "chassis_intrusion_switch",
+        "front_status_led_board",
+        "uid_button",
+        "alarm_buzzer",
+        "lcd_status_panel",
+        "bmc_management_controller",
+        "management_ethernet_phy",
+        "bios_firmware_image",
+        "platform_configuration_eeprom"
+      ],
+      "rationale": "Thermal and power telemetry must feed management control.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:safety_protection:power_distribution:hardwired_trip",
+      "moduleId": "safety_protection:power_distribution",
+      "moduleName": "Security And Safety Protection -> Power Distribution",
+      "activity": "Verify hardwired_trip interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "hardwired_trip"
+      ],
+      "componentWordIds": [
+        "thermal_trip_relay",
+        "overtemperature_latch",
+        "fan_failure_interlock",
+        "hardwired_shutdown_line",
+        "protective_earth_stud",
+        "insulation_barrier_sheet",
+        "finger_safe_psu_cover",
+        "warning_label_set",
+        "hold_up_capacitor_module",
+        "brownout_detector",
+        "current_shunt_module",
+        "efuse_channel_set"
+      ],
+      "rationale": "Thermal and electrical safety faults must force power shutdown.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "interface_review:structure_containment:environmental_interface:airflow_path",
+      "moduleId": "structure_containment:environmental_interface",
+      "moduleName": "Rack Structure Containment -> Thermal Airflow Interface",
+      "activity": "Verify airflow_path interface contract",
+      "evidenceKind": "interface_review",
+      "status": "ready_for_review",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [
+        "airflow_path"
+      ],
+      "componentWordIds": [
+        "1u_rack_chassis",
+        "slide_rail_kit",
+        "internal_divider_panel",
+        "front_bezel_assembly",
+        "accelerator_retention_bracket",
+        "pcie_riser_support",
+        "card_stiffener_rail",
+        "gpu_airflow_baffle",
+        "fan_wall_assembly",
+        "pwm_fan_controller",
+        "airflow_straightener",
+        "replaceable_dust_filter",
+        "heatsink_cold_plate",
+        "thermal_interface_material_set",
+        "heatpipe_assembly",
+        "rear_exhaust_duct",
+        "front_inlet_grille",
+        "rear_exhaust_grille",
+        "air_seal_foam_kit",
+        "rack_pressure_map_label"
+      ],
+      "rationale": "The rack chassis must preserve the front-to-back airflow path used by cooling.",
+      "acceptanceCriteria": [
+        "Both endpoint modules declare the interface.",
+        "At least one submodule carrier is named on each endpoint.",
+        "Electrical, thermal, fluid, mechanical or data capacity is validated by the next detailed design pass."
+      ],
+      "blockers": []
+    },
+    {
+      "id": "compliance_review:IEC-62368-1",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for IEC-62368-1",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Audio/video, ICT and communication equipment safety",
+      "acceptanceCriteria": [
+        "Electrical safety, enclosure, temperature and abnormal-operation evidence."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:CE-EMC",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for CE-EMC",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Electromagnetic compatibility technical file",
+      "acceptanceCriteria": [
+        "EMC design review, pre-compliance or test evidence for rack appliance."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "compliance_review:SECURE-BOOT-REVIEW",
+      "moduleId": "system_compliance",
+      "moduleName": "System Compliance",
+      "activity": "Plan evidence for SECURE-BOOT-REVIEW",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Secure boot and fleet-management review",
+      "acceptanceCriteria": [
+        "TPM, measured boot, firmware signing, recovery and management-access evidence."
+      ],
+      "blockers": [
+        "Compliance evidence not yet collected in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:1",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Accelerator thermal throttling or shutdown under rack inlet conditions",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 128; mitigation: Thermal path sizing, inlet derating, fan redundancy and telemetry alarms.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:2",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Insecure firmware or management interface compromise",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 135; mitigation: TPM measured boot, signed firmware, locked debug access and management-network controls.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    },
+    {
+      "id": "risk_review:3",
+      "moduleId": "system_risk",
+      "moduleName": "System Risk Register",
+      "activity": "Review risk control for Inference outage from PSU, fan or SSD failure",
+      "evidenceKind": "compliance_review",
+      "status": "open",
+      "requirementIds": [],
+      "sanityCheckIds": [],
+      "interfaceIds": [],
+      "componentWordIds": [],
+      "rationale": "Provisional RPN 112; mitigation: Redundant PSU path, hot-swap fans, storage health monitoring and runtime failover policy.",
+      "acceptanceCriteria": [
+        "Severity, occurrence and detection ratings have been reviewed by a domain owner.",
+        "Mitigation is accepted, corrected or converted into a design action.",
+        "Any residual high-risk item has an owner before publication."
+      ],
+      "blockers": [
+        "Risk evidence not yet reviewed in scratch prototype."
+      ]
+    }
+  ]
+}
