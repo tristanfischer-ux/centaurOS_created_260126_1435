@@ -1291,6 +1291,7 @@ function propagateBriefConstraintsToDesign(design: any, parsedBrief: any): { wri
 async function runReviewerStep(opts: {
   label: string
   model: string
+  fallbackModel?: string
   systemAppend?: string
   thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high'
   groundWithGoogleSearch?: boolean
@@ -1322,24 +1323,45 @@ ${densityTargets}
 Return the corrected JSON.`
 
   const before = summarise(opts.currentDesign.modules ?? [])
-  console.error(`\n[chain] ${opts.label} ...`)
-  const result = await callLlm({
-    model: opts.model,
-    system,
-    user,
-    maxTokens: MAX_TOKENS_BY_MODEL[opts.model] ?? 150_000,
-    thinkingLevel: opts.thinkingLevel,
-    groundWithGoogleSearch: opts.groundWithGoogleSearch,
-    timeoutMs: 1_500_000,
-  })
-  console.error(`[chain] ${opts.label} raw response: ${result.text.length} chars`)
 
-  // Parse patches response — small output, no truncation risk.
-  const patchResponse = await parseJson(result.text, {
-    stage: opts.label,
-    model: opts.model,
-    rawDumpPath: opts.rawDumpPath,
-  })
+  // Sprint 2D (Tristan 2026-05-20): primary model + optional fallback. If
+  // the primary model fails (request error or parseJson throws even after
+  // enableLlmRepair), retry once with the fallback. Universal — applies to
+  // every reviewer step (R1/R2/R3/R4) when a fallback is configured.
+  const tryOne = async (model: string, isRetry: boolean): Promise<{ patchResponse: any; result: any; modelUsed: string }> => {
+    const labelWithRetry = isRetry ? `${opts.label} (retry with ${model})` : opts.label
+    console.error(`\n[chain] ${labelWithRetry} ...`)
+    const result = await callLlm({
+      model,
+      system,
+      user,
+      maxTokens: MAX_TOKENS_BY_MODEL[model] ?? 150_000,
+      thinkingLevel: opts.thinkingLevel,
+      groundWithGoogleSearch: opts.groundWithGoogleSearch,
+      timeoutMs: 1_500_000,
+    })
+    console.error(`[chain] ${labelWithRetry} raw response: ${result.text.length} chars`)
+    const patchResponse = await parseJson(result.text, {
+      stage: labelWithRetry,
+      model,
+      rawDumpPath: opts.rawDumpPath,
+    })
+    return { patchResponse, result, modelUsed: model }
+  }
+
+  let attempt: { patchResponse: any; result: any; modelUsed: string }
+  try {
+    attempt = await tryOne(opts.model, false)
+  } catch (err) {
+    if (!opts.fallbackModel || opts.fallbackModel === opts.model) {
+      throw err
+    }
+    console.error(`[chain] ${opts.label} primary model ${opts.model} failed: ${(err as Error).message.slice(0, 200)}`)
+    console.error(`[chain] ${opts.label} falling back to ${opts.fallbackModel}`)
+    logAction({ step: `${opts.label}.fallback_triggered`, model: opts.model, error: String(err).slice(0, 200) })
+    attempt = await tryOne(opts.fallbackModel, true)
+  }
+  const { patchResponse, result, modelUsed: _modelUsed } = attempt
   const patches: any[] = Array.isArray(patchResponse?.patches) ? patchResponse.patches : []
   console.error(`[chain] ${opts.label} returned ${patches.length} patches`)
 
@@ -1689,15 +1711,23 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   logAction({ step: 'propagate_constraints', target_module: propagation.target_module, written: propagation.written })
 
   // ── Phase 1: Reviewers (identical template)
-  const r1 = await runReviewerStep({ label: 'STEP 5: R1 Grok 4.3', model: GROK_4_3, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, '5-r1-grok.raw.txt'), keyMetrics })
+  // Sprint 2D (Tristan 2026-05-20): each reviewer step has a fallback
+  // model in a different vendor family so a transient model failure
+  // (R2 GLM-5.1 truncated mid-stream in iter-9, KIMI K2.6 intermittently
+  // unavailable per MEMORY) doesn't kill the chain. The fallback uses a
+  // peer reviewer's model — same review-pass purpose, different
+  // tokeniser / JSON-emission style. Each fallback is the model that
+  // sits in the OTHER half of the reviewer pool so we don't both fail
+  // for a shared infra issue.
+  const r1 = await runReviewerStep({ label: 'STEP 5: R1 Grok 4.3', model: GROK_4_3, fallbackModel: QWEN_3_6_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, '5-r1-grok.raw.txt'), keyMetrics })
   design = r1.design
   writeFileSync(resolve(outDir, '5-r1-grok.json'), JSON.stringify(design, null, 2))
 
-  const r2 = await runReviewerStep({ label: 'STEP 6: R2 GLM-5.1', model: GLM_5_1, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, '6-r2-glm.raw.txt'), keyMetrics })
+  const r2 = await runReviewerStep({ label: 'STEP 6: R2 GLM-5.1', model: GLM_5_1, fallbackModel: GROK_4_3, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, '6-r2-glm.raw.txt'), keyMetrics })
   design = r2.design
   writeFileSync(resolve(outDir, '6-r2-glm.json'), JSON.stringify(design, null, 2))
 
-  const r3 = await runReviewerStep({ label: 'STEP 7: R3 Qwen 3.6 Max', model: QWEN_3_6_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, '7-r3-qwen.raw.txt'), keyMetrics })
+  const r3 = await runReviewerStep({ label: 'STEP 7: R3 Qwen 3.6 Max', model: QWEN_3_6_MAX, fallbackModel: GLM_5_1, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, '7-r3-qwen.raw.txt'), keyMetrics })
   design = r3.design
   writeFileSync(resolve(outDir, '7-r3-haiku.json'), JSON.stringify(design, null, 2))
 
@@ -1757,6 +1787,7 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   const r4 = await runReviewerStep({
     label: 'STEP 8: R4 Flash-Lite review',  // LM-only, not grounded
     model: FLASH_LITE,
+    fallbackModel: FLASH_3_5,  // Sprint 2D fallback
     systemAppend: R4_FACTCHECK_APPEND + criticAppend,
     thinkingLevel: 'high',
     brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design,
