@@ -1367,29 +1367,90 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     margin: 0; font-size: 13.5px; color: var(--bc-fg-muted); line-height: 1.6;
                 }
                 .bc-fiona-empty p strong { color: var(--bc-fg); }
-                /* ─── Council grid ─── */
-                .bc-council-grid {
-                    display: grid;
-                    grid-template-columns: repeat(2, 1fr);
-                    gap: 16px;
+                /* ─── Council stack (inline vertical layout — replaces 2×2 grid) ─── */
+                .bc-council-stack {
+                    display: flex;
+                    flex-direction: column;
                 }
-                .bc-council-grid.specialists-3 {
-                    grid-template-columns: repeat(3, 1fr);
+                /* Divider between specialist rows */
+                .bc-council-stack > * + * {
+                    border-top: 1px solid var(--bc-border-soft);
                 }
-                /* ─── Specialist card ─── */
+                /* ─── Specialist card (stack variant — no box border, full width) ─── */
                 .bc-specialist-card {
                     background: var(--bc-surface);
+                    padding: 20px 0;
+                    display: flex;
+                    flex-direction: column;
+                }
+                /* Preserve old bordered-card style when used outside the stack */
+                .bc-specialist-card.bc-card-bordered {
                     border: 1px solid var(--bc-border);
                     border-radius: 14px;
                     padding: 18px 20px;
                     box-shadow: var(--bc-shadow-xs);
-                    display: flex;
-                    flex-direction: column;
                     transition: box-shadow 0.15s, transform 0.15s;
                 }
-                .bc-specialist-card:hover {
+                .bc-specialist-card.bc-card-bordered:hover {
                     box-shadow: var(--bc-shadow-md);
                     transform: translateY(-1px);
+                }
+                /* Loading row placeholder inside stack */
+                .bc-stack-loading-row {
+                    padding: 20px 0;
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    color: var(--bc-fg-muted);
+                }
+                .bc-stack-loading-row .bc-slr-avatar {
+                    width: 40px; height: 40px;
+                    border-radius: 100%;
+                    display: flex; align-items: center; justify-content: center;
+                    font-weight: 800; font-size: 13px;
+                    flex-shrink: 0;
+                    border: 2px solid #fff;
+                }
+                .bc-stack-loading-row .bc-slr-meta { flex: 1; min-width: 0; }
+                .bc-stack-loading-row .bc-srl-name { font-size: 14px; font-weight: 700; color: var(--bc-fg); }
+                .bc-stack-loading-row .bc-srl-status { font-size: 13px; font-style: italic; color: var(--bc-fg-muted); }
+                /* Fallback badge */
+                .bc-fallback-badge {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: 4px;
+                    font-size: 10.5px;
+                    font-weight: 600;
+                    color: var(--bc-fg-muted);
+                    background: var(--bc-surface-muted);
+                    border: 1px solid var(--bc-border);
+                    border-radius: 4px;
+                    padding: 2px 7px;
+                    margin-top: 6px;
+                    cursor: default;
+                    font-family: ui-monospace, monospace;
+                }
+                /* Queued row in cal-framing phase */
+                .bc-stack-queued-row {
+                    padding: 14px 0;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    opacity: 0.55;
+                }
+                .bc-stack-queued-row .bc-sqr-avatar {
+                    width: 36px; height: 36px;
+                    border-radius: 100%;
+                    display: flex; align-items: center; justify-content: center;
+                    font-weight: 800; font-size: 12px;
+                    flex-shrink: 0;
+                    border: 2px solid #fff;
+                }
+                .bc-stack-queued-row .bc-sqr-name {
+                    font-size: 13.5px; font-weight: 700; color: var(--bc-fg);
+                }
+                .bc-stack-queued-row .bc-sqr-status {
+                    font-size: 12px; color: var(--bc-fg-subtle); font-style: italic;
                 }
                 .bc-specialist-head {
                     display: flex; align-items: flex-start; gap: 12px;
@@ -1595,8 +1656,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 @media (max-width: 780px) {
                     .bc-page { padding: 18px 0 60px; }
                     .bc-tier-picker { grid-template-columns: repeat(2, 1fr); }
-                    .bc-council-grid { grid-template-columns: 1fr; }
-                    .bc-council-grid.specialists-3 { grid-template-columns: 1fr; }
                     .bc-suggestions-grid { grid-template-columns: 1fr; }
                     .bc-picker-grid { grid-template-columns: repeat(2, 1fr); }
                 }
@@ -1931,7 +1990,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
 
             {session.phase === "idle" ? (
                 /* Pre-submission: show the specialist roster with their personas */
-                <div className={`bc-council-grid${councilMembers.length === 3 ? " specialists-3" : ""}`}>
+                <div className="bc-council-stack">
                     {councilMembers.map((specialist) => {
                         const avatarClass = getAvatarClass(specialist.id)
                         const sigLabel = getSigCloseLabel(specialist.id)
@@ -1966,7 +2025,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                     </p>
                                 </div>
                                 <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
-                                    {/* W76: removed .slice(0, 120)+&hellip; truncation — show the full working style */}
                                     <div className="bc-sig-label">{sigLabel}</div>
                                     <div className="bc-sig-body">{specialist.workingStyle}</div>
                                 </div>
@@ -1976,30 +2034,32 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 </div>
             ) : session.councilPhase === "cal-framing" ? (
                 /* W77: Cal is still framing — specialists are queued, NOT yet started.
-                   Show a static roster with a "queued" label, no pulsing animation,
-                   so the user can see who is in the council without implying they are running. */
-                <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
+                   Show a compact roster with a "queued" label — no animation. */
+                <div className="bc-council-stack">
                     {sessionCouncilMembers.map((specialist) => (
-                        <div key={specialist.id} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border-soft)", opacity: 0.65 }}>
-                            <div className={`bc-sp-avatar ${getAvatarClass(specialist.id)}`} style={{ margin: "0 auto 12px" }}>
+                        <div key={specialist.id} className="bc-stack-queued-row">
+                            <div className={`bc-sqr-avatar ${getAvatarClass(specialist.id)}`}>
                                 {specialist.name.slice(0, 2).toUpperCase()}
                             </div>
-                            <h3>{specialist.name}</h3>
-                            <p style={{ color: "var(--bc-fg-subtle)", fontStyle: "italic", fontSize: "12px" }}>Queued — waiting for Cal to frame the question</p>
+                            <div>
+                                <div className="bc-sqr-name">{specialist.name}</div>
+                                <div className="bc-sqr-status">Queued — waiting for Cal to frame the question</div>
+                            </div>
                         </div>
                     ))}
                 </div>
             ) : (session.phase === "pending" && (session.councilPhase === "r1-running" || session.councilPhase === "r2-running" || session.councilPhase === "cal-closing")) ||
                (session.phase === "done" && session.specialistResponses.length > 0) ? (
-                /* W77: R1 in flight or done — show hybrid grid.
-                   Arrived specialists show real cards; others show animated loading placeholders.
-                   This creates the one-by-one progressive reveal as each promise resolves. */
-                <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
-                    {sessionCouncilMembers.map((specialist) => {
-                        const arrived = session.specialistResponses.find(r => r.id === specialist.id)
-                        const avatarClass = getAvatarClass(specialist.id)
-                        const initials = specialist.name.slice(0, 2).toUpperCase()
-                        const sigLabel = getSigCloseLabel(specialist.id)
+                /* W77: R1 in flight or done — show stacked list.
+                   Specialists appear in COMPLETION ORDER as each promise resolves.
+                   Still-loading specialists show as compact loading rows at the bottom. */
+                <div className="bc-council-stack">
+                    {/* Arrived specialists first (in arrival order) */}
+                    {session.specialistResponses.map((arrived) => {
+                        const specialist = sessionCouncilMembers.find(s => s.id === arrived.id)
+                        const avatarClass = getAvatarClass(arrived.id)
+                        const initials = arrived.name.slice(0, 2).toUpperCase()
+                        const sigLabel = getSigCloseLabel(arrived.id)
                         const sigColorMap: Record<string, string> = {
                             "strategist":          "bc-sig-sage",
                             "finance-lead":        "bc-sig-finn",
@@ -2008,30 +2068,19 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             "chief-of-staff":      "bc-sig-cal",
                             "fundraising-advisor": "bc-sig-fiona",
                         }
-                        const sigColorClass = sigColorMap[specialist.id] ?? ""
-
-                        if (!arrived) {
-                            // Still loading — animated placeholder
-                            return (
-                                <div key={specialist.id} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border)" }}>
-                                    <div className={`bc-sp-avatar bc-loading-pulse ${avatarClass}`} style={{ margin: "0 auto 12px" }}>
-                                        {initials}
-                                    </div>
-                                    <h3>{specialist.name}</h3>
-                                    <p style={{ fontStyle: "italic" }}>{LOADING_LINES[loadingLineIdx]}</p>
-                                </div>
-                            )
-                        }
-
-                        // Arrived — show real card (dimmed if the model errored)
+                        const sigColorClass = sigColorMap[arrived.id] ?? ""
                         const isError = arrived.modelLabel === "error"
+
                         return (
-                            <div key={arrived.id} className="bc-specialist-card" style={isError ? { opacity: 0.6, borderColor: "var(--bc-border-soft)" } : undefined}>
+                            <div key={arrived.id} className="bc-specialist-card" style={isError ? { opacity: 0.6 } : undefined}>
                                 <div className="bc-specialist-head">
                                     <div className={`bc-sp-avatar ${avatarClass}`}>{initials}</div>
                                     <div className="bc-sp-meta">
                                         <div className="bc-name-row">
                                             <span className="bc-sp-name">{arrived.name}</span>
+                                            {specialist && (
+                                                <span style={{ fontSize: "12px", color: "var(--bc-fg-muted)" }}>{specialist.title}</span>
+                                            )}
                                         </div>
                                         <div className="bc-sp-role">{arrived.title}</div>
                                     </div>
@@ -2042,20 +2091,41 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                 {!isError && (
                                     <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
                                         <div className="bc-sig-label">{sigLabel}</div>
+                                        {arrived.fallbackModelUsed && (
+                                            <span
+                                                className="bc-fallback-badge"
+                                                title={`Primary model failed. This response was generated by the fallback model: ${arrived.fallbackModelUsed}`}
+                                            >
+                                                fallback: {arrived.fallbackModelUsed.split("/").pop()}
+                                            </span>
+                                        )}
                                     </div>
                                 )}
                             </div>
                         )
                     })}
+                    {/* Still-loading specialists shown as compact rows below arrived ones */}
+                    {sessionCouncilMembers
+                        .filter(s => !session.specialistResponses.find(r => r.id === s.id))
+                        .map((specialist) => (
+                            <div key={specialist.id} className="bc-stack-loading-row">
+                                <div className={`bc-slr-avatar bc-loading-pulse ${getAvatarClass(specialist.id)}`}>
+                                    {specialist.name.slice(0, 2).toUpperCase()}
+                                </div>
+                                <div className="bc-slr-meta">
+                                    <div className="bc-srl-name">{specialist.name}</div>
+                                    <div className="bc-srl-status bc-loading-pulse">{LOADING_LINES[loadingLineIdx]}</div>
+                                </div>
+                            </div>
+                        ))
+                    }
                 </div>
             ) : (
-                /* Error or empty — show placeholder grid */
-                <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
+                /* Error or empty — show minimal fallback */
+                <div className="bc-council-stack">
                     {sessionCouncilMembers.map((_, idx) => (
-                        <div key={idx} className="bc-empty-card">
-                            <div className="bc-empty-icon">&middot;</div>
-                            <h3>No response</h3>
-                            <p>The council did not return responses. Please try again.</p>
+                        <div key={idx} style={{ padding: "16px 0", color: "var(--bc-fg-muted)", fontSize: "13px" }}>
+                            The council did not return responses. Please try again.
                         </div>
                     ))}
                 </div>
@@ -2075,68 +2145,63 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         <span className="bc-rule" />
                         <span className="bc-hint">Each specialist updated their view</span>
                     </div>
-                    <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
-                        {sessionCouncilMembers.map((specialist) => {
-                            const r1Entry = session.specialistResponses.find(r => r.id === specialist.id)
-                            const r1Failed = r1Entry?.modelLabel === "error"
-                            const r2arrived = session.specialistResponses.find(r => r.id === specialist.id && r.round2Response)
-                            const avatarClass = getAvatarClass(specialist.id)
-                            const initials = specialist.name.slice(0, 2).toUpperCase()
-                            const sigColorMap: Record<string, string> = {
-                                "strategist":          "bc-sig-sage",
-                                "finance-lead":        "bc-sig-finn",
-                                "sales-lead":          "bc-sig-sal",
-                                "cto":                 "bc-sig-max",
-                                "chief-of-staff":      "bc-sig-cal",
-                                "fundraising-advisor": "bc-sig-fiona",
-                            }
-                            const sigColorClass = sigColorMap[specialist.id] ?? ""
-
-                            if (r1Failed) {
+                    <div className="bc-council-stack">
+                        {/* Arrived R2 responses in completion order */}
+                        {session.specialistResponses
+                            .filter(r => r.round2Response)
+                            .map((r2arrived) => {
+                                const avatarClass = getAvatarClass(r2arrived.id)
+                                const initials = r2arrived.name.slice(0, 2).toUpperCase()
+                                const sigColorMap: Record<string, string> = {
+                                    "strategist":          "bc-sig-sage",
+                                    "finance-lead":        "bc-sig-finn",
+                                    "sales-lead":          "bc-sig-sal",
+                                    "cto":                 "bc-sig-max",
+                                    "chief-of-staff":      "bc-sig-cal",
+                                    "fundraising-advisor": "bc-sig-fiona",
+                                }
+                                const sigColorClass = sigColorMap[r2arrived.id] ?? ""
                                 return (
-                                    <div key={`r2-skipped-${specialist.id}`} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border-soft)", opacity: 0.5 }}>
-                                        <div className={`bc-sp-avatar ${avatarClass}`} style={{ margin: "0 auto 12px", opacity: 0.5 }}>
-                                            {initials}
-                                        </div>
-                                        <h3>{specialist.name}</h3>
-                                        <p style={{ fontStyle: "italic", color: "var(--bc-fg-subtle)" }}>Unavailable this session</p>
-                                    </div>
-                                )
-                            }
-
-                            if (!r2arrived) {
-                                return (
-                                    <div key={`r2-loading-${specialist.id}`} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-blue-dim)" }}>
-                                        <div className={`bc-sp-avatar bc-loading-pulse ${avatarClass}`} style={{ margin: "0 auto 12px" }}>
-                                            {initials}
-                                        </div>
-                                        <h3>{specialist.name}</h3>
-                                        <p style={{ fontStyle: "italic" }}>Updating after seeing peers…</p>
-                                    </div>
-                                )
-                            }
-
-                            return (
-                                <div key={`r2-${r2arrived.id}`} className="bc-specialist-card" style={{ borderColor: "var(--bc-blue-dim)", background: "linear-gradient(180deg, #f0f9ff 0%, var(--bc-surface) 40%)" }}>
-                                    <div className="bc-specialist-head">
-                                        <div className={`bc-sp-avatar ${avatarClass}`}>{initials}</div>
-                                        <div className="bc-sp-meta">
-                                            <div className="bc-name-row">
-                                                <span className="bc-sp-name">{r2arrived.name}</span>
-                                                <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", background: "var(--bc-blue-soft)", color: "var(--bc-blue)", padding: "2px 6px", borderRadius: "4px", border: "1px solid var(--bc-blue-dim)" }}>Round 2</span>
+                                    <div key={`r2-${r2arrived.id}`} className="bc-specialist-card">
+                                        <div className="bc-specialist-head">
+                                            <div className={`bc-sp-avatar ${avatarClass}`}>{initials}</div>
+                                            <div className="bc-sp-meta">
+                                                <div className="bc-name-row">
+                                                    <span className="bc-sp-name">{r2arrived.name}</span>
+                                                    <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", background: "var(--bc-blue-soft)", color: "var(--bc-blue)", padding: "2px 6px", borderRadius: "4px", border: "1px solid var(--bc-blue-dim)" }}>Round 2</span>
+                                                </div>
+                                                <div className="bc-sp-role">{r2arrived.title}</div>
                                             </div>
-                                            <div className="bc-sp-role">{r2arrived.title}</div>
+                                        </div>
+                                        <div className="bc-sp-body" style={{ whiteSpace: "pre-wrap" }}>
+                                            {r2arrived.round2Response}
+                                        </div>
+                                        <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
+                                            <div className="bc-sig-label">{getSigCloseLabel(r2arrived.id)}</div>
                                         </div>
                                     </div>
-                                    <div className="bc-sp-body" style={{ whiteSpace: "pre-wrap" }}>
-                                        {r2arrived.round2Response}
+                                )
+                            })
+                        }
+                        {/* Still-loading R2 specialists (those with R1 but no R2 yet) */}
+                        {sessionCouncilMembers
+                            .filter(s => {
+                                const r1 = session.specialistResponses.find(r => r.id === s.id)
+                                if (!r1 || r1.modelLabel === "error") return false
+                                return !r1.round2Response && session.councilPhase === "r2-running"
+                            })
+                            .map((specialist) => (
+                                <div key={`r2-loading-${specialist.id}`} className="bc-stack-loading-row">
+                                    <div className={`bc-slr-avatar bc-loading-pulse ${getAvatarClass(specialist.id)}`}>
+                                        {specialist.name.slice(0, 2).toUpperCase()}
                                     </div>
-                                    <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
-                                        <div className="bc-sig-label">{getSigCloseLabel(r2arrived.id)}</div>
+                                    <div className="bc-slr-meta">
+                                        <div className="bc-srl-name">{specialist.name}</div>
+                                        <div className="bc-srl-status bc-loading-pulse">Updating after seeing peers…</div>
                                     </div>
                                 </div>
-                            )
-                        })}
+                            ))
+                        }
                     </div>
                 </>
             )}

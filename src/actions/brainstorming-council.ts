@@ -132,6 +132,130 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
     "vp-supply-chain":     "google/gemini-3.1-pro-preview",
 }
 
+// ─── Per-specialist fallback chains ──────────────────────────────────────────
+//
+// When a specialist's primary model errors, times out, or returns empty
+// content, the failover wrapper tries each fallback in order before giving up.
+//
+// Rules applied when building these chains:
+//   - No Anthropic models anywhere (per project constraint — pipeline is
+//     Anthropic-free; see MEMORY.md: forgeos_anthropic_eliminated_from_failover)
+//   - Each fallback is a confirmed OpenRouter slug that has been seen working
+//     on this account (same allow-list as COUNCIL_MODEL_MAP above)
+//   - Fallbacks stay within a "compatible" performance tier so quality degrades
+//     gracefully rather than catastrophically
+//   - Reasoning models fall back to prose models of similar capability; prose
+//     models fall back within the prose tier
+
+const COUNCIL_FALLBACK_CHAINS: Record<string, string[]> = {
+    // Grok 4.3 → Gemini 3.1 Pro → DeepSeek V4-Flash (fast, reliable prose)
+    "chief-of-staff":      ["google/gemini-3.1-pro-preview", "deepseek/deepseek-v4-flash"],
+
+    // Gemini 3.1 Pro → DeepSeek V4-Pro (structured reasoning) → DeepSeek V4-Flash
+    "strategist":          ["deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"],
+
+    // DeepSeek V4-Pro → Kimi K2.6 (reasoning, diff lineage) → Qwen 3.6 Max
+    "fundraising-advisor": ["moonshotai/kimi-k2.6", "qwen/qwen3.6-max-preview"],
+
+    // Kimi K2.6 → DeepSeek V4-Pro (reasoning) → DeepSeek V4-Flash
+    "finance-lead":        ["deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"],
+
+    // DeepSeek V4-Flash → Qwen 3.6 Max → Grok 4.3
+    "vp-manufacturing":    ["qwen/qwen3.6-max-preview", "x-ai/grok-4.3"],
+
+    // DeepSeek V4-Pro → DeepSeek V4-Flash → Gemini 3.1 Pro
+    "cto":                 ["deepseek/deepseek-v4-flash", "google/gemini-3.1-pro-preview"],
+
+    // Qwen 3.6 Max → DeepSeek V4-Flash → Grok 4.3
+    "product-lead":        ["deepseek/deepseek-v4-flash", "x-ai/grok-4.3"],
+
+    // DeepSeek V4-Flash → Qwen 3.6 Max → Grok 4.3
+    "growth-marketer":     ["qwen/qwen3.6-max-preview", "x-ai/grok-4.3"],
+    "sales-lead":          ["qwen/qwen3.6-max-preview", "x-ai/grok-4.3"],
+    "vp-engineering":      ["qwen/qwen3.6-max-preview", "x-ai/grok-4.3"],
+
+    // Kimi K2.6 → DeepSeek V4-Flash → Qwen 3.6 Max
+    "hiring-team":         ["deepseek/deepseek-v4-flash", "qwen/qwen3.6-max-preview"],
+
+    // GLM-5.1 → DeepSeek V4-Flash → Qwen 3.6 Max
+    "legal-counsel":       ["deepseek/deepseek-v4-flash", "qwen/qwen3.6-max-preview"],
+
+    // Gemini 3.1 Pro → DeepSeek V4-Pro → DeepSeek V4-Flash
+    "vp-supply-chain":     ["deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"],
+}
+
+// ─── Failover wrapper ─────────────────────────────────────────────────────────
+
+/**
+ * Calls a specialist's primary model, falling back through COUNCIL_FALLBACK_CHAINS
+ * if the primary errors, times out, or returns empty content (including the
+ * Gemini "reasoning tokens but zero output text" cliff failure mode).
+ *
+ * Returns either:
+ *   { ok: true; text: string; modelUsed: string; usedFallback: boolean }
+ *   { ok: false; reason: string }
+ *
+ * When a fallback is used, `usedFallback: true` is set so the caller can
+ * surface a (fallback: <model-slug>) badge in the UI for auditability.
+ */
+async function callSpecialistWithFailover(
+    specialistId: string,
+    callInput: Omit<Parameters<typeof callOpenRouter>[0], "model">,
+): Promise<
+    | { ok: true; text: string; modelUsed: string; usedFallback: boolean }
+    | { ok: false; reason: string }
+> {
+    const primary = COUNCIL_MODEL_MAP[specialistId] ?? "deepseek/deepseek-v4-flash"
+    const fallbacks = COUNCIL_FALLBACK_CHAINS[specialistId] ?? []
+    const chain = [primary, ...fallbacks]
+
+    let lastError = "All models exhausted"
+
+    for (const model of chain) {
+        const isFallback = model !== primary
+        try {
+            const result = await callOpenRouter({ ...callInput, model })
+            if (result.ok) {
+                const text = result.text.trim()
+                // Treat empty text as a failure (reasoning cliff mode).
+                if (text.length === 0) {
+                    console.warn(
+                        "[callSpecialistWithFailover] %s returned empty text on %s — trying next",
+                        specialistId, model,
+                    )
+                    lastError = `${model} returned empty text`
+                    continue
+                }
+                if (isFallback) {
+                    console.info(
+                        "[callSpecialistWithFailover] %s used fallback model %s (primary was %s)",
+                        specialistId, model, primary,
+                    )
+                }
+                return { ok: true, text, modelUsed: model, usedFallback: isFallback }
+            }
+            console.warn(
+                "[callSpecialistWithFailover] %s model %s error: %s — trying next",
+                specialistId, model, result.error,
+            )
+            lastError = result.error ?? "model error"
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err)
+            console.warn(
+                "[callSpecialistWithFailover] %s model %s threw: %s — trying next",
+                specialistId, model, msg,
+            )
+            lastError = msg
+        }
+    }
+
+    console.error(
+        "[callSpecialistWithFailover] %s exhausted all %d models. Last error: %s",
+        specialistId, chain.length, lastError,
+    )
+    return { ok: false, reason: lastError }
+}
+
 // Model label shown in the response card
 const COUNCIL_MODEL_LABEL: Record<string, string> = {
     "chief-of-staff":      "Grok 4.3",
@@ -492,7 +616,6 @@ export async function getSpecialistRound1Response(
     specialist: { id: string; name: string; title: string; tagline: string },
 ): Promise<{ ok: true; response: SpecialistResponse } | { ok: false; error: string }> {
     if (!question?.trim()) return { ok: false, error: "Question is required" }
-    const model = COUNCIL_MODEL_MAP[specialist.id] ?? "deepseek/deepseek-v4-flash"
     const modelLabel = COUNCIL_MODEL_LABEL[specialist.id] ?? "DeepSeek V4-Flash"
     let system = getSpecialistSystemPrompt(specialist.id, specialist.name, specialist.title, question)
 
@@ -500,8 +623,8 @@ export async function getSpecialistRound1Response(
     // Run FTS lookup in parallel with the LLM call: await it here because
     // getGroundedFundContext is fast (~30 ms Postgres FTS) and must complete
     // before we build the system prompt. Net latency impact is negligible
-    // because Fiona's LLM call (DeepSeek V4-Flash) takes 3–5 s — the FTS
-    // resolves long before the streaming response starts.
+    // because Fiona's LLM call takes 3–5 s — the FTS resolves long before
+    // the streaming response starts.
     if (specialist.id === 'fundraising-advisor') {
         const knownFunds = await getGroundedFundContext(question)
         if (knownFunds) {
@@ -510,14 +633,15 @@ export async function getSpecialistRound1Response(
         }
     }
 
-    const result = await callOpenRouter({
-        model,
+    // Use the failover wrapper — tries primary model then fallback chain.
+    const result = await callSpecialistWithFailover(specialist.id, {
         system,
         prompt: question,
         maxTokens: 4096,
         temperature: 0.75,
         timeoutMs: 75_000,
     })
+
     if (!result.ok) {
         return {
             ok: true,
@@ -526,10 +650,11 @@ export async function getSpecialistRound1Response(
                 name: specialist.name,
                 title: specialist.title,
                 modelLabel,
-                response: `${specialist.name} was unable to respond to this question. The model returned an error — try again in a moment.`,
+                response: `${specialist.name} was unable to respond to this question. All models in the fallback chain were exhausted — try again in a moment.`,
             },
         }
     }
+
     return {
         ok: true,
         response: {
@@ -537,7 +662,9 @@ export async function getSpecialistRound1Response(
             name: specialist.name,
             title: specialist.title,
             modelLabel,
-            response: result.text.trim(),
+            response: result.text,
+            // Surface fallback info so the UI can show an audit badge.
+            ...(result.usedFallback ? { fallbackModelUsed: result.modelUsed } : {}),
         },
     }
 }
@@ -554,18 +681,19 @@ export async function getSpecialistRound2Response(
     peersRound1: Array<{ name: string; response: string }>,
 ): Promise<{ ok: true; id: string; round2Response: string } | { ok: false; error: string }> {
     if (!question?.trim()) return { ok: false, error: "Question is required" }
-    const model = COUNCIL_MODEL_MAP[specialist.id] ?? "deepseek/deepseek-v4-flash"
     const round2Prompt = buildRound2Prompt(specialist, ownRound1Response, peersRound1)
-    const result = await callOpenRouter({
-        model,
+
+    // Use the failover wrapper for R2 as well.
+    const result = await callSpecialistWithFailover(specialist.id, {
         system: getSpecialistSystemPrompt(specialist.id, specialist.name, specialist.title, question),
         prompt: round2Prompt,
         maxTokens: 4096,
         temperature: 0.72,
         timeoutMs: 90_000,
     })
-    if (!result.ok) return { ok: false, error: result.error ?? "Round 2 call failed" }
-    return { ok: true, id: specialist.id, round2Response: result.text.trim() }
+
+    if (!result.ok) return { ok: false, error: result.reason ?? "Round 2 call failed" }
+    return { ok: true, id: specialist.id, round2Response: result.text }
 }
 
 /**
