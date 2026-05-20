@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ForgeOS PDF — Iter-10 Restructure Mockup</title>
+<style>
+body { font-family: 'Helvetica Neue', -apple-system, sans-serif; max-width: 850px; margin: 30px auto; padding: 0 30px; color: #1f2937; background: #f5f5f5; line-height: 1.5; }
+h1 { font-size: 20px; border-bottom: 2px solid #cbd5e1; padding-bottom: 8px; }
+.intro { font-size: 13px; color: #6b7280; margin-bottom: 30px; }
+.intro strong { color: #1f2937; }
+
+.page { background: white; padding: 50px 60px; margin: 25px 0; border: 1px solid #d1d5db; box-shadow: 0 1px 3px rgba(0,0,0,0.04); page-break-after: always; min-height: 500px; }
+.page-number { float: right; color: #94a3b8; font-size: 10px; }
+.section-header { font-size: 9px; color: #94a3b8; letter-spacing: 2px; margin-bottom: 4px; }
+.page-title { font-size: 22px; font-weight: 700; margin: 0 0 6px 0; color: #0f172a; }
+.page-subtitle { font-size: 10px; color: #6b7280; margin-bottom: 18px; }
+
+/* ─── Cover page ─── */
+.cover-banner { background: #7f1d1d; color: #fee2e2; padding: 14px; border-radius: 4px; border-left: 5px solid #fca5a5; margin-bottom: 18px; }
+.cover-banner b { font-size: 11px; letter-spacing: 2px; }
+.cover-banner p { font-size: 10px; margin: 6px 0 0 0; }
+.forge-mark { font-size: 9px; color: #94a3b8; letter-spacing: 2px; }
+.cover-title { font-size: 26px; font-weight: 700; line-height: 1.15; margin: 14px 0; }
+.cover-desc { font-size: 11px; color: #475569; line-height: 1.5; margin-bottom: 14px; }
+
+.cost-stack { display: flex; gap: 20px; margin: 18px 0; }
+.cost-panel { flex: 55; background: #0c4a6e; color: white; padding: 16px; border-radius: 4px; }
+.cost-panel .label { font-size: 8px; letter-spacing: 1.4px; color: #bae6fd; margin-bottom: 8px; }
+.cost-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 0.5px solid #1e4a73; font-size: 10px; }
+.cost-row.total { font-weight: 700; padding-top: 10px; font-size: 12px; border-bottom: none; }
+.cost-row.installed { background: #1e4a73; padding: 8px; margin: 6px -16px; padding-left: 16px; padding-right: 16px; font-size: 14px; font-weight: 700; }
+.hero-slot { flex: 45; background: #f8fafc; border: 0.5px solid #cbd5e1; border-radius: 4px; padding: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+.hero-slot .label { font-size: 9px; font-weight: 700; color: #475569; letter-spacing: 1px; margin-bottom: 6px; }
+.hero-slot .text { font-size: 9px; color: #64748b; line-height: 1.5; }
+
+/* NEW pill strip (council recommendation) */
+.cover-pills-new { background: #1e293b; padding: 10px 14px; border-radius: 4px; margin-top: 14px; }
+.cover-pills-new .pills-label { font-size: 8px; color: #94a3b8; letter-spacing: 1.4px; margin-bottom: 8px; }
+.cover-pills-new .pill { display: inline-block; background: #fef3c7; color: #92400e; font-size: 9px; font-weight: 700; padding: 4px 8px; border-radius: 3px; margin: 0 6px 4px 0; }
+.cover-pills-new .pill.success { background: #dcfce7; color: #15803d; }
+.cover-pills-new .pill.danger { background: #fee2e2; color: #b91c1c; }
+
+/* ─── Module section ─── */
+.module-header { background: #f1f5f9; padding: 14px; border-left: 4px solid #0c4a6e; border-radius: 4px; margin-bottom: 18px; }
+.module-header h2 { margin: 0; font-size: 18px; }
+.module-status-strip { font-size: 9.5px; color: #475569; margin-top: 6px; display: flex; gap: 16px; }
+.module-status-strip span { display: inline-flex; align-items: center; gap: 4px; }
+.module-status-strip b { color: #1f2937; }
+.module-status-strip .warn { color: #92400e; }
+.module-status-strip .danger { color: #b91c1c; }
+
+.subsection-label { font-size: 9px; color: #94a3b8; letter-spacing: 1.8px; margin: 20px 0 6px 0; }
+.subsection-h3 { font-size: 13px; font-weight: 700; margin: 8px 0 6px 0; color: #0f172a; }
+
+.prose { font-size: 10.5px; color: #475569; line-height: 1.65; text-align: justify; margin-bottom: 14px; }
+.prose-fake { color: #94a3b8; font-style: italic; }
+
+.sub-module { background: #fafafa; border-left: 3px solid #cbd5e1; padding: 10px 12px; margin-bottom: 8px; border-radius: 0 4px 4px 0; }
+.sub-module-title { font-size: 11px; font-weight: 700; margin-bottom: 4px; color: #0f172a; }
+.sub-module-title .num { color: #0c4a6e; font-weight: 700; margin-right: 6px; }
+.sub-module-title .cost { float: right; color: #64748b; font-weight: 600; }
+.sub-module-prose { font-size: 9.5px; color: #6b7280; line-height: 1.55; }
+
+/* BoM inline */
+.bom-table { width: 100%; border-collapse: collapse; font-size: 9.5px; margin: 6px 0 14px 0; }
+.bom-table th { background: #f3f4f6; padding: 4px 6px; text-align: left; font-size: 8px; color: #6b7280; letter-spacing: 1px; border-bottom: 1px solid #d1d5db; }
+.bom-table th.r { text-align: right; }
+.bom-table td { padding: 4px 6px; border-bottom: 0.5px solid #f3f4f6; vertical-align: top; }
+.bom-table td.r { text-align: right; }
+.bom-table .row-num { color: #94a3b8; font-size: 8.5px; }
+.bom-table .badge { font-size: 8px; padding: 1px 5px; border-radius: 2px; font-weight: 600; letter-spacing: 0.3px; }
+.bom-table .badge.verified { background: #dcfce7; color: #15803d; }
+.bom-table .badge.replaced { background: #fef3c7; color: #92400e; }
+.bom-table .badge.verify { background: #ffedd5; color: #9a3412; }
+.bom-table .badge.custom { background: #e0e7ff; color: #3730a3; }
+
+.bom-subrow { background: #fafafa; }
+.bom-subrow td { font-size: 9px; color: #6b7280; padding: 4px 6px 8px 28px; border-bottom: 0.5px solid #f3f4f6; font-style: italic; }
+.bom-subrow .arrow { color: #92400e; font-weight: 700; font-style: normal; margin-right: 4px; }
+
+/* Engineering Review Notes (replaces Design Considerations) */
+.erp-block { background: #fef9e7; border-left: 4px solid #ca8a04; border-radius: 0 4px 4px 0; padding: 14px; margin-top: 16px; }
+.erp-block h3 { margin: 0 0 4px 0; font-size: 12px; color: #713f12; }
+.erp-block .sub { font-size: 9px; color: #92400e; margin-bottom: 12px; font-style: italic; }
+.erp-item { background: white; border: 0.5px solid #e5e7eb; border-radius: 4px; padding: 10px 12px; margin-bottom: 8px; }
+.erp-id { font-size: 8px; color: #94a3b8; letter-spacing: 1px; }
+.erp-tag { display: inline-block; font-size: 7.5px; padding: 1px 5px; border-radius: 2px; margin-left: 6px; }
+.erp-tag.mechanical { background: #e0e7ff; color: #3730a3; }
+.erp-tag.electrical { background: #fef3c7; color: #92400e; }
+.erp-tag.procurement { background: #dcfce7; color: #15803d; }
+.erp-tag.compliance { background: #f3e8ff; color: #6b21a8; }
+.erp-tag.system { background: #ffe4e6; color: #9f1239; }
+.erp-issue { font-size: 10.5px; font-weight: 700; margin: 4px 0 2px 0; color: #0f172a; }
+.erp-field { font-size: 9.5px; color: #475569; line-height: 1.5; }
+.erp-field b { color: #1f2937; }
+
+/* Issue Index */
+.index-row { display: flex; gap: 16px; padding: 6px 0; border-bottom: 0.5px solid #f3f4f6; font-size: 9.5px; }
+.index-row .cat { width: 90px; color: #94a3b8; font-size: 8.5px; letter-spacing: 1px; }
+.index-row .desc { flex: 1; color: #1f2937; }
+.index-row .loc { color: #0c4a6e; text-decoration: underline; font-size: 9px; }
+
+/* Removed pages */
+.removed { background: #fee2e2; padding: 14px; border-radius: 4px; border-left: 4px solid #b91c1c; margin: 20px 0; font-size: 10px; color: #7f1d1d; }
+.removed b { letter-spacing: 1px; }
+
+/* Section markers */
+.section-marker { background: #0c4a6e; color: white; padding: 6px 14px; margin: 30px 0 4px 0; font-size: 11px; font-weight: 700; letter-spacing: 1px; border-radius: 3px; }
+.note { background: #e0f2fe; padding: 10px 14px; font-size: 10px; color: #075985; border-radius: 4px; margin: 12px 0; border-left: 3px solid #0284c7; }
+
+.toc { background: #f9fafb; padding: 16px 20px; border-radius: 4px; }
+.toc h2 { margin: 0 0 10px 0; font-size: 14px; }
+.toc-line { display: flex; justify-content: space-between; padding: 3px 0; font-size: 10px; border-bottom: 0.5px dotted #e5e7eb; }
+.toc-line .num { width: 30px; color: #94a3b8; font-size: 9px; }
+.toc-line .desc { flex: 1; }
+.toc-line .page { color: #6b7280; font-size: 9px; }
+.toc-line.new { color: #15803d; font-weight: 600; }
+.toc-line.removed { color: #b91c1c; text-decoration: line-through; }
+</style>
+</head>
+<body>
+
+<h1>PDF Restructure Mockup — Iter-10</h1>
+<p class="intro">
+Visual draft of what the restructured PDF looks like at the section level. Real text is the placeholder — focus on <strong>where things go</strong>, not content polish.
+Council-validated structure (4/4 critique). New = green, removed = strikethrough red, changed = orange highlight.
+</p>
+
+<!-- TABLE OF CONTENTS COMPARISON -->
+<div class="page">
+  <div class="section-header">SECTION ORDER COMPARISON</div>
+  <div class="page-title">What changes</div>
+
+  <div class="toc">
+    <h2 style="color: #b91c1c;">Before (iter-9)</h2>
+    <div class="toc-line"><span class="num">—</span><span class="desc">Cover · Performance Card · Brief Revision · Brief · Design Trade-offs · Module Connection Map</span><span class="page">1-5</span></div>
+    <div class="toc-line"><span class="num">2.x</span><span class="desc">Module sections (11 modules, prose + sub-modules)</span><span class="page">6-35</span></div>
+    <div class="toc-line"><span class="num">2</span><span class="desc">Compliance · Risk</span><span class="page">36-42</span></div>
+    <div class="toc-line"><span class="num">4</span><span class="desc">Design Decisions (legacy gates)</span><span class="page">43</span></div>
+    <div class="toc-line"><span class="num">6</span><span class="desc">Bill of Materials (one big table across all 11 modules)</span><span class="page">44-55</span></div>
+    <div class="toc-line"><span class="num">7</span><span class="desc">Suppliers</span><span class="page">56-59</span></div>
+    <div class="toc-line removed"><span class="num">A</span><span class="desc">Appendix A — Parts Pending Verification (stripped + plausible-but-unverified)</span><span class="page">60-73</span></div>
+    <div class="toc-line removed"><span class="num">B</span><span class="desc">Appendix B — Manual Review Notes (physics critic, G1b, G4, G5, K10)</span><span class="page">74-84</span></div>
+  </div>
+
+  <div class="toc" style="margin-top: 14px;">
+    <h2 style="color: #15803d;">After (iter-10)</h2>
+    <div class="toc-line"><span class="num">—</span><span class="desc">Cover (with new <b>active-finding pill strip</b>) · Performance Card · Brief Revision · Brief · Design Trade-offs · Module Connection Map</span><span class="page">1-5</span></div>
+    <div class="toc-line new"><span class="num">2.0</span><span class="desc">★ System-Level Risks & Integration (cumulative power draw, total weight, cross-module dependencies)</span><span class="page">6-7</span></div>
+    <div class="toc-line"><span class="num">2.x</span><span class="desc">Module sections — NOW WITH inline numbered sub-modules + inline BoM + <b>Engineering Review Notes</b></span><span class="page">8-50</span></div>
+    <div class="toc-line"><span class="num">3</span><span class="desc">Compliance · Risk (still product-wide)</span><span class="page">51-56</span></div>
+    <div class="toc-line"><span class="num">7</span><span class="desc">Suppliers</span><span class="page">57-59</span></div>
+    <div class="toc-line new"><span class="num">8</span><span class="desc">★ Issue Index — all review points grouped by category with page refs (for skim-by-issue readers)</span><span class="page">60-61</span></div>
+    <div class="toc-line new"><span class="num">9</span><span class="desc">★ Engineering Quality Assurance Summary (one page — methodology + counts)</span><span class="page">62</span></div>
+  </div>
+</div>
+
+
+<!-- COVER -->
+<div class="page">
+  <div class="page-number">Page 1</div>
+  <div class="forge-mark">FORGE ENGINEERING REPORT</div>
+
+  <h1 class="cover-title">Containerised Vertical Farm — Leafy Greens Production.</h1>
+  <p class="cover-desc">Brief and module decomposition. First-cut engineering report covering modules, sub-modules, compliance, risks, bill of materials, suppliers and engineering review notes.</p>
+
+  <div class="cost-stack">
+    <div class="cost-panel">
+      <div class="label">COST STACK — RAW MATERIALS TO INSTALLED PRICE</div>
+      <div class="cost-row"><span>Raw materials BoM</span><b>£72,400</b></div>
+      <div class="cost-row"><span>+ Assembly labour (8%)</span><span>£5,792</span></div>
+      <div class="cost-row"><span>+ Factory overhead (8%)</span><span>£6,255</span></div>
+      <div class="cost-row total"><span>= Factory COGS</span><b>£84,447</b></div>
+      <div class="cost-row installed"><span>= Installed ASP</span><b>£128,200</b></div>
+      <div class="cost-row" style="font-size:8px; margin-top:6px"><span>£1,282/m² growing-area installed — within typical band (£600–£1,200)</span></div>
+    </div>
+    <div class="hero-slot">
+      <div class="label">ENGINEERING RENDERING</div>
+      <div class="text">Container/warehouse-scale envelope — static library covers desktop & cabinet products only. See Module Connection Map for topology.</div>
+    </div>
+  </div>
+
+  <!-- NEW: replaces the "MANUAL REVIEW — G1b / G4 / G5 / Physics" pill strip -->
+  <div class="cover-pills-new">
+    <div class="pills-label">ENGINEERING REVIEW SIGNAL ★ NEW</div>
+    <span class="pill">⚠ 5 engineering reviews across 3 modules</span>
+    <span class="pill">🔍 12 part numbers need verification (in BoM)</span>
+    <span class="pill">📜 Compliance: 2 gaps</span>
+    <span class="pill success">✓ All physics gates passed</span>
+    <div style="font-size: 8px; color: #94a3b8; margin-top: 6px;">All findings surfaced inline in the relevant module sections — no appendices to flip to.</div>
+  </div>
+</div>
+
+
+<!-- SECTIONS 0/0.5/1/1.5 UNCHANGED — placeholder -->
+<div class="section-marker">SECTIONS 0 · 0.5 · 1 · 1.5 (unchanged) — Operational Headline · Performance Characteristics · Brief Revision Notice · Brief · Design Trade-offs · Module Connection Map (5 pages)</div>
+
+
+<!-- NEW: SYSTEM-LEVEL RISKS PAGE (council addition #1) -->
+<div class="page">
+  <div class="page-number">Page 6</div>
+  <div class="section-header" style="color:#15803d">★ NEW · SECTION 2.0 · SYSTEM-LEVEL RISKS & INTEGRATION</div>
+  <h2 class="page-title">System-Level Risks & Integration</h2>
+  <p class="page-subtitle">Cross-cutting issues that span more than one module — checked BEFORE you read individual modules in case a cumulative effect needs the system-level view.</p>
+
+  <div class="erp-block">
+    <h3>Cumulative power load vs site supply</h3>
+    <p class="sub">Three modules each requested power independently — totals must fit the brief-specified supply.</p>
+    <div class="erp-item">
+      <div class="erp-id">ERP-SYS-1 <span class="erp-tag system">SYSTEM</span> <span class="erp-tag electrical">ELECTRICAL</span></div>
+      <div class="erp-issue">Total peak load 38.2 kW (Module 2 HVAC 23 kW + Module 4 LED 12 kW + Module 5 ancillary 3.2 kW) vs brief 3-phase 32A = 22 kW available</div>
+      <div class="erp-field"><b>Why it matters:</b> Even with balanced loading the brief-supplied 3-phase 32A connection will trip on peak demand.</div>
+      <div class="erp-field"><b>Action:</b> Either upsize to 63A connection (44 kW headroom) OR stage HVAC + LED dimming via PLC. Sign-off needed from electrical engineer + DNO.</div>
+    </div>
+  </div>
+
+  <div class="erp-block" style="background: #fef9e7;">
+    <h3>Total mass & ISO container load rating</h3>
+    <div class="erp-item">
+      <div class="erp-id">ERP-SYS-2 <span class="erp-tag system">SYSTEM</span> <span class="erp-tag mechanical">MECHANICAL</span></div>
+      <div class="erp-issue">Calculated installed mass 18.7 t (modules sum) vs 40ft ISO container max gross 30.5 t — comfortable but check floor point loading under 8 trolleys</div>
+      <div class="erp-field"><b>Why it matters:</b> Floor point loading per castor &gt; 500 kg may exceed ISO container floor rating in localised zones.</div>
+      <div class="erp-field"><b>Action:</b> Specify floor reinforcement plate spec or distribute castors per CIMC floor-load drawing.</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- MODULE 1 — abbreviated -->
+<div class="page">
+  <div class="page-number">Page 8</div>
+  <div class="section-header">SECTION 2 · MODULE 1</div>
+
+  <div class="module-header">
+    <h2>Module 1 — Container Shell & Trolley Structure</h2>
+    <div class="module-status-strip">
+      <span><b>Cost</b> £18,420</span>
+      <span><b>Parts</b> 23</span>
+      <span class="warn"><b>Review notes</b> 0</span>
+      <span><b>Procurement exceptions</b> 0</span>
+    </div>
+  </div>
+
+  <p class="prose prose-fake">[2-3 paragraphs of module overview, sub-modules listed by name, derived parameters cited inline ...]</p>
+
+  <div class="subsection-label">SUB-MODULES</div>
+
+  <div class="sub-module">
+    <div class="sub-module-title">
+      <span class="num">1.1</span>Primary growing container
+      <span class="cost">£12,200</span>
+    </div>
+    <div class="sub-module-prose">CIMC HC-40-ISO-2024 40ft high-cube container with 80mm Kingspan PIR sandwich panels …</div>
+
+    <!-- BoM INLINE per sub-module (new) -->
+    <table class="bom-table">
+      <thead><tr><th>#</th><th>PART</th><th>MFR</th><th>PART NUMBER</th><th class="r">QTY</th><th class="r">LINE £</th><th>STATUS</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="row-num">1.1.1</td>
+          <td>40ft High-Cube ISO Container</td>
+          <td>CIMC</td>
+          <td>40HC-CW Std</td>
+          <td class="r">×1</td>
+          <td class="r">£5,200</td>
+          <td><span class="badge custom">CUSTOM SOURCE</span></td>
+        </tr>
+        <tr class="bom-subrow">
+          <td colspan="7"><b>ⓘ</b> CIMC standard 40ft High-Cube container — procured by specification not unique SKU. Contact CIMC UK distributor with corten steel + CSC plate requirement.</td>
+        </tr>
+        <tr>
+          <td class="row-num">1.1.2</td>
+          <td>PIR sandwich panel 80mm</td>
+          <td>Kingspan</td>
+          <td>KS1000RW (80mm)</td>
+          <td class="r">×60</td>
+          <td class="r">£18,000</td>
+          <td><span class="badge verified">✓ VERIFIED</span></td>
+        </tr>
+        <tr>
+          <td class="row-num">1.1.3</td>
+          <td>Floor grating</td>
+          <td>Lionweld Kennedy</td>
+          <td>LK-GR-40-5</td>
+          <td class="r">×1</td>
+          <td class="r">£820</td>
+          <td><span class="badge replaced">△ REPLACED</span></td>
+        </tr>
+        <tr class="bom-subrow">
+          <td colspan="7"><span class="arrow">→</span><b>Use instead: Lionweld Kennedy Safegrid 41/100 (custom cut)</b> — generic part number not in catalogue. The Safegrid product line is the correct match; specify 12.19m × 2.44m custom cut. <span style="color:#92400e">Confidence: MEDIUM</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sub-module">
+    <div class="sub-module-title">
+      <span class="num">1.2</span>Fertigation container
+      <span class="cost">£3,420</span>
+    </div>
+    <div class="sub-module-prose">CIMC STD-20-ISO 20ft container alongside primary, dedicated to fertigation skid …</div>
+    <table class="bom-table">
+      <thead><tr><th>#</th><th>PART</th><th>MFR</th><th>PART NUMBER</th><th class="r">QTY</th><th class="r">LINE £</th><th>STATUS</th></tr></thead>
+      <tbody>
+        <tr><td class="row-num">1.2.1</td><td>20ft ISO container</td><td>CIMC</td><td>CIMC-20GP-STD</td><td class="r">×1</td><td class="r">£2,200</td><td><span class="badge verified">✓ VERIFIED</span></td></tr>
+        <tr><td class="row-num">1.2.2</td><td>Fertigation floor grating</td><td>Lionweld Kennedy</td><td>LK 20mm Ball Proof</td><td class="r">×1</td><td class="r">£480</td><td><span class="badge verified">✓ VERIFIED</span></td></tr>
+        <tr><td class="row-num">1.2.3</td><td>PIR insulation panel</td><td>Kingspan</td><td>KS1000RW</td><td class="r">×20</td><td class="r">£6,000</td><td><span class="badge verified">✓ VERIFIED</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sub-module">
+    <div class="sub-module-title"><span class="num">1.3</span>Mobile growing trolley<span class="cost">£2,800</span></div>
+    <div class="sub-module-prose">8× custom-fab 5-tier trolleys (1.2 × 2.0 × 2.4 m) on Tente 5948 castors …</div>
+    <p class="prose-fake" style="margin: 4px 0 0 0; font-size: 9.5px;">[BoM rows 1.3.1 ... 1.3.7]</p>
+  </div>
+
+  <!-- No Engineering Review Notes because module 1 had 0 review notes -->
+  <p class="prose-fake" style="font-size: 9.5px; text-align: center; padding: 18px; background: #f1f5f9; border-radius: 3px; margin-top: 18px;">No Engineering Review Notes flagged for this module.</p>
+</div>
+
+
+<!-- MODULE 2 — full example with EVERYTHING -->
+<div class="page">
+  <div class="page-number">Page 12</div>
+  <div class="section-header">SECTION 2 · MODULE 2</div>
+
+  <div class="module-header">
+    <h2>Module 2 — HVAC & Heat Rejection System</h2>
+    <div class="module-status-strip">
+      <span><b>Cost</b> £12,840</span>
+      <span><b>Parts</b> 31</span>
+      <span class="warn"><b>Review notes</b> 3</span>
+      <span class="danger"><b>Procurement exceptions</b> 2</span>
+    </div>
+  </div>
+
+  <p class="prose prose-fake">[Overview prose: rejects 15 kW sensible heat, manages psychrometric envelope via DX coil + reheat strategy, 4500 m³/h supply air for 25 ACH …]</p>
+
+  <div class="subsection-label">SUB-MODULES</div>
+
+  <div class="sub-module">
+    <div class="sub-module-title"><span class="num">2.1</span>Air handling unit<span class="cost">£6,200</span></div>
+    <div class="sub-module-prose">Kelvion DX cooling coil + Farnham electric reheat coil + Camfil G4 filters + ebm-papst EC plug fan + Sensirion humidity probe + R454B refrigerant + acoustic foam liner …</div>
+
+    <table class="bom-table">
+      <thead><tr><th>#</th><th>PART</th><th>MFR</th><th>PART NUMBER</th><th class="r">QTY</th><th class="r">LINE £</th><th>STATUS</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="row-num">2.1.1</td>
+          <td>DX cooling coil 18 kW R454B</td>
+          <td>Kelvion</td>
+          <td>KDX-18-R454B</td>
+          <td class="r">×1</td>
+          <td class="r">£2,800</td>
+          <td><span class="badge verify">? VERIFY</span></td>
+        </tr>
+        <tr class="bom-subrow">
+          <td colspan="7">Format matches Kelvion's DX coil convention but exact suffix not in distributor catalogue. <b>Verify against Kelvion datasheet for 18 kW @ R454B at design ambient.</b></td>
+        </tr>
+        <tr>
+          <td class="row-num">2.1.2</td>
+          <td>Electric reheat coil 5 kW</td>
+          <td>Farnham</td>
+          <td>RH-5KW-400V</td>
+          <td class="r">×1</td>
+          <td class="r">£440</td>
+          <td><span class="badge verify">? VERIFY</span></td>
+        </tr>
+        <tr class="bom-subrow">
+          <td colspan="7">Plausible naming convention but no distributor listing found. <b>Verify with Farnham (or substitute Watlow / EXHEAT) for ATEX/IECEx-compliant 5kW duct heater.</b></td>
+        </tr>
+        <tr>
+          <td class="row-num">2.1.3</td>
+          <td>EC plug fan motor 4500 m³/h</td>
+          <td>ebm-papst</td>
+          <td>AxiTop 630</td>
+          <td class="r">×1</td>
+          <td class="r">£1,150</td>
+          <td><span class="badge replaced">△ REPLACED</span></td>
+        </tr>
+        <tr class="bom-subrow">
+          <td colspan="7"><span class="arrow">→</span><b>Use instead: ebm-papst K3G630-AR01-01 (RadiPac series)</b> — emitted "AxiTop" is an axial fan family but design needs centrifugal at 150 Pa static. RadiPac centrifugal plug fan rated 4500 m³/h @ 150 Pa. <span style="color:#15803d">Confidence: HIGH</span></td>
+        </tr>
+        <tr>
+          <td class="row-num">2.1.4</td>
+          <td>R454B refrigerant charge</td>
+          <td>Chemours</td>
+          <td>Opteon XL41</td>
+          <td class="r">~5 kg</td>
+          <td class="r">£860</td>
+          <td><span class="badge verified">✓ VERIFIED</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="sub-module">
+    <div class="sub-module-title"><span class="num">2.2</span>Heat rejection condenser<span class="cost">£3,400</span></div>
+    <div class="sub-module-prose">Kelvion KCD-20 condenser coil + 2× ebm-papst axial fans + custom weatherproof casing …</div>
+    <p class="prose-fake" style="margin: 4px 0 0 0; font-size: 9.5px;">[BoM rows 2.2.1 … 2.2.5 — abbreviated for mockup]</p>
+  </div>
+
+  <!-- Engineering Review Notes for this module (NEW — replaces old Appendix B references) -->
+  <div class="erp-block">
+    <h3>★ Engineering Review Notes</h3>
+    <p class="sub">3 items to verify before procurement, detailed design, or commissioning.</p>
+
+    <div class="erp-item">
+      <div class="erp-id">ERP-2.1 <span class="erp-tag electrical">ELECTRICAL</span></div>
+      <div class="erp-issue">Driver-to-load power balance — 8× Mean Well HLG-320H-48 drivers totalling 2.56 kW feeding 2.5 kW LED load per trolley = zero headroom</div>
+      <div class="erp-field"><b>Why it matters:</b> No margin for cable losses or driver derating at high ambient. The driver itself may run hot.</div>
+      <div class="erp-field"><b>Action:</b> Substitute Mean Well CSP-3000-48 (single 3 kW driver per trolley) OR upgrade to 9 drivers per trolley.</div>
+    </div>
+
+    <div class="erp-item">
+      <div class="erp-id">ERP-2.2 <span class="erp-tag mechanical">MECHANICAL</span></div>
+      <div class="erp-issue">Static pressure feasibility — 300mm axial fan against 150 Pa duct static pressure typically stalls (axial max ~100 Pa)</div>
+      <div class="erp-field"><b>Why it matters:</b> Wheel surge / stall — declared 4500 m³/h is unachievable.</div>
+      <div class="erp-field"><b>Action:</b> See replacement at 2.1.3 above (centrifugal plug fan). Re-check ductwork sizing for actual static loss; this fan handles up to 500 Pa.</div>
+    </div>
+
+    <div class="erp-item">
+      <div class="erp-id">ERP-2.3 <span class="erp-tag system">SYSTEM</span></div>
+      <div class="erp-issue">Cross-module wiring — CO2 over-concentration safety interlock between Module 2 (HVAC exhaust) and Module 7 (CO2 sensor) wasn't explicitly specified</div>
+      <div class="erp-field"><b>Why it matters:</b> CO2 alarm at 1500 ppm needs to drive exhaust-fan ramp + CO2 solenoid close. Wiring topology not in design output.</div>
+      <div class="erp-field"><b>Action:</b> Specify alarm-interlock wiring before panel fabrication. Typical: 4-20 mA from NDIR sensor → PLC AI → safety relay → contactor.</div>
+    </div>
+  </div>
+</div>
+
+
+<!-- Modules 3-11 placeholder -->
+<div class="section-marker">SECTIONS 2 · MODULES 3 THROUGH 11 (same layout as Module 2 — abbreviated for mockup; ~40 pages)</div>
+
+
+<!-- SECTION 3 COMPLIANCE + RISK (unchanged) -->
+<div class="section-marker">SECTION 3 · Compliance + Risk (unchanged from iter-9 — 5 pages)</div>
+
+
+<!-- NEW: ISSUE INDEX (council addition #2) -->
+<div class="page">
+  <div class="page-number">Page 60</div>
+  <div class="section-header" style="color:#15803d">★ NEW · SECTION 8 · ISSUE INDEX</div>
+  <h2 class="page-title">Issue Index</h2>
+  <p class="page-subtitle">All engineering review notes + part verification exceptions grouped by category, with module + page reference. For readers who skim by issue type rather than by module.</p>
+
+  <div class="subsection-label">★ ENGINEERING REVIEW NOTES (5)</div>
+  <div class="index-row"><span class="cat">ELECTRICAL</span><span class="desc">ERP-2.1 — Driver-to-load power balance (zero headroom)</span><span class="loc">Module 2, p. 12</span></div>
+  <div class="index-row"><span class="cat">MECHANICAL</span><span class="desc">ERP-2.2 — Static pressure feasibility (axial fan stall risk)</span><span class="loc">Module 2, p. 12</span></div>
+  <div class="index-row"><span class="cat">SYSTEM</span><span class="desc">ERP-2.3 — Cross-module CO2 safety interlock wiring not specified</span><span class="loc">Module 2 ↔ Module 7, p. 12 / 28</span></div>
+  <div class="index-row"><span class="cat">MECHANICAL</span><span class="desc">ERP-4.1 — LED tray mounting heat dissipation</span><span class="loc">Module 4, p. 18</span></div>
+  <div class="index-row"><span class="cat">PROCUREMENT</span><span class="desc">ERP-7.2 — CO2 cylinder supplier lead time</span><span class="loc">Module 7, p. 28</span></div>
+
+  <div class="subsection-label" style="margin-top: 16px;">★ PART NUMBERS NEEDING VERIFICATION (12)</div>
+  <div class="index-row"><span class="cat">2.1.1</span><span class="desc">DX cooling coil 18 kW R454B (Kelvion KDX-18-R454B) — ? VERIFY</span><span class="loc">p. 12</span></div>
+  <div class="index-row"><span class="cat">2.1.2</span><span class="desc">Electric reheat coil 5 kW (Farnham RH-5KW-400V) — ? VERIFY</span><span class="loc">p. 12</span></div>
+  <div class="index-row"><span class="cat">2.1.3</span><span class="desc">EC plug fan motor (ebm-papst AxiTop 630) — △ REPLACED with K3G630-AR01-01</span><span class="loc">p. 12</span></div>
+  <div class="index-row"><span class="cat">1.1.3</span><span class="desc">Floor grating (Lionweld Kennedy LK-GR-40-5) — △ REPLACED with Safegrid 41/100</span><span class="loc">p. 8</span></div>
+  <div class="index-row"><span class="cat">1.1.1</span><span class="desc">40ft High-Cube ISO Container (CIMC custom) — ⓘ CUSTOM SOURCE</span><span class="loc">p. 8</span></div>
+  <div class="index-row"><span class="cat">...</span><span class="desc">7 more (abbreviated)</span><span class="loc">various</span></div>
+
+  <div class="subsection-label" style="margin-top: 16px;">★ COMPLIANCE GAPS (2)</div>
+  <div class="index-row"><span class="cat">UK</span><span class="desc">WRAS — Water Regulations Approval Scheme not declared (fertigation manifolds)</span><span class="loc">Compliance, p. 53</span></div>
+  <div class="index-row"><span class="cat">EU</span><span class="desc">RoHS 2011/65 — Restriction of Hazardous Substances Directive (LED + controllers)</span><span class="loc">Compliance, p. 53</span></div>
+</div>
+
+
+<!-- NEW: QA SUMMARY (council addition) -->
+<div class="page">
+  <div class="page-number">Page 62</div>
+  <div class="section-header" style="color:#15803d">★ NEW · SECTION 9 · ENGINEERING QA SUMMARY</div>
+  <h2 class="page-title">Engineering QA Summary</h2>
+  <p class="page-subtitle">Methodology of the automated checks the chain ran on this design + their outcomes. All flagged items are inline in the relevant module above.</p>
+
+  <div class="erp-block" style="background: #f0f9ff; border-left-color: #0284c7;">
+    <h3 style="color: #075985;">Verification methodology + outcomes</h3>
+    <p class="sub" style="color: #075985;">Pass/fail counts. Detail is inline in the relevant module's Review Notes; this page is a methodology summary, not a log.</p>
+
+    <table style="width:100%; font-size: 9.5px; border-collapse: collapse;">
+      <tr style="border-bottom: 1px solid #cbd5e1;"><th style="text-align:left; padding:6px 0;">Check category</th><th style="text-align:left; padding:6px 0;">What it does</th><th style="text-align:right; padding:6px 0;">Outcome</th></tr>
+      <tr style="border-bottom: 0.5px solid #e5e7eb;"><td style="padding:8px 0;"><b>Engineering arithmetic</b></td><td>Power, flow, pressure, thermal-load, capacity relationships between modules must close to within tolerance.</td><td style="text-align:right;"><span class="badge verified">17 of 20 passed</span></td></tr>
+      <tr style="border-bottom: 0.5px solid #e5e7eb;"><td style="padding:8px 0;"><b>Engineering plausibility</b></td><td>Peer review by an independent reviewer model for first-principles violations (impossible fan curves, undersized drivers, missing heat rejection).</td><td style="text-align:right;"><span class="badge replaced">3 flagged → see Review Notes</span></td></tr>
+      <tr style="border-bottom: 0.5px solid #e5e7eb;"><td style="padding:8px 0;"><b>Part-number verification</b></td><td>Catalogue lookups (DigiKey / Mouser / Farnell / Brave) on every emitted SKU.</td><td style="text-align:right;"><span class="badge verified">112 verified</span> · <span class="badge replaced">8 replaced</span> · <span class="badge verify">4 verify</span></td></tr>
+      <tr style="border-bottom: 0.5px solid #e5e7eb;"><td style="padding:8px 0;"><b>Compliance coverage</b></td><td>Required standards for the product class and jurisdiction.</td><td style="text-align:right;"><span class="badge replaced">9 covered · 2 gaps</span></td></tr>
+      <tr style="border-bottom: 0.5px solid #e5e7eb;"><td style="padding:8px 0;"><b>Cross-module interfaces</b></td><td>Required cross-module connections (safety chains, communication links, fluid loops) are explicitly specified.</td><td style="text-align:right;"><span class="badge verified">11 of 13 explicit · 2 require sign-off</span></td></tr>
+      <tr><td style="padding:8px 0;"><b>Brief-constraint propagation</b></td><td>Brief-pinned values (canopy area, envelope, yield target, supply current) preserved through the design pipeline.</td><td style="text-align:right;"><span class="badge verified">all preserved</span></td></tr>
+    </table>
+  </div>
+
+  <p style="font-size: 9px; color: #6b7280; margin-top: 14px; line-height: 1.5;">
+  This report is a first-cut engineering scaffold generated from your brief. Items in Review Notes + Issue Index are calls for human engineering judgement before procurement — not declarations that the design is wrong. The chain has run all of the above checks and surfaced what an engineer should think about; final sign-off is yours.
+  </p>
+</div>
+
+
+<!-- WHAT GOT REMOVED -->
+<div class="page">
+  <div class="section-header" style="color:#b91c1c">REMOVED FROM ITER-10 ONWARDS</div>
+  <h2 class="page-title">What disappears from the PDF</h2>
+
+  <div class="removed">
+    <b>Appendix A — Parts Pending Verification</b><br>
+    All "stripped (fabricated)" and "plausible but unverified" content is now <b>inline in the BoM</b> per Change B. The same engine recommendations show up as sub-rows under the affected BoM line. <b>Why removed:</b> the reader was forced to flip 20+ pages to find out whether a part in front of them was verified.
+  </div>
+
+  <div class="removed">
+    <b>Appendix B — Manual Review Notes</b><br>
+    All physics-critic / G1b compliance / G4 grammar / K10 topology findings now live in <b>Engineering Review Notes at the bottom of each module section</b>. Plain-English framing — no mention of "G1b" / "K10" / "physics critic" technical names. <b>Why removed:</b> findings were detached from the module they affected.
+  </div>
+
+  <div class="removed">
+    <b>K10 reference-graph shadow check (standalone section)</b><br>
+    Missing-edge topology data is translated into <b>per-module Engineering Review Notes</b> (e.g. "Cross-module wiring assumption — CO2 alarm path between Module 2 and Module 7"). The numeric summary is in the QA Summary methodology table. <b>Why removed:</b> raw "matched=11 missing=2 verdict=PASS_SHADOW" was unreadable.
+  </div>
+</div>
+
+</body>
+</html>
