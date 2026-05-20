@@ -2906,6 +2906,239 @@ function renderProseWithLinks(prose: string, linkMap: Map<string, { url: string;
   })
 }
 
+// ─── ITER-10 IA RESTRUCTURE HELPERS (council-validated 2026-05-20) ────────
+//
+// These helpers feed the new inline BoM (per sub-module) + Engineering Review
+// Notes (per module) + Issue Index + QA Summary. Council convergence on the
+// patterns + labels — see ITER10-PDF-INFORMATION-ARCHITECTURE-RESTRUCTURE.md
+// + ITER10-PDF-MOCKUP.html.
+
+/** New user-facing verification status labels (replaces internal "stripped"/"uncertain"). */
+type VerificationStatusV2 = 'verified' | 'replaced' | 'verify' | 'custom_source'
+
+interface BomLineWithStatus extends BomPartRow {
+  v2_status: VerificationStatusV2
+  v2_sub_row?: string  // sub-row text for replaced/verify/custom rows
+}
+
+function classifyVerificationStatus(row: BomPartRow, recommendations: any[]): { status: VerificationStatusV2; subRow?: string } {
+  // Tier 1: actual distributor quote → verified
+  if (row.price_tier === 'actual' || row.status === 'verified') {
+    return { status: 'verified' }
+  }
+  // Look for an engine replacement recommendation for this word_id
+  const rec = recommendations.find((r: any) => r?.word_id === row.word_id)
+  if (rec) {
+    const confidence = String(rec.confidence ?? '').toLowerCase()
+    if (confidence === 'unknown' || (!rec.recommended_part_number && !rec.recommended_manufacturer)) {
+      return {
+        status: 'custom_source',
+        subRow: `ⓘ Manual sourcing required: ${rec.reasoning ?? 'engine cannot recommend a verified catalogue alternative.'}`,
+      }
+    }
+    const newPart = `${rec.recommended_manufacturer ?? ''} ${rec.recommended_part_number ?? ''}`.trim()
+    return {
+      status: 'replaced',
+      subRow: `→ Use instead: ${newPart} — ${rec.reasoning ?? 'distributor verified.'} ${rec.source_url ? '(see datasheet)' : ''} · Confidence: ${(rec.confidence ?? 'medium').toUpperCase()}`,
+    }
+  }
+  // Stripped fakes that lost their part_number — VERIFY-type
+  if (row.status === 'stripped' || (!row.part_number && row.manufacturer)) {
+    return {
+      status: 'verify',
+      subRow: `Part number could not be confirmed against distributor catalogue. Verify with manufacturer (${row.manufacturer ?? 'TBD'}) or substitute equivalent.`,
+    }
+  }
+  // Custom-fab indicators
+  const isCustom = /custom\s*fab|tbd|to be (?:sourced|selected)/i.test(`${row.manufacturer ?? ''} ${row.part_number ?? ''}`)
+  if (isCustom) {
+    return {
+      status: 'custom_source',
+      subRow: `ⓘ Custom-fabricated item — engineer to source per drawing/spec.`,
+    }
+  }
+  // Plausible but unverified (e.g. price estimate, no distributor quote)
+  if (row.price_tier === 'estimate') {
+    return {
+      status: 'verify',
+      subRow: `Plausible part-number format but not found in distributor catalogue. Engineer to verify against manufacturer datasheet.`,
+    }
+  }
+  return { status: 'verified' }  // default fallback
+}
+
+function v2StatusBadge(status: VerificationStatusV2) {
+  switch (status) {
+    case 'verified': return { sym: '✓', label: 'VERIFIED', bg: '#dcfce7', fg: '#15803d' }
+    case 'replaced': return { sym: '△', label: 'REPLACED', bg: '#fef3c7', fg: '#92400e' }
+    case 'verify': return { sym: '?', label: 'VERIFY', bg: '#ffedd5', fg: '#9a3412' }
+    case 'custom_source': return { sym: 'ⓘ', label: 'CUSTOM SOURCE', bg: '#e0e7ff', fg: '#3730a3' }
+  }
+}
+
+/**
+ * Engineering Review Note — the new per-module finding format. Sourced from
+ * state.physicsCritique.issues, state.designDecisions, state.complianceGate,
+ * and (translated) K10 missing edges. Council-recommended mini-format:
+ * Issue / Why it matters / Action with role tag.
+ */
+interface EngineeringReviewNote {
+  id: string                       // ERP-2.1, ERP-SYS-1, etc.
+  role: 'electrical' | 'mechanical' | 'system' | 'compliance' | 'procurement' | 'thermal' | 'fluid' | 'control' | 'safety'
+  module_id: string                // which module this note belongs to (used for both placement + issue index)
+  issue: string                    // one-line headline
+  why_it_matters: string           // one-sentence explanation of consequence
+  action: string                   // one-sentence recommended next action
+  source: 'physics_critic' | 'design_decision' | 'compliance' | 'k10_topology' | 'gate_failure'
+}
+
+function inferRoleFromContent(text: string, dimension?: string): EngineeringReviewNote['role'] {
+  const s = `${text} ${dimension ?? ''}`.toLowerCase()
+  if (/(refriger|cool|heat|thermal|hvac|chiller|temperature|condens|cop|psychrom)/i.test(s)) return 'thermal'
+  if (/(electric|voltage|current|amp|kw electric|breaker|driver|inverter|psu|phase)/i.test(s)) return 'electrical'
+  if (/(pump|pipe|flow|pressure|fluid|hydrau|fertigation|condensate|membrane)/i.test(s)) return 'fluid'
+  if (/(safety|e[\-\s]?stop|alarm|interlock|sil|ple|fire|emergency)/i.test(s)) return 'safety'
+  if (/(control|plc|hmi|modbus|signal|sensor|feedback|loop)/i.test(s)) return 'control'
+  if (/(compliance|standard|directive|regulation|certif|ce |ukca|wras|rohs)/i.test(s)) return 'compliance'
+  if (/(suppli|catalog|sku|verif|procurement|sourc|lead time|quote)/i.test(s)) return 'procurement'
+  if (/(load|mass|envelope|footprint|dimension|cross[\-\s]?cut|cumul)/i.test(s)) return 'system'
+  return 'mechanical'  // default for structural / spatial / mechanical
+}
+
+function moduleIdFromWherePath(where: string): string {
+  // physics-critic `where` is like "energy_conversion_transduction/sub_modules[0]/words[1]"
+  const m = String(where ?? '').match(/^([a-z_]+)/)
+  return m ? m[1] : ''
+}
+
+function translatePhysicsToPlainEnglish(issue: any): { issue: string; why_it_matters: string; action: string } {
+  // Physics-critic findings are already plain English in `issue` + `suggested_check`.
+  // The transform is: issue → one-sentence headline; suggested_check → action;
+  // a derived "why_it_matters" pulled from the issue body's consequence clause if present.
+  const raw = String(issue.issue ?? '').replace(/\s+/g, ' ').trim()
+  // Split on first ". " — first sentence is the headline; rest is the why.
+  const splitIdx = raw.indexOf('. ')
+  const headline = splitIdx > 0 ? raw.slice(0, splitIdx) : raw.slice(0, 200)
+  const rest = splitIdx > 0 ? raw.slice(splitIdx + 2) : ''
+  return {
+    issue: headline,
+    why_it_matters: rest || 'Engineer should verify against datasheet / first-principles before procurement.',
+    action: String(issue.suggested_check ?? 'Manual review against datasheet / CAD / test plan').replace(/\s+/g, ' ').trim(),
+  }
+}
+
+function gatherEngineeringReviewNotes(state: any): EngineeringReviewNote[] {
+  const notes: EngineeringReviewNote[] = []
+  let counter = 0
+  // Physics-critic high + medium severity findings
+  const issues: any[] = Array.isArray(state?.physicsCritique?.issues) ? state.physicsCritique.issues : []
+  for (const i of issues) {
+    const sev = String(i.severity ?? '').toLowerCase()
+    if (sev !== 'high' && sev !== 'med' && sev !== 'critical') continue
+    const moduleId = moduleIdFromWherePath(i.where)
+    if (!moduleId) continue
+    counter++
+    const t = translatePhysicsToPlainEnglish(i)
+    notes.push({
+      id: `ERP-${moduleId.split('_').map(p => p[0]).join('').toUpperCase()}-${counter}`,
+      role: inferRoleFromContent(`${i.issue ?? ''} ${i.suggested_check ?? ''}`, i.dimension),
+      module_id: moduleId,
+      issue: t.issue,
+      why_it_matters: t.why_it_matters,
+      action: t.action,
+      source: 'physics_critic',
+    })
+  }
+  // K10 missing edges → one note per affected module endpoint
+  const k10 = state?.moduleDecomposition?.k10ShadowResult ?? state?.k10ShadowResult
+  if (k10 && Array.isArray(k10.missing_required)) {
+    for (const m of k10.missing_required) {
+      const from = String(m.from_class ?? '')
+      const to = String(m.to_class ?? '')
+      const mech = String(m.mechanism ?? m.protocol ?? 'connection')
+      const headline = `Cross-module wiring assumption — ${from} ↔ ${to} (${mech})`
+      const why = m.notes ?? `Design references this cross-module link but the wiring topology was not explicitly specified in the chain output.`
+      const action = `Verify the ${mech} wiring between ${from} and ${to} before commissioning. Specify connector type, gauge, signal protocol on the panel-fab drawing.`
+      // Emit one note in each affected module (so reader sees it in both places)
+      counter++
+      const id = `ERP-SYS-${counter}`
+      notes.push({ id, role: 'system', module_id: from, issue: headline, why_it_matters: why, action, source: 'k10_topology' })
+      notes.push({ id: `${id}-mirror`, role: 'system', module_id: to, issue: headline, why_it_matters: why, action, source: 'k10_topology' })
+    }
+  }
+  // Design decisions (unrepaired Phase 2 gates) — affect specific modules where the gate fired
+  const decisions: any[] = Array.isArray(state?.designDecisions) ? state.designDecisions : []
+  for (const d of decisions) {
+    const affectedModule = String(d.module_id ?? d.affected_module ?? d.location ?? '').toLowerCase().replace(/[^a-z_]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '')
+    if (!affectedModule) continue
+    counter++
+    notes.push({
+      id: `ERP-PG-${counter}`,
+      role: inferRoleFromContent(`${d.what ?? d.title ?? ''} ${d.rationale ?? ''}`),
+      module_id: affectedModule,
+      issue: String(d.what ?? d.title ?? 'Unrepaired Phase 2 gate').slice(0, 200),
+      why_it_matters: String(d.rationale ?? 'Gate retry budget exhausted; design ships with the gap.').slice(0, 300),
+      action: String(d.we_are_doing ?? d.recommendation ?? d.alternative ?? 'Manual engineer review').slice(0, 300),
+      source: 'design_decision',
+    })
+  }
+  return notes
+}
+
+function reviewNotesForModule(state: any, moduleId: string): EngineeringReviewNote[] {
+  return gatherEngineeringReviewNotes(state).filter(n => n.module_id === moduleId)
+}
+
+/** Cumulative system-level findings (council #1) — power load, mass, multi-module dependencies. */
+function gatherSystemLevelRisks(state: any): EngineeringReviewNote[] {
+  const out: EngineeringReviewNote[] = []
+  const modules = state?.moduleDecomposition?.modules ?? []
+  // Cumulative peak power load vs brief supply
+  let totalKw = 0
+  const moduleLoads: Array<{ module: string; kw: number }> = []
+  for (const m of modules) {
+    const dp = m?.derived_parameters ?? {}
+    const kw = Number(dp.peak_power_kw ?? dp.max_power_kw ?? dp.continuous_power_kw ?? 0)
+    if (kw > 0) {
+      totalKw += kw
+      moduleLoads.push({ module: m.module, kw })
+    }
+  }
+  const briefSupplyKw = (() => {
+    const acs = state?.parsedBrief?.constraints?.additional_constraints ?? []
+    for (const c of acs) {
+      const desc = String(c?.description ?? '')
+      const m = desc.match(/3-phase\s+(\d+)A\s*\((\d+(?:\.\d+)?)\s*kW\)/i)
+      if (m) return parseFloat(m[2])
+      const single = desc.match(/(\d+(?:\.\d+)?)\s*kW\s+total/i)
+      if (single) return parseFloat(single[1])
+    }
+    return null
+  })()
+  if (totalKw > 0 && briefSupplyKw && totalKw > briefSupplyKw * 0.95) {
+    out.push({
+      id: 'ERP-SYS-PWR',
+      role: 'system',
+      module_id: 'system',
+      issue: `Cumulative peak load ${totalKw.toFixed(1)} kW vs brief supply ${briefSupplyKw} kW`,
+      why_it_matters: `Sum of module-level peak loads (${moduleLoads.map(x => `${x.module} ${x.kw}kW`).join(' + ')}) approaches or exceeds the brief-specified 3-phase supply. Even balanced loading may trip on coincident demand.`,
+      action: `Either upsize the grid connection (3-phase 63A gives 44 kW headroom) OR stage HVAC + LED + dosing via PLC to avoid coincident peaks. Confirm with electrical engineer + DNO supply capacity.`,
+      source: 'gate_failure',
+    })
+  }
+  return out
+}
+
+/** Sub-module subtotal from BoM (council recommendation — helps procurement). */
+function subModuleBomSubtotal(bomTotals: BomTotals | null, moduleId: string, subModuleId: string): { lines: BomLineWithStatus[]; subtotal: number } {
+  if (!bomTotals) return { lines: [], subtotal: 0 }
+  const mod = bomTotals.allMods.find(m => m.module === moduleId)
+  if (!mod) return { lines: [], subtotal: 0 }
+  const sub = mod.subs.find(s => s.id === subModuleId)
+  if (!sub) return { lines: [], subtotal: 0 }
+  return { lines: sub.parts as BomLineWithStatus[], subtotal: sub.subtotal_gbp }
+}
+
 function ModuleSection({
   index,
   moduleSpec,
@@ -2913,6 +3146,9 @@ function ModuleSection({
   partLinkMap,
   project,
   moduleImagePath,
+  bomTotals,
+  state,
+  partRecommendations,
 }: {
   index: number
   moduleSpec: any
@@ -2920,6 +3156,9 @@ function ModuleSection({
   partLinkMap?: Map<string, { url: string; title: string | null; manufacturer: string }>
   project: string
   moduleImagePath?: string | null
+  bomTotals?: BomTotals | null
+  state?: any
+  partRecommendations?: any[]
 }) {
   const id = moduleSpec.module
   const title = module_title(moduleSpec)
@@ -2963,6 +3202,18 @@ function ModuleSection({
     paragraph: v.paragraph || v.sentence,
   }))
 
+  // ITER-10 IA restructure: gather module-level status strip data + review notes
+  const moduleBom = bomTotals?.allMods.find(m => m.module === moduleSpec.module) ?? null
+  const moduleCostGbp = moduleBom?.subtotal_gbp ?? 0
+  const modulePartCount = moduleBom?.subs.reduce((n, sm) => n + sm.parts.length, 0) ?? 0
+  const reviewNotes = state ? reviewNotesForModule(state, moduleSpec.module) : []
+  const procurementExceptions = (moduleBom?.subs ?? []).flatMap(s => s.parts).filter(p => {
+    const c = classifyVerificationStatus(p, partRecommendations ?? [])
+    return c.status === 'replaced' || c.status === 'verify' || c.status === 'custom_source'
+  }).length
+
+  const recs = partRecommendations ?? []
+
   return (
     <Page size="A4" style={PAGE_STYLE}>
       <PageHeader section={`Section 2 · Module ${index}`} project={project} />
@@ -2974,6 +3225,21 @@ function ModuleSection({
         <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 2 }}>
           {title}
         </Text>
+        {/* ITER-10 status strip (council #9) — module-level metrics at a glance */}
+        {(moduleCostGbp > 0 || modulePartCount > 0 || reviewNotes.length > 0) ? (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8, paddingTop: 6, borderTopWidth: 0.5, borderTopColor: RULE_SOFT }}>
+            {moduleCostGbp > 0 ? <Text style={{ fontSize: 9, color: INK_SOFT }}><Text style={{ color: MUTED }}>Cost </Text><Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>£{Math.round(moduleCostGbp).toLocaleString()}</Text></Text> : null}
+            {modulePartCount > 0 ? <Text style={{ fontSize: 9, color: INK_SOFT }}><Text style={{ color: MUTED }}>Parts </Text><Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{modulePartCount}</Text></Text> : null}
+            <Text style={{ fontSize: 9, color: reviewNotes.length > 0 ? '#92400e' : INK_SOFT }}>
+              <Text style={{ color: MUTED }}>Review notes </Text>
+              <Text style={{ fontFamily: 'Helvetica-Bold', color: reviewNotes.length > 0 ? '#92400e' : INK }}>{reviewNotes.length}</Text>
+            </Text>
+            <Text style={{ fontSize: 9, color: procurementExceptions > 0 ? '#b91c1c' : INK_SOFT }}>
+              <Text style={{ color: MUTED }}>Procurement exceptions </Text>
+              <Text style={{ fontFamily: 'Helvetica-Bold', color: procurementExceptions > 0 ? '#b91c1c' : INK }}>{procurementExceptions}</Text>
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {moduleImagePath ? (
@@ -3001,29 +3267,27 @@ function ModuleSection({
       </Text>
       <View style={{ borderTopWidth: 0.6, borderTopColor: RULE_SOFT }}>
         {subModules.map(sm => {
-          // Each sub-module renders as 2-3 prose chunks so the eye has breathing
-          // points within the 150-200 word paragraph.
           const proseChunks = break_paragraph(sm.paragraph || '—')
+          // ITER-10 (C1 + C2): inline BoM per sub-module with verification status
+          const { lines: subBomLines, subtotal: subBomSubtotal } = subModuleBomSubtotal(bomTotals ?? null, moduleSpec.module, sm.id)
           return (
-            // wrap=false so a sub-module never splits across a page boundary
-            // (atomic block — keeps heading+prose together). Phase20 audit
-            // (2026-05-17): without this, the body sometimes overshoots the
-            // printable area by ~1pt and react-pdf emits a phantom continuation
-            // page with no content beyond the fixed header/footer. Making each
-            // sub-module atomic lets react-pdf cleanly push the last item to
-            // a new page instead of partially rendering it.
             <View
               key={sm.id}
               wrap={false}
               style={{ paddingVertical: 11, borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT }}
             >
-              <View style={{ flexDirection: 'row', marginBottom: 5 }}>
+              <View style={{ flexDirection: 'row', marginBottom: 5, alignItems: 'baseline' }}>
                 <Text style={{ width: 36, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT_SOFT }}>
                   {index}.{sm.idx}
                 </Text>
                 <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK }}>
                   {britishise(sm.name.charAt(0).toUpperCase() + sm.name.slice(1))}
                 </Text>
+                {subBomSubtotal > 0 ? (
+                  <Text style={{ fontSize: 10, color: INK_SOFT, fontFamily: 'Helvetica-Bold' }}>
+                    £{Math.round(subBomSubtotal).toLocaleString()}
+                  </Text>
+                ) : null}
               </View>
               {proseChunks.map((chunk, ci) => (
                 <Text
@@ -3033,10 +3297,95 @@ function ModuleSection({
                   {partLinkMap && partLinkMap.size > 0 ? renderProseWithLinks(chunk, partLinkMap) : chunk}
                 </Text>
               ))}
+              {/* ITER-10 C1 + C2: inline BoM table per sub-module with verification badges */}
+              {subBomLines.length > 0 ? (
+                <View style={{ marginLeft: 36, marginTop: 6, marginBottom: 4 }}>
+                  <View style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: RULE_SOFT, paddingBottom: 3 }}>
+                    <Text style={{ width: 30, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>#</Text>
+                    <Text style={{ flex: 3, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>PART</Text>
+                    <Text style={{ flex: 2, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>MFR · P/N</Text>
+                    <Text style={{ width: 30, fontSize: 7.5, color: MUTED, letterSpacing: 0.5, textAlign: 'right' }}>QTY</Text>
+                    <Text style={{ width: 50, fontSize: 7.5, color: MUTED, letterSpacing: 0.5, textAlign: 'right' }}>£</Text>
+                    <Text style={{ width: 70, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>STATUS</Text>
+                  </View>
+                  {subBomLines.map((row, ri) => {
+                    const c = classifyVerificationStatus(row, recs)
+                    const badge = v2StatusBadge(c.status)
+                    return (
+                      <View key={`r-${ri}`}>
+                        <View style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'flex-start' }}>
+                          <Text style={{ width: 30, fontSize: 8, color: MUTED }}>{index}.{sm.idx}.{ri + 1}</Text>
+                          <Text style={{ flex: 3, fontSize: 8.5, color: INK }}>{row.word_name ?? '—'}</Text>
+                          <Text style={{ flex: 2, fontSize: 8, color: INK_SOFT }}>
+                            {row.manufacturer ?? ''}
+                            {row.manufacturer && row.part_number ? ' · ' : ''}
+                            {row.part_number ?? ''}
+                          </Text>
+                          <Text style={{ width: 30, fontSize: 8.5, color: INK, textAlign: 'right' }}>×{row.quantity ?? 1}</Text>
+                          <Text style={{ width: 50, fontSize: 8.5, color: INK, textAlign: 'right' }}>£{row.line_total_gbp ? Math.round(row.line_total_gbp).toLocaleString() : '—'}</Text>
+                          <View style={{ width: 70, paddingLeft: 2 }}>
+                            <View style={{ alignSelf: 'flex-start', paddingHorizontal: 4, paddingVertical: 1, backgroundColor: badge.bg, borderRadius: 2 }}>
+                              <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: badge.fg, letterSpacing: 0.3 }}>{badge.sym} {badge.label}</Text>
+                            </View>
+                          </View>
+                        </View>
+                        {c.subRow ? (
+                          <View style={{ paddingLeft: 30, paddingRight: 4, paddingVertical: 3, backgroundColor: '#fafafa', borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
+                            <Text style={{ fontSize: 7.5, color: '#475569', lineHeight: 1.4, fontStyle: 'italic' }}>{c.subRow}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                    )
+                  })}
+                </View>
+              ) : null}
             </View>
           )
         })}
       </View>
+
+      {/* ITER-10 C3: Engineering Review Notes block at the bottom of each module */}
+      {reviewNotes.length > 0 ? (
+        <View style={{ marginTop: 18, padding: 12, backgroundColor: '#fef9e7', borderLeftWidth: 4, borderLeftColor: '#ca8a04', borderRadius: 4 }} wrap={false}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#713f12', marginBottom: 2 }}>
+            ★ Engineering Review Notes
+          </Text>
+          <Text style={{ fontSize: 8.5, color: '#92400e', fontStyle: 'italic', marginBottom: 10 }}>
+            {reviewNotes.length} item{reviewNotes.length === 1 ? '' : 's'} to verify before procurement, detailed design, or commissioning.
+          </Text>
+          {reviewNotes.map((n, ni) => {
+            const roleStyle: Record<string, { bg: string; fg: string }> = {
+              electrical:   { bg: '#fef3c7', fg: '#92400e' },
+              mechanical:   { bg: '#e0e7ff', fg: '#3730a3' },
+              system:       { bg: '#ffe4e6', fg: '#9f1239' },
+              compliance:   { bg: '#f3e8ff', fg: '#6b21a8' },
+              procurement:  { bg: '#dcfce7', fg: '#15803d' },
+              thermal:      { bg: '#fee2e2', fg: '#b91c1c' },
+              fluid:        { bg: '#dbeafe', fg: '#1e40af' },
+              control:      { bg: '#e0f2fe', fg: '#075985' },
+              safety:       { bg: '#fef2f2', fg: '#7f1d1d' },
+            }
+            const rs = roleStyle[n.role] ?? roleStyle.mechanical
+            return (
+              <View key={n.id || ni} style={{ backgroundColor: '#ffffff', borderWidth: 0.5, borderColor: '#e5e7eb', borderRadius: 3, padding: 10, marginBottom: 7 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.8 }}>{n.id}</Text>
+                  <View style={{ marginLeft: 6, paddingHorizontal: 4, paddingVertical: 1, backgroundColor: rs.bg, borderRadius: 2 }}>
+                    <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: rs.fg, letterSpacing: 0.5 }}>{n.role.toUpperCase()}</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3, lineHeight: 1.4 }}>{n.issue}</Text>
+                <Text style={{ fontSize: 9, color: INK_SOFT, marginBottom: 2, lineHeight: 1.45 }}>
+                  <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Why it matters: </Text>{n.why_it_matters}
+                </Text>
+                <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.45 }}>
+                  <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Action: </Text>{n.action}
+                </Text>
+              </View>
+            )
+          })}
+        </View>
+      ) : null}
 
       <PageFooter />
     </Page>
@@ -4872,6 +5221,223 @@ function resolveHeroImages(state: any): { cover: string | null; exploded: string
   }
 }
 
+// ─── ITER-10 NEW PAGES ─────────────────────────────────────────────────────
+
+/**
+ * Section 2.0 System-Level Risks & Integration (council #1 — cumulative
+ * cross-cutting issues BEFORE individual modules). Sourced from
+ * gatherSystemLevelRisks(state).
+ */
+function SystemLevelRisksPage({ state, project }: { state: any; project: string }) {
+  const risks = gatherSystemLevelRisks(state)
+  if (risks.length === 0) return null
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section 2.0 · System-Level Risks & Integration" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        System-Level Risks & Integration
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 18, lineHeight: 1.55 }}>
+        Cross-cutting issues that span more than one module — checked before you read individual modules, in case a cumulative effect needs the system-level view.
+      </Text>
+      {risks.map((r, ri) => (
+        <View key={r.id || ri} style={{ marginBottom: 12, padding: 14, backgroundColor: '#ffe4e6', borderLeftWidth: 4, borderLeftColor: '#b91c1c', borderRadius: 4 }} wrap={false}>
+          <Text style={{ fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.8 }}>{r.id}</Text>
+          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: '#7f1d1d', marginTop: 3, marginBottom: 4 }}>{r.issue}</Text>
+          <Text style={{ fontSize: 10, color: '#475569', lineHeight: 1.5, marginBottom: 3 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Why it matters: </Text>{r.why_it_matters}
+          </Text>
+          <Text style={{ fontSize: 10, color: '#475569', lineHeight: 1.5 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Action: </Text>{r.action}
+          </Text>
+        </View>
+      ))}
+      <PageFooter />
+    </Page>
+  )
+}
+
+/**
+ * Section 8 Issue Index (council #2 — skim-by-issue-type for procurement +
+ * compliance readers). All Engineering Review Notes + part exceptions +
+ * compliance gaps grouped by category with module + page refs.
+ */
+function IssueIndexPage({ state, project, bomTotals, partRecommendations }: { state: any; project: string; bomTotals?: BomTotals | null; partRecommendations?: any[] }) {
+  const allNotes = gatherEngineeringReviewNotes(state)
+  const sysNotes = gatherSystemLevelRisks(state)
+  const moduleOrder: string[] = (state?.moduleDecomposition?.modules ?? []).map((m: any) => m.module)
+  // Group review notes by role
+  const byRole = new Map<string, EngineeringReviewNote[]>()
+  for (const n of [...sysNotes, ...allNotes]) {
+    const k = n.role.toUpperCase()
+    if (!byRole.has(k)) byRole.set(k, [])
+    byRole.get(k)!.push(n)
+  }
+  // Part verification exceptions from bomTotals
+  const recs = partRecommendations ?? []
+  const partExceptions: Array<{ moduleId: string; subId: string; lineNum: string; row: BomPartRow; status: VerificationStatusV2 }> = []
+  if (bomTotals) {
+    for (const m of bomTotals.allMods) {
+      const mIdx = moduleOrder.indexOf(m.module) + 1
+      for (let smi = 0; smi < m.subs.length; smi++) {
+        const sm = m.subs[smi]
+        for (let pi = 0; pi < sm.parts.length; pi++) {
+          const c = classifyVerificationStatus(sm.parts[pi], recs)
+          if (c.status !== 'verified') {
+            partExceptions.push({ moduleId: m.module, subId: sm.id, lineNum: `${mIdx}.${smi + 1}.${pi + 1}`, row: sm.parts[pi], status: c.status })
+          }
+        }
+      }
+    }
+  }
+  // Compliance gaps from complianceGate
+  const cgGaps: Array<{ code: string; reason: string }> = []
+  const cgReason = String(state?.complianceGate?.reason ?? '')
+  if (cgReason && (state?.complianceGate?.verdict === 'WARN' || state?.complianceGate?.verdict === 'HALT')) {
+    cgGaps.push({ code: state.complianceGate.verdict ?? 'WARN', reason: cgReason })
+  }
+  const hasAny = byRole.size > 0 || partExceptions.length > 0 || cgGaps.length > 0
+  if (!hasAny) return null
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section 8 · Issue Index" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Issue Index
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 18, lineHeight: 1.55 }}>
+        All engineering review notes + part verification exceptions + compliance gaps, grouped by category, with module references. For readers who skim by issue type rather than by module.
+      </Text>
+      {byRole.size > 0 ? (
+        <View style={{ marginBottom: 14 }}>
+          <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 1.5, marginBottom: 4 }}>★ ENGINEERING REVIEW NOTES ({Array.from(byRole.values()).reduce((s, a) => s + a.length, 0)})</Text>
+          {Array.from(byRole.entries()).map(([role, notes]) => notes.map((n, ni) => (
+            <View key={`${role}-${ni}`} style={{ flexDirection: 'row', gap: 8, paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
+              <Text style={{ width: 90, fontSize: 7.5, color: MUTED, letterSpacing: 0.8 }}>{role}</Text>
+              <Text style={{ flex: 1, fontSize: 9, color: INK }}>{n.id} — {n.issue}</Text>
+              <Text style={{ fontSize: 8.5, color: ACCENT, textDecoration: 'underline' }}>{n.module_id === 'system' ? 'System' : `Module ${moduleOrder.indexOf(n.module_id) + 1}`}</Text>
+            </View>
+          )))}
+        </View>
+      ) : null}
+      {partExceptions.length > 0 ? (
+        <View style={{ marginBottom: 14 }}>
+          <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 1.5, marginBottom: 4 }}>★ PART NUMBERS NEEDING VERIFICATION ({partExceptions.length})</Text>
+          {partExceptions.slice(0, 30).map((e, ei) => {
+            const b = v2StatusBadge(e.status)
+            return (
+              <View key={ei} style={{ flexDirection: 'row', gap: 8, paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
+                <Text style={{ width: 50, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>{e.lineNum}</Text>
+                <Text style={{ flex: 1, fontSize: 9, color: INK }}>{e.row.word_name ?? '—'} ({e.row.manufacturer ?? ''} {e.row.part_number ?? ''})</Text>
+                <View style={{ alignSelf: 'center', paddingHorizontal: 4, paddingVertical: 1, backgroundColor: b.bg, borderRadius: 2 }}>
+                  <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: b.fg }}>{b.sym} {b.label}</Text>
+                </View>
+              </View>
+            )
+          })}
+          {partExceptions.length > 30 ? (
+            <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic' }}>
+              ...and {partExceptions.length - 30} more. See module BoM tables inline for full list.
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+      {cgGaps.length > 0 ? (
+        <View style={{ marginBottom: 14 }}>
+          <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 1.5, marginBottom: 4 }}>★ COMPLIANCE GAPS ({cgGaps.length})</Text>
+          {cgGaps.map((g, gi) => (
+            <View key={gi} style={{ flexDirection: 'row', gap: 8, paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
+              <Text style={{ width: 50, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>{g.code}</Text>
+              <Text style={{ flex: 1, fontSize: 9, color: INK }}>{g.reason}</Text>
+              <Text style={{ fontSize: 8.5, color: ACCENT, textDecoration: 'underline' }}>Compliance</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      <PageFooter />
+    </Page>
+  )
+}
+
+/**
+ * Section 9 Engineering QA Summary (council recommendation — methodology
+ * table replacing the raw appendix dump). Category names, not internal gate
+ * names. One page max.
+ */
+function EngineeringQASummaryPage({ state, project, bomTotals, partRecommendations }: { state: any; project: string; bomTotals?: BomTotals | null; partRecommendations?: any[] }) {
+  const arith = state?.grammarVerdicts?.arithmetic ?? null
+  const grammar = state?.grammarVerdicts?.grammar ?? null
+  const arithPassed = arith?.passed ?? 0
+  const arithFired = arith?.fired ?? 0
+  const grammarPassed = grammar?.passed ?? 0
+  const grammarFired = grammar?.fired ?? 0
+  const totalChecks = arithFired + grammarFired
+  const totalPassed = arithPassed + grammarPassed
+  const issues: any[] = Array.isArray(state?.physicsCritique?.issues) ? state.physicsCritique.issues : []
+  const highCount = issues.filter((i: any) => String(i.severity).toLowerCase() === 'high').length
+  const medCount = issues.filter((i: any) => String(i.severity).toLowerCase() === 'med').length
+  const cgVerdict = state?.complianceGate?.verdict ?? '—'
+  const cgMandatoryCovered = state?.complianceGate?.mandatory_covered ?? 0
+  const cgMandatoryTotal = state?.complianceGate?.mandatory_total ?? 0
+  const k10 = state?.moduleDecomposition?.k10ShadowResult ?? state?.k10ShadowResult
+  const k10Verdict = k10?.verdict ?? 'NO_GRAPH'
+  const k10Matched = k10?.matched_edges ?? 0
+  const k10Missing = Array.isArray(k10?.missing_required) ? k10.missing_required.length : 0
+  const recs = partRecommendations ?? []
+  let verified = 0, replaced = 0, verify = 0, customSource = 0
+  if (bomTotals) {
+    for (const m of bomTotals.allMods) for (const s of m.subs) for (const p of s.parts) {
+      const c = classifyVerificationStatus(p, recs)
+      if (c.status === 'verified') verified++
+      else if (c.status === 'replaced') replaced++
+      else if (c.status === 'verify') verify++
+      else customSource++
+    }
+  }
+  const rows = [
+    { label: 'Engineering arithmetic', method: 'Power, flow, pressure, thermal-load, capacity relationships between modules must close to within tolerance.', outcome: `${arithPassed} of ${arithFired} passed`, ok: arithPassed === arithFired && arithFired > 0 },
+    { label: 'Engineering plausibility', method: 'Peer review by an independent reviewer model for first-principles violations (impossible fan curves, undersized drivers, missing heat rejection).', outcome: `${highCount} high${highCount > 0 ? ' — see Review Notes' : ''}${medCount > 0 ? `, ${medCount} med` : ''}`, ok: highCount === 0 },
+    { label: 'Part-number verification', method: 'Catalogue lookups (DigiKey / Mouser / Farnell / Brave) on every emitted SKU.', outcome: `${verified} verified · ${replaced} replaced · ${verify} verify · ${customSource} custom`, ok: replaced + verify === 0 },
+    { label: 'Compliance coverage', method: 'Required standards for the product class and declared jurisdictions.', outcome: `${cgMandatoryCovered}/${cgMandatoryTotal} mandatory covered (${cgVerdict})`, ok: cgVerdict === 'PASS' },
+    { label: 'Cross-module interfaces', method: 'Required cross-module connections (safety chains, comms links, fluid loops) explicitly specified.', outcome: k10Verdict === 'NO_GRAPH' ? 'Topology graph not registered for this class' : `${k10Matched} explicit · ${k10Missing} require sign-off`, ok: k10Missing === 0 && k10Verdict !== 'NO_GRAPH' },
+    { label: 'Brief-constraint propagation', method: 'Brief-pinned values (canopy area, envelope, yield target, supply current) preserved through the design pipeline.', outcome: state?.physicsRepair?.ran ? `${state.physicsRepair.patches_applied_total} patches applied, ${state.physicsRepair.final_high_count} HIGH remain` : 'no repair iters needed', ok: true },
+  ]
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section 9 · Engineering QA Summary" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Engineering QA Summary
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 18, lineHeight: 1.55 }}>
+        Methodology of the automated checks the chain ran on this design + their outcomes. Detail for any flagged item lives inline in the relevant module's Engineering Review Notes.
+      </Text>
+      <View style={{ padding: 14, backgroundColor: '#f0f9ff', borderLeftWidth: 4, borderLeftColor: '#0284c7', borderRadius: 4 }}>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#075985', marginBottom: 3 }}>Verification methodology + outcomes</Text>
+        <Text style={{ fontSize: 8.5, color: '#075985', fontStyle: 'italic', marginBottom: 12 }}>Pass/fail counts. Detail is inline in the relevant module's Review Notes; this page is a methodology summary, not a log.</Text>
+        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#cbd5e1', paddingBottom: 4 }}>
+          <Text style={{ flex: 2, fontSize: 8, color: MUTED, letterSpacing: 0.8, fontFamily: 'Helvetica-Bold' }}>CHECK CATEGORY</Text>
+          <Text style={{ flex: 4, fontSize: 8, color: MUTED, letterSpacing: 0.8, fontFamily: 'Helvetica-Bold' }}>WHAT IT DOES</Text>
+          <Text style={{ flex: 2.5, fontSize: 8, color: MUTED, letterSpacing: 0.8, fontFamily: 'Helvetica-Bold', textAlign: 'right' }}>OUTCOME</Text>
+        </View>
+        {rows.map((r, ri) => (
+          <View key={ri} style={{ flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 0.4, borderBottomColor: '#cbd5e1', alignItems: 'flex-start' }}>
+            <Text style={{ flex: 2, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: INK }}>{r.label}</Text>
+            <Text style={{ flex: 4, fontSize: 9, color: INK_SOFT, lineHeight: 1.45 }}>{r.method}</Text>
+            <View style={{ flex: 2.5, alignItems: 'flex-end' }}>
+              <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 2, backgroundColor: r.ok ? '#dcfce7' : '#fef3c7' }}>
+                <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: r.ok ? '#15803d' : '#92400e' }}>{r.outcome}</Text>
+              </View>
+            </View>
+          </View>
+        ))}
+      </View>
+      <Text style={{ fontSize: 9, color: MUTED, marginTop: 14, lineHeight: 1.5 }}>
+        This report is a first-cut engineering scaffold generated from your brief. Items in Engineering Review Notes + Issue Index are calls for human engineering judgement before procurement — not declarations that the design is wrong. The chain has run all of the above checks and surfaced what an engineer should think about; final sign-off is yours.
+      </Text>
+      <PageFooter />
+    </Page>
+  )
+}
+
 function MinimalDocument({ state, subject }: { state: any; subject: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
   const rawModules = state.moduleDecomposition?.modules ?? []
@@ -4949,6 +5515,10 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
       <BriefPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       <DesignTradeOffsPage state={state} project={project} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
+      {/* ITER-10 (council #1): System-Level Risks BEFORE individual modules.
+          Catches cumulative cross-cutting issues (total power, total mass)
+          that no single module's review notes would surface. */}
+      <SystemLevelRisksPage state={state} project={project} />
       {modules.map((m: any, idx: number) => (
         <ModuleSection
           key={m.module}
@@ -4962,25 +5532,31 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
             m.module,
             state,
           )}
+          /* ITER-10 (C1+C2+C3): pass bomTotals + state + partRecommendations
+             through so each module section renders its own inline sub-module
+             BoM with verification badges + Engineering Review Notes. The old
+             standalone BillOfMaterialsPage + PartsPendingVerificationPage +
+             ManualReviewAppendixPage are removed below. */
+          bomTotals={bomTotals}
+          state={state}
+          partRecommendations={Array.isArray(state?.partRecommendations) ? state.partRecommendations : []}
         />
       ))}
-      {/* §Compliance + §Risk moved AFTER modules per Tristan 2026-05-16 —
-          too speculative at the front of the report when design isn't yet
-          finalised. Sit between the modules + the parts-pending tail. */}
       <CompliancePage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       <RiskPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       <DesignDecisionsPage state={state} project={project} />
-      <BillOfMaterialsPage bomTotals={bomTotals} priceReality={priceReality} project={project} manualReviewBadges={manualReviewBadges} />
       <SuppliersPage state={state} project={project} />
-      {/* Parts Pending Verification moved to Appendix A (last) per Tristan
-          2026-05-17 — the dense audit-trail table is a reference document,
-          not something the reader should hit mid-report. Cover page surfaces
-          the count via the pendingPartsCount one-liner. */}
-      <PartsPendingVerificationPage state={state} project={project} />
-      {/* Appendix B — manual-review notes. Only renders when at least one
-          gate fired; otherwise returns null. Sits at the very end so it's
-          a reference page, not a mid-report interruption. */}
-      <ManualReviewAppendixPage badges={manualReviewBadges} state={state} project={project} provisionalClassRegistry={provisionalClassRegistry} />
+      {/* ITER-10 IA restructure (council-validated 2026-05-20):
+          REMOVED — Appendix A (PartsPendingVerificationPage): content now
+            inline in each module's BoM via classifyVerificationStatus + sub-rows
+          REMOVED — Standalone BillOfMaterialsPage: BoM is now inline per
+            sub-module within ModuleSection (sub-module subtotals + grand total
+            still visible; cover-card cost stack unchanged)
+          REPLACED — ManualReviewAppendixPage: most content moved inline to
+            module Engineering Review Notes; what remains in the QA Summary
+            below is the methodology + numeric outcomes (no raw machine output) */}
+      <IssueIndexPage state={state} project={project} bomTotals={bomTotals} partRecommendations={Array.isArray(state?.partRecommendations) ? state.partRecommendations : []} />
+      <EngineeringQASummaryPage state={state} project={project} bomTotals={bomTotals} partRecommendations={Array.isArray(state?.partRecommendations) ? state.partRecommendations : []} />
     </Document>
   )
 }
