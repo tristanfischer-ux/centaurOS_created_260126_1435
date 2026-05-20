@@ -246,6 +246,23 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // I9. Fresh-chain markers — these fields prove the NEW chain stages ran.
+  // Soft check (informational); only fails if all three are missing (suggests
+  // a chain run pre-dating Sprints 1B/3A/0v2).
+  const freshMarkers = {
+    cost_repair: !!state?.cost_repair_summary,
+    supplier_validation: !!state?.supplier_validation_summary,
+    brief_hero_image: !!state?.brief_hero_image_path,
+  }
+  const freshCount = Object.values(freshMarkers).filter(Boolean).length
+  assertions.push(assertEq(
+    'I9.fresh_chain_markers',
+    'state has at least one of: cost_repair_summary, supplier_validation_summary, brief_hero_image_path',
+    freshCount,
+    (n) => n >= 1,
+    () => `none of the fresh-chain markers present — state predates Sprints 1B/3A/0v2: ${JSON.stringify(freshMarkers)}`,
+  ))
+
   // VF-specific additional invariants
   if (productClass === 'vertical_farm' || productClass === 'verticalfarm') {
     const eo = modules.find((m: any) => m.module === 'energy_conversion_transduction')
