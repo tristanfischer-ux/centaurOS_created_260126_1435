@@ -972,10 +972,68 @@ export async function verifyAllParts(
 }
 
 /**
+ * Pattern-based "obviously a description, not a SKU" detector. Universal
+ * fix 2026-05-20 (iter-8 council finding E — pre-RAG version). VF iter-7
+ * BoM had Inventronics part_number = "200 W, 0.9 PF" — that's a power
+ * rating + power factor, not a part number. Also "Osram PHYTOVYNE R1500"
+ * (search-yields-no-results fabrication). Until SKU verification against
+ * Octopart/Mouser RAG ships, this regex pre-pass strips obvious
+ * description-as-SKU strings BEFORE the LLM verifier runs (cheaper) AND
+ * catches LLM-verifier misses.
+ *
+ * Returns true when the string is very likely a description not a SKU.
+ * Conservative — only fires when one of several strong signals matches.
+ */
+export function patternLooksLikeDescriptionNotSku(partNumber: string): { fake: boolean; reason: string } {
+  const s = String(partNumber ?? '').trim()
+  if (!s || s.length < 2) return { fake: false, reason: '' }
+
+  // Pattern 1: starts with number + unit (e.g. "200 W", "120 V, 0.9 PF",
+  // "5 kW", "4500 m³/h"). SKUs almost never start with a numeric value
+  // followed by a unit symbol.
+  if (/^\d+(?:\.\d+)?\s*[A-Za-z]{1,4}(\b|,|\s)/.test(s)) {
+    const unitMatch = s.match(/^\d+(?:\.\d+)?\s*([A-Za-z]{1,4})/)
+    const unit = unitMatch?.[1] ?? ''
+    if (/^(w|kw|mw|v|kv|a|ka|hz|khz|mhz|pa|kpa|bar|psi|nm|cm|mm|m|l|kg|t|c|f|k|m3|ohm|pf|hp|ml|gpm|cfm|lpm)$/i.test(unit)) {
+      return { fake: true, reason: `looks like a unit-prefixed value ("${s.slice(0, 30)}"), not a manufacturer SKU` }
+    }
+  }
+
+  // Pattern 2: comma followed by space-and-letters in middle (description
+  // pattern: "Volume X, Property Y"). Real SKUs use comma rarely if ever.
+  if (/,\s+[A-Za-z]/.test(s)) {
+    return { fake: true, reason: `contains description-style comma ("${s.slice(0, 30)}"), not a SKU pattern` }
+  }
+
+  // Pattern 3: three or more consecutive whitespace-separated words made
+  // entirely of letters (no digits, no hyphens). Real SKUs almost always
+  // contain some numeric or punctuation discriminator.
+  if (/^[A-Za-z]+\s+[A-Za-z]+\s+[A-Za-z]+/.test(s)) {
+    return { fake: true, reason: `three or more all-alphabetic words ("${s.slice(0, 30)}"), not a SKU pattern` }
+  }
+
+  // Pattern 4: explicit descriptor words that real catalogue part numbers
+  // don't contain in the SKU string itself ("series", "type", "model",
+  // "rating", "grade" + suffix).
+  if (/\b(series|type|model|rating|grade)\b\s+[A-Z0-9]/i.test(s)) {
+    return { fake: true, reason: `contains descriptor word + suffix ("${s.slice(0, 30)}"), not a SKU` }
+  }
+
+  return { fake: false, reason: '' }
+}
+
+/**
  * Mutate modules in-place: strip part_number modifiers from words whose
  * verification status is "unverified" AND confidence is "high". Manufacturer
  * stays — only the SKU is removed (so a Phoenix Contact word loses its fake
  * QUINT-TS-20 SKU but stays a "Phoenix Contact" item).
+ *
+ * 2026-05-20 iter-8 council fix E (light): ALSO strip part_number when it
+ * matches a high-confidence "obvious description-not-SKU" pattern, even if
+ * the LLM verifier didn't flag it as unverified+high. This catches the
+ * "200 W, 0.9 PF" / "5 kW R290 monobloc" / similar misses that survived
+ * verification because the verifier sometimes assumed the LLM was passing
+ * descriptive context not a SKU.
  *
  * Returns count of stripped part_numbers + a list of (word_id, removed_pn)
  * for the action log.
@@ -991,7 +1049,27 @@ export function stripUnverifiedParts(
       stripSet.set(`${v.module}::${v.sub_module_id}::${v.word_id}`, v)
     }
   }
-  if (stripSet.size === 0) return { stripped: 0, details: [] }
+  // Pattern pre-pass added 2026-05-20: also queue any part_number matching
+  // the obvious-description pattern, regardless of verifier status.
+  const patternStripDetails = new Map<string, string>()
+  for (const m of modules ?? []) {
+    for (const sm of ((m as any).sub_modules ?? [])) {
+      for (const w of (sm.words ?? [])) {
+        const mods = Array.isArray(w.modifier_characters) ? w.modifier_characters : []
+        const pnMod = mods.find((mc: any) => normaliseKind(String(mc?.kind ?? '')) === 'part_number')
+        if (!pnMod) continue
+        const pn = String(pnMod.value ?? '')
+        const r = patternLooksLikeDescriptionNotSku(pn)
+        if (r.fake) {
+          const key = `${m.module}::${sm.id}::${w.id ?? '?'}`
+          if (!stripSet.has(key)) {
+            patternStripDetails.set(key, `${pn} — pattern strip: ${r.reason}`)
+          }
+        }
+      }
+    }
+  }
+  if (stripSet.size === 0 && patternStripDetails.size === 0) return { stripped: 0, details: [] }
 
   const details: Array<{ word_id: string; removed_pn: string; reasoning: string }> = []
   let stripped = 0
@@ -1000,15 +1078,21 @@ export function stripUnverifiedParts(
       for (const w of (sm.words ?? [])) {
         const key = `${m.module}::${sm.id}::${w.id ?? '?'}`
         const v = stripSet.get(key)
-        if (!v) continue
+        const patternReason = patternStripDetails.get(key)
+        if (!v && !patternReason) continue
         const mods = Array.isArray(w.modifier_characters) ? w.modifier_characters : null
         if (!mods) continue
+        const pnBefore = String(mods.find((mc: any) => normaliseKind(String(mc?.kind ?? '')) === 'part_number')?.value ?? '')
         const before = mods.length
         const filtered = mods.filter((mc: any) => normaliseKind(String(mc?.kind ?? '')) !== 'part_number')
         if (filtered.length < before) {
           w.modifier_characters = filtered
           stripped++
-          details.push({ word_id: key, removed_pn: v.part_number, reasoning: v.reasoning })
+          details.push({
+            word_id: key,
+            removed_pn: v?.part_number ?? pnBefore,
+            reasoning: v?.reasoning ?? patternReason ?? 'pattern strip',
+          })
         }
       }
     }

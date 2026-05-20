@@ -707,6 +707,73 @@ const driverLoadPowerBalanceGate: ArithmeticGate = {
 }
 
 /**
+ * Fan static-pressure feasibility gate (2026-05-20 iter-8 council fix C):
+ * detect declared fan operating-point claims that exceed the physical
+ * capability of the fan type/size.
+ *
+ * Closes the AHU axial-fan-stall class — VF iter-7 physics critic caught
+ * "ebm-papst W3G300-AB01-01 is a 300mm axial fan. Design claims 4500 m³/h
+ * at 150 Pa. In reality a 300mm axial fan max static ~100 Pa, stalls at
+ * its free-air flow ~2200 m³/h". No gate existed for fan-curve sanity.
+ *
+ * Universal: applies to any product with declared fan size + type +
+ * operating static pressure. The lookup table is engineering-typical
+ * maximum static for each (size, type) combination; declared static
+ * above 1.1× this maximum indicates a wrong fan choice.
+ *
+ * Sources: ebm-papst RadiCal/RadiPac/AxiTop catalogues, Comefri,
+ * Continental Industrie general selection guides. Values are conservative
+ * upper bounds for that physical size class — exceeding them by >10%
+ * means the wheel will operate beyond its surge / stall line.
+ */
+const FAN_STATIC_LOOKUP: Array<{ size_min: number; size_max: number; type_regex: RegExp; max_static_pa: number; alt_type: string }> = [
+  // Axial fans (propeller-style, low static)
+  { size_min: 150, size_max: 199, type_regex: /\baxial\b/i, max_static_pa: 60,  alt_type: 'centrifugal plug fan or backward-curve' },
+  { size_min: 200, size_max: 249, type_regex: /\baxial\b/i, max_static_pa: 80,  alt_type: 'centrifugal plug fan or backward-curve' },
+  { size_min: 250, size_max: 299, type_regex: /\baxial\b/i, max_static_pa: 95,  alt_type: 'centrifugal plug fan or backward-curve' },
+  { size_min: 300, size_max: 399, type_regex: /\baxial\b/i, max_static_pa: 110, alt_type: 'centrifugal plug fan (e.g. ebm-papst RadiPac)' },
+  { size_min: 400, size_max: 499, type_regex: /\baxial\b/i, max_static_pa: 140, alt_type: 'centrifugal plug fan (e.g. ebm-papst RadiPac)' },
+  { size_min: 500, size_max: 800, type_regex: /\baxial\b/i, max_static_pa: 200, alt_type: 'centrifugal plug fan (e.g. ebm-papst RadiPac)' },
+  // Centrifugal / EC plug fans (high static)
+  { size_min: 150, size_max: 299, type_regex: /\b(centrifugal|plug|radipac|radial)\b/i, max_static_pa: 350, alt_type: '' },
+  { size_min: 300, size_max: 499, type_regex: /\b(centrifugal|plug|radipac|radial)\b/i, max_static_pa: 500, alt_type: '' },
+  { size_min: 500, size_max: 800, type_regex: /\b(centrifugal|plug|radipac|radial)\b/i, max_static_pa: 800, alt_type: '' },
+]
+
+const fanStaticPressureFeasibilityGate: ArithmeticGate = {
+  name: 'fan_static_pressure_feasibility',
+  description: 'declared fan static pressure ≤ 1.1 × maximum for size + type class (axial vs centrifugal)',
+  evaluate(modules) {
+    for (const m of modules) {
+      const dp = m.derived_parameters
+      const sizeMm = num(dp, 'fan_size_mm', 'impeller_size_mm', 'wheel_diameter_mm')
+      const staticPa = num(dp, 'fan_static_pressure_pa', 'duct_static_pressure_pa', 'declared_static_pa')
+      const fanTypeRaw = String((dp as any)?.fan_type ?? (dp as any)?.fan_kind ?? '').toLowerCase()
+      // Trigger: any of the three fields declared → fan operating point claimed.
+      const hasTrigger = sizeMm !== null || staticPa !== null || fanTypeRaw.length > 0
+      if (!hasTrigger) continue
+      const present: string[] = []
+      const missing: string[] = []
+      if (sizeMm !== null) present.push(`fan_size_mm=${sizeMm}`); else missing.push('fan_size_mm')
+      if (staticPa !== null) present.push(`fan_static_pressure_pa=${staticPa}`); else missing.push('fan_static_pressure_pa')
+      if (fanTypeRaw.length > 0) present.push(`fan_type=${fanTypeRaw}`); else missing.push('fan_type')
+      if (missing.length > 0) return incompleteResult('fan_static_pressure_feasibility', m.module, missing, present)
+      const lookup = FAN_STATIC_LOOKUP.find(row => sizeMm! >= row.size_min && sizeMm! <= row.size_max && row.type_regex.test(fanTypeRaw))
+      if (!lookup) {
+        // Unknown size/type combo → not a verifiable claim, silent.
+        continue
+      }
+      if (staticPa! <= lookup.max_static_pa * 1.1) {
+        return { score: 600, passed: true, reasons: [`fan static OK on ${m.module}: ${sizeMm}mm ${fanTypeRaw} at ${staticPa}Pa (within ${lookup.max_static_pa}Pa typical max)`], affected: [m.module] }
+      }
+      const altHint = lookup.alt_type ? ` FIX: substitute ${lookup.alt_type} sized for ${staticPa}Pa static.` : ''
+      return { score: -2200, passed: false, reasons: [`fan static FAIL on ${m.module}: ${sizeMm}mm ${fanTypeRaw} claims ${staticPa}Pa but max for this size+type is ~${lookup.max_static_pa}Pa — wheel will surge/stall, declared flow unachievable.${altHint}`], affected: [m.module] }
+    }
+    return emptyResult()
+  },
+}
+
+/**
  * Pressure balance gate (2026-05-20 iter-8 council fix D): pump rated
  * pressure must meet or exceed downstream membrane/system required pressure.
  *
@@ -767,6 +834,7 @@ export const UNIVERSAL_ARITHMETIC_GATES: ArithmeticGate[] = [
   cellDischargeRateGate,
   driverLoadPowerBalanceGate,
   fluidPressureBalanceGate,
+  fanStaticPressureFeasibilityGate,
 ]
 
 export function runArithmeticGates(modules: ModuleSpec[]): {
