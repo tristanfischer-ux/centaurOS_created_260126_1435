@@ -1790,6 +1790,69 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     logAction({ step: 'canonical_product_class_override', llm_emitted: String(design?.product_class ?? ''), canonical: currentProductClass, overridden: false })
   }
 
+  // ── Physics Repair Loop (Tristan 2026-05-20 directive)
+  //
+  // The chain's job is to deliver a WORKING design, not just flag broken ones.
+  // Before this stage: physics critic (STEP 7.5) emits HIGH findings; R4 (STEP 8)
+  // gets them as advisory text but rarely acts because findings are prose not
+  // structured patches and R4 is the cheapest reviewer. Phase 2 repair loop only
+  // fires on gate failures, not physics findings. Result: chain ships broken
+  // designs with DO-NOT-PROCURE banner (iter-8 fix).
+  //
+  // After this stage: each HIGH-severity physics finding is dispatched to a
+  // STRONG model (Gemini 3.1 Pro — same as Generator) with explicit MANDATORY
+  // repair directive and the suggested_check from the critic. Model emits
+  // structured patches (replace_modifier, edit_word, add_word_to_sub_module,
+  // set_derived_parameter) that swap out the wrong components. Loops until
+  // plausibility ≥ 7 OR HIGH count = 0 OR max iters (4) reached.
+  //
+  // Universal: works for every product class. Class-agnostic prose findings,
+  // model-side judgment on which parts to swap.
+  let physicsRepairResult: any = null
+  const tPhysRepair = Date.now()
+  try {
+    const hasHighSev = critique && (critique.issues ?? []).some((i: any) => {
+      const s = String(i?.severity ?? '').toLowerCase()
+      return s === 'high' || s === 'critical' || s === 'halt'
+    })
+    const lowPlaus = critique && (critique.scores?.engineering_plausibility ?? 10) <= 5
+    if (critique && (hasHighSev || lowPlaus)) {
+      const { runPhysicsRepairLoop } = await import('../src/lib/pdf-engine-v2/radical/physics-repair')
+      physicsRepairResult = await runPhysicsRepairLoop({
+        modules: design.modules ?? [],
+        crossLinks: (design as any).cross_module_grammar_links ?? [],
+        initialCritique: critique,
+        brief: parsedResult.data,
+        keyMetrics,
+        productClass: currentProductClass,
+        apiKey,
+        // defaults: repairModel=Gemini 3.1 Pro, critiqueModel=Gemini 3.5 Flash, maxIters=4, plausibilityTarget=7
+      })
+      if (physicsRepairResult?.final_critique) {
+        critique = physicsRepairResult.final_critique
+      }
+      console.error(`[chain] physics repair: ${physicsRepairResult.iters} iter(s); HIGH ${physicsRepairResult.initial_high_count}→${physicsRepairResult.final_high_count}; plausibility ${physicsRepairResult.initial_plausibility}→${physicsRepairResult.final_plausibility}; patches ${physicsRepairResult.patches_applied_total}`)
+      for (const d of (physicsRepairResult.iter_diagnostics ?? [])) {
+        console.error(`  iter ${d.iter}: proposed ${d.patches_proposed} applied ${d.patches_applied} | HIGH ${d.high_in}→${d.high_out} plaus ${d.plausibility_in}→${d.plausibility_out}${d.unfixable_reason ? ' | ' + d.unfixable_reason : ''}`)
+      }
+    } else {
+      console.error(`[chain] physics repair: skipped (no HIGH findings, plausibility ${critique?.scores?.engineering_plausibility ?? '?'}/10)`)
+    }
+  } catch (err) {
+    console.error(`[chain] physics repair threw: ${(err as Error).message}; continuing without`)
+  }
+  logAction({
+    step: 'physics_repair',
+    latency_ms: Date.now() - tPhysRepair,
+    ran: !!physicsRepairResult?.ran,
+    iters: physicsRepairResult?.iters ?? 0,
+    initial_high: physicsRepairResult?.initial_high_count ?? 0,
+    final_high: physicsRepairResult?.final_high_count ?? 0,
+    initial_plausibility: physicsRepairResult?.initial_plausibility,
+    final_plausibility: physicsRepairResult?.final_plausibility,
+    patches_applied: physicsRepairResult?.patches_applied_total ?? 0,
+  })
+
   // ── End-of-Phase-1 normalisation pass (universal, 2026-05-15).
   // The 4 reviewers each emit modifiers in their own formatting (× vs x, "IP65"
   // vs "IP65 protection"), so by the time R4 returns, words can carry 2-3
@@ -2365,6 +2428,11 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
       recommendations_unknown: partRecommendations.filter(r => r.confidence === 'unknown').length,
     },
     physicsCritique: critique,
+    // 2026-05-20 iter-9 Step 1: physics repair loop diagnostics (Tristan
+    // "design that does work" directive). state.physicsRepair carries the
+    // before/after metrics so the renderer + audit can see whether the
+    // chain successfully auto-resolved physics findings.
+    physicsRepair: physicsRepairResult ?? null,
     physicsLedger,
     // 2026-05-19 v5.1 audit fix #1 (Grok + GPT-5.5): persist complianceGate
     // in the INITIAL state object, not just the post-engines re-stamp block.
