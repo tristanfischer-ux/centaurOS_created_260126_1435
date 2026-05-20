@@ -39,11 +39,11 @@ const TABS: ShowcaseTab[] = [
     icon: <Hammer className="h-4 w-4" />,
     url: 'fractionalforge.app/the-forge',
     image: '/images/screenshots/design-modules.png',
-    headline: 'From idea to product design',
-    description: 'Describe your product and the platform walks through the materials, hardware, software, and equipment you will need. Every component links directly to suppliers who can make it.',
+    headline: 'A ~100-page build report from one paragraph',
+    description: 'Describe your product in a paragraph. The Forge returns an engineering build report — architecture, modules, full BoM, 13-stage gate verdicts, manufacturer shortlist per module, and a strict source-evidence boundary so candidate claims are never confused with procurement-ready ones. Every BoM line is provenanced; every gate is scored.',
     callouts: [
-      { text: 'Product modules, explained', position: 'top-[10%] left-[5%]' },
-      { text: 'Link to matched suppliers', position: 'top-[35%] right-[5%]' },
+      { text: 'Architecture + modules', position: 'top-[10%] left-[5%]' },
+      { text: 'Pass / review / blocked verdicts', position: 'top-[35%] right-[5%]' },
     ],
   },
   // Recruits tab removed 2026-05-20 — fractional-executives marketplace

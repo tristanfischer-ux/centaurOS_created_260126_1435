@@ -109,11 +109,11 @@ const FAQS = [
   },
   {
     question: "How does ForgeOS work?",
-    answer: "ForgeOS gives you 13 specialists — strategy, engineering, manufacturing, supply chain, finance, fundraising, and more — who provide structured analysis and support across every discipline. You brainstorm with them, they challenge assumptions, and the output is a decision and a next step. Alongside that, you get access to an investor database of over 13,000 UK firms, and The Forge build engine that drafts your product against 13,700+ UK and European manufacturer profiles — so every module in the report comes with a supplier shortlist.",
+    answer: "Describe your hardware idea in one paragraph and The Forge returns a roughly 100-page engineering build report — system architecture, modules, full bill of materials, 13-stage gate verdicts (architecture, engineering review, sourcing, BoM admission, procurement readiness, document trust), a manufacturer shortlist per module drawn from 14,000+ UK and EU supplier profiles, and an honest audit of what is procurement-ready and what still needs work. Alongside that, you brainstorm with 13 specialists across strategy, engineering, manufacturing, finance and fundraising, and get matched against 14,000+ UK investors with thesis-fit scoring and Connection Briefs on how to reach them.",
   },
   {
     question: "How quickly can I go from idea to prototype?",
-    answer: "The aim of ForgeOS is to let you get a product designed and built before you have spent a year finding a factory, negotiating a lease, and installing equipment. The Forge (currently in beta) helps you understand what materials, equipment, and suppliers your product will need. 13,700+ UK and European manufacturers are integrated into The Forge, so when you describe your product the build report shows which manufacturers can make each module — rather than building your own factory, you find partners who already have the building, the machinery, and the expertise.",
+    answer: "The aim of ForgeOS is to compress the months you would normally spend finding a factory, negotiating a lease, and installing equipment into hours of report-driven planning. The Forge (currently in beta) returns the build report on demand: architecture, BoM, gate verdicts, sourcing intake queue, and a per-module manufacturer shortlist drawn from 14,000+ UK and European supplier profiles. Rather than building your own factory, you start with a credible document that names the partners who already have the building, the machinery, and the expertise to make each module.",
   },
   {
     question: "How much does it cost?",
@@ -456,19 +456,19 @@ function HeroSection() {
         <motion.div initial="hidden" animate="visible" variants={fadeInScale} className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full">
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
           <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
-            Brainstorming and investors for hardware founders
+            An AI-built engineering report for hardware founders
           </span>
         </motion.div>
 
         <motion.h1 initial="hidden" animate="visible" variants={heroHeadline} className="font-playfair text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-black leading-tight mb-6 md:mb-8">
-          Make every product{" "}
+          Your product, fully scoped.{" "}
           <motion.span initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }} className="text-international-orange">
-            smart.
+            In one PDF.
           </motion.span>
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          ForgeOS gives hardware founders brainstorming with 13 specialists, access to over 13,000 UK investors, and a build engine that drafts your product against 13,700+ UK and European manufacturer profiles. Think out loud, find the right capital, and see who can actually make what you&apos;re designing.
+          Describe your hardware idea in one paragraph. The Forge returns a ~100-page engineering build report — system architecture, modules, bill of materials, 13-stage gate verdicts, manufacturer shortlists, and an honest audit of what is ready and what still needs work. Alongside it: brainstorming with 13 specialists and a match against 14,000+ UK investors. The kind of due-diligence pack a hardware founder would otherwise spend months pulling together.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
@@ -533,15 +533,15 @@ function TristanIntroSection() {
 
 const HOW_IT_WORKS_PILLARS = [
   {
-    label: "The Smart-Product Wave",
-    title: "Designed for what hardware is becoming.",
-    image: "/images/marketing/ecosystem-os.png",
-    imageAlt: "Connected sensors and intelligent product concepts",
-    body: "Most hardware categories are about to be re-imagined for intelligence \u2014 air-quality monitors, kettles, drills, dialysis devices. ForgeOS helps hardware founders brainstorm the smart version, find the investors who fund it, and connect with the manufacturers who can build it.",
+    label: "The Forge",
+    title: "A ~100-page build report from one paragraph.",
+    image: "/images/marketing/factory-partner.png",
+    imageAlt: "Engineering build report cover with architecture diagram",
+    body: "Describe your hardware idea in one paragraph. The Forge returns an engineering build report \u2014 cover dashboard with feasibility score and BoM readiness, system architecture, module decomposition, full bill of materials, 13-stage gate verdicts, manufacturer shortlist for every module, sourcing intake queue, and an honest audit of what is ready and what still needs work. The kind of due-diligence pack a hardware founder would otherwise spend months pulling together.",
     highlights: [
-      "Brainstorm with 13 specialists across every discipline",
-      "Over 13,000 UK investors profiled and matched to your stage",
-      "13,700+ manufacturers indexed by capability and specialism",
+      "~100 pages of architecture, BoM, gates and sourcing evidence",
+      "13-stage pipeline with pass / review / blocked verdicts on every section",
+      "Manufacturer shortlist per module, drawn from 14,000+ UK and EU supplier profiles",
     ],
   },
   {
@@ -557,27 +557,27 @@ const HOW_IT_WORKS_PILLARS = [
     ],
   },
   {
-    label: "Specialists",
-    title: "13 Specialists. Your Judgement.",
-    image: "/images/marketing/role-apprentice.png",
-    imageAlt: "Young engineers collaborating on product design",
-    body: "13 specialists support every decision \u2014 strategy, engineering, finance, manufacturing, supply chain, fundraising, and more. They provide structured analysis, draw on real data, and challenge assumptions. The decisions remain yours.",
+    label: "Investors",
+    title: "14,000+ UK investors, pre-researched and matched.",
+    image: "/images/marketing/ecosystem-os.png",
+    imageAlt: "Investor match dashboard with thesis fit scores",
+    body: "Paste your deck, exec summary, or business plan. Get a ranked shortlist of UK venture capital, private equity, angels, family offices and grants \u2014 matched to your stage, sector and cheque size. Every firm comes with thesis-fit reasoning, partner contacts, and a Connection Brief on how to reach them. No competitor offers the \"how to actually reach this person\" layer.",
     highlights: [
-      "Strategy, engineering, finance, legal, and 9 more disciplines",
-      "Grounded in real supplier, investor, and industry data",
-      "Your context, your decisions \u2014 supported at every step",
+      "14,000+ UK firms profiled \u2014 VC, PE, angels, family offices, grants",
+      "Thesis-fit scoring across stage, sector, geography and cheque size",
+      "Connection Brief per investor: warm-intro paths, partner emails, recent activity",
     ],
   },
   {
-    label: "The Forge",
-    title: "From product idea to manufacturer shortlist",
-    image: "/images/marketing/factory-partner.png",
-    imageAlt: "Factory floor with manufacturing equipment",
-    body: "Describe your product in one paragraph. The Forge returns a system architecture, module decomposition, draft Bill of Materials, and a design report — with a shortlist of UK and European manufacturers under every module, drawn from 13,700+ indexed supplier profiles. The supplier search is baked into the output, not a separate page you have to visit.",
+    label: "Honest by default",
+    title: "Every claim provenanced. Every gate scored.",
+    image: "/images/marketing/role-apprentice.png",
+    imageAlt: "Audit-trail and evidence boundary illustration",
+    body: "Hardware reports built without evidence trails are how founders ship products that miss compliance, blow CAPEX targets, or buy from a fictional supplier. The Forge report keeps a strict source-evidence boundary — candidate BoM lines are marked candidate-only until real supplier evidence is attached, every engineering gate carries pass / review / blocked verdicts with required-action callouts, and document-trust is its own gate. You see what is solid and what is not.",
     highlights: [
-      "13,700+ UK and European manufacturers integrated into the build report",
-      "Forge identifies the manufacturers experienced in your product's sensor / electronics / edge-compute mix",
-      "Every module ships with a ranked supplier shortlist — no separate search step",
+      "Source-evidence boundary — nothing claimed as priced until real supplier-quoted evidence is attached",
+      "Every gate has a Required Action: review who, sourcing intake what, evidence to collect",
+      "No hallucinated suppliers, no invented part numbers, no rosy numbers without provenance",
     ],
   },
 ] as const
@@ -597,7 +597,7 @@ function HowItWorksSection() {
             How It <span className="text-international-orange">Works</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Brainstorming with specialists, the investors who back hardware, and a build engine that turns your idea into a manufacturer-backed report — so you stop reinventing wheels.
+            A ~100-page engineering build report from one paragraph, alongside the brainstorming and investor matching that make it real — so you stop reinventing wheels.
           </p>
         </AnimatedSection>
 
@@ -708,13 +708,13 @@ function FounderArticlesSection() {
               Hardware has never had an AWS equivalent. Every founder ends up reinventing the same wheels — finding engineers, finding investors, sorting out IP, building a finance team — all pre-revenue, all without the budget for any of it.
             </p>
             <p>
-              Fractional Forge is my attempt at that equivalent. Rather than building your own factory from scratch, the platform&apos;s build engine drafts your product against over 13,700 UK and European manufacturers who already have the building, the machinery, and the expertise. As you work through your idea, you see who can make each module of what you are designing — and you can reach out to them for real advice on how it actually gets made.
+              Fractional Forge is my attempt at that AWS equivalent. You describe your product in a paragraph, and the platform returns a roughly 100-page engineering build report — system architecture, modules, bill of materials, 13-stage gate verdicts on what is engineered and what still needs review, a manufacturer shortlist for every module, and an honest audit of what you can treat as procurement-ready and what you cannot. The kind of due-diligence document I would have killed for in 2010, that an engineering consultancy would charge tens of thousands to produce.
             </p>
             <p>
-              Alongside that, Fractional Forge brings together 13 specialists and an investor database of over 13,000 UK firms — so the rest of the hardware founder&apos;s job sits in one place too.
+              Alongside that, Fractional Forge brings together 13 specialists you can brainstorm with and an investor database of over 14,000 UK firms matched to your stage, sector and cheque size — so the rest of the hardware founder&apos;s job sits in one place too.
             </p>
             <p>
-              And if you have been thinking about building your own company — Fractional Forge is designed to take you from &quot;I have an idea&quot; to &quot;I know exactly what the next step is&quot;. Brainstorm with the specialists, find the investors who match your stage, and let The Forge surface the manufacturers who can build what you are designing.
+              And if you have been thinking about building your own company — Fractional Forge is designed to take you from &quot;I have an idea&quot; to &quot;I have a report I can hand to an investor or an engineer&quot;. Brainstorm with the specialists, find the investors who match your stage, and let The Forge produce the engineering pack that turns the idea into something real.
             </p>
             <p>
               Have a look and let me know how you get on.
