@@ -2670,6 +2670,28 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     console.error('[chain] CHAIN_SKIP_SUPPLIER_VALIDATION=1 — skipping supplier-contact-validation step')
   }
 
+  // ── Hero Image Generation (Sprint 0 v2, Tristan 2026-05-20): generate
+  // a brief-aware cover image when the static-class hero would be the
+  // wrong scale. Calls Vercel AI Gateway / OpenAI gpt-image-1. Saves
+  // to <out-dir>/cover.png and updates state.brief_hero_image_path.
+  // Renderer prefers this over the static class PNG. Universal — works
+  // for any product class. Fail-soft. Skip via CHAIN_SKIP_IMAGE_GEN=1.
+  if (process.env.CHAIN_SKIP_IMAGE_GEN !== '1') {
+    const tImg = Date.now()
+    try {
+      execFileSync('npx', ['tsx', resolve(__dirname, 'generate-hero-images.tsx'), statePath, '--write'], {
+        stdio: 'inherit',
+        cwd: resolve(__dirname, '..'),
+      })
+      logAction({ step: 'hero_image_generation', latency_ms: Date.now() - tImg, ok: true })
+    } catch (err) {
+      console.error(`[chain] hero-image-generation failed: ${(err as Error).message}; continuing without`)
+      logAction({ step: 'hero_image_generation', latency_ms: Date.now() - tImg, ok: false, error: String(err).slice(0, 200) })
+    }
+  } else {
+    console.error('[chain] CHAIN_SKIP_IMAGE_GEN=1 — skipping hero-image-generation step')
+  }
+
   // ── Deployment envelope (Task #248, 2026-05-19): persist the canonical
   // shipping/installation envelope for the product class onto state. The PA
   // pipeline (stages/3-size-layout.ts) already does this but is NOT reachable

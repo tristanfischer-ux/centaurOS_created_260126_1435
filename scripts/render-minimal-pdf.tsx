@@ -5178,6 +5178,15 @@ function EnvelopeOutline({
  */
 
 function resolveHeroImages(state: any): { cover: string | null; exploded: string | null } {
+  // Sprint 0 v2 (Tristan 2026-05-20): brief-aware AI-generated hero
+  // takes precedence over the static class library. generate-hero-
+  // images.tsx writes the path into state.brief_hero_image_path; if
+  // present + readable, use that directly (skips envelope-mismatch
+  // suppression because the AI image is generated AT the brief scale).
+  const briefHero = typeof state?.brief_hero_image_path === 'string' ? state.brief_hero_image_path : null
+  if (briefHero && existsSync(briefHero)) {
+    return { cover: briefHero, exploded: null }
+  }
   const raw =
     state?.moduleDecomposition?.product_class ??
     state?.parsedBrief?.product_class ??
