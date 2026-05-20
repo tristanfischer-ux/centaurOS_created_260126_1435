@@ -4967,14 +4967,20 @@ function classToSlug(productClass: string): string {
 }
 
 function resolveModuleImage(productClass: string, moduleId: string, state?: any): string | null {
+  // Sprint 0 v3 (Tristan 2026-05-20): brief-aware per-module images
+  // take precedence over the static class library. generate-module-
+  // images.tsx writes state.module_image_paths = { module_id: absPath }.
+  const briefModulePath = state?.module_image_paths?.[moduleId]
+  if (typeof briefModulePath === 'string' && existsSync(briefModulePath)) {
+    return briefModulePath
+  }
   const slug = classToSlug(productClass)
   if (!slug) return null
   // 2026-05-20 (Tristan second review): the static class image is the wrong
   // scale for container/warehouse-sized briefs ("completely the wrong
   // size"). When the brief envelope clearly exceeds the static-render
   // implied scale, return null — the caller renders an EnvelopeOutline
-  // proportional placeholder instead. Static is OK only for desktop /
-  // cabinet briefs.
+  // proportional placeholder instead.
   if (state !== undefined && briefEnvelopeMismatchesStaticHero(state)) return null
   const projectRoot = resolve(__dirname, '..')
   const path = resolve(projectRoot, 'public', 'heroes', slug, `module-${moduleId}.png`)

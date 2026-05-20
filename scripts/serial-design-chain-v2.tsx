@@ -2692,6 +2692,26 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     console.error('[chain] CHAIN_SKIP_IMAGE_GEN=1 — skipping hero-image-generation step')
   }
 
+  // ── Per-Module Image Generation (Sprint 0 v3, Tristan 2026-05-20):
+  // generate one schematic per module to replace the static class
+  // Blender renders. Opt-in via CHAIN_ENABLE_MODULE_IMAGES=1 because of
+  // cost ($0.04 × N modules = ~$0.40 per run). Universal. Fail-soft.
+  if (process.env.CHAIN_ENABLE_MODULE_IMAGES === '1') {
+    const tMod = Date.now()
+    try {
+      execFileSync('npx', ['tsx', resolve(__dirname, 'generate-module-images.tsx'), statePath, '--write'], {
+        stdio: 'inherit',
+        cwd: resolve(__dirname, '..'),
+      })
+      logAction({ step: 'module_image_generation', latency_ms: Date.now() - tMod, ok: true })
+    } catch (err) {
+      console.error(`[chain] module-image-generation failed: ${(err as Error).message}; continuing without`)
+      logAction({ step: 'module_image_generation', latency_ms: Date.now() - tMod, ok: false, error: String(err).slice(0, 200) })
+    }
+  } else {
+    // default OFF — log only when explicitly disabled vs implicit
+  }
+
   // ── Deployment envelope (Task #248, 2026-05-19): persist the canonical
   // shipping/installation envelope for the product class onto state. The PA
   // pipeline (stages/3-size-layout.ts) already does this but is NOT reachable
