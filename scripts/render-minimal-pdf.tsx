@@ -144,6 +144,16 @@ function normalise_unicode(s: string): string {
     .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g, c => String('⁰¹²³⁴⁵⁶⁷⁸⁹'.indexOf(c)))
     .replace(/⁻/g, '-')
     .replace(/⁺/g, '+')
+    // Math/separator glyphs commonly emitted by Stage 1.7 rad_syntax that
+    // would garble if they leaked into user-facing text. ⊙ (Circled Dot
+    // Operator) is the chain's rad_syntax separator; · (middle dot) renders
+    // fine; → already mapped above. Add coverage for ⊗ (×), ⊕ (+), ≤ ≥, ≈.
+    .replace(/⊙/g, ' + ')
+    .replace(/⊗/g, ' x ')
+    .replace(/⊕/g, ' + ')
+    .replace(/≤/g, '<=')
+    .replace(/≥/g, '>=')
+    .replace(/≈/g, '~')
     // Greek micro sign µ (U+00B5) and mu (U+03BC) → ASCII u (closest match)
     .replace(/[µμ]/g, 'u')
     // Ohm sign Ω (U+03A9, U+2126) → ohm
