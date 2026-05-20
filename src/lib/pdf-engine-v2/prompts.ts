@@ -874,6 +874,32 @@ HOW TO USE THESE NUMBERS (binding):
 
 WHEN YOUR DECOMPOSITION EXCEEDS THE CEILING, the FIRST thing you do is re-read the brief and ask "would a real installer manual list this many distinct part types?" The answer is almost always no — COLLAPSE before emitting.
 
+=== FINISHED COMMODITY ASSEMBLY RULE (UNIVERSAL — applies to every product class) ===
+
+Some sub-modules are dominated by a FINISHED COMMODITY ASSEMBLY — a real catalogue item bought whole from a manufacturer at retail price. When that is the case, emit ONE word for the finished assembly with manufacturer + part_number. Do NOT itemise the internal sub-parts that come WITH the assembly when purchased.
+
+Examples of finished commodity assemblies — emit as ONE word, do not decompose:
+
+  • ISO shipping containers (20-ft, 40-ft, high-cube). Bought from CIMC / Maersk Container Industry / Singamas as ONE unit — corner castings, floor crossmembers, door seals, side panels, insulation are all INCLUDED. £3k-£8k each at retail catalogue. NEVER list "corner casting" or "floor crossmember" as separate BoM words when the container is also in the BoM.
+  • Off-the-shelf scroll / screw / reciprocating compressors. Copeland / Bitzer / Danfoss / Embraco. Internal oil separator, suction muffler, motor, accumulator come WITH the unit. NEVER list internal compressor parts separately.
+  • Factory-assembled inverters / PCS modules / hybrid converters / variable-frequency drives. SMA / Sungrow / Fronius / Tesla / ABB. Internal IGBTs, gate drivers, control board, contactors come WITH the unit.
+  • Pre-built pumps (motor + housing + impeller + seal integrated). Grundfos / Wilo / Pedrollo / KSB.
+  • OEM HVAC packages — rooftop units, mini-split outdoor + indoor, packaged chillers. Daikin / Mitsubishi / Carrier.
+  • OEM-branded LED grow-light fixtures (heatsink + driver + lens + LEDs integrated). Fluence / Heliospectra / Valoya / Bridgelux.
+  • Pre-built control panels (PLC + HMI + I/O + power supply in one cabinet). Siemens / Allen-Bradley / Beckhoff package units.
+  • Bearings as commodity items. SKF / Timken / NSK / NTN — bought by spec, internal balls / cage / races come with.
+
+What to do INSTEAD of decomposing a finished assembly:
+  1. Emit ONE word for the finished assembly with the manufacturer's exact part number (CIMC HC-40HC-ISO-2024; Copeland ZP72KCE; Fluence SPYDR-2i, etc.).
+  2. Capture internal-spec details ("4,000 BTU/hr, 240 V, R-410A, AHRI-certified", "3-phase 400 V 32 A in / 48 V DC out", "80 mm PIR sandwich, U-value 0.22 W/m²K") in derived_parameters or modifier_characters on the parent word — NOT as additional sub-module words.
+  3. If the brief explicitly specifies internal upgrades, that becomes a MODIFIER on the parent word.
+
+What you SHOULD itemise:
+  • Items the integrator buys SEPARATELY and assembles together — racks, frames, mounting brackets, fasteners, cable trays, sensors that are NOT part of an OEM package, custom-fab brackets, wiring harnesses cut to length, conduit, instrumentation tubing.
+  • Custom-fabricated parts (laser-cut sheet metal, machined parts, custom PCBs, bespoke enclosures).
+
+Litmus test: "Would a real procurement engineer place a SEPARATE purchase order for this part, or does it come WITH the parent assembly?" If it comes WITH the parent, it's NOT a separate word.
+
 === ALLOWED RADICALS (default per module — refine for the product if needed) ===
 
 energy_storage_source: electrochemical_energy_function, lithium_iron_phosphate_chemistry, fluid_flow_state, pressure_vessel_function
