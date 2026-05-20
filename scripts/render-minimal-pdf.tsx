@@ -1895,7 +1895,25 @@ function CoverPage({
                 Illustration only — AI-generated render, not a photograph of the actual unit. Used for visual reference; final geometry will follow the engineering specification.
               </Text>
             </View>
-          ) : null}
+          ) : (
+            // 2026-05-20 hot-fix: when iter-7 envelope suppression (commit
+            // cb3feb843) hides the static hero PNG because the brief envelope
+            // exceeds the static-render scale, render a text placeholder
+            // explaining WHY rather than leaving the slot blank. Tristan
+            // flagged a verify chain with zero images — placeholder makes the
+            // omission visible + sets expectation for upcoming per-brief
+            // image generation (iter-11 W2 multimodal workstream).
+            <View style={{ flex: 45, alignItems: 'center', justifyContent: 'center', padding: 14, borderWidth: 0.5, borderColor: '#cbd5e1', borderRadius: 4, backgroundColor: '#f8fafc' }}>
+              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#475569', letterSpacing: 1, marginBottom: 6 }}>
+                ENGINEERING RENDERING
+              </Text>
+              <Text style={{ fontSize: 8, color: '#64748b', textAlign: 'center', lineHeight: 1.5 }}>
+                Container/warehouse-scale envelope — static-render library covers desktop & cabinet products only.{'\n\n'}
+                See Section 2 Module Connection Map for system topology + Appendix B for CAD coordinate spec.{'\n\n'}
+                Per-brief image generation scheduled for next release.
+              </Text>
+            </View>
+          )}
           </View>
         ) : bomTotals ? (
           // Fallback when no cost-stack ratios resolve — show the legacy

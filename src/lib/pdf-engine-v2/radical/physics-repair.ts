@@ -133,19 +133,49 @@ D. **Verify capacity claims**. Common pitfalls:
    - Grundfos "MAGNA3 32-80" is a circulator (8m max head), NOT a pressure pump. Use CR-series for >10m head.
    - LED PPFD scales as power × efficacy; 200 W/m² at 2.5 µmol/J ≈ 500 µmol/m²/s. Stay within brief.
 
-E. **Output JSON**:
+E. **🛑 BRIEF CONSTRAINTS ARE INVIOLABLE. NEVER mutate brief-pinned fields.**
+
+   The user's brief explicitly fixes certain quantities — these are HARD CONSTRAINTS, not adjustable parameters. The user message will include a "BRIEF CONSTRAINTS — DO NOT VIOLATE" block listing every brief-pinned value. You MUST NOT emit patches that change:
+
+   - structure_containment.canopy_area_m2 / growing_area_m2 (brief fixes canopy size)
+   - structure_containment.container_length_mm / width_mm / height_mm (brief fixes envelope)
+   - structure_containment.trolley_count / rack_count / module_count
+   - quantity modifiers on container shells, trolleys, racks, cell modules
+   - any module.derived_parameters key that corresponds to a brief-explicit value (target_performance, max_dimensions, target_canopy_m2, batch_size, unit_cost_ceiling, peak_power_kw if brief stated)
+
+   If a finding can ONLY be fixed by changing a brief-pinned field (e.g. "yield target requires more canopy than the brief allows"), DO NOT emit scaling patches. Instead output:
+   \`\`\`
+   { "patches": [], "unfixable_reason": "requires brief revision: <which brief constraint and why>" }
+   \`\`\`
+   The chain will surface this as a brief-revision-needed manual review. DO NOT silently scale the design to satisfy physics by violating the brief.
+
+   Example of the bug to AVOID: if brief says "100 m² canopy + 25 t/yr yield" and physics says "5× over leafy-green biological limit", the WRONG fix is "scale canopy 5× to 500 m²". The RIGHT response is "patches: [], unfixable_reason: requires brief revision: yield target 25 t/yr at 100 m² needs 250 kg/m²/yr but biological limit is 50 kg/m²/yr — yield target must drop to 5 t/yr OR canopy must grow (but canopy is brief-pinned at 100 m²)".
+
+F. **Allowed mutation scope** — these are SAFE:
+   - replace_modifier on part_number / manufacturer / rating_primary (swap wrong components for right ones)
+   - replace_modifier on driver_power_w / fan_static_pressure_pa / pump_rated_bar / refrigerant (correct sizing without changing scale)
+   - edit_word on name_human (clarify role)
+   - add_word_to_sub_module for ADDING a missing safety/cooling/control component (e.g. add a chiller to a chilled-water loop that lacks one)
+   - set_derived_parameter for non-brief-pinned fields (cooling_capacity_kw IF brief didn't pin it, refrigerant_charge_kg, etc.)
+
+   These are FORBIDDEN without explicit brief permission:
+   - replace_modifier on quantity (scaling component counts almost always violates brief)
+   - set_derived_parameter on any brief-pinned field
+   - add_word_to_sub_module that introduces a fundamentally different SCALE (e.g. adding a "second container" word)
+
+G. **Output JSON**:
    \`\`\`
    {
      "patches": [<one or more patches>],
      "rationale": "<one sentence per patch explaining the swap>"
    }
    \`\`\`
-   If the finding genuinely can't be fixed (e.g. "design has fundamental impossibility"), output:
+   If the finding genuinely can't be fixed without violating the brief, output:
    \`\`\`
-   { "patches": [], "unfixable_reason": "<why>" }
+   { "patches": [], "unfixable_reason": "<which brief constraint blocks the fix, and what needs to change at the brief level>" }
    \`\`\`
 
-F. **Cap**: max 4 patches per call. Be surgical.
+H. **Cap**: max 4 patches per call. Be surgical.
 `
 
 interface RepairPatchOut {
@@ -169,14 +199,54 @@ interface RepairResponseOut {
   unfixable_reason?: string | null
 }
 
+/**
+ * Format brief constraints as a "DO NOT VIOLATE" block for the repair
+ * model's user message. Pulls every brief-pinned numeric / dimensional /
+ * quantity field and lists them explicitly so the model can't claim
+ * ignorance about which fields are mutable vs fixed.
+ */
+function formatBriefConstraintsBlock(brief: any): string {
+  if (!brief || !brief.constraints) return 'BRIEF CONSTRAINTS: (none parsed — treat structure_containment.canopy_area_m2, container dimensions, trolley count as inviolable by default)'
+  const c = brief.constraints
+  const lines: string[] = ['BRIEF CONSTRAINTS — DO NOT VIOLATE. Patches that change any of these fields will be REJECTED:']
+  if (c.target_performance?.value) {
+    lines.push(`  • target_performance: ${c.target_performance.value} ${c.target_performance.unit ?? ''} (${c.target_performance.key_metric ?? 'metric'}) — DO NOT scale up design to meet a yield that exceeds physical limits; flag as unfixable instead`)
+  }
+  if (c.target_canopy_m2?.value) {
+    lines.push(`  • target_canopy_m2: ${c.target_canopy_m2.value} m² (user-fixed canopy size — do NOT increase by adding containers/trolleys/racks)`)
+  }
+  if (c.max_dimensions_mm) {
+    const d = c.max_dimensions_mm
+    if (d.w || d.d || d.h) lines.push(`  • max_dimensions_mm: ${d.w ?? '?'} × ${d.d ?? '?'} × ${d.h ?? '?'} mm (envelope is brief-pinned)`)
+  }
+  if (c.max_mass_kg?.value) lines.push(`  • max_mass_kg: ${c.max_mass_kg.value} kg`)
+  if (c.unit_cost_ceiling?.value) lines.push(`  • unit_cost_ceiling: £${c.unit_cost_ceiling.value} per unit`)
+  if (c.batch_size?.value) lines.push(`  • batch_size: ${c.batch_size.value} units/year`)
+  if (c.operating_environment) lines.push(`  • operating_environment: ${c.operating_environment.temp_min_c ?? '?'}-${c.operating_environment.temp_max_c ?? '?'} °C`)
+  // Also extract numeric values from additional_constraints prose (these often
+  // pin specific design choices like "18 kW peak refrigeration" or "8 mobile trolleys")
+  if (Array.isArray(c.additional_constraints)) {
+    for (const ac of c.additional_constraints) {
+      if (ac?.description) lines.push(`  • additional: ${ac.description}`)
+    }
+  }
+  lines.push('')
+  lines.push('If a finding can only be resolved by changing one of the above, return { "patches": [], "unfixable_reason": "..." } — DO NOT emit scaling patches.')
+  return lines.join('\n')
+}
+
 async function callRepairModel(opts: {
   finding: CritiqueIssue
   affectedSnippet: any  // the relevant module/sub_module/word JSON
+  brief: any            // parsedBrief — passed through to format brief constraints
   apiKey: string
   model: string
   timeoutMs?: number
 }): Promise<RepairResponseOut> {
-  const userContent = `PHYSICS-CRITIC FINDING TO FIX:
+  const briefBlock = formatBriefConstraintsBlock(opts.brief)
+  const userContent = `${briefBlock}
+
+PHYSICS-CRITIC FINDING TO FIX:
 
 dimension: ${opts.finding.dimension}
 severity: ${opts.finding.severity}
@@ -193,7 +263,7 @@ CURRENT DESIGN AT THE AFFECTED LOCATION:
 
 ${JSON.stringify(opts.affectedSnippet, null, 2).slice(0, 20000)}
 
-Emit the patch JSON now.`
+Emit the patch JSON now. Remember: if the only fix violates brief constraints, return unfixable_reason — do NOT silently scale up the design.`
 
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), opts.timeoutMs ?? 300_000)
@@ -240,6 +310,67 @@ Emit the patch JSON now.`
 }
 
 /**
+ * Brief-constraint guard (added 2026-05-20 emergency hot-fix after verify
+ * chain showed Physics Repair Loop scaled canopy_area_m2 from 100 → 672,
+ * containers from 1 → 7, trolleys from 8 → 56 to "fix" a yield-vs-canopy
+ * physics finding — should have declared unfixable instead).
+ *
+ * Returns a reject-reason string if the patch would violate a brief
+ * constraint, or null if the patch is safe to apply.
+ *
+ * Rules:
+ *  - Patches on structure_containment quantity fields (container count,
+ *    trolley count, rack count) are REJECTED.
+ *  - Patches on canopy_area_m2 / growing_area_m2 are REJECTED if a brief
+ *    target exists (any value — assume brief pins it).
+ *  - Patches on max_dimensions_mm-style fields are REJECTED.
+ *  - Patches on cooling_capacity_kw are REJECTED if brief.additional_constraints
+ *    mentions a peak refrigeration kW value.
+ *  - Other patches pass through.
+ */
+function checkBriefConstraintViolation(brief: any, p: RepairPatchOut): string | null {
+  const c = brief?.constraints
+  if (!c) return null
+
+  // Block any quantity mutation on structure_containment scale-bearing components
+  if (p.op === 'replace_modifier' && p.module === 'structure_containment' && String(p.modifier_kind ?? '').toLowerCase() === 'quantity') {
+    return `quantity mutation on structure_containment.${p.sub_module_id}.${p.word_id} violates brief envelope/count — declare unfixable instead`
+  }
+
+  // Block set_derived_parameter on canopy / growing area
+  if (p.op === 'set_derived_parameter' && /^(canopy|growing|cultivation|productive)_area_m2$/.test(String(p.key ?? ''))) {
+    return `set_derived_parameter on ${p.key} violates brief-pinned canopy area — declare unfixable instead`
+  }
+
+  // Block set_derived_parameter on container/envelope dimensions
+  if (p.op === 'set_derived_parameter' && /(container|envelope)_(length|width|height|volume)/.test(String(p.key ?? ''))) {
+    return `set_derived_parameter on ${p.key} violates brief-pinned envelope — declare unfixable instead`
+  }
+
+  // Block set_derived_parameter on trolley/rack/module count
+  if (p.op === 'set_derived_parameter' && /^(trolley_count|rack_count|module_count|cells_per_module|cell_count)$/.test(String(p.key ?? ''))) {
+    return `set_derived_parameter on ${p.key} violates brief unit count — declare unfixable instead`
+  }
+
+  // Block adding a new container/trolley word (different scale)
+  if (p.op === 'add_word_to_sub_module' && p.module === 'structure_containment') {
+    const newName = String(p.new_word?.name_human ?? p.new_word?.id ?? '').toLowerCase()
+    if (/(container|shell|trolley|rack)/.test(newName)) {
+      return `add_word "${newName}" to structure_containment introduces new envelope/scale — declare unfixable instead`
+    }
+  }
+
+  // Block target_performance value mutation (if a brief target exists)
+  if (p.op === 'set_derived_parameter' && /^(target_performance|target_yield|annual_yield)/.test(String(p.key ?? ''))) {
+    if (c.target_performance?.value !== undefined) {
+      return `set_derived_parameter on ${p.key} would override brief.target_performance — declare unfixable instead`
+    }
+  }
+
+  return null
+}
+
+/**
  * Apply a physics-repair patch directly to the modules tree. Returns true
  * if applied. We don't go through universal-repair.ts:applyPatches() because
  * that uses numeric-index paths (`sub_modules[3].words[7]`) which require
@@ -247,8 +378,17 @@ Emit the patch JSON now.`
  * (`led_driver_320w_word`). Direct id-based traversal is simpler.
  *
  * Manual-sourcing flags are logged but don't mutate state.
+ *
+ * 2026-05-20 hot-fix: pre-apply brief-constraint check rejects patches that
+ * would violate the brief (canopy mutations, container quantity scaling,
+ * envelope dimension changes, etc.).
  */
-function applyPhysicsRepairPatch(modules: ModuleSpec[], p: RepairPatchOut, log: string[]): boolean {
+function applyPhysicsRepairPatch(modules: ModuleSpec[], p: RepairPatchOut, brief: any, log: string[]): boolean {
+  const briefViolation = checkBriefConstraintViolation(brief, p)
+  if (briefViolation) {
+    log.push(`REJECT (brief-violation): ${briefViolation}`)
+    return false
+  }
   // flag_for_manual_sourcing has no patch — just record
   if (p.op === 'flag_for_manual_sourcing') {
     log.push(`flag_for_manual_sourcing word_id=${p.word_id ?? '?'} reason=${p.reason ?? ''}`)
@@ -401,6 +541,7 @@ export async function runPhysicsRepairLoop(opts: {
     const responses = await Promise.all(findingsThisIter.map(f => callRepairModel({
       finding: f,
       affectedSnippet: extractAffectedSnippet(currentModules, f.where),
+      brief: opts.brief,  // brief constraints passed through for "DO NOT VIOLATE" block (2026-05-20 hot-fix)
       apiKey: opts.apiKey,
       model: repairModel,
     })))
@@ -422,7 +563,7 @@ export async function runPhysicsRepairLoop(opts: {
     const applyLog: string[] = []
     let appliedThisIter = 0
     for (const p of allPatchesRaw) {
-      if (applyPhysicsRepairPatch(currentModules, p, applyLog)) appliedThisIter++
+      if (applyPhysicsRepairPatch(currentModules, p, opts.brief, applyLog)) appliedThisIter++
     }
     result.patches_applied_total += appliedThisIter
 
