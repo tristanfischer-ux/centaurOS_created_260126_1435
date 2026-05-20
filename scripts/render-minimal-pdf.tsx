@@ -2966,14 +2966,16 @@ function noteTextForFlaggedRow(row: BomPartRow, recommendations: any[]): string 
 
 /** Collect notes for one sub-module from every source the chain emits.
  *  Numbers them sequentially; the noteIndexMap is what the BoM renderer
- *  uses for superscripts. */
+ *  uses for superscripts. Physics-critic findings already filtered + mapped
+ *  to this sub-module by the caller — passed in as `physicsFindings`. */
 function noteCollectorForSubModule(
   bomLines: BomPartRow[],
   recommendations: any[],
   manualReviewBadges: ManualReviewBadge[],
-  state: any,
+  _state: any,
   moduleId: string,
   subModuleId: string,
+  physicsFindings: any[] = [],
 ): SubModuleNote[] {
   const notes: SubModuleNote[] = []
   // 1. Per-row replacement / verification / custom-source notes
@@ -2992,24 +2994,23 @@ function noteCollectorForSubModule(
     const bMod = String(bAny.module_id ?? '')
     if (bSub && bSub !== subModuleId) continue
     if (!bSub && bMod && bMod !== moduleId) continue
-    if (!bSub && !bMod) continue  // module-level badges handled at module bottom
+    if (!bSub && !bMod) continue  // module-level badges handled at module top
     const text = String(bAny.narrative ?? bAny.summary ?? bAny.label ?? '').trim()
     if (!text) continue
     notes.push({ idx: notes.length + 1, text, severity: 'warn' })
   }
-  // 3. Physics-critic findings whose where_path resolves to this sub-module
-  const issues: any[] = Array.isArray(state?.physicsCritique?.issues) ? state.physicsCritique.issues : []
-  for (const i of issues) {
-    const sev = String(i.severity ?? '').toLowerCase()
-    if (sev !== 'high' && sev !== 'critical') continue
-    const where = String(i.where ?? '')
-    if (!where.startsWith(moduleId)) continue
-    // where ~ "energy_conversion_transduction/sub_modules[0]/words[1]"
-    const subMatch = where.match(/sub_modules\[(\d+)\]/)
-    if (!subMatch) continue
-    // We don't have the index→id mapping reliably here; trust the
-    // module-level Engineering Review Notes block to catch these too.
-    // To avoid duplicate noise, skip — they'll render in module-bottom block.
+  // 3. Physics-critic findings — Tristan 2026-05-20 fifth review: route
+  //    into the per-sub-module Notes (inline with BoM) instead of a
+  //    standalone callout. Caller pre-filters + maps where_path indices to
+  //    sub-module ids so this function just renders.
+  for (const f of physicsFindings) {
+    const issue = String(f.issue ?? '').replace(/\s+/g, ' ').trim()
+    const check = String(f.suggested_check ?? '').replace(/\s+/g, ' ').trim()
+    if (!issue && !check) continue
+    const text = check
+      ? `Engineering check — ${issue}${issue.endsWith('.') ? '' : '.'} Suggested action: ${check}`
+      : `Engineering check — ${issue}`
+    notes.push({ idx: notes.length + 1, text, severity: 'error' })
   }
   return notes
 }
@@ -3250,9 +3251,36 @@ function ModuleSection({
   // said only Cost is scanned by the reader.
   const moduleBom = bomTotals?.allMods.find(m => m.module === moduleSpec.module) ?? null
   const moduleCostGbp = moduleBom?.subtotal_gbp ?? 0
-  const reviewNotes = state ? reviewNotesForModule(state, moduleSpec.module) : []
   const recs = partRecommendations ?? []
   const badges = manualReviewBadges ?? []
+
+  // ITER-10.5 fifth review (Tristan 2026-05-20): physics-critic findings
+  // route into the per-sub-module Notes block (inline with prose), with
+  // module-level findings (no sub-module match) appended to the module
+  // narrative as engineering-check paragraphs. The old standalone
+  // "Engineering Review Notes" beige callout at module bottom is removed.
+  const physicsBySubId = new Map<string, any[]>()
+  const physicsModuleLevel: any[] = []
+  const _allFindings: any[] = Array.isArray(state?.physicsCritique?.issues) ? state.physicsCritique.issues : []
+  const _moduleSubModules = (moduleSpec.sub_modules ?? []) as Array<{ id: string }>
+  for (const f of _allFindings) {
+    const sev = String(f.severity ?? '').toLowerCase()
+    if (sev !== 'high' && sev !== 'critical') continue
+    const where = String(f.where ?? '')
+    if (!where.startsWith(moduleSpec.module)) continue
+    const subMatch = where.match(/sub_modules\[(\d+)\]/)
+    if (subMatch) {
+      const subIdx = parseInt(subMatch[1], 10)
+      const sm = _moduleSubModules[subIdx]
+      if (sm?.id) {
+        const arr = physicsBySubId.get(sm.id) ?? []
+        arr.push(f)
+        physicsBySubId.set(sm.id, arr)
+        continue
+      }
+    }
+    physicsModuleLevel.push(f)
+  }
 
   return (
     <Page size="A4" style={PAGE_STYLE}>
@@ -3315,6 +3343,26 @@ function ModuleSection({
             {chunk}
           </Text>
         ))}
+        {/* ITER-10.5 fifth review: module-level engineering checks
+            (physics-critic findings not tied to a specific sub-module)
+            flow inline as engineering-check paragraphs, NOT a boxed
+            callout. Sub-module-tied findings render in their sub-module's
+            Notes block beneath the BoM. */}
+        {physicsModuleLevel.map((f, fi) => {
+          const issue = String(f.issue ?? '').replace(/\s+/g, ' ').trim()
+          const check = String(f.suggested_check ?? '').replace(/\s+/g, ' ').trim()
+          if (!issue && !check) return null
+          return (
+            <Text
+              key={`mod-finding-${fi}`}
+              style={{ fontSize: 10.5, color: INK_SOFT, lineHeight: 1.65, marginBottom: 8, textAlign: 'justify' }}
+            >
+              <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Engineering check — </Text>
+              {issue}{issue && !issue.endsWith('.') ? '.' : ''}
+              {check ? ` Suggested action: ${check}` : ''}
+            </Text>
+          )
+        })}
       </View>
 
       <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 6, marginBottom: 8 }}>
@@ -3327,7 +3375,7 @@ function ModuleSection({
           // image #2). Replaces the cramped 3-deep numbering + 4-letter
           // status badges of iter-10.
           const { lines: subBomLines, subtotal: subBomSubtotal } = subModuleBomSubtotal(bomTotals ?? null, moduleSpec.module, sm.id)
-          const notes = state ? noteCollectorForSubModule(subBomLines, recs, badges, state, moduleSpec.module, sm.id) : []
+          const notes = state ? noteCollectorForSubModule(subBomLines, recs, badges, state, moduleSpec.module, sm.id, physicsBySubId.get(sm.id) ?? []) : []
           const noteIndexMap = new Map<string, number>()
           for (const n of notes) {
             if (n.word_id) noteIndexMap.set(n.word_id, n.idx)
@@ -3370,51 +3418,11 @@ function ModuleSection({
           deleted standalone DesignTradeOffsPage per Tristan directive). */}
       {state ? <ModuleDesignTradeOffsBlock state={state} moduleId={moduleSpec.module} /> : null}
 
-      {/* ITER-10.5 (Tristan 2026-05-20 second review): Engineering Review
-          Notes moved from BELOW module total to AFTER BoM/trade-offs and
-          BEFORE module total. Issues with the module's parts are clearer
-          when they appear before the bottom-line cost. */}
-      {reviewNotes.length > 0 ? (
-        <View style={{ marginTop: 18, padding: 12, backgroundColor: '#fef9e7', borderLeftWidth: 4, borderLeftColor: '#ca8a04', borderRadius: 4 }} wrap={false}>
-          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#713f12', marginBottom: 2 }}>
-            ★ Engineering Review Notes
-          </Text>
-          <Text style={{ fontSize: 8.5, color: '#92400e', fontStyle: 'italic', marginBottom: 10 }}>
-            {reviewNotes.length} item{reviewNotes.length === 1 ? '' : 's'} to verify before procurement, detailed design, or commissioning.
-          </Text>
-          {reviewNotes.map((n, ni) => {
-            const roleStyle: Record<string, { bg: string; fg: string }> = {
-              electrical:   { bg: '#fef3c7', fg: '#92400e' },
-              mechanical:   { bg: '#e0e7ff', fg: '#3730a3' },
-              system:       { bg: '#ffe4e6', fg: '#9f1239' },
-              compliance:   { bg: '#f3e8ff', fg: '#6b21a8' },
-              procurement:  { bg: '#dcfce7', fg: '#15803d' },
-              thermal:      { bg: '#fee2e2', fg: '#b91c1c' },
-              fluid:        { bg: '#dbeafe', fg: '#1e40af' },
-              control:      { bg: '#e0f2fe', fg: '#075985' },
-              safety:       { bg: '#fef2f2', fg: '#7f1d1d' },
-            }
-            const rs = roleStyle[n.role] ?? roleStyle.mechanical
-            return (
-              <View key={n.id || ni} style={{ backgroundColor: '#ffffff', borderWidth: 0.5, borderColor: '#e5e7eb', borderRadius: 3, padding: 10, marginBottom: 7 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 3 }}>
-                  <Text style={{ fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.8 }}>{n.id}</Text>
-                  <View style={{ marginLeft: 6, paddingHorizontal: 4, paddingVertical: 1, backgroundColor: rs.bg, borderRadius: 2 }}>
-                    <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: rs.fg, letterSpacing: 0.5 }}>{n.role.toUpperCase()}</Text>
-                  </View>
-                </View>
-                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3, lineHeight: 1.4 }}>{n.issue}</Text>
-                <Text style={{ fontSize: 9, color: INK_SOFT, marginBottom: 2, lineHeight: 1.45 }}>
-                  <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Why it matters: </Text>{n.why_it_matters}
-                </Text>
-                <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.45 }}>
-                  <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Action: </Text>{n.action}
-                </Text>
-              </View>
-            )
-          })}
-        </View>
-      ) : null}
+      {/* ITER-10.5 fifth review (Tristan 2026-05-20): Engineering Review
+          Notes standalone callout REMOVED. Physics-critic findings flow
+          inline: sub-module-specific ones into each sub-module's Notes
+          block beneath the BoM; module-level ones into engineering-check
+          paragraphs within the module narrative above. */}
 
       {/* Module total — sits at the very bottom of the module section as the
           bottom-line cost, after issues + trade-offs have been surfaced. */}
