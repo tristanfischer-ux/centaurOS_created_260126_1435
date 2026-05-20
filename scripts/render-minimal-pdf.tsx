@@ -2949,14 +2949,19 @@ function priceRealityRefForRow(row: BomPartRow): string {
 }
 
 /** Plain-English note text for a flagged BoM row.
- *  Replaces the cramped inline italic sub-row from iter-10. */
+ *  Replaces the cramped inline italic sub-row from iter-10.
+ *  Tristan 2026-05-20: "Replacement recommended" reads like correcting a
+ *  prior procurement plan — switched to "Suggested alternative supplier"
+ *  so the same document doesn't appear to override itself. */
 function noteTextForFlaggedRow(row: BomPartRow, recommendations: any[]): string | null {
   const c = classifyVerificationStatus(row, recommendations)
   if (c.status === 'verified') return null
   if (!c.subRow) return null
   // Strip the iter-10 arrow/symbol prefixes; they made sense alongside a
   // badge but now the note IS the signal.
-  return c.subRow.replace(/^[→ⓘ]\s*/u, '').replace(/^Use instead:\s*/, 'Replacement recommended — use instead: ')
+  return c.subRow
+    .replace(/^[→ⓘ]\s*/u, '')
+    .replace(/^Use instead:\s*/, 'Suggested alternative supplier — ')
 }
 
 /** Collect notes for one sub-module from every source the chain emits.
@@ -3017,11 +3022,13 @@ function SubModuleBomBlock({
   subtotal,
   subModuleName,
   noteIndexMap,
+  partLinkMap,
 }: {
   bomLines: BomPartRow[]
   subtotal: number
   subModuleName: string
   noteIndexMap: Map<string, number>
+  partLinkMap?: Map<string, { url: string; title: string | null; manufacturer: string }>
 }) {
   if (bomLines.length === 0) return null
   return (
@@ -3060,7 +3067,28 @@ function SubModuleBomBlock({
               {noteIdx ? <Text style={NOTE_MARK_STYLE}> {noteIdx}</Text> : null}
             </Text>
             <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT }}>{row.manufacturer ?? '—'}</Text>
-            <Text style={{ flex: 1.6, fontSize: 8.5, color: INK_SOFT, fontFamily: 'Helvetica-Bold' }}>{row.part_number ?? '—'}</Text>
+            {(() => {
+              // ITER-10.5 (Tristan 2026-05-20): part-number cell becomes a
+              // distributor / manufacturer link when partLinkMap has the SKU
+              // (same map the narrative uses via renderProseWithLinks).
+              const pn = row.part_number
+              const linked = pn && partLinkMap ? partLinkMap.get(pn) : null
+              if (linked && linked.url) {
+                return (
+                  <Link
+                    src={linked.url}
+                    style={{ flex: 1.6, fontSize: 8.5, color: ACCENT_SOFT, fontFamily: 'Helvetica-Bold', textDecoration: 'underline' }}
+                  >
+                    {pn}
+                  </Link>
+                )
+              }
+              return (
+                <Text style={{ flex: 1.6, fontSize: 8.5, color: INK_SOFT, fontFamily: 'Helvetica-Bold' }}>
+                  {pn ?? '—'}
+                </Text>
+              )
+            })()}
             <Text style={{ width: 30, fontSize: 9, color: INK, textAlign: 'right' }}>×{row.quantity ?? 1}</Text>
             <Text style={{ width: 50, fontSize: 9, color: INK, textAlign: 'right' }}>{unitPriceCell}</Text>
             <Text style={{ width: 55, fontSize: 9, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>{lineCell}</Text>
@@ -3330,6 +3358,7 @@ function ModuleSection({
                 subtotal={subBomSubtotal}
                 subModuleName={britishise(sm.name)}
                 noteIndexMap={noteIndexMap}
+                partLinkMap={partLinkMap}
               />
               <NotesBlock notes={notes} />
             </View>
