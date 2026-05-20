@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { BrowserFrame } from './browser-frame'
-import { Hammer, UserPlus, TrendingUp, Target, ShoppingCart, Briefcase, Flame, Users } from 'lucide-react'
+import { Hammer, TrendingUp, Target, ShoppingCart, Briefcase, Flame, Users } from 'lucide-react'
 
 interface ShowcaseTab {
   id: string
@@ -46,21 +46,12 @@ const TABS: ShowcaseTab[] = [
       { text: 'Link to matched suppliers', position: 'top-[35%] right-[5%]' },
     ],
   },
-  // 2. Recruits — fractional executives marketplace
-  {
-    id: 'recruits',
-    label: 'Recruits',
-    icon: <UserPlus className="h-4 w-4" />,
-    url: 'fractionalforge.app/recruits',
-    image: '/images/screenshots/marketplace.png',
-    headline: 'Experienced professionals, on your terms',
-    description: 'A marketplace of experienced professionals with decades of domain expertise. Search by specialism, see their background, and engage them directly at their own day rate.',
-    callouts: [
-      { text: 'Search by specialism', position: 'top-[10%] left-[5%]' },
-      { text: 'Rates set by the professionals', position: 'top-[45%] right-[5%]' },
-    ],
-  },
-  // 3. Investors — fundraising
+  // Recruits tab removed 2026-05-20 — fractional-executives marketplace
+  // deferred to month 6+ per the 2026-04-24 one-product pivot. Don't
+  // market a product the nav doesn't carry. Restore by re-adding the
+  // ShowcaseTab entry here (see git history).
+
+  // 2. Investors — fundraising
   {
     id: 'investors',
     label: 'Investors',
@@ -88,7 +79,7 @@ const TABS: ShowcaseTab[] = [
       { text: 'You make the decisions', position: 'bottom-[20%] right-[5%]' },
     ],
   },
-  // 5. Source — 13,700+ UK and European manufacturers
+  // 4. Source — manufacturer shortlist baked into Forge output
   {
     id: 'source',
     label: 'Source',
@@ -96,7 +87,7 @@ const TABS: ShowcaseTab[] = [
     url: 'fractionalforge.app/the-forge/source',
     image: '/images/screenshots/source-sankey.png',
     headline: '13,700+ UK and European manufacturers',
-    description: 'Every part of your design linked to the manufacturers who can actually make it. Search by capability, location, and specialism — reach out directly for real expertise.',
+    description: 'Every module in your Forge build report is linked to the manufacturers who can actually make it — drawn from 13,700+ indexed suppliers, filtered by capability, location, and specialism. You reach out to them directly from the report; there is no separate supplier search page to visit.',
     callouts: [
       { text: 'Matched to your design', position: 'top-[15%] right-[5%]' },
       { text: 'Reach out to real suppliers', position: 'top-[50%] left-[5%]' },

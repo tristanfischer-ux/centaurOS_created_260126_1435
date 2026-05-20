@@ -109,11 +109,11 @@ const FAQS = [
   },
   {
     question: "How does ForgeOS work?",
-    answer: "ForgeOS gives you 13 specialists — strategy, engineering, manufacturing, supply chain, finance, fundraising, and more — who provide structured analysis and support across every discipline. You brainstorm with them, they challenge assumptions, and the output is a decision and a next step. Alongside that, you get access to an investor database of over 13,000 UK firms and a supplier directory of 13,700+ manufacturers searchable by capability.",
+    answer: "ForgeOS gives you 13 specialists — strategy, engineering, manufacturing, supply chain, finance, fundraising, and more — who provide structured analysis and support across every discipline. You brainstorm with them, they challenge assumptions, and the output is a decision and a next step. Alongside that, you get access to an investor database of over 13,000 UK firms, and The Forge build engine that drafts your product against 13,700+ UK and European manufacturer profiles — so every module in the report comes with a supplier shortlist.",
   },
   {
     question: "How quickly can I go from idea to prototype?",
-    answer: "The aim of ForgeOS is to let you get a product designed and built before you have spent a year finding a factory, negotiating a lease, and installing equipment. The Forge (currently in beta) helps you understand what materials, equipment, and suppliers your product will need. 13,700+ UK and European manufacturers are indexed and searchable — so rather than building your own factory, you can find partners who already have the building, the machinery, and the expertise to make what you are designing.",
+    answer: "The aim of ForgeOS is to let you get a product designed and built before you have spent a year finding a factory, negotiating a lease, and installing equipment. The Forge (currently in beta) helps you understand what materials, equipment, and suppliers your product will need. 13,700+ UK and European manufacturers are integrated into The Forge, so when you describe your product the build report shows which manufacturers can make each module — rather than building your own factory, you find partners who already have the building, the machinery, and the expertise.",
   },
   {
     question: "How much does it cost?",
@@ -456,7 +456,7 @@ function HeroSection() {
         <motion.div initial="hidden" animate="visible" variants={fadeInScale} className="inline-flex items-center gap-2 mb-5 sm:mb-6 md:mb-8 px-3 sm:px-4 py-2 border bg-card rounded-full">
           <span className="w-2 h-2 rounded-full bg-international-orange animate-pulse" />
           <span className="text-international-orange text-xs font-mono uppercase tracking-widest">
-            Brainstorming, investors, and suppliers for hardware founders
+            Brainstorming and investors for hardware founders
           </span>
         </motion.div>
 
@@ -468,7 +468,7 @@ function HeroSection() {
         </motion.h1>
 
         <motion.p initial="hidden" animate="visible" variants={heroTagline} className="text-foreground text-base sm:text-lg md:text-xl max-w-3xl mx-auto leading-relaxed mb-6 sm:mb-8 md:mb-10">
-          ForgeOS gives hardware founders brainstorming with 13 specialists and access to over 13,000 UK investors and 13,700 manufacturers. Think out loud, find the right capital, and connect with the suppliers who can build what you&apos;re designing.
+          ForgeOS gives hardware founders brainstorming with 13 specialists, access to over 13,000 UK investors, and a build engine that drafts your product against 13,700+ UK and European manufacturer profiles. Think out loud, find the right capital, and see who can actually make what you&apos;re designing.
         </motion.p>
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6, duration: 0.6 }} className="flex flex-col items-center gap-6 w-full sm:w-auto">
@@ -569,15 +569,15 @@ const HOW_IT_WORKS_PILLARS = [
     ],
   },
   {
-    label: "Manufacturing Network",
-    title: "A Connected Manufacturing Network",
+    label: "The Forge",
+    title: "From product idea to manufacturer shortlist",
     image: "/images/marketing/factory-partner.png",
     imageAlt: "Factory floor with manufacturing equipment",
-    body: "Over 13,700 manufacturers across the UK and Europe indexed with capability data. Search by what you need built — PCB assembly, injection moulding, 3D printing, CNC — and get ranked shortlists back. Find the right partners to make it real.",
+    body: "Describe your product in one paragraph. The Forge returns a system architecture, module decomposition, draft Bill of Materials, and a design report — with a shortlist of UK and European manufacturers under every module, drawn from 13,700+ indexed supplier profiles. The supplier search is baked into the output, not a separate page you have to visit.",
     highlights: [
-      "13,700+ UK and European manufacturers and suppliers indexed",
-      "Find suppliers experienced in sensor, electronics, and edge-compute integration",
-      "Search by capability, location, and specialism to find the right match",
+      "13,700+ UK and European manufacturers integrated into the build report",
+      "Forge identifies the manufacturers experienced in your product's sensor / electronics / edge-compute mix",
+      "Every module ships with a ranked supplier shortlist — no separate search step",
     ],
   },
 ] as const
@@ -597,7 +597,7 @@ function HowItWorksSection() {
             How It <span className="text-international-orange">Works</span>
           </h2>
           <p className="text-muted-foreground text-sm sm:text-base md:text-lg max-w-2xl mx-auto leading-relaxed">
-            Brainstorming with specialists and access to investor and supplier intelligence — so you stop reinventing wheels.
+            Brainstorming with specialists, the investors who back hardware, and a build engine that turns your idea into a manufacturer-backed report — so you stop reinventing wheels.
           </p>
         </AnimatedSection>
 
@@ -708,13 +708,13 @@ function FounderArticlesSection() {
               Hardware has never had an AWS equivalent. Every founder ends up reinventing the same wheels — finding engineers, finding investors, sorting out IP, building a finance team — all pre-revenue, all without the budget for any of it.
             </p>
             <p>
-              Fractional Forge is my attempt at that equivalent. Rather than building your own factory from scratch, the platform connects you directly to over 13,700 UK and European manufacturers who already have the building, the machinery, and the expertise. As you work through your product, you can see who can make what you are designing, and reach out to them for real advice on how it actually gets made.
+              Fractional Forge is my attempt at that equivalent. Rather than building your own factory from scratch, the platform&apos;s build engine drafts your product against over 13,700 UK and European manufacturers who already have the building, the machinery, and the expertise. As you work through your idea, you see who can make each module of what you are designing — and you can reach out to them for real advice on how it actually gets made.
             </p>
             <p>
-              Alongside the manufacturing network, Fractional Forge brings together 13 specialists and an investor database of over 13,000 UK firms — so the rest of the hardware founder&apos;s job sits in one place too.
+              Alongside that, Fractional Forge brings together 13 specialists and an investor database of over 13,000 UK firms — so the rest of the hardware founder&apos;s job sits in one place too.
             </p>
             <p>
-              And if you have been thinking about building your own company — Fractional Forge is designed to take you from &quot;I have an idea&quot; to &quot;I know exactly what the next step is&quot;. Brainstorm with the specialists, find the investors who match your stage, and search for the manufacturers who can build what you are designing.
+              And if you have been thinking about building your own company — Fractional Forge is designed to take you from &quot;I have an idea&quot; to &quot;I know exactly what the next step is&quot;. Brainstorm with the specialists, find the investors who match your stage, and let The Forge surface the manufacturers who can build what you are designing.
             </p>
             <p>
               Have a look and let me know how you get on.

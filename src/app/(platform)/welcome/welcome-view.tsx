@@ -3,11 +3,13 @@
  *
  * @description First-login tour page rebuilt 2026-04-25 for the post-pivot
  * product: Brainstorming-led, Fundraising-focused, with a trimmed sidebar
- * (Brainstorming · Fundraising · Workshop · Marketplace).
+ * (Brainstorming · Fundraising · Workshop). Suppliers surface removed
+ * from nav 2026-05-20; supplier data is now baked into The Forge build
+ * report rather than browsed standalone.
  *
  * Structure: hero + personal letter from Tristan → "Try these three in
  * your first hour" card pointing at brainstorm/investors/forge → guided
- * tour of the four current sidebar sections with their canonical
+ * tour of the three current sidebar sections with their canonical
  * drop-in/output → trimmed roster of the four key leaders (Fang, Chase,
  * Fiona, Sage) with a link to all 13 → closing CTA.
  *
@@ -31,7 +33,6 @@ import {
     Sparkles,
     Building2,
     Hammer,
-    Store,
 } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -135,8 +136,8 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
                             />
                             <FirstHourStep
                                 number={3}
-                                title="Search for suppliers who can build it."
-                                body={"Over 13,700 UK and European manufacturers indexed by capability, location, and specialism. Type what you need — PCB assembly, injection moulding, 3D printing — and get a ranked shortlist back."}
+                                title="Try The Forge with a one-paragraph product idea."
+                                body={"Describe what you want to build. The Forge returns a system architecture, module decomposition, draft Bill of Materials, and a shortlist of UK and European manufacturers — drawn from 13,700+ indexed suppliers — who can make each module."}
                             />
                         </CardContent>
                     </Card>
@@ -160,9 +161,11 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
             <div id="tour" className="scroll-mt-8" />
 
             {/* ─────────────────────────────────────────────────────── */}
-            {/* Section deep-dives — match the four current sidebar
-                sections (Brainstorming · Fundraising · Workshop ·
-                Marketplace) in the order they appear in the sidebar. */}
+            {/* Section deep-dives — match the three current sidebar
+                sections (Brainstorming · Fundraising · Workshop) in
+                the order they appear in the sidebar. Suppliers removed
+                2026-05-20 — supplier value now surfaces inside The
+                Forge build report rather than as its own browse page. */}
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-0 pt-14 lg:pt-16 space-y-6 lg:space-y-8 max-w-4xl">
                 <SectionBlock
@@ -189,16 +192,7 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
                     subtitle="From idea to manufactured product"
                     startHref="/the-forge-v2"
                     startLabel="Open The Forge"
-                    intro="Currently in beta. Type your product idea in one paragraph and The Forge will return a system architecture, module decomposition, skeleton Bill of Materials, and a design report. The goal: take a product concept through engineering, manufacturing, and procurement — all the way to a supplier shortlist and cost estimate."
-                    rows={[]}
-                />
-                <SectionBlock
-                    icon={Store}
-                    label="Suppliers"
-                    subtitle="Find who can build what you're designing"
-                    startHref="/marketplace"
-                    startLabel="Open Suppliers"
-                    intro="Over 13,700 UK and European manufacturers and suppliers indexed by capability, location, and specialism. Search for PCB assembly, injection moulding, 3D printing, CNC, testing labs, fulfilment — and get ranked shortlists back based on what you need built."
+                    intro="Currently in beta. Type your product idea in one paragraph and The Forge returns a system architecture, module decomposition, draft Bill of Materials, and a design report. The build report shortlists UK and European manufacturers who can make each module — drawn from 13,700+ indexed suppliers — so the supplier search is built into the output rather than a separate page you have to visit."
                     rows={[]}
                 />
             </section>
