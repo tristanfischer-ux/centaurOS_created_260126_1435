@@ -22,6 +22,14 @@ export interface SpecialistResponse {
      *  Each specialist sees all R1 responses from peers + own R1, then
      *  provides a 2–3 paragraph update. Absent for tier='quick' (1 round). */
     round2Response?: string
+    /**
+     * When the primary model failed and a fallback was used, this holds the
+     * OpenRouter slug of the model that actually responded (e.g.
+     * "deepseek/deepseek-v4-flash"). Used by the UI to show a small
+     * "(fallback: <model-slug>)" badge in the specialist row footer so
+     * operators can audit silent step-downs. Absent when the primary succeeded.
+     */
+    fallbackModelUsed?: string
 }
 
 export interface CouncilResult {
