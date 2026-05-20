@@ -137,6 +137,17 @@ const CORPUS_CLASS_HINT: Record<string, string> = {
   wind_turbine: 'wind-turbine-small',
   pv_module: 'pv-module-residential',
   industrial_3d_printer: 'industrial-3d-printer',
+  // Vertical farm / CEA (added 2026-05-20, Task #68 — was missing, so VF chain
+  // runs resolved class to null and Engine C searched the whole corpus
+  // without product-class context. The slug here matches the `category` field
+  // seeded by scripts/seed-corpus-vf-commodities.tsx.
+  vertical_farm: 'vertical_farm',
+  vertical_farming: 'vertical_farm',
+  cea: 'vertical_farm',
+  controlled_environment_agriculture: 'vertical_farm',
+  hydroponic: 'vertical_farm',
+  hydroponics: 'vertical_farm',
+  greenhouse: 'vertical_farm',
 }
 
 function resolveCorpusClassHint(state: any): string | null {

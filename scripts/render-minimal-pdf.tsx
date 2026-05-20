@@ -483,7 +483,14 @@ type BomPartRow = {
   part_verify_reason?: string
 }
 type BomSub = { id: string; name: string; parts: BomPartRow[]; subtotal_gbp: number }
-type BomMod = { module: string; label: string; subs: BomSub[]; subtotal_gbp: number }
+// 2026-05-20 (Tristan cost-overrun forensic): display_name is the
+// reader-facing friendly module title (e.g. "Container Shell & Mobile
+// Racking") as written by Stage 1.7 module decomposition into
+// state.moduleDecomposition.modules[].display_name. `label` is the
+// taxonomy-humanised slug ("Structure Containment"); preserved as a
+// fallback only. Universal — every product class benefits because every
+// class emits display_name from Stage 1.7.
+type BomMod = { module: string; label: string; display_name?: string; subs: BomSub[]; subtotal_gbp: number }
 type BomTotals = {
   allMods: BomMod[]
   grandTotal_gbp: number
@@ -632,7 +639,13 @@ function computeBomTotals(state: any): BomTotals | null {
   let tbdRows = 0
 
   for (const m of orderedModules as any[]) {
-    const mod: BomMod = { module: m.module, label: humanise(m.module), subs: [], subtotal_gbp: 0 }
+    const mod: BomMod = {
+      module: m.module,
+      label: humanise(m.module),
+      display_name: typeof m.display_name === 'string' && m.display_name.trim().length > 0 ? m.display_name.trim() : undefined,
+      subs: [],
+      subtotal_gbp: 0,
+    }
     for (const sm of m.sub_modules ?? []) {
       const sub: BomSub = { id: sm.id, name: sm.name_human || humanise(sm.id), parts: [], subtotal_gbp: 0 }
       for (const w of sm.words ?? []) {
@@ -854,7 +867,7 @@ function applyBatchEconomics(state: any, bomTotals: BomTotals | null, slugHint?:
   let grandTotal_gbp = 0
   const allMods: BomMod[] = []
   for (const m of bomTotals.allMods) {
-    const newMod: BomMod = { module: m.module, label: m.label, subs: [], subtotal_gbp: 0 }
+    const newMod: BomMod = { module: m.module, label: m.label, display_name: m.display_name, subs: [], subtotal_gbp: 0 }
     for (const sub of m.subs) {
       const newSub: BomSub = { id: sub.id, name: sub.name, parts: [], subtotal_gbp: 0 }
       for (const p of sub.parts) {
@@ -1861,6 +1874,32 @@ function CoverPage({
                 </>
               )
             })()}
+            {/* Cost-overrun forensic (Tristan 2026-05-21): compact
+                price-reality verdict ON THE COVER, immediately under the
+                Installed ASP headline. Previously removed in iter-10.5
+                third review for "cover clutter" reasons — but with that
+                removed, a £356k installed ASP for a 100 m² VF (when typical
+                is £60-120k) had NO reader-visible flag and shipped silently.
+                Re-adding ONLY when the verdict is over/under (no clutter
+                when in_band). Universal across product classes. */}
+            {priceReality && (priceReality.verdict === 'high' || priceReality.verdict === 'low') && priceReality.metric_value !== null ? (
+              (() => {
+                const absPct = Math.abs(priceReality.pct_deviation || 0)
+                const isOver = priceReality.verdict === 'high'
+                const verdictWord = isOver
+                  ? `${Math.round(absPct)}% ABOVE typical`
+                  : `${Math.round(absPct)}% BELOW typical`
+                return (
+                  <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: '#1e4a73' }}>
+                    <Text style={{ fontSize: 9, color: '#ffffff' }}>
+                      <Text style={{ fontFamily: 'Helvetica-Bold', color: isOver ? '#fca5a5' : '#fcd34d' }}>{isOver ? '! ' : '? '}</Text>
+                      <Text style={{ fontFamily: 'Helvetica-Bold' }}>{fmtGBP_compact(priceReality.metric_value)} per {priceReality.metric_label.replace(/^£\//, '').split('(')[0].trim()}</Text>
+                      <Text style={{ color: '#bae6fd' }}> — {verdictWord} (band {fmtGBP_compact(priceReality.band_low)}–{fmtGBP_compact(priceReality.band_high)})</Text>
+                    </Text>
+                  </View>
+                )
+              })()
+            ) : null}
             {/* ITER-10.5 third review (Tristan 2026-05-20): cover stays
                 clean. Everything below the Installed ASP headline number —
                 BoM stats line, price-reality verdict, Engine C reference
@@ -4995,6 +5034,16 @@ function resolveModuleImage(productClass: string, moduleId: string, state?: any)
   if (typeof briefModulePath === 'string' && existsSync(briefModulePath)) {
     return briefModulePath
   }
+  // Sprint 0 v4 (Tristan 2026-05-21): when per-module images are absent,
+  // FALL BACK TO THE BRIEF HERO so every module page shows the same
+  // uniform Blender illustration — solves the "gpt-image-1 produces
+  // stylistically variable images per call" problem. Caller's caption
+  // already names which module the page is about. Universal across
+  // product classes.
+  const briefHero = typeof state?.brief_hero_image_path === 'string' ? state.brief_hero_image_path : null
+  if (briefHero && existsSync(briefHero)) {
+    return briefHero
+  }
   const slug = classToSlug(productClass)
   if (!slug) return null
   // 2026-05-20 (Tristan second review): the static class image is the wrong
@@ -5292,7 +5341,7 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
         {orderedMods.map((m, idx) => (
           <View key={m.module} style={{ flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 0.4, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
             <Text style={{ width: 28, fontSize: 10, color: MUTED }}>{idx + 1}.</Text>
-            <Text style={{ flex: 1, fontSize: 10, color: INK }}>{m.label}</Text>
+            <Text style={{ flex: 1, fontSize: 10, color: INK }}>{m.display_name || m.label}</Text>
             <Text style={{ fontSize: 10, color: INK, fontFamily: 'Helvetica-Bold', textAlign: 'right' }}>
               £{m.subtotal_gbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </Text>

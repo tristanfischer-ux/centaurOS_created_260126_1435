@@ -60,6 +60,8 @@ import {
 import { runPhysicsLedger } from '../src/lib/pdf-engine-v2/stages/0.1-physics-ledger'
 import { runComplianceGate, type ComplianceGateResult } from '../src/lib/pdf-engine-v2/stages/3.5-compliance-gate'
 import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/lib/pdf-engine-v2/stages/1.8-brief-target-reconciliation'
+import { resolvePriceBand } from '../src/lib/pdf-engine-v2/class-price-bands'
+import { resolveCostStack, computeCostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
 import { verifyAllParts, stripUnverifiedParts, recommendReplacementsForStripped, buildTechnicalSummary, enrichWithRagSuggestions, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
@@ -2750,46 +2752,54 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     console.error('[chain] CHAIN_SKIP_SUPPLIER_VALIDATION=1 — skipping supplier-contact-validation step')
   }
 
-  // ── Hero Image Generation (Sprint 0 v2, Tristan 2026-05-20): generate
-  // a brief-aware cover image when the static-class hero would be the
-  // wrong scale. Calls Vercel AI Gateway / OpenAI gpt-image-1. Saves
-  // to <out-dir>/cover.png and updates state.brief_hero_image_path.
-  // Renderer prefers this over the static class PNG. Universal — works
-  // for any product class. Fail-soft. Skip via CHAIN_SKIP_IMAGE_GEN=1.
+  // ── Product Illustration Generation (Tristan 2026-05-20): validated
+  // Blender pipeline replaces both the gpt-image-1 cover + per-module
+  // gpt-image-1 calls. Single render-product-blender.py scene built from
+  // envelope + module decomposition; render-product-illustrations.tsx
+  // wrapper orbits the camera (turntable, AZIMUTH-only variation per
+  // module — same radius / elevation / lens) and saves cover + per-module
+  // PNGs. Persists state.brief_hero_image_path + state.module_image_paths.
+  // Universal — class-agnostic. ~1.25 s per render, 12 renders in ~15 s
+  // for an 11-module brief. Fail-soft: if Blender is absent, falls through
+  // to the gpt-image-1 cover so we still have a hero. Skip entirely via
+  // CHAIN_SKIP_IMAGE_GEN=1.
   if (process.env.CHAIN_SKIP_IMAGE_GEN !== '1') {
     const tImg = Date.now()
+    let blenderSucceeded = false
     try {
-      execFileSync('npx', ['tsx', resolve(__dirname, 'generate-hero-images.tsx'), statePath, '--write'], {
+      execFileSync('npx', ['tsx', resolve(__dirname, 'render-product-illustrations.tsx'), statePath, '--write'], {
         stdio: 'inherit',
         cwd: resolve(__dirname, '..'),
       })
-      logAction({ step: 'hero_image_generation', latency_ms: Date.now() - tImg, ok: true })
+      // Did the wrapper actually persist a hero? It exits 0 even when
+      // Blender is absent (fail-soft), so confirm by re-reading state.
+      try {
+        const post = JSON.parse(require('fs').readFileSync(statePath, 'utf-8'))
+        blenderSucceeded = typeof post?.brief_hero_image_path === 'string' && post.brief_hero_image_path.length > 0
+      } catch { blenderSucceeded = false }
+      logAction({ step: 'blender_illustrations', latency_ms: Date.now() - tImg, ok: blenderSucceeded })
     } catch (err) {
-      console.error(`[chain] hero-image-generation failed: ${(err as Error).message}; continuing without`)
-      logAction({ step: 'hero_image_generation', latency_ms: Date.now() - tImg, ok: false, error: String(err).slice(0, 200) })
+      console.error(`[chain] blender illustrations failed: ${(err as Error).message}; falling back to gpt-image-1`)
+      logAction({ step: 'blender_illustrations', latency_ms: Date.now() - tImg, ok: false, error: String(err).slice(0, 200) })
+    }
+    if (!blenderSucceeded) {
+      // Blender missing or failed — fall back to gpt-image-1 cover so
+      // the PDF at least has a brief-aware hero. No per-module images;
+      // renderer drops back to the EnvelopeOutline placeholder per module.
+      const tFallback = Date.now()
+      try {
+        execFileSync('npx', ['tsx', resolve(__dirname, 'generate-hero-images.tsx'), statePath, '--write'], {
+          stdio: 'inherit',
+          cwd: resolve(__dirname, '..'),
+        })
+        logAction({ step: 'hero_image_fallback_gpt_image_1', latency_ms: Date.now() - tFallback, ok: true })
+      } catch (err) {
+        console.error(`[chain] hero-image-generation fallback failed: ${(err as Error).message}; continuing without`)
+        logAction({ step: 'hero_image_fallback_gpt_image_1', latency_ms: Date.now() - tFallback, ok: false, error: String(err).slice(0, 200) })
+      }
     }
   } else {
-    console.error('[chain] CHAIN_SKIP_IMAGE_GEN=1 — skipping hero-image-generation step')
-  }
-
-  // ── Per-Module Image Generation (Sprint 0 v3, Tristan 2026-05-20):
-  // generate one schematic per module to replace the static class
-  // Blender renders. Opt-in via CHAIN_ENABLE_MODULE_IMAGES=1 because of
-  // cost ($0.04 × N modules = ~$0.40 per run). Universal. Fail-soft.
-  if (process.env.CHAIN_ENABLE_MODULE_IMAGES === '1') {
-    const tMod = Date.now()
-    try {
-      execFileSync('npx', ['tsx', resolve(__dirname, 'generate-module-images.tsx'), statePath, '--write'], {
-        stdio: 'inherit',
-        cwd: resolve(__dirname, '..'),
-      })
-      logAction({ step: 'module_image_generation', latency_ms: Date.now() - tMod, ok: true })
-    } catch (err) {
-      console.error(`[chain] module-image-generation failed: ${(err as Error).message}; continuing without`)
-      logAction({ step: 'module_image_generation', latency_ms: Date.now() - tMod, ok: false, error: String(err).slice(0, 200) })
-    }
-  } else {
-    // default OFF — log only when explicitly disabled vs implicit
+    console.error('[chain] CHAIN_SKIP_IMAGE_GEN=1 — skipping illustration generation')
   }
 
   // ── Deployment envelope (Task #248, 2026-05-19): persist the canonical
@@ -2932,7 +2942,95 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
       let cost_reality_status: string = 'pass'
       let cost_reality_rejection: any = null
       let cost_reality_verdict: 'pass' | 'warn' | 'reject' = 'pass'
-      if (bomTotalGbp > 0 && (orderOfMag < 2 || orderOfMag > 7)) {
+
+      // Cost-overrun forensic (Tristan 2026-05-20): the order-of-magnitude
+      // check above passes anything between £100 and £10M, so a £215k VF
+      // BoM (real band £100k-£200k for 100 m²) sailed through silently.
+      // Add a per-class band check using the SAME resolvePriceBand the
+      // cover uses — if installed-ASP per metric is >2× the band ceiling
+      // or <0.3× the band floor, reject the gate so the worker doesn't
+      // ship a wildly mispriced report without a visible flag. Universal
+      // across product classes — every class has a price band.
+      let band_reality: any = null
+      try {
+        const band = resolvePriceBand(liveState)
+        if (band && bomTotalGbp > 0) {
+          const { ratios, class_key } = resolveCostStack(liveState)
+          const stack = computeCostStack(bomTotalGbp, ratios, class_key)
+          const installedAsp = stack.installed_asp_gbp > 0 ? stack.installed_asp_gbp : bomTotalGbp
+          const metricInput = band.metric_compute(liveState)
+          if (metricInput !== null && Number.isFinite(metricInput) && metricInput > 0) {
+            const metricValue = installedAsp / metricInput
+            const lo = band.market_band_low
+            const hi = band.market_band_high
+            let bandVerdict: 'in_band' | 'high' | 'low' = 'in_band'
+            let pct = 0
+            if (metricValue >= lo && metricValue <= hi) {
+              bandVerdict = 'in_band'
+            } else if (metricValue < lo) {
+              bandVerdict = 'low'
+              pct = ((metricValue - lo) / lo) * 100
+            } else {
+              bandVerdict = 'high'
+              pct = ((metricValue - hi) / hi) * 100
+            }
+            band_reality = {
+              band_metric: band.natural_metric,
+              metric_value: Math.round(metricValue * 100) / 100,
+              metric_input: metricInput,
+              band_low: lo,
+              band_high: hi,
+              installed_asp_gbp: Math.round(installedAsp),
+              verdict: bandVerdict,
+              pct_deviation: Math.round(pct * 10) / 10,
+            }
+            // Hard reject when off the band by >100% (i.e. >2× high or
+            // <0.5× low). That's the renderer's "Critical" tier already
+            // — we just hoist the verdict up to the gate so the chain
+            // stops or flags BEFORE rendering instead of silently shipping.
+            if (Math.abs(pct) > 100) {
+              cost_reality_verdict = 'reject'
+              cost_reality_status = 'manual_review_required'
+              cost_reality_rejection = {
+                reason: bandVerdict === 'high'
+                  ? `Installed-ASP ${band.natural_metric} = £${metricValue.toFixed(0)} is ${Math.round(Math.abs(pct))}% ABOVE typical band £${lo}-£${hi}. Likely cause: Cost Repair over-corrected, quantity multiplied wrong, or Engine B class-floor too aggressive. Inspect partVerifications for £5k+ line items.`
+                  : `Installed-ASP ${band.natural_metric} = £${metricValue.toFixed(0)} is ${Math.round(Math.abs(pct))}% BELOW typical band £${lo}-£${hi}. Likely cause: missing major subsystems, Engine B fell short, or distributor cascade timed out on big-ticket items.`,
+                bom_total_gbp: Math.round(bomTotalGbp),
+                installed_asp_gbp: Math.round(installedAsp),
+                metric_value: Math.round(metricValue * 100) / 100,
+                metric_label: band.natural_metric,
+                band_low: lo,
+                band_high: hi,
+                pct_deviation: Math.round(pct * 10) / 10,
+                priced_lines: bomPricedLines,
+                unpriced_lines: bomUnpricedLines,
+              }
+            } else if (Math.abs(pct) > 30 && cost_reality_verdict === 'pass') {
+              // Soft warn at >30% off — minor variance, still emit but flag
+              cost_reality_verdict = 'warn'
+              cost_reality_rejection = {
+                reason: `Installed-ASP ${band.natural_metric} = £${metricValue.toFixed(0)} is ${Math.round(Math.abs(pct))}% off typical band £${lo}-£${hi}. Within engineering noise but worth a manual review of the largest BoM lines.`,
+                bom_total_gbp: Math.round(bomTotalGbp),
+                installed_asp_gbp: Math.round(installedAsp),
+                metric_value: Math.round(metricValue * 100) / 100,
+                metric_label: band.natural_metric,
+                band_low: lo,
+                band_high: hi,
+                pct_deviation: Math.round(pct * 10) / 10,
+                priced_lines: bomPricedLines,
+                unpriced_lines: bomUnpricedLines,
+              }
+            }
+            liveState.cost_reality_band = band_reality
+          }
+        }
+      } catch (err) {
+        // Band check is best-effort — never block the gate if it fails;
+        // fall through to the existing order-of-magnitude check.
+        console.error(`[chain] G2 band check failed: ${(err as Error).message}; falling back to order-of-magnitude only`)
+      }
+
+      if (cost_reality_verdict === 'pass' && bomTotalGbp > 0 && (orderOfMag < 2 || orderOfMag > 7)) {
         cost_reality_verdict = 'reject'
         cost_reality_status = 'manual_review_required'
         cost_reality_rejection = {
@@ -2944,7 +3042,7 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
           unpriced_lines: bomUnpricedLines,
           order_of_magnitude: Math.round(orderOfMag * 10) / 10,
         }
-      } else if (bomTotalGbp > 0 && bomPricedLines < pv.length * 0.5) {
+      } else if (cost_reality_verdict === 'pass' && bomTotalGbp > 0 && bomPricedLines < pv.length * 0.5) {
         // Soft warn: less than 50% of BoM lines have prices.
         cost_reality_verdict = 'warn'
         cost_reality_rejection = {

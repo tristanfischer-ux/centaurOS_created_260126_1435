@@ -189,6 +189,19 @@ async function main() {
   let corrected = 0
   let manualSourcing = 0
   let leaveAsIs = 0
+  let upCapped = 0 // UP-correction guard (cost-overrun forensic 2026-05-20)
+
+  // UP-correction cap (Tristan 2026-05-20 cost-overrun forensic): when
+  // the LLM proposes correcting an Engine B estimate UPWARD by more than
+  // COST_REPAIR_UP_CAP_RATIO× the existing price, route to
+  // manual_sourcing_required instead. The Engine B class-floor is already
+  // biased toward the class median, so a >Nx upward jump is more often a
+  // hallucinated catalogue floor than a real ten-thousand-pound part. The
+  // £18,500 "fertigation floor" line on the VF iter-10.6 PDF is the
+  // motivating case. Universal across product classes. Tunable via env;
+  // default 4× is permissive (catches the 100× hallucinations, lets
+  // realistic 2-3× corrections through).
+  const UP_CAP_RATIO = Number(process.env.COST_REPAIR_UP_CAP_RATIO || 4)
 
   for (const r of allResponses) {
     const idx = pv.findIndex((v: any) => v.word_id === r.word_id)
@@ -200,15 +213,24 @@ async function main() {
     if (r.action === 'corrected' && typeof r.corrected_unit_price_gbp === 'number' && r.corrected_unit_price_gbp > 0) {
       const correctedPrice = Math.round(r.corrected_unit_price_gbp * 100) / 100
       const oldPrice = pv[idx].price_estimate_gbp
+      // UP-cap guard
+      if (typeof oldPrice === 'number' && oldPrice > 0 && correctedPrice > oldPrice * UP_CAP_RATIO) {
+        // Reject the correction; route to manual sourcing with an explicit
+        // reason so the audit trail is preserved.
+        pv[idx].cost_repair_action = 'manual_sourcing_required'
+        pv[idx].cost_repair_excluded_from_subtotal = true
+        pv[idx].cost_repair_reasoning =
+          `[UP-CAP] LLM proposed £${correctedPrice.toFixed(2)} (${(correctedPrice / oldPrice).toFixed(1)}× current £${oldPrice.toFixed(2)}). ` +
+          `Exceeds COST_REPAIR_UP_CAP_RATIO=${UP_CAP_RATIO}; correction rejected. Original reasoning: ${r.reasoning}`
+        manualSourcing++
+        upCapped++
+        continue
+      }
       pv[idx].price_estimate_gbp = correctedPrice
       pv[idx].price_estimate_high_gbp = Math.round(correctedPrice * 1.3 * 100) / 100
       pv[idx].price_estimate_low_gbp = Math.round(correctedPrice * 0.7 * 100) / 100
       pv[idx].cost_repair_corrected_price_gbp = correctedPrice
       pv[idx].cost_repair_previous_price_gbp = oldPrice
-      // Mark estimate source so the renderer/downstream can identify this row
-      // was post-corrected. Engine B's batch-economics skip still applies to
-      // 'curve' rows; we don't change estimate_source so subsequent stages
-      // continue to treat it as already volume-anchored.
       corrected++
     } else if (r.action === 'manual_sourcing_required') {
       pv[idx].cost_repair_excluded_from_subtotal = true
@@ -216,6 +238,10 @@ async function main() {
     } else {
       leaveAsIs++
     }
+  }
+
+  if (upCapped > 0) {
+    console.log(`[cost-repair] UP-cap routed ${upCapped} suspicious upward corrections to manual_sourcing_required (cap=${UP_CAP_RATIO}×)`)
   }
 
   console.log(`[cost-repair] verdicts: corrected=${corrected}, manual_sourcing=${manualSourcing}, leave_as_is=${leaveAsIs} (of ${allResponses.length} responses)`)
@@ -226,6 +252,8 @@ async function main() {
     corrected_count: corrected,
     manual_sourcing_count: manualSourcing,
     leave_as_is_count: leaveAsIs,
+    up_capped_count: upCapped,
+    up_cap_ratio: UP_CAP_RATIO,
     fixer_model: FIXER_MODEL,
     generated_at: new Date().toISOString(),
   }
