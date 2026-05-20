@@ -111,11 +111,48 @@ function targetPerformanceValueAs(state: any, targetUnit: string): number | null
     { w: 0.001, kw: 1, mw: 1000, gw: 1_000_000 },
     { g: 0.001, kg: 1, t: 1000, tonne: 1000, tonnes: 1000 },
     { ml: 0.001, l: 1, m3: 1000 },
+    // 2026-05-20 VF iter-7 universal fix: area family. The vertical-farm
+    // class metric_compute now reads canopy_area_m2 from derived_parameters
+    // and the band is £/m² installed (£600-£1200/m²) instead of a single
+    // £15k-£45k flat band that implicitly assumed a 4-8 m² unit.
+    { cm2: 0.0001, m2: 1, ha: 10000 },
   ]
   for (const f of families) {
     if (unit in f && t in f) return (v * f[unit]) / f[t]
   }
   return v
+}
+
+/**
+ * Read the growing area / canopy area from the design state. Used by
+ * vertical-farm and any future class whose installed cost scales linearly
+ * with productive surface area. Searches derived_parameters across every
+ * module (canopy_area_m2 / growing_area_m2 / cultivation_area_m2) and
+ * falls back to brief.target_canopy_m2 or target_performance.value when
+ * the unit is m².
+ *
+ * Added 2026-05-20 (VF iter-7 council fix). The 4927444a-style "£14k/unit
+ * installed for 100m² = 9% below typical" cover-card claim was caused by
+ * the VF class metric_compute returning 1 (per-unit) against a band that
+ * implicitly assumed a 4-8 m² desktop unit. With canopy area read from
+ * state, a 100m² VF compares against £600-1200/m² × 100m² = £60-120k.
+ */
+function growingAreaM2(state: any): number | null {
+  const modulesA = state?.moduleDecomposition?.design?.modules
+  const modulesB = state?.moduleDecomposition?.modules
+  const mods: any[] = Array.isArray(modulesA) ? modulesA : Array.isArray(modulesB) ? modulesB : []
+  for (const m of mods) {
+    const dp = m?.derived_parameters
+    if (!dp) continue
+    for (const k of ['canopy_area_m2', 'growing_area_m2', 'cultivation_area_m2', 'productive_area_m2']) {
+      const a = dp[k]
+      if (typeof a === 'number' && Number.isFinite(a) && a > 0) return a
+    }
+  }
+  const briefA = state?.parsedBrief?.constraints?.target_canopy_m2?.value
+    ?? state?.parsedBrief?.constraints?.canopy_area_m2?.value
+  if (typeof briefA === 'number' && Number.isFinite(briefA) && briefA > 0) return briefA
+  return targetPerformanceValueAs(state, 'm2')
 }
 
 function maxMassKg(state: any): number | null {
@@ -444,25 +481,30 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
   },
 
   // ---- Vertical farm ----
+  //
+  // 2026-05-20 VF iter-7 council fix: was £/unit with band £15-45k assuming a
+  // small 4-8 m² desktop unit. For the efe55422 brief (100 m² containerised
+  // VF, 8 mobile trolleys, separate 20-ft fertigation container), the cover
+  // showed "£14k/unit installed — 9% below typical" when the real per-m²
+  // figure was £140/m² vs market £600-1200/m² (88% below band low).
+  //
+  // Now: metric is £/m² growing-area installed, band sourced from commercial
+  // VF benchmarks (IGC, IDTechEx, Babylon Micro-Farms, Vertical Future,
+  // Infarm, OnePointOne). For a 100 m² VF the band check compares against
+  // £60k-£120k (low-end EPC-bare to mid-market turnkey).
   'vertical-farm': {
-    natural_metric: '£/unit installed (modular leafy-greens vertical farm)',
-    metric_compute: () => 1,
-    // Engine D multiplier (L=0.18, OH=0.18, M=0.25, C=0.10, I=0.55) = 2.97×.
-    // Raw band £11-26k × 2.97 = £32.6k-77.2k (multiplier-derived). Grok
-    // 15 kg/week modular installed: £15k-45k (Rabobank, IDTechEx, Vertical
-    // Farm Daily, Babylon/Infarm/Vertical Future quotes). ~83% disagreement
-    // on midpoint — multiplier overshoots; install factor (0.55) appears
-    // too high for what is essentially a plug-in rack with water + power.
-    // Final committed: Grok empirical range.
-    market_band_low: 15_000,
-    market_band_high: 45_000,
+    natural_metric: '£/m² growing-area installed (containerised leafy-greens vertical farm)',
+    metric_compute: (state) => growingAreaM2(state),
+    market_band_low: 600,   // EPC-bare modular VF, plug-in racks + water + power
+    market_band_high: 1200, // Commercial containerised VF (full HVAC + dehumidification + CO2 + control + fertigation skid)
     sources: [
+      'IGC (Indoor Growers Coalition) commercial vertical-farm cost benchmarks 2024-25',
+      'IDTechEx Vertical Farming 2023-2025 — turnkey containerised systems',
+      'Babylon Micro-Farms / Vertical Future / Infarm / OnePointOne unit quotes 2023-25 (normalised £/m²)',
       'Rabobank Vertical Farming Outlook 2024',
-      'IDTechEx Vertical Farming 2023-2025',
       'Vertical Farm Daily modular system coverage',
-      'Babylon / Infarm / Vertical Future unit quotes 2023-25',
     ],
-    notes: 'Installed ASP for 15 kg/week leafy-greens unit (4-8 m², integrated LED + fertigation + HVAC). Multiplier 2.97× overshoots Grok market by ~83% — COST_STACK install factor (0.55) likely too high for plug-in rack; flagged for COST_STACK calibration.',
+    notes: 'Per-m² band. For a 100 m² containerised VF with mobile trolleys + separate fertigation skid + R454B chiller + dehumidification + CO2 enrichment, expect £60k-£120k installed. The previous £15-45k flat band was calibrated against 4-8 m² desktop units and silently passed a 100m² VF at £140/m² as "9% below typical".',
     // Mid-volume professional. LED arrays + structural aluminium + pumps
     // priced at distributor rates absorb 30-40% over fab. Pipeline at
     // £60,582/unit vs band £11-26k (+130% high). 0.30 trims £60,582 →

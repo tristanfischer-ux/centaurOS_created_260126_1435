@@ -4475,12 +4475,66 @@ function classToSlug(productClass: string): string {
   return ''
 }
 
-function resolveModuleImage(productClass: string, moduleId: string): string | null {
+function resolveModuleImage(productClass: string, moduleId: string, state?: any): string | null {
   const slug = classToSlug(productClass)
   if (!slug) return null
+  // 2026-05-20 VF iter-7 council fix: per-module Blender images live in the
+  // same public/heroes/<slug>/ directory and have the same brief-blindness
+  // problem as the cover hero. If the brief envelope doesn't match the
+  // static hero's implied scale (e.g. 40-ft ISO container vs desktop cabinet),
+  // every module's diagram is also misleading. Suppress them.
+  if (state !== undefined && !heroEnvelopeMatchesStaticHero(state)) return null
   const projectRoot = resolve(__dirname, '..')
   const path = resolve(projectRoot, 'public', 'heroes', slug, `module-${moduleId}.png`)
   return existsSync(path) ? path : null
+}
+
+/**
+ * 2026-05-20 VF iter-7 council fix: the static hero PNGs in public/heroes/
+ * are calibrated for small desktop / cabinet units (~1.5 × 1 × 2 m). The
+ * vertical-farm hero shows a Babylon-style cabinet; the BESS hero shows a
+ * single small rack. When the brief asks for a containerised system (40-ft
+ * ISO container = 12.2 × 2.4 × 2.9 m = ~85 m³, or a warehouse-scale unit),
+ * the static hero is materially misleading — the reader sees a desktop
+ * cabinet and conflates it with the real envelope (which is two orders of
+ * magnitude bigger).
+ *
+ * Until brief-aware image generation is wired, suppress the hero whenever
+ * the declared envelope clearly exceeds the static hero's implied scale.
+ * The cover falls back to text-only — honest beats wrong.
+ *
+ * Threshold: 8 m³ envelope volume. A 20-ft container = 33 m³. A desktop
+ * cabinet = ~3 m³. Everything between is ambiguous; we err on the side of
+ * suppression because a wrong image is worse than no image.
+ */
+function heroEnvelopeMatchesStaticHero(state: any): boolean {
+  const maxDim = state?.parsedBrief?.constraints?.max_dimensions_mm
+  if (maxDim) {
+    const w = Number(maxDim.w ?? 0)
+    const d = Number(maxDim.d ?? 0)
+    const h = Number(maxDim.h ?? 0)
+    if (w > 0 && d > 0 && h > 0) {
+      const volumeM3 = (w * d * h) / 1_000_000_000
+      if (volumeM3 > 8) return false
+    }
+  }
+  const modulesA = state?.moduleDecomposition?.design?.modules
+  const modulesB = state?.moduleDecomposition?.modules
+  const mods: any[] = Array.isArray(modulesA) ? modulesA : Array.isArray(modulesB) ? modulesB : []
+  for (const m of mods) {
+    const dp = m?.derived_parameters
+    if (!dp) continue
+    const lengthMm = Number(dp.container_length_mm ?? dp.envelope_length_mm ?? 0)
+    if (lengthMm > 5000) return false
+    const volM3 = Number(dp.envelope_volume_m3 ?? dp.cabinet_volume_m3 ?? 0)
+    if (volM3 > 8) return false
+  }
+  // Also check for explicit container references in module names/descriptions.
+  // Brief text "40ft ISO container" + "20ft fertigation" doesn't always reach
+  // derived_parameters — fall back to text-scan.
+  const briefText = String(state?.parsedBrief?.brief_text ?? state?.brief?.text ?? '')
+  if (/\b(20|40)\s?-?\s?(ft|foot)\s+(iso|hi-?cube|container|shipping)\b/i.test(briefText)) return false
+  return true
 }
 
 function resolveHeroImages(state: any): { cover: string | null; exploded: string | null } {
@@ -4490,6 +4544,10 @@ function resolveHeroImages(state: any): { cover: string | null; exploded: string
     ''
   const slug = classToSlug(raw)
   if (!slug) return { cover: null, exploded: null }
+  // Brief envelope sanity check: don't show a desktop hero for a container-scale brief.
+  if (!heroEnvelopeMatchesStaticHero(state)) {
+    return { cover: null, exploded: null }
+  }
   // Renderer runs from project root; public/heroes resolves relative to cwd
   // when script is invoked via `npx tsx scripts/...` from the project root.
   const projectRoot = resolve(__dirname, '..')
@@ -4587,6 +4645,7 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
           moduleImagePath={resolveModuleImage(
             state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? '',
             m.module,
+            state,
           )}
         />
       ))}
