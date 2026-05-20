@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ForgeOS Chain Engine — V6 (iter-8 state) + Iter-9 Integration Map</title>
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; padding: 30px; max-width: 1400px; margin: auto; line-height: 1.55; color: #1f2937; }
+h1 { font-size: 24px; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; }
+h2 { font-size: 18px; margin-top: 32px; color: #1e3a8a; }
+h3 { font-size: 14px; margin-top: 22px; color: #374151; letter-spacing: 0.3px; }
+code { background: #f3f4f6; padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+pre { background: #f9fafb; padding: 14px; border-radius: 6px; overflow-x: auto; font-size: 11px; line-height: 1.5; }
+table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 13px; }
+th { background: #f3f4f6; padding: 8px; text-align: left; border-bottom: 2px solid #e5e7eb; font-weight: 600; }
+td { padding: 8px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
+.proof { background: #fef3c7; padding: 10px; border-left: 3px solid #d97706; margin: 8px 0; border-radius: 3px; font-size: 13px; }
+.value { background: #dcfce7; padding: 10px; border-left: 3px solid #16a34a; margin: 8px 0; border-radius: 3px; font-size: 13px; }
+.warn { background: #fee2e2; padding: 10px; border-left: 3px solid #b91c1c; margin: 8px 0; border-radius: 3px; font-size: 13px; }
+.note { color: #6b7280; font-size: 12px; font-style: italic; }
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({ startOnLoad: true, theme: 'neutral', flowchart: { curve: 'basis', padding: 14 } });</script>
+</head>
+<body>
+<h1>ForgeOS Chain Engine — V6 (iter-8 state) + Iter-9 Integration</h1>
+<p class="note">Audited from <code>scripts/serial-design-chain-v2.tsx</code> + <code>scripts/render-minimal-pdf.tsx</code> + the gates registries on commit <code>e0bdee772</code>. Not from memory.</p>
+
+<h2>Pipeline v6 — Current State (post-iter-8, 12 commits today)</h2>
+<p class="note">New since v5 marked with ⭐. Stages that now BLOCK marked with 🛑. Universal guards added today marked with 🛡️.</p>
+
+<pre class="mermaid">
+flowchart TD
+  Brief[/"📄 Brief intake<br/>(website → /api/pdf-engine-v2/submit)"/] --> P0Init["Phase 0 init<br/>brief saved"]
+  P0Init --> P0Refine{{"Phase 0 brief refinement<br/>(plausibility critic, MAX_BRIEF_ITERS=3)"}}
+  P0Refine -->|brief revised| P0Refine
+  P0Refine -->|converged| BriefBlock["BriefBlock assembled<br/>(target_performance, constraints, jurisdiction)"]
+  BriefBlock --> G0["G0 Physics Ledger<br/>(deterministic, hard/soft physics check)"]
+  G0 --> G1b["G1b Compliance Gate ⭐today<br/>(WRAS, RoHS, MD 2006/42/EC dedup)"]
+
+  G1b --> Gen["STEP 4 · Generator<br/>(Gemini 3.1 Pro — module decomposition)"]
+  Gen --> R1["STEP 5 · R1 Grok 4.3<br/>(review + patch)"]
+  R1 --> R2["STEP 6 · R2 GLM-5.1<br/>(review + patch)"]
+  R2 --> R3["STEP 7 · R3 Qwen 3.6 Max<br/>(review + patch)"]
+  R3 --> R5["STEP 7.5 · Physics Critic ⭐today blocks<br/>(Gemini 3.5 Flash, scores brief/eng/coh/parts/honesty)"]
+  R5 -->|"plausibility ≤ 3 OR fidelity ≤ 3"| Blocked["🛑 acceptanceStatus = 'blocked'"]
+  R5 -->|"score > 3"| R4["STEP 8 · R4 Flash-Lite<br/>(physics critic findings injected)"]
+  Blocked --> R4
+
+  R4 --> Norm1["End-of-Phase-1 normalisation<br/>(quantity merge, modifier collapse)"]
+  Norm1 --> G05["G0.5 Brief Target Reconciliation<br/>(comparisons made, mismatches detected)"]
+  G05 -->|HALT scale mismatch| Halt[/"⛔ FATAL exit code 3"/]
+  G05 -->|PASS or WARN| P2Entry["Phase 2 entry<br/>(translate + gates + repair, MAX_ITERS=18)"]
+
+  P2Entry --> P2Loop{{"Phase 2 loop"}}
+  P2Loop --> Arith["17 Arithmetic Gates ⭐today (3 new)<br/>cells×Ah×V · module count · series V · usable kWh ·<br/>COP · refrigerant flow · LED PPFD · irrigation flow ·<br/>DC bus consistency · current headroom · cooling power ·<br/>cost ceiling · mass budget · cell discharge ·<br/>⭐power balance · ⭐pressure balance · ⭐fan static"]
+  P2Loop --> Grammar["14 Grammar Gates 🛡️today<br/>(orphan/dangling/sensor-receiver/<br/>controller-actuator/thermal-closes/<br/>power-topology/word-density/modifier-richness/<br/>cross-module-required-links + 🛡️cross-class-bleed-guard)"]
+  Arith --> Repair{{"failed gates > 0?"}}
+  Grammar --> Repair
+  Repair -->|"yes + iters<18"| RepairLLM["Repair LLM<br/>(apply patches)"]
+  RepairLLM --> P2Loop
+  Repair -->|"no OR iters≥18"| Norm2["Post-Phase-2 re-normalisation"]
+
+  Norm2 --> K10["K10 Shadow Validation<br/>(class-reference graph match)<br/>+ 🛡️registry-bug guard (today)"]
+  K10 --> Headline["Headline derivation<br/>(deterministic from design)"]
+  Headline --> PartVerif["G5 Part Verification<br/>(LLM verifier + 🛡️ pattern-strip pre-pass today)"]
+
+  PartVerif --> State1["state.json initial save<br/>(includes brief, design, NL layer,<br/>physicsCritique, complianceGate,<br/>grammarVerdicts, manualReviewBadges)"]
+  State1 --> PCard["⭐ buildPerformanceCard(state)<br/>(class-aware spec sheet — 5 sections × ~13 metrics)"]
+  PCard --> DDReview["⭐ buildDesignDecisionsReview(state)<br/>(CAPEX/OPEX/Reliability trade-offs from state)"]
+  DDReview --> EngB["Engine B · estimate-missing-prices<br/>(20-class Flash-Lite + 🛡️floor clamp today<br/>+ VF overrides 4→12 today)"]
+  EngB --> EngC["Engine C · reference-anchor-prices<br/>(Phase 4 corpus 29.9k records)"]
+  EngC --> EngD["Engine D · enrich-state-with-suppliers<br/>(28k-company DB + Brave fallback<br/>+ 🛡️render-time URL reconciliation today)"]
+
+  EngD --> G2["G2 Cost-Reality Gate<br/>(BoM-band check + per-m² for VF today ⭐)"]
+  G2 --> G3["G3 Review-Completeness Gate<br/>(final gate aggregation)"]
+  G3 --> StateF["state.json final save"]
+  StateF --> Render["⭐ render-minimal-pdf.tsx"]
+
+  Render --> Cover["Cover (with banner if blocked) ⭐today<br/>+ hero image suppressed if envelope>8m³ 🛡️today"]
+  Cover --> RPCard["Section 0.5 Performance ⭐NEW today"]
+  RPCard --> RBriefRev["Brief Revision Notice (if revised)"]
+  RBriefRev --> RBrief["Section 1 Brief"]
+  RBrief --> RDTradeOff["Section 1.5 Design Trade-offs ⭐NEW today"]
+  RDTradeOff --> RModMap["Section 2 Module Connection Map"]
+  RModMap --> RModules["Module sections (1..N)"]
+  RModules --> RCompliance["Section 2 Compliance"]
+  RCompliance --> RRisk["Section 3 Risk & FMEA"]
+  RRisk --> RDDecisions["Section 4 Design Decisions (legacy)"]
+  RDDecisions --> RBoM["Section 6 BoM + 🛡️dedup-flag today"]
+  RBoM --> RSuppliers["Section 7 Suppliers + 🛡️URL reconcile today"]
+  RSuppliers --> RPartsPending["Appendix A Parts Pending"]
+  RPartsPending --> RManualAppendix["Appendix B Manual Review Notes"]
+  RManualAppendix --> PDF[/"🎯 chain-v2.pdf"/]
+
+  PDF --> Upload["Upload to Supabase Storage<br/>(pdf + state.json + actions.jsonl)"]
+
+  style Brief fill:#dbeafe,stroke:#1e40af
+  style PDF fill:#dcfce7,stroke:#16a34a
+  style Halt fill:#fee2e2,stroke:#b91c1c
+  style Blocked fill:#fee2e2,stroke:#b91c1c
+  style Arith fill:#fef3c7
+  style Grammar fill:#fef3c7
+  style PCard fill:#dcfce7
+  style DDReview fill:#dcfce7
+  style RPCard fill:#dcfce7
+  style RDTradeOff fill:#dcfce7
+</pre>
+
+<h2>Iter-9 Integration Map — Where each new workstream plugs in</h2>
+
+<p>Below: each W-workstream's exact insertion point in the pipeline above, the tangible value it adds, and the iter-7 finding it would have prevented.</p>
+
+<h3>W6-lite — Regression harness</h3>
+<table>
+<tr><th>Plug-in point</th><td>Out-of-band CI step. Triggered on every commit that touches <code>scripts/serial-design-chain-v2.tsx</code>, <code>src/lib/pdf-engine-v2/radical/*</code>, <code>src/lib/pdf-engine-v2/class-*.ts</code>, or <code>scripts/render-minimal-pdf.tsx</code>. Does NOT change the production chain.</td></tr>
+<tr><th>What it does</th><td>Runs 15 golden briefs (5 each for VF + BESS + heatpump) through the chain. Compares output state.json against frozen invariants: gate-pass counts ±tolerance, BoM total within class band, manual-review badge counts, performance card warning count, design decisions count by status. Diff fails → CI blocks merge.</td></tr>
+<tr><th>Run time</th><td>~7 hrs (15 briefs × 28 min each, parallelisable to 1-2 hrs with multi-Mac-Studio or cloud GPU)</td></tr>
+</table>
+<div class="value"><b>Tangible value:</b> the K10 cross-class bleed fix today narrowly missed introducing a regression on heatpump (which DOES have `energy_storage_source` as a required module). Without a heatpump regression test, I'd have shipped a fix that protected VF and broke heat pump.</div>
+
+<h3>W0 — Canonical Object Model</h3>
+<table>
+<tr><th>Plug-in point</th><td>NEW file <code>src/lib/pdf-engine-v2/object-model/</code>. Replaces the scattered registries (<code>class-priors.ts</code>, <code>class-connections.ts</code>, <code>class-suppliers.ts</code>, <code>class-standards.ts</code>, <code>class-floors.ts</code>) as VIEWS over a single typed graph. Consumed by:
+<ul><li>Pre-Phase-1 (G1b compliance) — typed standards per archetype</li>
+<li>Phase 1 Generator — emits against typed schema, not free prose</li>
+<li>Phase 2 grammar gates — required connections derived from object graph</li>
+<li>Engine B — typed BoM (component_class is a property of the object, not Flash-Lite guess)</li>
+<li>Engine D — suppliers tied to specific object instances</li></ul></td></tr>
+<tr><th>What it adds</th><td>One source of truth per class. <code>VerticalFarm.AirHandlingUnit</code> has typed fields <code>{ static_pressure_pa, fan_size_mm, fan_type }</code>. Generator can't emit an axial fan at 150 Pa because the type system rejects it. K10 cross-class bleed cannot happen because <code>VerticalFarm</code> doesn't have an <code>EnergyStorageSource</code> sub-class.</td></tr>
+</table>
+<div class="value"><b>Tangible value:</b> iter-7 findings I (K10 bleed) + B (LED 10× driver mismatch) + C (fan stall) + H (duplicate BoM rows) would all be caught at TYPE-CHECK TIME, not at runtime by gates. Would have prevented 4 of 10 iter-7 findings from ever existing.</div>
+
+<h3>W1 — Deterministic engineering tools (in-flight)</h3>
+<table>
+<tr><th>Plug-in point</th><td>Two integration modes:
+<ul><li><b>In-flight (Gemini function-calling)</b>: Generator at STEP 4 gains <code>tools=[psychrometrics, fan_curve, voltage_drop, refrigerant_cycle, pressure_drop]</code>. When emitting HVAC module, Generator calls <code>psychrometrics.calc(temp_db=22, rh=70, alt=20)</code> → gets dewpoint, enthalpy → sizes reheat coil accurately.</li>
+<li><b>Post-hoc verification</b>: each Phase 2 arithmetic gate that currently has a lookup table calls the tool instead. <code>fanStaticPressureFeasibilityGate</code> calls <code>fan_curve.lookup(size, type)</code> not a hardcoded table.</li></ul></td></tr>
+<tr><th>What it adds</th><td>Deterministic physics replaces LLM guessing. Tool always returns <code>{value, source, uncertainty}</code> — no fake determinism. Cached by (tool, inputs-hash).</td></tr>
+</table>
+<div class="value"><b>Tangible value:</b> iter-7 findings B (LED driver mismatch) + C (fan stall) + D (RO pump pressure 6× short) directly prevented. Generator wouldn't have emitted a 300mm axial fan at 150 Pa because `fan_curve.lookup(300, 'axial')` returns max 100 Pa and Generator sees that BEFORE writing the spec.</div>
+
+<h3>W4 — Adversarial dev (steel-man + red-team)</h3>
+<table>
+<tr><th>Plug-in point</th><td>NEW pre-merge CI check on chain-critical files. Triggers on PR creation to those paths. Dispatches 2 LLMs steel-manning the BEFORE state + 2 LLMs red-teaming the AFTER state.</td></tr>
+<tr><th>What it adds</th><td>Surfaces regressions that the developer (me) and the council (audit-after-the-fact) miss. Output committed alongside the change.</td></tr>
+</table>
+<div class="value"><b>Tangible value:</b> commit <code>decdcdfa6</code> introduced a name collision (DesignDecisionsPage clash with Section 4) — type-check caught it after push, fixed in <code>c50bfb933</code>. Red-team would have caught it BEFORE merge.</div>
+
+<h3>W3 — Mixture of Domain Experts</h3>
+<table>
+<tr><th>Plug-in point</th><td>Replace the R1-R4 generic reviewer slots (STEP 5-8) with class-aware specialist routing. Each module gets its domain expert: Module 2 (HVAC) → HVAC expert, Module 5 (Electrical) → Electrical expert, etc.</td></tr>
+<tr><th>What it adds</th><td>Specialist prompts + tool access. HVAC expert has <code>psychrometrics</code> + <code>refrigerant_cycle</code> tools + ASHRAE prompt. Electrical expert has <code>voltage_drop</code> + BS 7671 prompt. Each fights for its corner.</td></tr>
+</table>
+<div class="value"><b>Tangible value:</b> iter-7 finding B (LED 10× mismatch) survived 4 generic reviewers but would not have survived an Electrical expert who's prompted to check driver-load relationships explicitly.</div>
+
+<h3>W7 — In-Context Learning via curated exemplar packs</h3>
+<table>
+<tr><th>Plug-in point</th><td>Pre-Phase-1: a retrieval step BEFORE STEP 4 Generator. Retrieves 2-3 golden reports by (class, envelope, scale) similarity. Injects as in-context examples to Generator AND each W3 specialist.</td></tr>
+<tr><th>What it adds</th><td>Class-specific gold-standard templates. VF 100m² container brief retrieves the BEST VF container example, not a 4-8m² cabinet example. Generator starts from a real working pattern instead of from-scratch.</td></tr>
+</table>
+<div class="value"><b>Tangible value:</b> iter-7 finding A (Engine B under-pricing) — if the exemplar pack included a real 100m² VF with realistic prices, Generator would emit prices in the right magnitude from the start, before Engine B even runs.</div>
+
+<h3>W5 — Pattern distillation</h3>
+<table>
+<tr><th>Plug-in point</th><td>Offline batch job. Consumes the last ≥20 runs per class from <code>chain_telemetry</code>. Proposes registry diffs (class-priors additions, Engine B anchor updates, supplier catalogue updates). Diffs go to a PR queue — human (Tristan) reviews + merges.</td></tr>
+<tr><th>What it adds</th><td>Closes the loop on what we did manually today. Today: I noticed VF had only 4 component overrides; expanded to 12. W5 detects this drift automatically and proposes the update.</td></tr>
+</table>
+<div class="value"><b>Tangible value:</b> the iter-5 → iter-7 generalisation gap (heat pump Engine B fix didn't generalise to VF) would be caught automatically after 20 VF runs showed the same under-pricing pattern.</div>
+
+<h3>W2 — Multimodal reference grounding</h3>
+<table>
+<tr><th>Plug-in point</th><td>NEW chain step between K10 and Headline (post-Phase-2, post-design-finalised). Calls Gemini 3.5 Flash with the chain's module list + reference images for the class. Emits manual-review badge if class/category mismatch detected.</td></tr>
+<tr><th>What it adds</th><td>Catches what text-only audits miss. The iter-7 cabinet-image-on-container-brief WAS caught by my visual read but missed by 4 text-only council members.</td></tr>
+</table>
+<div class="value"><b>Tangible value:</b> iter-7 image finding (cabinet shown for 40ft container brief) — would have been caught automatically by W2, surfacing a manual-review badge BEFORE Tristan looked at the PDF.</div>
+
+<h3>W6-full — Continuous learning</h3>
+<table>
+<tr><th>Plug-in point</th><td>Telemetry pipe (logs every chain action) + drift dashboard (weekly digest). User-signal capture: brief revisions, supplier overrides, cost manual edits. NO auto-mutation into production — diffs proposed to Tristan only.</td></tr>
+<tr><th>What it adds</th><td>The "gets better every day" property — but human-gated, not autonomous. Detects when class quality drifts. Today's iter-8 work was essentially a manual version of W6-full.</td></tr>
+</table>
+<div class="value"><b>Tangible value:</b> if VF quality drops (e.g., new Generator model regressed humidity strategy), W6-full's weekly digest flags "VF gate-pass rate dropped from 87% → 71% — investigate". Without it, regressions accumulate silently.</div>
+
+<h2>Rollout sequence with proof-point at each step</h2>
+
+<p>Each step delivers something MEASURABLE before the next is built. Council validation: every step's proof goes to the 4-model council to confirm the engine ACTUALLY got better.</p>
+
+<table>
+<tr><th>Step</th><th>Workstream</th><th>Deliverable</th><th>Proof point (measurable, council-validated)</th></tr>
+<tr><td>1</td><td>W6-lite</td><td>15 golden briefs + invariants captured (VF + BESS + heatpump × 5 each)</td><td>Today's iter-8 commits replayed against the harness; baseline metrics captured for each class. Council confirms: "the harness catches the same findings the visual audit caught, and would have caught the K10 bleed regression."</td></tr>
+<tr><td>2</td><td>W0 micro (VF only)</td><td>Typed VerticalFarm object graph + Generator emits against schema</td><td>Re-run 5 VF golden briefs. Confirm: K10 bleed CANNOT occur (type system rejects), duplicate BoM lines CANNOT occur, container-vs-cabinet envelope confusion CANNOT occur. Council validates: "the type system actually blocks these failure modes, not just discourages them."</td></tr>
+<tr><td>3</td><td>W1 micro (3 tools, VF)</td><td><code>psychrometrics.calc</code>, <code>fan_curve.lookup</code>, <code>pressure_drop.pipe</code> + Generator function-calling</td><td>Re-run 5 VF briefs. Compare: physics-critic HIGH-finding count BEFORE (avg 4-8 per VF run iter-7) vs AFTER. Council confirms: "the AHU axial fan stall + RO pump pressure mismatch + LED driver mismatch findings don't appear in the new VF runs because the tool calls prevented their generation."</td></tr>
+<tr><td>4</td><td>W4</td><td>Adversarial CI on chain-critical paths</td><td>Replay today's 12 iter-8 commits through the adversarial check. Council validates: "red-team finds the iter-7 name collision pre-merge, finds at least 1 of the type errors that landed."</td></tr>
+<tr><td>5</td><td>W3 micro (2 experts for VF)</td><td>HVAC + Electrical experts replace generic reviewers for VF Module 2 + 5</td><td>Re-run 5 VF briefs. Compare: physics-critic HIGH findings on Module 2 + 5 BEFORE vs AFTER. Council confirms: "Module 2 HVAC + Module 5 Electrical findings drop by X%; the specialists catch what R1-R4 generics missed."</td></tr>
+<tr><td>6</td><td>W7 micro (VF exemplar pack)</td><td>3 golden VF reports curated, retrieved by (envelope, scale) similarity, injected into Generator + HVAC + Electrical specialist contexts</td><td>Re-run 5 VF briefs with mixed envelope sizes (40ft container, 20ft container, 4-8m² desktop). Confirm: Engine B BoM totals land in the realistic band for each envelope size, not the generic-class-default tier.</td></tr>
+<tr><td>7</td><td>Scale to BESS + heatpump</td><td>Steps 2-6 applied to BESS and heatpump classes</td><td>Re-run all 15 golden briefs. All 3 classes show measurable quality improvement per W6-lite harness.</td></tr>
+<tr><td>8</td><td>W5 (≥20 runs/class)</td><td>Pattern distillation proposes first registry diff to Tristan</td><td>Distillation proposes a class-floor adjustment or new gate based on observed drift. Tristan approves or rejects. Iteration proven.</td></tr>
+<tr><td>9</td><td>W2 (3 classes)</td><td>Multimodal reference grounding for VF + BESS + heatpump</td><td>Re-run 15 briefs. Confirm: category-mismatch detection fires when expected (e.g. desktop hero on container brief).</td></tr>
+<tr><td>10</td><td>W6-full</td><td>Drift dashboard + weekly digest</td><td>First weekly digest shows real drift signal. Tristan confirms the digest is actionable.</td></tr>
+</table>
+
+<h2>Open questions for council</h2>
+<ol>
+<li><b>Is W0 (object model) viable as a 2-week deliverable?</b> Replacing 5+ scattered registries (class-priors, class-connections, class-suppliers, class-standards, class-floors) with one typed graph is a big surgical edit. Could be 4-6 weeks if there's significant Phase 1 generator rework.</li>
+<li><b>Should W1 tools be Python-subprocess or in-process TypeScript?</b> Council previously said Python; the ts-codebase doesn't currently spawn Python (it spawns tsx). Subprocess overhead adds latency.</li>
+<li><b>For W3 specialists: route per-module, or per-finding?</b> Per-module is simpler but a finding can span modules (e.g. LED-driver mismatch is Module 4 BoM + Module 5 electrical sizing).</li>
+<li><b>How big should the W6-lite harness be?</b> 15 briefs is a starting point. Should it grow? Council previously said ≥20 per class for distillation — does the harness need that too?</li>
+<li><b>Should the council itself participate in W6-lite verification?</b> Run council on every harness output, automatically — surfacing findings as additional regression signals?</li>
+</ol>
+
+</body>
+</html>
