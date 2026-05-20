@@ -136,6 +136,14 @@ function normalise_unicode(s: string): string {
     // comma-like glyphs for these otherwise (drawer 227e3c8fd74fcd32 bug #7:
     // class-hazards.ts has correct H₂/CH₄/N₂/CO₂ but renders as "H,, CO, CH,,").
     .replace(/[₀₁₂₃₄₅₆₇₈₉]/g, c => String('₀₁₂₃₄₅₆₇₈₉'.indexOf(c)))
+    // Unicode superscripts U+2070-U+2079 (digits) + U+207B (superscript
+    // minus) → ASCII. Helvetica supports ¹²³ from Latin-1 but ⁰⁴-⁹ and ⁻
+    // all fall back to garbled glyphs ({, t, u, v, w...). The chain emits
+    // PPFD as "µmol·m⁻²·s⁻¹" which renders as "umol·m{²·s{¹"; this fixes it
+    // to "umol·m-2·s-1" which is readable. Universal across product classes.
+    .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g, c => String('⁰¹²³⁴⁵⁶⁷⁸⁹'.indexOf(c)))
+    .replace(/⁻/g, '-')
+    .replace(/⁺/g, '+')
     // Greek micro sign µ (U+00B5) and mu (U+03BC) → ASCII u (closest match)
     .replace(/[µμ]/g, 'u')
     // Ohm sign Ω (U+03A9, U+2126) → ohm
