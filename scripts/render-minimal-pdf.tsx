@@ -222,6 +222,44 @@ function stripHtmlTags(s: string): string {
  * part numbers / URLs. Applied via clean_prose so every prose field passes
  * through. Compound endings (-ize → -ise) catch the inflections too.
  */
+/** Title-case a string while preserving engineering and geographic acronyms
+ *  (UK, EU, US, BESS, LED, HVAC, EMC, DX, etc.) and keeping mid-sentence
+ *  connector words ("and", "of", "the", "for") lowercase. Used by both the
+ *  cover-page subject and the BoM part-name renderer so the casing stays
+ *  consistent across the document.
+ *
+ *  Drawer: 227e3c8fd74fcd32 bug #10 — brief parser emits "Battery energy
+ *  storage system (bess)"; this re-uppercases the acronym. Tristan
+ *  2026-05-20 third review: also catches "Uk" → "UK" in titles, and
+ *  Title-Cases lowercase BoM part names like "grounding lug". */
+function toTitleCaseEng(input: string): string {
+  if (!input) return ''
+  const ACRONYMS = new Set([
+    // engineering subsystems / classes
+    'BESS','PCS','BMS','HVAC','EMS','UPS','AUV','HAPS','CGM','EV','AC','DC',
+    'LFP','NMC','IEC','UL','NFPA','ISO','SCADA','PLC','LED','PCB','PCBA',
+    'HMI','GPS','IMU','MCU','FPGA','RAM','SSD','LAN','USB','PWM','PV',
+    'MOSFET','IGBT','AFE','RTD','NTC','UAV','RF','GNSS','ADCS','CRC','MQTT',
+    'API','LTE','VFD','PDU','PID','OEM','EPC','MPPT','EEV','BPHE','OCPP',
+    'CCS2','EMC','EMI','DX','PIR','EPDM','CSC','UDL','RH','PPE','VOC','CO2',
+    'NEMA','IP','RJ45','I2C','SPI','RS232','RS485','PPM','RPM','PSI','BTU',
+    // geographic / political (Tristan 2026-05-20: "Uk" → "UK")
+    'UK','EU','US','USA','GB','EEA','UAE','MENA','APAC','EMEA','ASEAN',
+  ])
+  const SMALL_WORDS = new Set(['and','or','of','the','for','to','in','on','a','an','with'])
+  return input.split(/(\s+|\(|\))/).map((tok, idx) => {
+    if (/^[\s()]+$/.test(tok)) return tok
+    // If the token is already all-uppercase (≥2 letters) and contains a
+    // letter, treat it as a deliberately-cased acronym and leave it.
+    if (/^[A-Z]{2,}\d*$/.test(tok)) return tok
+    const upper = tok.toUpperCase()
+    if (ACRONYMS.has(upper)) return upper
+    const lower = tok.toLowerCase()
+    if (idx > 0 && SMALL_WORDS.has(lower)) return lower
+    return lower.charAt(0).toUpperCase() + lower.slice(1)
+  }).join('')
+}
+
 function britishise(s: string): string {
   if (!s) return s
   return s
@@ -1744,90 +1782,19 @@ function CoverPage({
                 </>
               )
             })()}
-            <Text style={{ fontSize: 7.5, color: '#bae6fd', marginTop: 6, fontStyle: 'italic' }}>
-              {bomTotals.totalRows} part lines across {bomTotals.allMods.length} modules · {bomTotals.actualPriced} live distributor quotes · {bomTotals.estimatePriced} web estimates · {bomTotals.tbdRows} TBD
-              {typeof bomTotals.scale_applied === 'number' && bomTotals.scale_applied !== 1.0
-                ? ` · Raw BoM scale factor ${bomTotals.scale_applied.toFixed(3).replace(/\.?0+$/, '')} (per-class batch economics)`
-                : ''}
-            </Text>
-            {priceReality && priceReality.verdict !== 'unavailable' && priceReality.metric_value !== null ? (
-              (() => {
-                const absPct = Math.abs(priceReality.pct_deviation || 0)
-                const sty = priceVerdictStyle(priceReality.verdict, absPct)
-                const isPerUnit = priceReality.metric_input === 1
-                // Engine D: price-reality now compares installed_asp_gbp
-                // against market-installed-ASP band, not raw BoM.
-                // 2026-05-18 (Track N visual audit MAJOR 2): metric_label
-                // already ends with "installed" for most classes (see
-                // class-price-bands.ts natural_metric — "£/kW thermal
-                // installed", "£/L working volume installed", "£/kWh
-                // installed"). The previous template tacked on a second
-                // " installed", producing "£751 per kW thermal installed
-                // installed — within typical installed-ASP range". Strip
-                // a trailing "installed" from the unit slice before adding
-                // ours back so the suffix appears exactly once.
-                const unitSlice = priceReality.metric_label
-                  .split('(')[0]
-                  .trim()
-                  .replace(/^£\//, '')
-                  .replace(/\s+installed\s*$/i, '')
-                  .trim()
-                const ratioLabel = isPerUnit
-                  ? `${fmtGBP_compact(priceReality.metric_value)}/unit installed`
-                  : `${fmtGBP_compact(priceReality.metric_value)} per ${unitSlice} installed`
-                const bandLabel = `band ${fmtGBP_compact(priceReality.band_low)}–${fmtGBP_compact(priceReality.band_high)}`
-                const verdictText = priceReality.verdict === 'in_band'
-                  ? 'within typical installed-ASP range'
-                  : priceReality.verdict === 'low'
-                  ? `${Math.round(absPct)}% below typical installed-ASP range`
-                  : `${Math.round(absPct)}% above typical installed-ASP range`
-                return (
-                  <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: '#1e4a73' }}>
-                    <Text style={{ fontSize: 9, color: '#ffffff' }}>
-                      <Text style={{ fontFamily: 'Helvetica-Bold', color: sty.colour === '#065f46' ? '#86efac' : sty.colour === '#92400e' ? '#fcd34d' : '#fca5a5' }}>{sty.symbol} </Text>
-                      <Text style={{ fontFamily: 'Helvetica-Bold' }}>{ratioLabel}</Text>
-                      <Text style={{ color: '#bae6fd' }}> — {verdictText} ({bandLabel})</Text>
-                    </Text>
-                  </View>
-                )
-              })()
-            ) : null}
-            {engineCSummary && engineCSummary.total_priced_lines > 0 ? (
-              // Engine C reference-anchor aggregate (2026-05-18). Renders
-              // beneath price-reality so the reader sees: "the headline number
-              // sits at X vs market band, AND Y of N priced BoM lines flagged
-              // 2× over (or 0.5× under) the Phase 4 corpus reference."
-              (() => {
-                const s = engineCSummary
-                const flagged = s.over + s.under
-                const pct = s.pct_flagged_out_of_range
-                const refCoverage = s.total_priced_lines > 0
-                  ? ((s.total_priced_lines - s.no_reference) / s.total_priced_lines) * 100
-                  : 0
-                return (
-                  <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: '#1e4a73' }}>
-                    <Text style={{ fontSize: 9, color: '#ffffff' }}>
-                      <Text style={{ fontFamily: 'Helvetica-Bold', color: pct > 30 ? '#fca5a5' : pct > 15 ? '#fcd34d' : '#86efac' }}>REF </Text>
-                      <Text style={{ fontFamily: 'Helvetica-Bold' }}>
-                        {flagged} of {s.total_priced_lines} priced lines flagged vs reference corpus
-                      </Text>
-                      <Text style={{ color: '#bae6fd' }}>
-                        {' '}({s.over} over · {s.under} under · {s.in_range} in_range · {s.no_reference} no_ref)
-                      </Text>
-                    </Text>
-                    <Text style={{ fontSize: 8, color: '#bae6fd', marginTop: 3, fontStyle: 'italic' }}>
-                      Corpus coverage {refCoverage.toFixed(0)}% — reference median from top-5 cosine matches in the Phase 4 corpus (29.9k embedded records); 2.0×/0.5× thresholds.
-                    </Text>
-                  </View>
-                )
-              })()
-            ) : null}
-            {/* Manual-review badge strip (council 2026-05-18). Surfaces gate
-                fires (G0 physics, G1b compliance, G2 cost-reality, G3
-                completeness, G4 grammar, G5 part-number) that previously
-                lived only in state.* and never reached the reader. Strip is
-                empty (returns null) when no gate has fired. */}
-            <ManualReviewCoverStrip badges={manualReviewBadges ?? []} />
+            {/* ITER-10.5 third review (Tristan 2026-05-20): cover stays
+                clean. Everything below the Installed ASP headline number —
+                BoM stats line, price-reality verdict, Engine C reference
+                summary, manual-review badge strip — was removed because the
+                cover sheet "is not a good thing to have" cluttered with
+                that material. The same data still surfaces:
+                  • Manual review badges → Cover footer or relocated to
+                    the relevant section pages.
+                  • Price reality + Engine C summary → moved to a
+                    dedicated section later in the document or to the
+                    Performance Card content folded into the brief.
+                  • BoM stats line → procurement reader gets it from
+                    Module totals + sub-module sub-totals inline. */}
           </View>
           {heroImagePath ? (
             // Right column of the two-column cover layout. Sized 207×170 to
@@ -1876,33 +1843,15 @@ function CoverPage({
             <ManualReviewCoverStrip badges={manualReviewBadges ?? []} />
           </View>
         ) : null}
-        {/* If we had no BoM at all, the badge strip never had a panel to live
-            inside — render the inline-light variant in the body so badges
-            still surface on the cover. */}
-        {(!bomTotals && (manualReviewBadges?.length ?? 0) > 0) ? (
-          <View style={{ marginTop: 14 }}>
-            <ManualReviewSectionNote badges={manualReviewBadges ?? []} />
-          </View>
-        ) : null}
-        {pendingPartsCount && pendingPartsCount > 0 ? (
-          <Text style={{ fontSize: 9, color: MUTED, marginTop: 10 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold' }}>{pendingPartsCount}</Text> part lines need verification — see the Notes block beneath each sub-module&apos;s Bill of Materials for the audit trail.
-          </Text>
-        ) : null}
-        {/* Hero image moved into the two-column row alongside the cost-stack
-            panel above (Tristan 2026-05-18). The legacy full-width hero
-            render that used to live here pushed the image onto page 2 once
-            the cost-stack panel grew to 10 rows. When there is no cost-stack
-            but a hero exists (legacy/fallback BoM-only path), render the
-            hero full-width below the BoM card to preserve the prior look. */}
-        {heroImagePath && !(bomTotals && costStack) ? (
-          <View style={{ marginTop: 8, marginBottom: 8, alignItems: 'center' }}>
-            <Image src={heroImagePath} style={{ width: 475, height: 280, objectFit: 'contain' }} />
-            <Text style={{ fontSize: 8, color: MUTED, marginTop: 6, fontStyle: 'italic' }}>
-              Illustration only — AI-generated render, not a photograph of the actual unit. Used for visual reference; final geometry will follow the engineering specification.
-            </Text>
-          </View>
-        ) : null}
+        {/* ITER-10.5 third review (Tristan 2026-05-20): cover cleanup
+            removed three sibling elements that used to live here:
+              • inline-light Manual Review badge strip (BoM-less fallback)
+              • pending-parts verification note
+              • full-width hero (no-cost-stack fallback)
+            The cover now ends after the cost-stack + outline two-column.
+            Manual-review badges, pending-parts counts, and supplementary
+            hero images all surface elsewhere in the document where they
+            have proper context. */}
       </View>
       <View style={{ position: 'absolute', bottom: 56, left: 60, right: 60 }}>
         <View style={{ height: 1, backgroundColor: RULE, marginBottom: 14 }} />
@@ -2011,7 +1960,11 @@ function formatMetricValue(rawValue: string, rawUnit: string | undefined): strin
 //
 // Goal: a buyer / engineer / council reviewer can answer "does this design
 // actually match the brief?" in 30 seconds without reading 80 pages.
-function PerformanceCardPage({ state, project }: { state: any; project: string }) {
+/** Performance Card body — the table content WITHOUT a Page wrapper, so it
+ *  can be embedded inside the Brief page (Tristan 2026-05-20 third review:
+ *  "performance characteristics data should just go into the briefing
+ *  requirements as one section"). */
+function PerformanceCardBody({ state }: { state: any }) {
   const card = state?.performanceCard
   if (!card || !Array.isArray(card.sections) || card.sections.length === 0) return null
 
@@ -2030,22 +1983,19 @@ function PerformanceCardPage({ state, project }: { state: any; project: string }
   }
 
   return (
-    <Page size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Section 0.5 · Performance Characteristics" project={project} />
-      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Performance Characteristics
-      </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
-        Numeric spec sheet for this product class. Each row shows the resolved value plus the brief constraint (where set), so contradictions between modules and the brief are visible at a glance.
+    <View>
+      <SubHeading>Performance characteristics</SubHeading>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 12, lineHeight: 1.5 }}>
+        Numeric spec sheet for this product class — resolved value alongside the brief constraint (where set), so contradictions between modules and the brief are visible at a glance.
       </Text>
 
       {card.warnings && card.warnings.length > 0 ? (
-        <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#fffbeb', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: '#d97706' }}>
-          <Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: '#92400e', marginBottom: 4 }}>
+        <View style={{ marginBottom: 12, padding: 9, backgroundColor: '#fffbeb', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: '#d97706' }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#92400e', marginBottom: 3 }}>
             {card.warnings.length} performance metric{card.warnings.length === 1 ? '' : 's'} flagged
           </Text>
           {card.warnings.slice(0, 5).map((w: any, i: number) => (
-            <Text key={i} style={{ fontSize: 9, color: '#78350f', lineHeight: 1.45 }}>
+            <Text key={i} style={{ fontSize: 8.5, color: '#78350f', lineHeight: 1.45 }}>
               • [{w.section}] {w.label}: {w.note}
             </Text>
           ))}
@@ -2053,35 +2003,35 @@ function PerformanceCardPage({ state, project }: { state: any; project: string }
       ) : null}
 
       {sectionsWithRows.map((section: any, si: number) => (
-        <View key={si} style={{ marginBottom: 12 }} wrap={false}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT, letterSpacing: 1.2, marginBottom: 4, textTransform: 'uppercase' }}>
+        <View key={si} style={{ marginBottom: 10 }} wrap={false}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, letterSpacing: 1.2, marginBottom: 3, textTransform: 'uppercase' }}>
             {section.name}
           </Text>
           <View style={{ borderTopWidth: 0.5, borderTopColor: RULE_SOFT }}>
-            <View style={{ flexDirection: 'row', paddingVertical: 4, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
-              <Text style={{ flex: 3, fontSize: 8, color: MUTED, letterSpacing: 1 }}>METRIC</Text>
-              <Text style={{ flex: 2, fontSize: 8, color: MUTED, letterSpacing: 1, textAlign: 'right' }}>VALUE</Text>
-              <Text style={{ flex: 2, fontSize: 8, color: MUTED, letterSpacing: 1, textAlign: 'right' }}>BRIEF TARGET</Text>
-              <Text style={{ width: 16, fontSize: 8, color: MUTED, textAlign: 'center' }}> </Text>
+            <View style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
+              <Text style={{ flex: 3, fontSize: 7.5, color: MUTED, letterSpacing: 0.8 }}>METRIC</Text>
+              <Text style={{ flex: 2, fontSize: 7.5, color: MUTED, letterSpacing: 0.8, textAlign: 'right' }}>VALUE</Text>
+              <Text style={{ flex: 2, fontSize: 7.5, color: MUTED, letterSpacing: 0.8, textAlign: 'right' }}>BRIEF TARGET</Text>
+              <Text style={{ width: 14, fontSize: 7.5, color: MUTED, textAlign: 'center' }}> </Text>
             </View>
             {section.metrics.map((m: any, mi: number) => {
               if (m.value === null && m.brief_target === null) return null
               const { sym, colour } = statusIcon(m.status)
               return (
-                <View key={mi} style={{ flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}>
+                <View key={mi} style={{ flexDirection: 'row', paddingVertical: 4, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}>
                   <View style={{ flex: 3 }}>
-                    <Text style={{ fontSize: 10, color: INK }}>{m.label}</Text>
+                    <Text style={{ fontSize: 9.5, color: INK }}>{m.label}</Text>
                     {m.note ? (
-                      <Text style={{ fontSize: 8.5, color: '#78350f', marginTop: 1, lineHeight: 1.35 }}>{m.note}</Text>
+                      <Text style={{ fontSize: 8, color: '#78350f', marginTop: 1, lineHeight: 1.35 }}>{m.note}</Text>
                     ) : null}
                   </View>
-                  <Text style={{ flex: 2, fontSize: 10, fontFamily: 'Helvetica-Bold', color: m.value !== null ? INK : '#94a3b8', textAlign: 'right' }}>
+                  <Text style={{ flex: 2, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: m.value !== null ? INK : '#94a3b8', textAlign: 'right' }}>
                     {m.value !== null ? String(m.value) : '—'}
                   </Text>
-                  <Text style={{ flex: 2, fontSize: 10, color: INK_SOFT, textAlign: 'right' }}>
+                  <Text style={{ flex: 2, fontSize: 9.5, color: INK_SOFT, textAlign: 'right' }}>
                     {m.brief_target !== null ? String(m.brief_target) : ''}
                   </Text>
-                  <Text style={{ width: 16, fontSize: 11, color: colour, textAlign: 'center' }}>{sym}</Text>
+                  <Text style={{ width: 14, fontSize: 10, color: colour, textAlign: 'center' }}>{sym}</Text>
                 </View>
               )
             })}
@@ -2089,14 +2039,12 @@ function PerformanceCardPage({ state, project }: { state: any; project: string }
         </View>
       ))}
 
-      <View style={{ marginTop: 8, padding: 8, backgroundColor: '#f7f8fa', borderRadius: 3 }}>
-        <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5 }}>
+      <View style={{ marginTop: 6, padding: 7, backgroundColor: '#f7f8fa', borderRadius: 3 }}>
+        <Text style={{ fontSize: 8, color: MUTED, lineHeight: 1.5 }}>
           Legend  ✓ in spec   △ differs from brief by &gt;5%   ⚠ outside class-typical range   ∼ computed from other metrics   — not declared by the engine
         </Text>
       </View>
-
-      <PageFooter />
-    </Page>
+    </View>
   )
 }
 
@@ -2471,6 +2419,11 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
 
       <SubHeading>Why now</SubHeading>
       <Paragraph>{whyNow}</Paragraph>
+
+      {/* ITER-10.5 third review (Tristan 2026-05-20): Performance
+          Characteristics folded INTO the Brief page so there's one
+          section, not two. */}
+      <PerformanceCardBody state={state} />
 
       <PageFooter />
     </Page>
@@ -3073,7 +3026,9 @@ function SubModuleBomBlock({
   if (bomLines.length === 0) return null
   return (
     <View style={{ marginTop: 8, marginBottom: 6, marginLeft: 36 }}>
-      {/* Header row */}
+      {/* Header row — ITER-10.5 third review: SRC/REF renamed to be
+          self-explanatory; a column legend renders beneath the table so
+          the reader doesn't have to guess at the abbreviations. */}
       <View style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: RULE, paddingBottom: 3 }}>
         <Text style={{ flex: 2.6, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>PART</Text>
         <Text style={{ flex: 1.4, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>MANUFACTURER</Text>
@@ -3081,7 +3036,7 @@ function SubModuleBomBlock({
         <Text style={{ width: 30, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>QTY</Text>
         <Text style={{ width: 50, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>UNIT (£)</Text>
         <Text style={{ width: 55, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>LINE (£)</Text>
-        <Text style={{ width: 60, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, paddingLeft: 6 }}>SRC · REF</Text>
+        <Text style={{ width: 60, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, paddingLeft: 6 }}>SOURCE · CHECK</Text>
       </View>
       {/* Data rows */}
       {bomLines.map((row, ri) => {
@@ -3101,7 +3056,7 @@ function SubModuleBomBlock({
             style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}
           >
             <Text style={{ flex: 2.6, fontSize: 9, color: INK }}>
-              {row.word_name ?? '—'}
+              {row.word_name ? toTitleCaseEng(row.word_name) : '—'}
               {noteIdx ? <Text style={NOTE_MARK_STYLE}> {noteIdx}</Text> : null}
             </Text>
             <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT }}>{row.manufacturer ?? '—'}</Text>
@@ -3126,6 +3081,13 @@ function SubModuleBomBlock({
         </Text>
         <View style={{ width: 60 }} />
       </View>
+      {/* Column legend — explains the SOURCE · CHECK abbreviations so the
+          reader knows what "Web", "Est.", ">2x", "<.5x", "OK" mean.
+          Rendered after every sub-module BoM table per Tristan: "each
+          time you do it, you're going to have to say what it is". */}
+      <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 4, lineHeight: 1.5, fontStyle: 'italic' }}>
+        SOURCE: Web = distributor catalogue · Est. = web estimate · Mfr = manufacturer site · — = no source.  CHECK (vs reference corpus): OK = within typical range · &gt;2x = price more than 2× the corpus median · &lt;.5x = price less than half the corpus median · - = no reference data.
+      </Text>
     </View>
   )
 }
@@ -5172,7 +5134,6 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
           adds much value". SystemLevelRisksPage moves to AFTER modules. */}
       {state.brief?.was_revised ? <BriefRevisionNoticePage state={state} project={project} /> : null}
       <BriefPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
-      <PerformanceCardPage state={state} project={project} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
       {modules.map((m: any, idx: number) => (
         <ModuleSection
@@ -5266,20 +5227,9 @@ async function main() {
       }))
     || (productClass ? humanise(productClass) : 'Engineering Report')
   ) as string
-  // Title case + preserve engineering acronyms (drawer 227e3c8fd74fcd32 bug #10:
-  // brief parser emits "Battery energy storage system (bess)" — lowercases acronym).
-  // Each word title-cased; known acronyms forced uppercase; small connector words
-  // ("and", "of", "the", "for") left lowercase except when leading.
-  const ACRONYMS = new Set(['BESS','PCS','BMS','HVAC','EMS','UPS','AUV','HAPS','CGM','EV','AC','DC','LFP','NMC','IEC','UL','NFPA','ISO','SCADA','PLC','LED','PCB','PCBA','HMI','GPS','IMU','MCU','FPGA','RAM','SSD','LAN','USB','PWM','PV','UPS','MOSFET','IGBT','AFE','RTD','NTC','UAV','RF','GNSS','ADCS','CRC','MQTT','API','LTE','BMS','VFD','PDU','PID','OEM','EPC','MPPT','EEV','BPHE','OCPP','CCS2'])
-  const SMALL_WORDS = new Set(['and','or','of','the','for','to','in','on','a','an','with'])
-  const subject = rawSubject.split(/(\s+|\(|\))/).map((tok, idx, arr) => {
-    if (/^[\s()]+$/.test(tok)) return tok
-    const lower = tok.toLowerCase()
-    const upper = tok.toUpperCase()
-    if (ACRONYMS.has(upper)) return upper
-    if (idx > 0 && SMALL_WORDS.has(lower)) return lower
-    return lower.charAt(0).toUpperCase() + lower.slice(1)
-  }).join('')
+  // Title case using the shared toTitleCaseEng helper (defined near the top
+  // of this file, also used to capitalise BoM part names).
+  const subject = toTitleCaseEng(rawSubject)
 
   console.error(`[render-minimal-pdf] state: ${statePath}`)
   console.error(`[render-minimal-pdf] modules: ${(state.moduleDecomposition?.modules ?? []).length}`)
