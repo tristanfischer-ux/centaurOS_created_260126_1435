@@ -2375,6 +2375,11 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     // 2026-05-19 firestorm: G0.5 brief-target-reconciliation result. Catches
     // generator scale-mismatch (1kW design vs 8kW brief class of failure).
     briefTargetReconciliation: reconciliation ?? null,
+    // 2026-05-20 iter-8 (Tristan): per-class performance summary table.
+    // Built last so it can read every resolved field. Renders as a spec
+    // sheet page right after the operational headline so a reader sees
+    // the headline numbers + their cross-checks before any prose.
+    performanceCard: null as ReturnType<typeof import('../src/lib/pdf-engine-v2/performance-card').buildPerformanceCard> | null,
     // 2026-05-19 fix M1 (audit-found): worker reads state.gatesPassed for the
     // pdf_engine_runs.state_snapshot_json column but chain never wrote it.
     // DB snapshot was always {gatesPassed: null}. Write the actual boolean.
@@ -2409,6 +2414,19 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     g5UnverifiedParts,
     acceptanceStatus,
     savedAt: new Date().toISOString(),
+  }
+  // 2026-05-20 iter-8: build per-class performance card AFTER the rest of
+  // state is populated. The card resolves canopy area, LED power, cooling,
+  // humidity, CO2 etc. from derived_parameters across all modules so the
+  // renderer can emit a spec-sheet page that flags cross-module
+  // contradictions (e.g. LED prose says 20 kW but BoM has 40 × 200 W = 8 kW).
+  try {
+    const { buildPerformanceCard } = await import('../src/lib/pdf-engine-v2/performance-card')
+    state.performanceCard = buildPerformanceCard(state)
+    console.error(`[chain] performance card: ${state.performanceCard.sections.length} sections, ${state.performanceCard.warnings.length} warnings`)
+    logAction({ step: 'performance_card', sections: state.performanceCard.sections.length, warnings: state.performanceCard.warnings.length })
+  } catch (err) {
+    console.error(`[chain] performance card build failed: ${(err as Error).message}`)
   }
   const statePath = resolve(outDir, 'state.json')
   writeFileSync(statePath, JSON.stringify(state, null, 2))

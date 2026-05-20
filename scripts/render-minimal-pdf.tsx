@@ -2078,6 +2078,110 @@ function HeadlinePage({ state, project }: { state: any; project: string }) {
   )
 }
 
+// ─── Section 0.5: Performance Characteristics (Tristan 2026-05-20) ─────────
+//
+// One-glance spec sheet. Reads state.performanceCard (built by
+// src/lib/pdf-engine-v2/performance-card.ts). Per-section tables show:
+//   metric label | resolved value | brief target (if applicable) | status
+//
+// Status icons:
+//   ✓ ok           — value resolved, within reasonable range, matches brief
+//   △ delta        — value resolved but differs from brief constraint by >5%
+//   ⚠ out of range — value resolved but outside class-typical range
+//   ∼ computed     — value derived from other metrics (e.g. yield/m²)
+//   — missing      — neither source nor compute produced a value
+//
+// Goal: a buyer / engineer / council reviewer can answer "does this design
+// actually match the brief?" in 30 seconds without reading 80 pages.
+function PerformanceCardPage({ state, project }: { state: any; project: string }) {
+  const card = state?.performanceCard
+  if (!card || !Array.isArray(card.sections) || card.sections.length === 0) return null
+
+  const sectionsWithRows = card.sections.filter((s: any) => Array.isArray(s.metrics) && s.metrics.some((m: any) => m.value !== null || m.brief_target !== null))
+  if (sectionsWithRows.length === 0) return null
+
+  const statusIcon = (s: string) => {
+    switch (s) {
+      case 'ok': return { sym: '✓', colour: '#15803d' }
+      case 'delta': return { sym: '△', colour: '#b45309' }
+      case 'out_of_range': return { sym: '⚠', colour: '#b91c1c' }
+      case 'computed': return { sym: '∼', colour: '#475569' }
+      case 'missing':
+      default: return { sym: '—', colour: '#94a3b8' }
+    }
+  }
+
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section 0.5 · Performance Characteristics" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Performance Characteristics
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
+        Numeric spec sheet for this product class. Each row shows the resolved value plus the brief constraint (where set), so contradictions between modules and the brief are visible at a glance.
+      </Text>
+
+      {card.warnings && card.warnings.length > 0 ? (
+        <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#fffbeb', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: '#d97706' }}>
+          <Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: '#92400e', marginBottom: 4 }}>
+            {card.warnings.length} performance metric{card.warnings.length === 1 ? '' : 's'} flagged
+          </Text>
+          {card.warnings.slice(0, 5).map((w: any, i: number) => (
+            <Text key={i} style={{ fontSize: 9, color: '#78350f', lineHeight: 1.45 }}>
+              • [{w.section}] {w.label}: {w.note}
+            </Text>
+          ))}
+        </View>
+      ) : null}
+
+      {sectionsWithRows.map((section: any, si: number) => (
+        <View key={si} style={{ marginBottom: 12 }} wrap={false}>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT, letterSpacing: 1.2, marginBottom: 4, textTransform: 'uppercase' }}>
+            {section.name}
+          </Text>
+          <View style={{ borderTopWidth: 0.5, borderTopColor: RULE_SOFT }}>
+            <View style={{ flexDirection: 'row', paddingVertical: 4, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
+              <Text style={{ flex: 3, fontSize: 8, color: MUTED, letterSpacing: 1 }}>METRIC</Text>
+              <Text style={{ flex: 2, fontSize: 8, color: MUTED, letterSpacing: 1, textAlign: 'right' }}>VALUE</Text>
+              <Text style={{ flex: 2, fontSize: 8, color: MUTED, letterSpacing: 1, textAlign: 'right' }}>BRIEF TARGET</Text>
+              <Text style={{ width: 16, fontSize: 8, color: MUTED, textAlign: 'center' }}> </Text>
+            </View>
+            {section.metrics.map((m: any, mi: number) => {
+              if (m.value === null && m.brief_target === null) return null
+              const { sym, colour } = statusIcon(m.status)
+              return (
+                <View key={mi} style={{ flexDirection: 'row', paddingVertical: 5, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}>
+                  <View style={{ flex: 3 }}>
+                    <Text style={{ fontSize: 10, color: INK }}>{m.label}</Text>
+                    {m.note ? (
+                      <Text style={{ fontSize: 8.5, color: '#78350f', marginTop: 1, lineHeight: 1.35 }}>{m.note}</Text>
+                    ) : null}
+                  </View>
+                  <Text style={{ flex: 2, fontSize: 10, fontFamily: 'Helvetica-Bold', color: m.value !== null ? INK : '#94a3b8', textAlign: 'right' }}>
+                    {m.value !== null ? String(m.value) : '—'}
+                  </Text>
+                  <Text style={{ flex: 2, fontSize: 10, color: INK_SOFT, textAlign: 'right' }}>
+                    {m.brief_target !== null ? String(m.brief_target) : ''}
+                  </Text>
+                  <Text style={{ width: 16, fontSize: 11, color: colour, textAlign: 'center' }}>{sym}</Text>
+                </View>
+              )
+            })}
+          </View>
+        </View>
+      ))}
+
+      <View style={{ marginTop: 8, padding: 8, backgroundColor: '#f7f8fa', borderRadius: 3 }}>
+        <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5 }}>
+          Legend  ✓ in spec   △ differs from brief by &gt;5%   ⚠ outside class-typical range   ∼ computed from other metrics   — not declared by the engine
+        </Text>
+      </View>
+
+      <PageFooter />
+    </Page>
+  )
+}
+
 // ─── Section 1: Brief & Requirements ───────────────────────────────────────
 
 // ─── Brief Revision Notice (Phase 0 2026-05-15) ────────────────────────────
@@ -4631,6 +4735,7 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
           below. Wrapper component below adds a 2nd page when exploded image
           exists for the product class. */}
       {state.keyMetrics ? <HeadlinePage state={state} project={project} /> : null}
+      <PerformanceCardPage state={state} project={project} />
       {state.brief?.was_revised ? <BriefRevisionNoticePage state={state} project={project} /> : null}
       <BriefPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
