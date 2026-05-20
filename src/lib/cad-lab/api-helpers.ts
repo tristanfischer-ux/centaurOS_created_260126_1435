@@ -533,8 +533,10 @@ export async function callOpenAI(
   }
 
   // Route through OpenRouter using OpenAI-compatible chat format.
-  // Map bare model IDs to OpenRouter's openai/ namespace (e.g. gpt-4.1-mini → openai/gpt-4.1-mini).
-  const orModelId = modelId.startsWith("openai/") ? modelId : `openai/${modelId}`
+  // Fully-qualified OpenRouter slugs (anything containing a `/`, e.g. `deepseek/deepseek-v4-flash`,
+  // `google/gemini-3.5-flash`) pass through unchanged. Bare model names (e.g. `gpt-4.1-mini`)
+  // are namespaced to `openai/` for backward compatibility with older call sites.
+  const orModelId = modelId.includes("/") ? modelId : `openai/${modelId}`
 
   // GPT-5+/o1/o3/o4 reasoning models REJECT `max_tokens` — they require `max_completion_tokens`.
   const isReasoningModel =
