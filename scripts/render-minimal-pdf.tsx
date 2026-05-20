@@ -2639,18 +2639,12 @@ function ModuleConnectionMapPageWithExploded({
           <Text style={{ fontSize: 10, color: MUTED, marginBottom: 16 }}>
             Figure 2. The same {moduleCount} modules separated vertically to show their spatial layering inside the product envelope. Pair this with the connection map (Figure 1) — the circle shows which modules talk to each other; the exploded view shows where each module physically sits.
           </Text>
-          {/* 2026-05-18 (Track N visual audit MAJOR 4): exploded view was */}
-          {/* framed 515×515 (square) with objectFit:'contain'. Heat-pump, */}
-          {/* bioreactor and drone source PNGs are portrait (tall+narrow), */}
-          {/* so the image got letter-boxed into a narrow vertical strip — */}
-          {/* sub-component labels became unreadable. Widen the frame to */}
-          {/* the full content width (467pt, page minus 64pt × 2 horiz */}
-          {/* padding) and raise the height to ~650pt so portrait sources */}
-          {/* scale up rather than down. Landscape sources (BESS rack) */}
-          {/* still scale to fit because objectFit:'contain' preserves */}
-          {/* aspect ratio. */}
-          <View style={{ alignItems: 'center', marginTop: 8, marginBottom: 8 }}>
-            <Image src={explodedImagePath} style={{ width: 467, height: 650, objectFit: 'contain' }} />
+          {/* ITER-10.5 (Tristan 2026-05-20): height shrunk from 650pt to
+              570pt so title + figure caption + image fit on the same page.
+              The prior 650pt pushed the image to a separate page from its
+              title. Portrait sources still scale up via objectFit:contain. */}
+          <View style={{ alignItems: 'center', marginTop: 6, marginBottom: 6 }}>
+            <Image src={explodedImagePath} style={{ width: 467, height: 570, objectFit: 'contain' }} />
             <Text style={{ fontSize: 8, color: MUTED, marginTop: 6, fontStyle: 'italic' }}>
               Deterministic CAD render — each module lifted from its real position to expose internals. Not a photograph.
             </Text>
@@ -3384,20 +3378,10 @@ function ModuleSection({
           deleted standalone DesignTradeOffsPage per Tristan directive). */}
       {state ? <ModuleDesignTradeOffsBlock state={state} moduleId={moduleSpec.module} /> : null}
 
-      {/* Module total — sits below trade-offs, immediately before Engineering
-          Review Notes. Mirrors the Chain V2 module-total row. */}
-      {moduleCostGbp > 0 ? (
-        <View style={{ marginTop: 10, paddingVertical: 8, paddingHorizontal: 10, backgroundColor: '#f1f5f9', borderRadius: 4, flexDirection: 'row', alignItems: 'baseline' }} wrap={false}>
-          <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK }}>
-            Module {index} total — {title}
-          </Text>
-          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
-            £{moduleCostGbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </Text>
-        </View>
-      ) : null}
-
-      {/* ITER-10 C3: Engineering Review Notes block at the bottom of each module */}
+      {/* ITER-10.5 (Tristan 2026-05-20 second review): Engineering Review
+          Notes moved from BELOW module total to AFTER BoM/trade-offs and
+          BEFORE module total. Issues with the module's parts are clearer
+          when they appear before the bottom-line cost. */}
       {reviewNotes.length > 0 ? (
         <View style={{ marginTop: 18, padding: 12, backgroundColor: '#fef9e7', borderLeftWidth: 4, borderLeftColor: '#ca8a04', borderRadius: 4 }} wrap={false}>
           <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#713f12', marginBottom: 2 }}>
@@ -3437,6 +3421,19 @@ function ModuleSection({
               </View>
             )
           })}
+        </View>
+      ) : null}
+
+      {/* Module total — sits at the very bottom of the module section as the
+          bottom-line cost, after issues + trade-offs have been surfaced. */}
+      {moduleCostGbp > 0 ? (
+        <View style={{ marginTop: 10, paddingVertical: 8, paddingHorizontal: 10, backgroundColor: '#f1f5f9', borderRadius: 4, flexDirection: 'row', alignItems: 'baseline' }} wrap={false}>
+          <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK }}>
+            Module {index} total — {title}
+          </Text>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
+            £{moduleCostGbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </Text>
         </View>
       ) : null}
 
@@ -5014,7 +5011,7 @@ function EnvelopeOutline({
         </View>
       </View>
       <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 8, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 4 }}>
-        Drawn to brief scale. Class-library render suppressed because the static PNG ({'≤'}2 m cabinet) does not represent this {(widthMm * heightMm * depthMm / 1_000_000_000).toFixed(1)} m³ envelope. Brief-aware visualisation queued.
+        Drawn to brief scale. Class-library render suppressed because the static PNG (up to 2 m cabinet) does not represent this {(widthMm * heightMm * depthMm / 1_000_000_000).toFixed(1)} m³ envelope. Brief-aware visualisation queued.
       </Text>
     </View>
   )
