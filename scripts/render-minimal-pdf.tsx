@@ -1012,9 +1012,9 @@ function collectManualReviewBadges(state: any): ManualReviewBadge[] {
     const lines = violations.map(v => `${v.severity === 'hard' ? 'HALT' : 'WARN'} · ${v.law}: ${v.headline}\n  Claimed: ${v.claimed}\n  Allowed: ${v.allowed}\n  ${v.rationale}`)
     out.push({
       id: 'g0_physics',
-      label: 'G0 physics',
+      label: 'Physics ledger',
       severity: pl.verdict === 'HALT' ? 'halt' : 'warn',
-      summary: `Physics ledger ${pl.verdict}: ${pl.reason}`,
+      summary: `Physics ledger ${pl.verdict === 'HALT' ? 'blocked' : 'flagged'}: ${pl.reason}`,
       appendix: lines.length > 0 ? lines.join('\n\n') : pl.reason,
     })
   }
@@ -1032,11 +1032,11 @@ function collectManualReviewBadges(state: any): ManualReviewBadge[] {
       : ''
     out.push({
       id: 'g1b_compliance',
-      label: 'G1b compliance',
+      label: 'Compliance review',
       severity: cg?.verdict === 'HALT' || g1bExhausted ? 'halt' : 'warn',
       summary: g1bExhausted
-        ? `Compliance gate HALT after re-augment retry exhausted: ${cg?.reason ?? 'class-mandatory standard conflict'}`
-        : `Compliance gate ${cg?.verdict ?? 'WARN'}: ${cg?.reason ?? 'standard conflict'}`,
+        ? `Compliance review blocked — could not auto-revise the brief to resolve: ${cg?.reason ?? 'class-mandatory standard conflict'}`
+        : `Compliance review ${cg?.verdict === 'HALT' ? 'blocked' : 'flagged'}: ${cg?.reason ?? 'standard conflict'}`,
       appendix: (lines.length > 0 ? lines.join('\n') : (cg?.reason ?? 'Compliance gate manual review.')) + revisionBlock,
     })
   }
@@ -1045,9 +1045,9 @@ function collectManualReviewBadges(state: any): ManualReviewBadge[] {
   if (state?.g3ManualReview === true) {
     out.push({
       id: 'g3_completeness',
-      label: 'G3 completeness',
+      label: 'Engineering review completeness',
       severity: 'warn',
-      summary: 'Review (G3) completeness gate exhausted retry budget — manual review required.',
+      summary: 'Engineering review pass exhausted its retry budget — content may be incomplete and needs human review.',
       appendix: 'Stage 6 Review (G3 completeness) failed twice in a row. The pipeline proceeded with the engineering review section empty or partial. A human reviewer should re-run the review pass against the final modules + research before this report is shared externally.',
     })
   }
@@ -1060,9 +1060,9 @@ function collectManualReviewBadges(state: any): ManualReviewBadge[] {
     const g4Notes = notes.filter(n => typeof n === 'string' && /multi-emitter|judge|G4/.test(n)).slice(0, 8)
     out.push({
       id: 'g4_grammar',
-      label: 'G4 grammar',
+      label: 'Module structure check',
       severity: 'warn',
-      summary: `Module-decomposition grammar gate exhausted after 2 retries${verdict ? ` (final verdict: ${verdict})` : ''}.`,
+      summary: `Module structure check exhausted after 2 retries${verdict ? ` (final verdict: ${verdict})` : ''} — expect missing cross-module connections or sub-module gaps.`,
       appendix: ['Stage 1.7 multi-emitter grammar / synthesis judges voted NEEDS_MAJOR on the final synthesis after the bounded retry budget was exhausted. The modules + sub-modules in this report should be cross-checked manually — expect missing cross-module grammar links or sub-module field gaps.', g4Notes.length > 0 ? '\nJudge notes:\n' + g4Notes.map(n => `  · ${n}`).join('\n') : ''].filter(Boolean).join(''),
     })
   }
@@ -1102,9 +1102,9 @@ function collectManualReviewBadges(state: any): ManualReviewBadge[] {
     const more = k10Edges.length > 40 ? `\n  …and ${k10Edges.length - 40} more.` : ''
     out.push({
       id: 'k10_grammar',
-      label: 'K10 reference graph',
+      label: 'Cross-module wiring',
       severity: 'warn',
-      summary: `Module decomposition still missing ${k10Edges.length} required reference-graph edge${k10Edges.length === 1 ? '' : 's'} for product class “${productClass}” after ${retriesUsed} re-emit${retriesUsed === 1 ? '' : 's'} — manual review of cross-module grammar links required.`,
+      summary: `Module decomposition still missing ${k10Edges.length} required cross-module connection${k10Edges.length === 1 ? '' : 's'} for ${productClass} after ${retriesUsed} retr${retriesUsed === 1 ? 'y' : 'ies'} — wiring topology needs human review before commissioning.`,
       appendix: [
         'Stage 1.7 K10 reference-graph gate (enforcing mode) failed twice. The emitted cross_module_grammar_links did not cover every required edge for this product class in the K10 ProductClassGraph; the pipeline proceeded with the best-effort synthesis but the missing cross-module links below should be added or justified manually before the report is shared externally.',
         '',
@@ -1122,9 +1122,9 @@ function collectManualReviewBadges(state: any): ManualReviewBadge[] {
     const more = g5Parts.length > 40 ? `\n  …and ${g5Parts.length - 40} more.` : ''
     out.push({
       id: 'g5_parts',
-      label: 'G5 part numbers',
+      label: 'Part-number verification',
       severity: 'warn',
-      summary: `${g5Parts.length} part number${g5Parts.length === 1 ? '' : 's'} could not be verified against DigiKey / Mouser / Farnell / web — manual sourcing required.`,
+      summary: `${g5Parts.length} part number${g5Parts.length === 1 ? '' : 's'} could not be confirmed against DigiKey, Mouser, Farnell, or manufacturer-domain web search — manual sourcing required.`,
       appendix: ['Stage 4.5 part-number verification did not find these SKUs at DigiKey, Mouser, Farnell, or via a Brave manufacturer-domain search. Each line is flagged in the Bill of Materials with an amber "?" badge; the supplier-resolution fallback for each is recorded below.', '', lines.join('\n') + more].join('\n'),
     })
   }
@@ -1152,9 +1152,9 @@ function collectManualReviewBadges(state: any): ManualReviewBadge[] {
         : ''
       out.push({
         id: 'physics_critic',
-        label: 'Physics critic',
+        label: 'Engineering plausibility review',
         severity: 'warn',
-        summary: `Physics critic flagged ${highIssues.length} high-severity engineering issue${highIssues.length === 1 ? '' : 's'} (${pcr.scores?.engineering_plausibility ?? '?'}/10 engineering-plausibility score).`,
+        summary: `Engineering plausibility review flagged ${highIssues.length} high-severity issue${highIssues.length === 1 ? '' : 's'} (engineering plausibility ${pcr.scores?.engineering_plausibility ?? '?'}/10).`,
         appendix: [
           pcr.headline ?? 'Physics & engineering review.',
           scoreLine,
@@ -1536,10 +1536,12 @@ function CoverPage({
   provisionalClassRegistry,
   acceptanceStatus,
   physicsCritique,
+  briefEnvelope,
 }: {
   subject: string
   projectId: string
   heroImagePath?: string | null
+  briefEnvelope?: { widthMm: number; depthMm: number; heightMm: number; label: string } | null
   bomTotals?: BomTotals | null
   costStack?: CostStack | null
   priceReality?: PriceReality | null
@@ -1582,31 +1584,35 @@ function CoverPage({
   const fidel = physicsCritique?.scores?.brief_to_design_fidelity
 
   return (
-    <Page size="A4" style={{ ...PAGE_STYLE, justifyContent: 'center', paddingHorizontal: 60 }}>
-      {isBlocked ? (
-        <View style={{
-          marginBottom: 18,
-          padding: 14,
-          backgroundColor: '#7f1d1d',
-          borderRadius: 4,
-          borderLeftWidth: 5,
-          borderLeftColor: '#fca5a5',
-        }}>
-          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#fee2e2', letterSpacing: 2, marginBottom: 6 }}>
-            DO NOT PROCURE — DESIGN BLOCKED
-          </Text>
-          <Text style={{ fontSize: 10, color: '#fee2e2', lineHeight: 1.5 }}>
-            The physics critic flagged this design with engineering plausibility{' '}
-            {typeof plaus === 'number' ? `${plaus}/10` : 'below 3/10'} and brief-to-design fidelity{' '}
-            {typeof fidel === 'number' ? `${fidel}/10` : 'below 3/10'}. The report below is a first-cut
-            engineering scaffold only — it contains first-principles violations (incorrect electrical
-            sizing, hydraulic inconsistency, fabricated part numbers, or capacity-arithmetic contradictions)
-            and is NOT procurement-grade. Resolve the high-severity findings in the physics appendix
-            before sharing externally or quoting suppliers.
-          </Text>
-        </View>
-      ) : null}
+    // ITER-10.5 fix (2026-05-20 second review): drop justifyContent entirely
+    // on the Page. The prior 'center' caused the cover body to push to page
+    // 2 when the DO NOT PROCURE banner was present; 'flex-start' didn't fix
+    // it either (the cover body was rendering as a unit and not splitting
+    // across pages). Removing justifyContent lets the content flow normally
+    // from top.
+    <Page size="A4" style={{ ...PAGE_STYLE, paddingHorizontal: 60 }}>
       <View style={{ marginBottom: 16 }}>
+        {isBlocked ? (
+          <View style={{
+            marginBottom: 14,
+            padding: 10,
+            backgroundColor: '#7f1d1d',
+            borderRadius: 4,
+            borderLeftWidth: 5,
+            borderLeftColor: '#fca5a5',
+          }}>
+            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#fee2e2', letterSpacing: 2, marginBottom: 4 }}>
+              DO NOT PROCURE — DESIGN BLOCKED
+            </Text>
+            <Text style={{ fontSize: 9, color: '#fee2e2', lineHeight: 1.45 }}>
+              Physics critic engineering plausibility{' '}
+              {typeof plaus === 'number' ? `${plaus}/10` : 'below 3/10'}, brief-to-design fidelity{' '}
+              {typeof fidel === 'number' ? `${fidel}/10` : 'below 3/10'}. First-cut engineering scaffold —
+              contains first-principles violations and is NOT procurement-grade. Resolve high-severity findings
+              in the physics appendix before sharing externally or quoting suppliers.
+            </Text>
+          </View>
+        ) : null}
         <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 2, marginBottom: 12 }}>
           FORGE ENGINEERING REPORT
         </Text>
@@ -1668,10 +1674,10 @@ function CoverPage({
           // two-column row so BOTH appear on page 1 — left column (~55%)
           // holds the cost stack, right column (~45%) holds the hero. When
           // there's no hero, the panel stays full-width as before.
-          <View style={heroImagePath
+          <View style={(heroImagePath || briefEnvelope)
             ? { marginTop: 14, flexDirection: 'row', alignItems: 'flex-start' }
             : { marginTop: 14 }}>
-          <View style={heroImagePath
+          <View style={(heroImagePath || briefEnvelope)
             ? { flex: 55, marginRight: 12, padding: 11, backgroundColor: '#0c4a6e', borderRadius: 5 }
             : { padding: 11, backgroundColor: '#0c4a6e', borderRadius: 5 }}>
             <Text style={{ fontSize: 8, color: '#bae6fd', letterSpacing: 1.4, marginBottom: 6 }}>
@@ -1830,27 +1836,28 @@ function CoverPage({
             <View style={{ flex: 45, alignItems: 'center' }}>
               <Image src={heroImagePath} style={{ width: 207, height: 170, objectFit: 'contain' }} />
               <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 6, fontStyle: 'italic', textAlign: 'center' }}>
-                Illustration only — generic class render, not a photograph of the actual unit. Not necessarily to brief scale — see Brief &amp; Requirements for confirmed envelope dimensions. Used for visual reference; final geometry follows the engineering specification.
+                Illustration only — generic class render, not a photograph of the actual unit. Used for visual reference; final geometry follows the engineering specification.
               </Text>
+            </View>
+          ) : briefEnvelope ? (
+            // ITER-10.5 (Tristan 2026-05-20 second review): static-render
+            // hero suppressed because brief envelope clearly exceeds the
+            // ≤2 m cabinet scale of the static PNG library. Render a
+            // proportional outline labelled with the actual brief
+            // dimensions instead of either (a) the wrong-scale static or
+            // (b) the iter-9 text placeholder.
+            <View style={{ flex: 45 }}>
+              <EnvelopeOutline
+                widthMm={briefEnvelope.widthMm}
+                depthMm={briefEnvelope.depthMm}
+                heightMm={briefEnvelope.heightMm}
+                label={briefEnvelope.label}
+                maxBoxW={207}
+                maxBoxH={170}
+              />
             </View>
           ) : (
-            // 2026-05-20 hot-fix: when iter-7 envelope suppression (commit
-            // cb3feb843) hides the static hero PNG because the brief envelope
-            // exceeds the static-render scale, render a text placeholder
-            // explaining WHY rather than leaving the slot blank. Tristan
-            // flagged a verify chain with zero images — placeholder makes the
-            // omission visible + sets expectation for upcoming per-brief
-            // image generation (iter-11 W2 multimodal workstream).
-            <View style={{ flex: 45, alignItems: 'center', justifyContent: 'center', padding: 14, borderWidth: 0.5, borderColor: '#cbd5e1', borderRadius: 4, backgroundColor: '#f8fafc' }}>
-              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#475569', letterSpacing: 1, marginBottom: 6 }}>
-                ENGINEERING RENDERING
-              </Text>
-              <Text style={{ fontSize: 8, color: '#64748b', textAlign: 'center', lineHeight: 1.5 }}>
-                Container/warehouse-scale envelope — static-render library covers desktop & cabinet products only.{'\n\n'}
-                See Section 2 Module Connection Map for system topology + Appendix B for CAD coordinate spec.{'\n\n'}
-                Per-brief image generation scheduled for next release.
-              </Text>
-            </View>
+            <View style={{ flex: 45 }} />
           )}
           </View>
         ) : bomTotals ? (
@@ -3288,10 +3295,31 @@ function ModuleSection({
         <View style={{ marginBottom: 14, alignItems: 'center' }}>
           <Image src={moduleImagePath} style={{ width: 515, height: 360, objectFit: 'contain' }} />
           <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 24 }}>
-            Illustration only — generic class render. Module {index} ({title}) shown in identity colour; other modules muted; enclosure ghosted. Not necessarily to brief scale — see Brief &amp; Requirements for confirmed envelope dimensions.
+            Illustration only — generic class render. Module {index} ({title}) shown in identity colour; other modules muted; enclosure ghosted.
           </Text>
         </View>
-      ) : null}
+      ) : state && readBriefEnvelopeDimensions(state) ? (() => {
+        // ITER-10.5 (Tristan 2026-05-20): module-class static PNG suppressed
+        // because the brief envelope clearly exceeds the ≤2 m cabinet scale
+        // of the static-render library. Render a proportional brief-envelope
+        // outline with a "this module is inside" note instead.
+        const env = readBriefEnvelopeDimensions(state)!
+        return (
+          <View style={{ marginBottom: 14, alignItems: 'center', paddingVertical: 18, borderRadius: 4, backgroundColor: '#fafafa', borderWidth: 0.5, borderColor: RULE }}>
+            <EnvelopeOutline
+              widthMm={env.widthMm}
+              depthMm={env.depthMm}
+              heightMm={env.heightMm}
+              label={env.label}
+              maxBoxW={300}
+              maxBoxH={240}
+            />
+            <Text style={{ fontSize: 8, color: MUTED, marginTop: 10, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 36 }}>
+              Module {index} ({title}) sits within the envelope above. Per-module class render suppressed because the static PNG library does not match this envelope scale.
+            </Text>
+          </View>
+        )
+      })() : null}
 
       <View style={{ marginBottom: 14 }}>
         {(overviewChunks.length > 0 ? overviewChunks : [overview || `Module ${index} of the product.`]).map((chunk, i) => (
@@ -4863,16 +4891,133 @@ function classToSlug(productClass: string): string {
   return ''
 }
 
-function resolveModuleImage(productClass: string, moduleId: string, _state?: any): string | null {
+function resolveModuleImage(productClass: string, moduleId: string, state?: any): string | null {
   const slug = classToSlug(productClass)
   if (!slug) return null
-  // 2026-05-20 (Tristan): always render the module-class image when present.
-  // The prior envelope-suppression was overly aggressive — Tristan: "no
-  // hero image and no blender 3D images... they need to be brought back".
-  // The caption beneath each module image carries the scale disclaimer.
+  // 2026-05-20 (Tristan second review): the static class image is the wrong
+  // scale for container/warehouse-sized briefs ("completely the wrong
+  // size"). When the brief envelope clearly exceeds the static-render
+  // implied scale, return null — the caller renders an EnvelopeOutline
+  // proportional placeholder instead. Static is OK only for desktop /
+  // cabinet briefs.
+  if (state !== undefined && briefEnvelopeMismatchesStaticHero(state)) return null
   const projectRoot = resolve(__dirname, '..')
   const path = resolve(projectRoot, 'public', 'heroes', slug, `module-${moduleId}.png`)
   return existsSync(path) ? path : null
+}
+
+/** True when the brief envelope clearly exceeds the static-render PNG's
+ *  implied desktop / cabinet scale (≤8 m³ volume, ≤5 m length, no 20/40-ft
+ *  ISO container references). Caller renders a proportional outline
+ *  placeholder instead of the static hero.
+ *
+ *  Restored from commit 591e02f8d (heroEnvelopeMatchesStaticHero); the
+ *  iter-9 cleanup commit f438b7863 removed it after Tristan asked for the
+ *  static heroes to come back unconditionally. Tristan's second review on
+ *  2026-05-20 reversed that — wrong-scale image is also a problem, so
+ *  suppress static + render proportional outline labelled with actual
+ *  brief dimensions. */
+function briefEnvelopeMismatchesStaticHero(state: any): boolean {
+  const maxDim = state?.parsedBrief?.constraints?.max_dimensions_mm
+  if (maxDim) {
+    const w = Number(maxDim.w ?? 0)
+    const d = Number(maxDim.d ?? 0)
+    const h = Number(maxDim.h ?? 0)
+    if (w > 0 && d > 0 && h > 0) {
+      const volumeM3 = (w * d * h) / 1_000_000_000
+      if (volumeM3 > 8) return true
+    }
+  }
+  const modulesA = state?.moduleDecomposition?.design?.modules
+  const modulesB = state?.moduleDecomposition?.modules
+  const mods: any[] = Array.isArray(modulesA) ? modulesA : Array.isArray(modulesB) ? modulesB : []
+  for (const m of mods) {
+    const dp = m?.derived_parameters
+    if (!dp) continue
+    const lengthMm = Number(dp.container_length_mm ?? dp.envelope_length_mm ?? 0)
+    if (lengthMm > 5000) return true
+    const volM3 = Number(dp.envelope_volume_m3 ?? dp.cabinet_volume_m3 ?? 0)
+    if (volM3 > 8) return true
+  }
+  const briefText = String(state?.parsedBrief?.brief_text ?? state?.brief?.text ?? '')
+  if (/\b(20|40)\s?-?\s?(ft|foot)\s+(iso|hi-?cube|container|shipping)\b/i.test(briefText)) return true
+  return false
+}
+
+/** Read brief envelope dimensions for the EnvelopeOutline placeholder.
+ *  Tries (in order): parsedBrief.constraints.max_dimensions_mm,
+ *  structure_containment module derived_parameters, deploymentEnvelope.
+ *  Returns null if no usable dimensions exist. */
+function readBriefEnvelopeDimensions(state: any): { widthMm: number; depthMm: number; heightMm: number; label: string } | null {
+  const maxDim = state?.parsedBrief?.constraints?.max_dimensions_mm
+  if (maxDim?.w && maxDim?.d && maxDim?.h) {
+    const briefText = String(state?.parsedBrief?.brief_text ?? '')
+    const containerMatch = briefText.match(/\b(20|40)\s?-?\s?(ft|foot)\s+(iso|hi-?cube|high\s+cube|container|shipping)/i)
+    const label = containerMatch ? `${containerMatch[1]}-ft ${containerMatch[3]} container` : 'Brief envelope'
+    return { widthMm: Number(maxDim.w), depthMm: Number(maxDim.d), heightMm: Number(maxDim.h), label }
+  }
+  const modulesA = state?.moduleDecomposition?.design?.modules
+  const modulesB = state?.moduleDecomposition?.modules
+  const mods: any[] = Array.isArray(modulesA) ? modulesA : Array.isArray(modulesB) ? modulesB : []
+  const struct = mods.find(m => m?.module === 'structure_containment')
+  const dp = struct?.derived_parameters ?? {}
+  const w = Number(dp.envelope_width_mm ?? dp.envelope_w_mm ?? dp.container_width_mm ?? 0)
+  const d = Number(dp.envelope_depth_mm ?? dp.envelope_d_mm ?? dp.container_depth_mm ?? 0)
+  const h = Number(dp.envelope_height_mm ?? dp.envelope_h_mm ?? dp.container_height_mm ?? 0)
+  if (w && d && h) {
+    return { widthMm: w, depthMm: d, heightMm: h, label: 'Brief envelope' }
+  }
+  return null
+}
+
+/** Proportional outline placeholder for when the static class hero is the
+ *  wrong scale. Renders a front-view rectangle scaled to fit the available
+ *  box (maxW × maxH) using the brief's actual aspect ratio, plus dimension
+ *  labels. */
+function EnvelopeOutline({
+  widthMm,
+  depthMm,
+  heightMm,
+  label,
+  maxBoxW,
+  maxBoxH,
+}: {
+  widthMm: number
+  depthMm: number
+  heightMm: number
+  label: string
+  maxBoxW: number
+  maxBoxH: number
+}) {
+  // Front view = widthMm × heightMm. Fit into maxBoxW × maxBoxH preserving ratio.
+  const aspect = widthMm / heightMm
+  let w = maxBoxW
+  let h = w / aspect
+  if (h > maxBoxH) { h = maxBoxH; w = h * aspect }
+  // Mini depth indicator — a smaller rectangle offset behind the front face,
+  // proportional to depth-vs-width.
+  const depthOffset = Math.min(12, Math.max(4, (depthMm / widthMm) * 20))
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center', width: maxBoxW, padding: 4 }}>
+      <Text style={{ fontSize: 7, color: MUTED, letterSpacing: 0.8, marginBottom: 6 }}>
+        PROPORTIONAL ENVELOPE OUTLINE
+      </Text>
+      <View style={{ position: 'relative', width: w + depthOffset + 4, height: h + depthOffset + 4 }}>
+        {/* Back face (depth cue) */}
+        <View style={{ position: 'absolute', top: 0, left: depthOffset, width: w, height: h, borderWidth: 0.6, borderColor: RULE, backgroundColor: '#f1f5f9' }} />
+        {/* Front face */}
+        <View style={{ position: 'absolute', top: depthOffset, left: 0, width: w, height: h, borderWidth: 1, borderColor: ACCENT, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'center', paddingHorizontal: 8 }}>{label}</Text>
+          <Text style={{ fontSize: 7.5, color: INK_SOFT, marginTop: 3, textAlign: 'center', paddingHorizontal: 8 }}>
+            {(widthMm / 1000).toFixed(2)} m W × {(heightMm / 1000).toFixed(2)} m H{depthMm ? ` × ${(depthMm / 1000).toFixed(2)} m D` : ''}
+          </Text>
+        </View>
+      </View>
+      <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 8, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 4 }}>
+        Drawn to brief scale. Class-library render suppressed because the static PNG ({'≤'}2 m cabinet) does not represent this {(widthMm * heightMm * depthMm / 1_000_000_000).toFixed(1)} m³ envelope. Brief-aware visualisation queued.
+      </Text>
+    </View>
+  )
 }
 
 /**
@@ -4901,12 +5046,10 @@ function resolveHeroImages(state: any): { cover: string | null; exploded: string
     ''
   const slug = classToSlug(raw)
   if (!slug) return { cover: null, exploded: null }
-  // 2026-05-20 (Tristan): always render the static class hero when present.
-  // The prior envelope check returned null for container-scale briefs; the
-  // resulting blank-cover regression was worse than the wrong-scale issue.
-  // The cover caption + each module image caption carry the scale
-  // disclaimer ("not necessarily to brief scale — see Brief & Requirements").
-  // _ = heroEnvelopeMatchesStaticHero  // function preserved for potential future use
+  // 2026-05-20 (Tristan second review): when brief envelope clearly exceeds
+  // the static-render scale, suppress static + render proportional outline
+  // in the caller instead. Static is OK only for desktop / cabinet briefs.
+  if (briefEnvelopeMismatchesStaticHero(state)) return { cover: null, exploded: null }
   const projectRoot = resolve(__dirname, '..')
   const coverPath = resolve(projectRoot, 'public', 'heroes', `${slug}-cover.png`)
   const explodedPath = resolve(projectRoot, 'public', 'heroes', `${slug}-exploded.png`)
@@ -4962,6 +5105,7 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
   const byModule = state.naturalLanguageLayer?.by_module ?? {}
   const partLinkMap = buildPartLinkMap(state)
   const heroImages = resolveHeroImages(state)
+  const briefEnvelope = readBriefEnvelopeDimensions(state)
   // Compute BoM totals once; CoverPage shows the headline figure and
   // BillOfMaterialsPage renders the full table from the same numbers.
   const rawBomTotals = computeBomTotals(state)
@@ -5021,7 +5165,7 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
 
   return (
     <Document>
-      <CoverPage subject={subject} projectId={project} heroImagePath={heroImages.cover} bomTotals={bomTotals} costStack={costStack} priceReality={priceReality} pendingPartsCount={pendingPartsCount} engineCSummary={state.engine_c_summary || null} manualReviewBadges={manualReviewBadges} provisionalClassRegistry={provisionalClassRegistry} acceptanceStatus={state?.acceptanceStatus} physicsCritique={state?.physicsCritique} />
+      <CoverPage subject={subject} projectId={project} heroImagePath={heroImages.cover} briefEnvelope={briefEnvelope} bomTotals={bomTotals} costStack={costStack} priceReality={priceReality} pendingPartsCount={pendingPartsCount} engineCSummary={state.engine_c_summary || null} manualReviewBadges={manualReviewBadges} provisionalClassRegistry={provisionalClassRegistry} acceptanceStatus={state?.acceptanceStatus} physicsCritique={state?.physicsCritique} />
       {/* ITER-10.5 (Tristan-defined 2026-05-20):
           Brief sits immediately after Cover. Operational Headline is folded
           INTO BriefPage as a banner at the top (HeadlinePage component
@@ -5052,14 +5196,16 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
           manualReviewBadges={manualReviewBadges}
         />
       ))}
-      {/* Phase H/J will merge SystemLevelRisksPage + RiskPage into a single
-          "Risk & Integration Analysis" section (Tristan Q1 answer: B). For
-          now both render; the merge happens in a later commit. */}
+      {/* ITER-10.5 (Tristan 2026-05-20 second review): risk and suppliers
+          sit directly beneath the modules. Compliance + design decisions
+          move to the back. Phase H/J will still merge SystemLevelRisks +
+          RiskPage into one "Risk & Integration Analysis" section; for now
+          both render in the new order. */}
       <SystemLevelRisksPage state={state} project={project} />
-      <CompliancePage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       <RiskPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
-      <DesignDecisionsPage state={state} project={project} />
       <SuppliersPage state={state} project={project} />
+      <CompliancePage state={state} project={project} manualReviewBadges={manualReviewBadges} />
+      <DesignDecisionsPage state={state} project={project} />
     </Document>
   )
 }
