@@ -652,6 +652,39 @@ function computeBomTotals(state: any): BomTotals | null {
   }
 
   if (allMods.length === 0) return null
+
+  // 2026-05-20 iter-8 council fix H: duplicate BoM line detection.
+  // VF iter-7 Module 4 had TWO "LED Driver" rows: Inventronics
+  // "200 W, 0.9 PF" ×40 AND Inventronics EUM050S050ST ×40 — same component
+  // role, two SKU strings (one a description-as-SKU, one real). Generator
+  // emission bug; render-time merge is unsafe (could collapse legitimately
+  // different parts that happen to share manufacturer + name), so the
+  // universal fix is to FLAG duplicates for manual review rather than merge.
+  // Detection key = (sub-module, manufacturer, normalised word_name prefix).
+  let duplicateCount = 0
+  for (const mod of allMods) {
+    for (const sub of mod.subs) {
+      const byKey = new Map<string, BomPartRow[]>()
+      for (const p of sub.parts) {
+        if (!p.manufacturer) continue
+        const namePrefix = String(p.word_name ?? '').toLowerCase().replace(/\s+/g, ' ').trim().split(/[\s,(]/)[0].slice(0, 30)
+        const key = `${String(p.manufacturer).toLowerCase()}|${namePrefix}`
+        if (!byKey.has(key)) byKey.set(key, [])
+        byKey.get(key)!.push(p)
+      }
+      for (const [, group] of byKey) {
+        if (group.length > 1) {
+          // Mark every row in the group as duplicate-flagged
+          for (const p of group) (p as any).duplicate_flag = `dup_${duplicateCount + 1}`
+          duplicateCount++
+        }
+      }
+    }
+  }
+  if (duplicateCount > 0) {
+    console.error(`[render-minimal-pdf] BoM duplicate detection: ${duplicateCount} suspected duplicate group(s) flagged for manual review (same manufacturer + role within sub-module)`)
+  }
+
   // Engine B (2026-05-18) — aggregate per-component-class contribution.
   // Rows without engine_b_component_class fall into 'unclassified' (legacy
   // distributor-only rows or pre-Engine-B iter runs).
@@ -4346,6 +4379,55 @@ function BillOfMaterialsPage({
 // are, link to the website. Make it useful so when people go 'who's going to
 // make this?' there's a call to action."
 
+/**
+ * 2026-05-20 iter-8 council fix F: supplier name-URL reconciliation.
+ * The VF iter-7 PDF showed "GrowUp Urban Farms" linked to
+ * cambridge-hok.co.uk/projects/growup-urban-farm — wrong domain (GrowUp's
+ * real site is growup.org.uk; cambridge-hok delivered the GrowUp project
+ * as a contractor). Same defect: "Digital Farming" → lettusgrow.com
+ * (LettUs Grow is real, "Digital Farming" is a hallucinated name).
+ *
+ * The enrichment script reconciles LLM-emitted names against the host,
+ * but database-sourced suppliers can have stale or wrong website_url
+ * fields that bypass that check. Render-time reconciliation catches the
+ * mismatch and suppresses the URL with a warning chip rather than
+ * surfacing a misleading link.
+ *
+ * Conservative match: name tokens AND host tokens share ≥1 substantive
+ * 3+ char word, OR a token of one substring-matches a token of the other
+ * (4+ char minimum). If no overlap → suppress URL, render warning chip.
+ */
+function supplierUrlReconciles(name: string, websiteUrl: string): boolean {
+  if (!name || !websiteUrl) return true
+  let host = ''
+  try { host = new URL(websiteUrl).hostname.replace(/^www\./, '').toLowerCase() } catch { return true }
+  if (!host) return true
+  const parts = host.split('.')
+  let apex = ''
+  if (parts.length >= 3 && (parts[parts.length - 2] === 'co' || parts[parts.length - 2] === 'com' || parts[parts.length - 2] === 'org')) {
+    apex = parts[parts.length - 3]
+  } else if (parts.length >= 2) {
+    apex = parts[parts.length - 2]
+  } else {
+    apex = parts[0]
+  }
+  const STOPWORDS = new Set(['ltd','plc','inc','llc','llp','gmbh','group','holdings','holding','services','solutions','systems','technology','technologies','energy','power','digital','global','international','the','and','for','of'])
+  const norm = (s: string): Set<string> => new Set(
+    s.toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').split(/[\s-]+/).filter(t => t.length >= 3 && !STOPWORDS.has(t))
+  )
+  const nameToks = norm(name)
+  const hostToks = norm(apex)
+  if (hostToks.size === 0) return true
+  for (const t of nameToks) {
+    if (hostToks.has(t)) return true
+    for (const h of hostToks) {
+      if (t.length >= 4 && h.includes(t)) return true
+      if (h.length >= 4 && t.includes(h)) return true
+    }
+  }
+  return false
+}
+
 function SuppliersPage({ state, project }: { state: any; project: string }) {
   const suppliers: any[] = Array.isArray(state.suppliers) ? state.suppliers : []
   if (suppliers.length === 0) return null
@@ -4368,9 +4450,18 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
     const sourceBadgeColour = sourceVerified ? '#065f46' : '#92400e'
     const sourceBadgeBg = sourceVerified ? '#d1fae5' : '#fef3c7'
     const location = [c.city, c.country].filter(Boolean).join(', ') || (sourceVerified ? 'Location on Companies House record' : 'Region not recorded')
-    const websiteText = c.website_url
+    // 2026-05-20 iter-8 council fix F: render-time supplier name-URL reconciliation.
+    // If the website_url's host doesn't share a substantive token with the
+    // supplier name (e.g. "GrowUp Urban Farms" → cambridge-hok.co.uk), suppress
+    // the URL display and surface a UNVERIFIED chip. Better to show no URL
+    // than to send a procurement reader to the wrong company.
+    const urlReconciles = c.website_url ? supplierUrlReconciles(String(c.name ?? ''), String(c.website_url)) : true
+    const websiteText = (c.website_url && urlReconciles)
       ? String(c.website_url).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '').slice(0, 50)
       : ''
+    if (c.website_url && !urlReconciles) {
+      console.error(`[render-minimal-pdf] supplier name-URL mismatch suppressed: name="${c.name}" url="${c.website_url}"`)
+    }
     const emailToUse: string | null = c.contact_email || c.contact_email_derived || null
     const capability: string = clean_prose(String(c.capability_oneliner ?? '')).trim()
     const fitBullets: string[] = Array.isArray(c.fit_bullets)
