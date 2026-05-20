@@ -181,7 +181,14 @@ const VERTICAL_FARM_SCHEMA: PerformanceCardSchema = {
     {
       name: 'Lighting',
       metrics: [
-        { id: 'led_power_kw', label: 'LED installed power', unit: 'kW', sources: ['any_module.derived.led_power_kw', 'any_module.derived.lighting_power_kw'], reasonable_range: [0.05, 0.5], note: () => null /* note set by per-m² check below */ },
+        // ITER-10.5 (Tristan 2026-05-20): LED installed power MUST read the
+        // TOTAL system field first. Chain emits both:
+        //   led_power_kw          — per-fixture raw LED chip power (often 0.5-1 kW for small farms)
+        //   total_led_power_kw    — full lighting system electrical input (15-30 kW typical for 100 m² VF)
+        // Performance Card means "total" so prefer total_led_power_kw +
+        // fall back to other fields. reasonable_range widened to cover
+        // desktop (1 kW) through warehouse-scale (100 kW) systems.
+        { id: 'led_power_kw', label: 'LED installed power', unit: 'kW', sources: ['any_module.derived.total_led_power_kw', 'any_module.derived.lighting_total_power_kw', 'any_module.derived.led_power_kw', 'any_module.derived.lighting_power_kw'], reasonable_range: [0.5, 100], note: () => null /* note set by per-m² check below */ },
         { id: 'led_power_per_m2', label: 'LED power density', unit: 'kW/m²', sources: [],
           compute: (_s, r) => {
             const a = num(r.canopy_area_m2?.value)
