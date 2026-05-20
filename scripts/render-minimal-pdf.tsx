@@ -1344,68 +1344,6 @@ function hasK10ShadowFail(state: any): boolean {
 // ordered by gate firing (G0 → G1b → G2 → G3 → G4 → G5). K10 shadow info
 // (if any) is appended at the end as a neutral slate block — it is NOT a
 // gate fire and never triggers a cover-page badge.
-function ManualReviewAppendixPage({
-  badges,
-  state,
-  project,
-  provisionalClassRegistry,
-}: {
-  badges: ManualReviewBadge[]
-  state: any
-  project: string
-  provisionalClassRegistry?: {
-    flag: boolean
-    reason?: string
-    payloadAttached?: boolean
-    generatorModel?: string
-    audit?: any
-    payload?: any
-  }
-}) {
-  const hasBadges = badges && badges.length > 0
-  const hasK10Fail = hasK10ShadowFail(state)
-  const hasProvisional = !!provisionalClassRegistry?.flag
-  if (!hasBadges && !hasK10Fail && !hasProvisional) return null
-  // Stable display order — physics first (it gates the whole pipeline), then
-  // compliance, then BoM-related (cost + parts), then engineering review (G3, G4).
-  const order: ManualReviewBadgeId[] = ['g0_physics', 'g1b_compliance', 'g2_cost_reality', 'g5_parts', 'g3_completeness', 'g4_grammar', 'k10_grammar']
-  const sorted = [...badges].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id))
-  return (
-    <Page size="A4" style={PAGE_STYLE} wrap>
-      <PageHeader section="Appendix B · Manual Review Notes" project={project} />
-      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Manual Review Notes
-      </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
-        {hasBadges
-          ? 'Pipeline gates that fired during this run. Each entry below is a gate that exhausted its bounded retry budget; the pipeline proceeded with the best-effort output but the affected section is not procurement-ready without human review.'
-          : 'Diagnostic notes from this run. No pipeline gates fired; the notes below are informational only and do not block procurement readiness.'}
-      </Text>
-      {sorted.map(b => {
-        const sty = manualReviewBadgeStyle(b.severity)
-        return (
-          <View
-            key={`mr-appendix-${b.id}`}
-            wrap={true}
-            style={{ marginBottom: 14, padding: 10, backgroundColor: sty.bg, borderRadius: 4, borderLeftWidth: 3, borderLeftColor: sty.border }}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
-              <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: sty.colour, marginRight: 6 }}>{sty.symbol}</Text>
-              <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: sty.colour }}>MANUAL REVIEW — {b.label}</Text>
-            </View>
-            <Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>{b.summary}</Text>
-            <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5 }}>{b.appendix}</Text>
-          </View>
-        )
-      })}
-      {hasK10Fail ? <K10ShadowAppendixBlock state={state} /> : null}
-      {hasProvisional ? (
-        <ProvisionalClassRegistryAppendixBlock entry={provisionalClassRegistry!} />
-      ) : null}
-      <PageFooter />
-    </Page>
-  )
-}
 
 /**
  * Task #87 (2026-05-18) — Appendix B provenance block for auto-generated
@@ -1892,7 +1830,7 @@ function CoverPage({
             <View style={{ flex: 45, alignItems: 'center' }}>
               <Image src={heroImagePath} style={{ width: 207, height: 170, objectFit: 'contain' }} />
               <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 6, fontStyle: 'italic', textAlign: 'center' }}>
-                Illustration only — AI-generated render, not a photograph of the actual unit. Used for visual reference; final geometry will follow the engineering specification.
+                Illustration only — generic class render, not a photograph of the actual unit. Not necessarily to brief scale — see Brief &amp; Requirements for confirmed envelope dimensions. Used for visual reference; final geometry follows the engineering specification.
               </Text>
             </View>
           ) : (
@@ -1941,7 +1879,7 @@ function CoverPage({
         ) : null}
         {pendingPartsCount && pendingPartsCount > 0 ? (
           <Text style={{ fontSize: 9, color: MUTED, marginTop: 10 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold' }}>{pendingPartsCount}</Text> part lines are unverified — see Appendix A for the audit trail.
+            <Text style={{ fontFamily: 'Helvetica-Bold' }}>{pendingPartsCount}</Text> part lines need verification — see the Notes block beneath each sub-module&apos;s Bill of Materials for the audit trail.
           </Text>
         ) : null}
         {/* Hero image moved into the two-column row alongside the cost-stack
@@ -2847,14 +2785,6 @@ function classifyVerificationStatus(row: BomPartRow, recommendations: any[]): { 
   return { status: 'verified' }  // default fallback
 }
 
-function v2StatusBadge(status: VerificationStatusV2) {
-  switch (status) {
-    case 'verified': return { sym: '✓', label: 'VERIFIED', bg: '#dcfce7', fg: '#15803d' }
-    case 'replaced': return { sym: '△', label: 'REPLACED', bg: '#fef3c7', fg: '#92400e' }
-    case 'verify': return { sym: '?', label: 'VERIFY', bg: '#ffedd5', fg: '#9a3412' }
-    case 'custom_source': return { sym: 'ⓘ', label: 'CUSTOM SOURCE', bg: '#e0e7ff', fg: '#3730a3' }
-  }
-}
 
 /**
  * Engineering Review Note — the new per-module finding format. Sourced from
@@ -3041,14 +2971,10 @@ interface SubModuleNote {
   severity?: 'info' | 'warn' | 'error'
 }
 
-/** Unicode superscript helper. Helvetica covers ⁰-⁹ glyphs. */
-function toSuperscript(n: number): string {
-  const sup: Record<string, string> = {
-    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
-    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
-  }
-  return String(n).split('').map(c => sup[c] ?? c).join('')
-}
+/** Note-marker style — small bold accent digit rendered after the part
+ *  name. We avoid Unicode superscripts (U+2074+ are missing from Helvetica
+ *  and render as garbled fallback glyphs like "t/u/v/w" for ⁴⁵⁶⁷). */
+const NOTE_MARK_STYLE = { fontSize: 6, fontFamily: 'Helvetica-Bold', color: ACCENT } as const
 
 /** Source-method short label for the BoM SRC column. */
 function srcLabelForRow(row: BomPartRow): string {
@@ -3159,7 +3085,6 @@ function SubModuleBomBlock({
       {/* Data rows */}
       {bomLines.map((row, ri) => {
         const noteIdx = noteIndexMap.get(row.word_id)
-        const partLabel = noteIdx ? `${row.word_name ?? '—'}${toSuperscript(noteIdx)}` : (row.word_name ?? '—')
         const unitPriceCell = row.unit_price_gbp > 0
           ? `~£${row.unit_price_gbp.toFixed(2)}`
           : '—'
@@ -3174,7 +3099,10 @@ function SubModuleBomBlock({
             key={`bom-${ri}`}
             style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}
           >
-            <Text style={{ flex: 2.6, fontSize: 9, color: INK }}>{partLabel}</Text>
+            <Text style={{ flex: 2.6, fontSize: 9, color: INK }}>
+              {row.word_name ?? '—'}
+              {noteIdx ? <Text style={NOTE_MARK_STYLE}> {noteIdx}</Text> : null}
+            </Text>
             <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT }}>{row.manufacturer ?? '—'}</Text>
             <Text style={{ flex: 1.6, fontSize: 8.5, color: INK_SOFT, fontFamily: 'Helvetica-Bold' }}>{row.part_number ?? '—'}</Text>
             <Text style={{ width: 30, fontSize: 9, color: INK, textAlign: 'right' }}>×{row.quantity ?? 1}</Text>
@@ -3201,7 +3129,9 @@ function SubModuleBomBlock({
   )
 }
 
-/** Notes block beneath a sub-module BoM. Italic, ≤8pt, numbered list. */
+/** Notes block beneath a sub-module BoM. Numbered list — numbers in bold
+ *  upright, note body in italic. (Helvetica-BoldOblique is not a registered
+ *  font in @react-pdf, so the bold and italic spans MUST stay disjoint. */
 function NotesBlock({ notes }: { notes: SubModuleNote[] }) {
   if (notes.length === 0) return null
   return (
@@ -3212,10 +3142,10 @@ function NotesBlock({ notes }: { notes: SubModuleNote[] }) {
       {notes.map(n => (
         <Text
           key={n.idx}
-          style={{ fontSize: 8, color: INK_SOFT, lineHeight: 1.5, marginBottom: 2.5, fontStyle: 'italic' }}
+          style={{ fontSize: 8, color: INK_SOFT, lineHeight: 1.5, marginBottom: 2.5 }}
         >
           <Text style={{ fontFamily: 'Helvetica-Bold', color: ACCENT }}>{n.idx}. </Text>
-          {n.text}
+          <Text style={{ fontStyle: 'italic' }}>{n.text}</Text>
         </Text>
       ))}
     </View>
@@ -3357,8 +3287,8 @@ function ModuleSection({
       {moduleImagePath ? (
         <View style={{ marginBottom: 14, alignItems: 'center' }}>
           <Image src={moduleImagePath} style={{ width: 515, height: 360, objectFit: 'contain' }} />
-          <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic' }}>
-            Illustration only — AI-generated render. Module {index} ({title}) shown in identity colour; other modules muted; enclosure ghosted.
+          <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 24 }}>
+            Illustration only — generic class render. Module {index} ({title}) shown in identity colour; other modules muted; enclosure ghosted. Not necessarily to brief scale — see Brief &amp; Requirements for confirmed envelope dimensions.
           </Text>
         </View>
       ) : null}
@@ -3880,305 +3810,6 @@ const RECS_PER_PAGE = 12
 // rows but no column header.
 const UNCERTAIN_PER_PAGE = 8
 
-function PartsPendingVerificationPage({ state, project }: { state: any; project: string }) {
-  const verifications: any[] = Array.isArray(state.partVerifications) ? state.partVerifications : []
-  const recommendations: any[] = Array.isArray(state.partRecommendations) ? state.partRecommendations : []
-  const uncertain = verifications.filter((v: any) => v.status === 'uncertain')
-  // P4 fix (2026-05-18): partVerificationSummary can drift from partVerifications
-  // when downstream producers (estimate-missing-prices.tsx) append rows AFTER
-  // the producer computed the summary. The producer's summary stays as the
-  // upstream cascade snapshot (audit re-runs showed summary.total=74 vs actual
-  // partVerifications.length=264, summary.uncertain=24 vs actual=214). Recompute
-  // total/verified/uncertain/skipped from the array each render. Preserve
-  // producer-provided `stripped` since stripped rows are not in the array.
-  const rawSummary = state.partVerificationSummary
-  const computed = {
-    total: verifications.length,
-    verified: verifications.filter((v: any) => v.status === 'verified').length,
-    uncertain: uncertain.length,
-    skipped: verifications.filter((v: any) => v.status === 'skip').length,
-    stripped: typeof rawSummary?.stripped === 'number' ? rawSummary.stripped : 0,
-  }
-  const summary = rawSummary
-    ? { ...rawSummary, ...computed }
-    : (verifications.length > 0 ? computed : null)
-  if (uncertain.length === 0 && recommendations.length === 0 && !summary) return null
-
-  // Chunk into pages: first page has summary + intro + first batch of recs,
-  // subsequent pages continue recs, then uncertain.
-  const recChunks: any[][] = []
-  for (let i = 0; i < recommendations.length; i += RECS_PER_PAGE) {
-    recChunks.push(recommendations.slice(i, i + RECS_PER_PAGE))
-  }
-  // 2026-05-18 (Track N visual audit MAJOR 6): straight `slice(i, i + 8)`
-  // chunking leaves an orphan last page with 1-3 rows + 70% blank when the
-  // uncertain count modulo UNCERTAIN_PER_PAGE is small. Rebalance the last
-  // two chunks when the trailing remainder is 1-3 rows: split the combined
-  // 8 + (1..3) into two pages of ceil(half) and floor(half) so neither page
-  // looks half-empty. When remainder is 4+ rows, leave as-is — a 4-row last
-  // page is acceptable density.
-  const uncertainChunks: any[][] = []
-  for (let i = 0; i < uncertain.length; i += UNCERTAIN_PER_PAGE) {
-    uncertainChunks.push(uncertain.slice(i, i + UNCERTAIN_PER_PAGE))
-  }
-  if (uncertainChunks.length >= 2) {
-    const last = uncertainChunks[uncertainChunks.length - 1]
-    const secondLast = uncertainChunks[uncertainChunks.length - 2]
-    if (last.length >= 1 && last.length <= 3) {
-      const combined = [...secondLast, ...last]
-      const half = Math.ceil(combined.length / 2)
-      uncertainChunks[uncertainChunks.length - 2] = combined.slice(0, half)
-      uncertainChunks[uncertainChunks.length - 1] = combined.slice(half)
-    }
-  }
-  const pages: React.ReactElement[] = []
-
-  // Helper to render a single recommendation card
-  const renderRecCard = (r: any, idx: number) => {
-    const isUnknown = String(r.confidence ?? '') === 'unknown'
-    const confColor = r.confidence === 'high' ? '#065f46' : r.confidence === 'medium' ? '#92400e' : '#9a3412'
-    const confBg = r.confidence === 'high' ? '#d1fae5' : r.confidence === 'medium' ? '#fed7aa' : '#fee2e2'
-    return (
-      <View key={`rec-${idx}`} style={{ marginBottom: 10, padding: 10, backgroundColor: '#fffbeb', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: '#c2410c' }}>
-        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
-          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, flex: 1 }}>
-            {clean_prose(String(r.word_name ?? r.word_id))}
-          </Text>
-          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: confColor, backgroundColor: confBg, paddingTop: 2, paddingBottom: 2, paddingLeft: 6, paddingRight: 6, borderRadius: 3 }}>
-            {isUnknown ? 'MANUAL SOURCING REQUIRED' : `${String(r.confidence).toUpperCase()} CONFIDENCE`}
-          </Text>
-        </View>
-        <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-          <View style={{ width: 130 }}><Text style={{ fontSize: 9, color: MUTED }}>Location</Text></View>
-          <View style={{ flex: 1 }}><Text style={{ fontSize: 9, color: INK_SOFT }}>{humanise(String(r.module ?? ''))} / {humanise(String(r.sub_module_id ?? ''))}</Text></View>
-        </View>
-        {isUnknown ? (
-          <View style={{ marginTop: 4 }}>
-            <Text style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.5 }}>{clean_prose(String(r.reasoning ?? ''))}</Text>
-          </View>
-        ) : (
-          <>
-            <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-              <View style={{ width: 130 }}><Text style={{ fontSize: 9, color: MUTED }}>Recommended manufacturer</Text></View>
-              <View style={{ flex: 1 }}><Text style={{ fontSize: 10, color: INK }}>{clean_prose(String(r.recommended_manufacturer ?? ''))}</Text></View>
-            </View>
-            <View style={{ flexDirection: 'row', marginBottom: 4 }}>
-              <View style={{ width: 130 }}><Text style={{ fontSize: 9, color: MUTED }}>Recommended part number</Text></View>
-              <View style={{ flex: 1 }}>
-                {r.source_url ? (
-                  <Link src={String(r.source_url)} style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT_SOFT, textDecoration: 'underline', textDecorationStyle: 'dotted' as any }}>
-                    {clean_prose(String(r.recommended_part_number ?? ''))}
-                  </Link>
-                ) : (
-                  <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK }}>{clean_prose(String(r.recommended_part_number ?? ''))}</Text>
-                )}
-              </View>
-            </View>
-            <View style={{ marginTop: 4 }}>
-              <Text style={{ fontSize: 9, color: MUTED, marginBottom: 2 }}>Why this</Text>
-              <Text style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.5 }}>{clean_prose(String(r.reasoning ?? ''))}</Text>
-            </View>
-          </>
-        )}
-      </View>
-    )
-  }
-
-  // Compact table-row form per Tristan 2026-05-17 (third request): the old card
-  // form used way too much space to convey not very much. Single-line row with
-  // truncated reasoning is enough — anyone wanting full reasoning has the
-  // state.json.
-  // 2026-05-18 (Track N visual audit BLOCKER 2): wide part numbers (e.g.
-  // "GYA1J681MCQ1G", "GP6000-0.020-12") were bleeding into the LOCATION
-  // column with zero gap — "GYA1J681MCQ1CEnergy Conversion". Causes: (a) the
-  // part-number cell had no `overflow:'hidden'` so long strings escaped
-  // horizontally, and (b) `paddingRight: 6` left too little visual gap once
-  // overflow was clipped. Fix: bump paddingRight to 10 on the part-number
-  // cell + add `overflow:'hidden'`, and break very long part numbers with a
-  // zero-width-space every 8 chars so they wrap inside the cell instead of
-  // overflowing. Same `flexShrink: 0` + min-width-0 belt-and-braces.
-  const softBreakPartNumber = (raw: string): string => {
-    const s = clean_prose(raw)
-    if (s.length <= 12) return s
-    // Insert a zero-width-space every 8 characters in long uninterrupted
-    // alphanumeric runs so react-pdf can wrap them. Real punctuation already
-    // gives the renderer break opportunities, so we only inject ZWSPs into
-    // runs of 8+ non-break characters.
-    return s.replace(/([A-Za-z0-9.\-_/]{8})/g, '$1​')
-  }
-  const renderUncertainRow = (v: any, idx: number) => (
-    <View key={`vrfy-${idx}`} wrap={false} style={{ flexDirection: 'row', paddingTop: 6, paddingBottom: 6, borderBottomWidth: 0.5, borderBottomColor: '#f0d0a8', alignItems: 'flex-start' }}>
-      <View style={{ flex: 2.4, paddingRight: 6, overflow: 'hidden' }}>
-        <Text style={{ fontSize: 9.5, color: INK, fontFamily: 'Helvetica-Bold' }}>{clean_prose(String(v.word_name ?? v.word_id))}</Text>
-      </View>
-      <View style={{ flex: 1.8, paddingRight: 6, overflow: 'hidden' }}>
-        <Text style={{ fontSize: 9.5, color: INK_SOFT }}>{clean_prose(String(v.manufacturer ?? '—'))}</Text>
-      </View>
-      <View style={{ flex: 1.6, paddingRight: 10, overflow: 'hidden' }}>
-        <Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: INK }}>{softBreakPartNumber(String(v.part_number ?? '—'))}</Text>
-      </View>
-      <View style={{ flex: 2.0, paddingRight: 6, overflow: 'hidden' }}>
-        <Text style={{ fontSize: 9, color: INK_SOFT }}>{humanise(String(v.module ?? ''))} / {humanise(String(v.sub_module_id ?? ''))}</Text>
-      </View>
-      <View style={{ flex: 2.5, overflow: 'hidden' }}>
-        <Text style={{ fontSize: 9, color: MUTED }}>{clean_prose(String(v.reasoning ?? ''))}</Text>
-      </View>
-    </View>
-  )
-  // Column header row for the uncertain table — same flex ratios as
-  // renderUncertainRow so columns line up. Tristan 2026-05-18: without this
-  // the table reads as "Duty Caster / Blickle / part-number / Structured
-  // Containment Frame" with no idea what each column means.
-  const renderUncertainHeader = () => (
-    <View style={{ flexDirection: 'row', paddingTop: 4, paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: '#c2410c', alignItems: 'flex-start', marginBottom: 2 }}>
-      <View style={{ flex: 2.4, paddingRight: 6 }}>
-        <Text style={{ fontSize: 8.5, color: MUTED, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }}>Sub-module</Text>
-      </View>
-      <View style={{ flex: 1.8, paddingRight: 6 }}>
-        <Text style={{ fontSize: 8.5, color: MUTED, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }}>Manufacturer</Text>
-      </View>
-      <View style={{ flex: 1.6, paddingRight: 10 }}>
-        <Text style={{ fontSize: 8.5, color: MUTED, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }}>Part Number</Text>
-      </View>
-      <View style={{ flex: 2.0, paddingRight: 6 }}>
-        <Text style={{ fontSize: 8.5, color: MUTED, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }}>Location in design</Text>
-      </View>
-      <View style={{ flex: 2.5 }}>
-        <Text style={{ fontSize: 8.5, color: MUTED, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase' }}>Reason for uncertainty</Text>
-      </View>
-    </View>
-  )
-  // "What is this?" explainer panel surfaced once before the uncertain rows.
-  // Tristan 2026-05-18: founder said "I know it's there, but I don't know what
-  // it's for — pages and pages of human-confirms but I don't know what for".
-  // This panel answers WHAT / WHAT TO DO / WHY NOT JUST STRIP THESE in tight
-  // prose, no acronyms.
-  const renderUncertainExplainer = () => (
-    <View style={{ marginBottom: 12, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
-      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>What is this?</Text>
-      <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 6 }}>
-        These are the parts the engine identified as plausible matches for your sub-module requirements, but could not independently verify against a real distributor catalogue or manufacturer datasheet. The manufacturer named makes products of this type, and the part-number format is consistent with their catalogue convention, but no specific item resolved.
-      </Text>
-      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>What to do</Text>
-      <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 6 }}>
-        For each row, your sales engineer should: (1) confirm the part exists in current stock, (2) confirm it fits the sub-module requirement listed under "Location in design", (3) replace with a verified item if it does not. The "Reason for uncertainty" column flags the specific verification step that failed.
-      </Text>
-      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>Why not just strip these?</Text>
-      <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>
-        The engine already strips parts it identifies as clearly fabricated. The remaining "uncertain" parts are kept because removing them would leave gaps in the bill of materials that your sales engineer would then have to backfill from scratch. Showing them as candidates-with-uncertainty is more useful than showing nothing.
-      </Text>
-    </View>
-  )
-  // "What is this?" explainer panel for the Stripped (fabricated) section.
-  // Tighter than the uncertain explainer — the existing italic line was too
-  // thin for founders to act on.
-  const renderStrippedExplainer = () => (
-    <View style={{ marginBottom: 10, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
-      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>What is this?</Text>
-      <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 6 }}>
-        Parts the engine identified as fabricated — the manufacturer does not make this, or the part-number format does not exist in their catalogue — and removed from the bill of materials. Below are the engine's best-effort suggestions for what to put in their place.
-      </Text>
-      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>What to do</Text>
-      <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>
-        Review each, approve or replace before procurement. A recommendation is only provided when the engine is confident a real alternative exists; otherwise the row says "manual sourcing required".
-      </Text>
-    </View>
-  )
-  // Compatibility alias — old name still used by recommendation chunks
-  const renderUncertainCard = renderUncertainRow
-
-  // Page 1: summary + intro + first recommendation chunk
-  pages.push(
-    <Page key="parts-page-1" size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Appendix A · Parts Pending Verification" project={project} />
-      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Appendix A — Parts Pending Verification
-      </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
-        Every (manufacturer, part number) pair was checked against published catalogues. Verified parts are listed in the Bill of Materials section as-is. Fabricated SKUs were stripped automatically. The items below could not be confidently verified — a human engineer should confirm or replace each before procurement.
-      </Text>
-      {summary ? (
-        <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>Verification summary</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            <Text style={{ fontSize: 10, color: INK_SOFT, marginRight: 16 }}>Total checked: <Text style={{ fontFamily: 'Helvetica-Bold' }}>{summary.total}</Text></Text>
-            <Text style={{ fontSize: 10, color: '#065f46', marginRight: 16 }}>Verified: <Text style={{ fontFamily: 'Helvetica-Bold' }}>{summary.verified}</Text></Text>
-            <Text style={{ fontSize: 10, color: '#9a3412', marginRight: 16 }}>Stripped (fakes): <Text style={{ fontFamily: 'Helvetica-Bold' }}>{summary.stripped}</Text></Text>
-            <Text style={{ fontSize: 10, color: '#92400e', marginRight: 16 }}>Uncertain: <Text style={{ fontFamily: 'Helvetica-Bold' }}>{summary.uncertain}</Text></Text>
-            {summary.skipped > 0 ? <Text style={{ fontSize: 10, color: MUTED, marginRight: 16 }}>Skipped: <Text style={{ fontFamily: 'Helvetica-Bold' }}>{summary.skipped}</Text></Text> : null}
-          </View>
-        </View>
-      ) : null}
-      {recommendations.length > 0 ? (
-        <>
-          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-            Stripped (was fabricated) — engine recommendations for replacement
-          </Text>
-          {renderStrippedExplainer()}
-          {(recChunks[0] ?? []).map((r, i) => renderRecCard(r, i))}
-        </>
-      ) : null}
-      {/* If there are NO recommendations, page 1 would otherwise be mostly
-          empty (just title + summary). Surface the uncertain explainer on page 1
-          so the appendix doesn't open with a near-blank page. The uncertain
-          rows themselves still go on dedicated pages (one chunk per page) so
-          the column header reliably appears at the top of every row-bearing
-          page. Tristan 2026-05-18 bug 4b/4c. */}
-      {recommendations.length === 0 && uncertain.length > 0 ? (
-        <>
-          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-            Plausible but unverified — human to confirm
-          </Text>
-          {renderUncertainExplainer()}
-          <Text style={{ fontSize: 9, color: MUTED, fontStyle: 'italic' }}>
-            Rows start on the next page. {uncertain.length} part{uncertain.length === 1 ? '' : 's'} flagged, listed alphabetically by module.
-          </Text>
-        </>
-      ) : null}
-      {recommendations.length === 0 && uncertain.length === 0 ? (
-        <Paragraph>No uncertain parts — every checked SKU was either verified against a real catalogue or stripped as fabricated. The Bill of Materials below can be procurement-actioned as-is.</Paragraph>
-      ) : null}
-      <PageFooter />
-    </Page>,
-  )
-
-  // Continuation pages for remaining recommendation chunks
-  for (let ci = 1; ci < recChunks.length; ci++) {
-    pages.push(
-      <Page key={`parts-rec-${ci}`} size="A4" style={PAGE_STYLE}>
-        <PageHeader section={`Appendix A · Parts Pending Verification (cont. ${ci + 1}/${recChunks.length})`} project={project} />
-        <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-          Recommendations (continued)
-        </Text>
-        {recChunks[ci].map((r, i) => renderRecCard(r, ci * RECS_PER_PAGE + i))}
-        <PageFooter />
-      </Page>,
-    )
-  }
-
-  // Uncertain parts on dedicated pages, one chunk per Page so the column
-  // header reliably appears at the top of every row-bearing page. The
-  // explainer panel renders ONCE — on page 1 when recommendations are empty
-  // (see the merged block above), or on the first uncertain chunk page when
-  // recommendations pushed the uncertain section to a dedicated set of pages.
-  for (let ci = 0; ci < uncertainChunks.length; ci++) {
-    const showExplainer = ci === 0 && recommendations.length > 0
-    pages.push(
-      <Page key={`parts-uncertain-${ci}`} size="A4" style={PAGE_STYLE}>
-        <PageHeader section={`Appendix A · Parts Pending Verification — Plausible but Unverified${uncertainChunks.length > 1 ? ` (${ci + 1}/${uncertainChunks.length})` : ''}`} project={project} />
-        <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-          Plausible but unverified — human to confirm{ci > 0 ? ' (continued)' : ''}
-        </Text>
-        {showExplainer ? renderUncertainExplainer() : null}
-        {renderUncertainHeader()}
-        {uncertainChunks[ci].map((v, i) => renderUncertainCard(v, ci * UNCERTAIN_PER_PAGE + i))}
-        <PageFooter />
-      </Page>,
-    )
-  }
-
-  return <>{pages}</>
-}
 
 // kept for backward compat — the old function body below is dead code, but
 // removing it would invalidate the diff context for downstream edits in this
@@ -5232,15 +4863,13 @@ function classToSlug(productClass: string): string {
   return ''
 }
 
-function resolveModuleImage(productClass: string, moduleId: string, state?: any): string | null {
+function resolveModuleImage(productClass: string, moduleId: string, _state?: any): string | null {
   const slug = classToSlug(productClass)
   if (!slug) return null
-  // 2026-05-20 VF iter-7 council fix: per-module Blender images live in the
-  // same public/heroes/<slug>/ directory and have the same brief-blindness
-  // problem as the cover hero. If the brief envelope doesn't match the
-  // static hero's implied scale (e.g. 40-ft ISO container vs desktop cabinet),
-  // every module's diagram is also misleading. Suppress them.
-  if (state !== undefined && !heroEnvelopeMatchesStaticHero(state)) return null
+  // 2026-05-20 (Tristan): always render the module-class image when present.
+  // The prior envelope-suppression was overly aggressive — Tristan: "no
+  // hero image and no blender 3D images... they need to be brought back".
+  // The caption beneath each module image carries the scale disclaimer.
   const projectRoot = resolve(__dirname, '..')
   const path = resolve(projectRoot, 'public', 'heroes', slug, `module-${moduleId}.png`)
   return existsSync(path) ? path : null
@@ -5264,35 +4893,6 @@ function resolveModuleImage(productClass: string, moduleId: string, state?: any)
  * cabinet = ~3 m³. Everything between is ambiguous; we err on the side of
  * suppression because a wrong image is worse than no image.
  */
-function heroEnvelopeMatchesStaticHero(state: any): boolean {
-  const maxDim = state?.parsedBrief?.constraints?.max_dimensions_mm
-  if (maxDim) {
-    const w = Number(maxDim.w ?? 0)
-    const d = Number(maxDim.d ?? 0)
-    const h = Number(maxDim.h ?? 0)
-    if (w > 0 && d > 0 && h > 0) {
-      const volumeM3 = (w * d * h) / 1_000_000_000
-      if (volumeM3 > 8) return false
-    }
-  }
-  const modulesA = state?.moduleDecomposition?.design?.modules
-  const modulesB = state?.moduleDecomposition?.modules
-  const mods: any[] = Array.isArray(modulesA) ? modulesA : Array.isArray(modulesB) ? modulesB : []
-  for (const m of mods) {
-    const dp = m?.derived_parameters
-    if (!dp) continue
-    const lengthMm = Number(dp.container_length_mm ?? dp.envelope_length_mm ?? 0)
-    if (lengthMm > 5000) return false
-    const volM3 = Number(dp.envelope_volume_m3 ?? dp.cabinet_volume_m3 ?? 0)
-    if (volM3 > 8) return false
-  }
-  // Also check for explicit container references in module names/descriptions.
-  // Brief text "40ft ISO container" + "20ft fertigation" doesn't always reach
-  // derived_parameters — fall back to text-scan.
-  const briefText = String(state?.parsedBrief?.brief_text ?? state?.brief?.text ?? '')
-  if (/\b(20|40)\s?-?\s?(ft|foot)\s+(iso|hi-?cube|container|shipping)\b/i.test(briefText)) return false
-  return true
-}
 
 function resolveHeroImages(state: any): { cover: string | null; exploded: string | null } {
   const raw =
@@ -5301,12 +4901,12 @@ function resolveHeroImages(state: any): { cover: string | null; exploded: string
     ''
   const slug = classToSlug(raw)
   if (!slug) return { cover: null, exploded: null }
-  // Brief envelope sanity check: don't show a desktop hero for a container-scale brief.
-  if (!heroEnvelopeMatchesStaticHero(state)) {
-    return { cover: null, exploded: null }
-  }
-  // Renderer runs from project root; public/heroes resolves relative to cwd
-  // when script is invoked via `npx tsx scripts/...` from the project root.
+  // 2026-05-20 (Tristan): always render the static class hero when present.
+  // The prior envelope check returned null for container-scale briefs; the
+  // resulting blank-cover regression was worse than the wrong-scale issue.
+  // The cover caption + each module image caption carry the scale
+  // disclaimer ("not necessarily to brief scale — see Brief & Requirements").
+  // _ = heroEnvelopeMatchesStaticHero  // function preserved for potential future use
   const projectRoot = resolve(__dirname, '..')
   const coverPath = resolve(projectRoot, 'public', 'heroes', `${slug}-cover.png`)
   const explodedPath = resolve(projectRoot, 'public', 'heroes', `${slug}-exploded.png`)
