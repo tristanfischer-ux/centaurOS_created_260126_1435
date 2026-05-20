@@ -2311,7 +2311,29 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     g5ManualReview ||
     !!(design as any)?.g4ManualReview ||
     (critique?.issues?.some(i => i.severity === 'high') ?? false)
-  const acceptanceStatus = (allPassed && !v5GateFlagged && designDecisions.length === 0)
+
+  // 2026-05-20 BESS iter-6 council fix #17 (GPT-5.5, Opus, Grok all flagged):
+  // The 4927444a BESS chain produced a "procurement-style" PDF despite the
+  // physics critic returning engineering_plausibility=2/10 with 8 HIGH-severity
+  // issues (30A fuses on 819V/300A bus, FF600R12ME4 half-bridge claimed as
+  // 3-phase 250kW inverter, 4700µF film cap "physically impossible", coolant
+  // flow 4× inconsistent, etc.). The status was 'accepted_with_decisions'.
+  //
+  // Universal rule: if the physics critic reports engineering_plausibility ≤ 3
+  // OR brief_to_design_fidelity ≤ 3, the design has critical first-principles
+  // violations and is NOT procurement-grade. Status promoted to 'blocked' so
+  // the renderer emits a DO-NOT-PROCURE header regardless of other gates.
+  const criticPlausibility = critique?.scores?.engineering_plausibility ?? 10
+  const criticFidelity = critique?.scores?.brief_to_design_fidelity ?? 10
+  const physicsBlocked = (typeof criticPlausibility === 'number' && criticPlausibility <= 3) ||
+                         (typeof criticFidelity === 'number' && criticFidelity <= 3)
+  if (physicsBlocked) {
+    console.error(`[chain] PHYSICS BLOCKED: engineering_plausibility=${criticPlausibility}/10 brief_fidelity=${criticFidelity}/10 — promoting acceptanceStatus to 'blocked'`)
+    logAction({ step: 'physics_block', plausibility: criticPlausibility, fidelity: criticFidelity })
+  }
+  const acceptanceStatus = physicsBlocked
+    ? 'blocked'
+    : (allPassed && !v5GateFlagged && designDecisions.length === 0)
     ? 'accepted_clean'
     : (designDecisions.length > 0 || v5GateFlagged ? 'accepted_with_decisions' : 'not_accepted')
 

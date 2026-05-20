@@ -179,3 +179,73 @@ To measure improvement across iterations:
 | ~10 | ~7 | ~4 |
 
 Down from iter-1's ~25/7/3 — meaningful HIGH-severity reduction (council noting many iter-1 issues fixed: empty suppliers ARG also fixed via supplier alias + bucket migration; cost £4086→£3955 closer to target; gatesPassed flipped false→true). Real progress.
+
+---
+
+## Iteration 5 (heat pump cost-trial — closed earlier in session)
+
+**Brief:** Same heat pump but with named-component constraints (Copeland YP-PFJ, ebm-papst HyBlade, STM32F0/L0).
+**Outcome:** Engine B classifier anti-example prompt landed; £113.20 fingerprint visibility traced through chain → real fix needs class-floor + production_volume from brief, not just classifier prompt.
+
+---
+
+## Iteration 6 (BESS — focus pivot)
+
+**State:** `COUNCIL_DONE` — synthesis below
+**Brief ID:** 4927444a-5916-4c70-90bd-64bd19fd6fad
+**Brief:** 500 kWh / 250 kW BESS in 20ft ISO container, R454B chiller, UL 9540A, BS EN 62619, IEC 62933, G99 grid code, +45°C ambient, £350/kWh installed
+**Chain time:** 28.8 min (04:17:35 → 04:46:26 UTC 2026-05-20)
+**Status:** ready, state.json 1054 KB + actions.jsonl 26 KB uploaded
+**PDF size:** 381 KB (suspiciously small — heat pump was 7+ MB)
+
+### Council 4 of 4 usable (£1.28)
+- Grok 4.3 — 7 findings ($0.056)
+- Opus 4.7 — 8 findings ($0.834)
+- Gemini 3.5 Flash @ 16K — 14K content ($0.177)
+- GPT-5.5 retry — 24 findings ($0.217) ← highest yield
+
+### Convergent HIGH findings
+1. **Capacity arithmetic gate failed** — 512 × 280Ah × 3.2V = 458.75 kWh, brief said 500 kWh (8.25% short). Section 0 says 1,376 cells, Module 4 says 512, BoM says ×512 (3-way contradiction).
+2. **Container envelope contradiction** — Section 1 says 20ft, Section 2 Module 1 says 40ft Hi-Cube. Brief was 20ft.
+3. **Cost stack unit bug** — Cover "£1.2/kWh installed — 99% below typical" actually £595,485 / 500 kWh = £1,191/kWh. Plus "Cell Voltage Sense Wire £134,896.64" (Engine B mis-priced 1000×).
+4. **Electrical sizing wrong** — 30A 500V cell fuses on 819V/300A bus (would blow instantly), LEV200A4ANA 200A contactor on 300A bus, FF600R12ME4 is single half-bridge not 3-phase 250 kW inverter, "4700 µF 1200V film cap" physically impossible.
+5. **Hydraulic inconsistency** — 32 plates × 0.3 L/min = 9.6 L/min but pump rated 40 L/min (4× mismatch), 19mm hose with 1/4 in NPT fittings (1.6× restrict).
+6. **Physics critic flagged 2/10 but report still emitted** — manual-review badge non-blocking even at safety-critical severity.
+7. **G5 fake-part rate** — 88 fabricated SKUs visible in BoM, counts contradict cover (96) / Section 6 (88) / Appendix A (88+8).
+8. **Compliance shallow** — "G99 compliant" on IGBT (G99 is interface-protection only), NFPA 855 cited (US not UK mandatory), UL 9540A claimed but Novec 1230 doesn't arrest cell TR.
+9. **PDF artefact thin** — 381 KB vs heat pump 7+ MB. No schematics, P&ID, single-line diagrams.
+
+### What the chain got right
+- R454B refrigerant choice
+- BS EN 62619 + UN 38.3 + IEC 62933 standard universe
+- Module decomposition reasonable
+- Engine B classified cells correctly (no oem_subsystem mis-pricing)
+
+### Quality metric
+| HIGH | MED | LOW |
+|------|-----|-----|
+| ~18 | ~6 | ~1 |
+
+Much higher HIGH count than heat pump iter-4 (~5) — BESS class has uncovered domain-specific gaps that didn't surface in heat pump runs.
+
+### Iter-8 fix priorities (root-cause)
+1. **Capacity arithmetic gate** — enforce `cells * Ah * V_nom ≥ brief.capacity_kwh × 0.98` (2% tolerance). Currently either threshold loose OR field-extraction missing.
+2. **Brief-constraint propagation gate (G0.5 v2)** — Section 0 headline regenerated from same parsed brief that Module 4 uses; "container = 20ft" must propagate to envelope.
+3. **Cost stack rendering fix** — divide-by-1000 path for cells_voltage_sense_wire; £/kWh sanity range (£100-£1500/kWh installed for BESS), HALT if outside.
+4. **Electrical sizing rules** — fuse + contactor rating ≥ bus continuous current; capacitor µF reality check vs rated voltage class.
+5. **M-stage physics-critic promotion** — if physics_critic.plausibility_score ≤ 3, HALT (not just badge).
+6. **Engine B BESS class floors** — `battery_cell` £180-250 floor, `pcs_assembly` £80k+ for 250 kW, `transformer` £8k+ for 300 kVA.
+
+---
+
+## Iteration 7 (VF — focus pivot, running)
+
+**State:** `RUNNING` — Generator (Step 4) in progress
+**Brief ID:** efe55422-c258-4e27-9dac-54af4228b43c
+**Brief:** 40ft Hi-Cube + 100m² growing area + 8 mobile trolleys + separate 20ft fertigation container + R454B chiller + dehumidification with condensate recovery + 15 kW heat + 8-12 kg/h transpiration + CO2 enrichment
+**Started:** 04:48:36 UTC 2026-05-20
+**G0:** PASS
+**G1b:** WARN — 5/7 mandatory; missing WRAS (UK water regs), RoHS 2011/65 (EU electronics)
+**Research:** classified vertical_farm, 4 competitors, 7 sources, 7 claims flagged
+
+Awaiting Generator → Phase 2 → render. Council dispatch queued for chain ready.

@@ -58,6 +58,25 @@ function emptyResult(): GateResult {
   return { score: 0, passed: true, reasons: [], affected: [] }
 }
 
+// Trigger/verify split (council fix 2026-05-20, BESS iter-6).
+//
+// The original gates silently fell through when ANY required field was
+// missing (`if (!a || !b || !c) continue`). That meant a BESS that declared
+// `cell_count + capacity_kwh` but no `cell_capacity_ah` skipped the capacity-
+// arithmetic check entirely — the 458.75 kWh ≠ 500 kWh contradiction landed
+// in the PDF unflagged. Every gate now distinguishes:
+//   - 0 trigger fields present → not the gate's domain, silent skip
+//   - ≥1 trigger field present but verify set incomplete → INCOMPLETE fail
+//   - all verify fields present → run the arithmetic
+function incompleteResult(gateName: string, moduleId: string, missing: string[], present: string[]): GateResult {
+  return {
+    score: -1500,
+    passed: false,
+    reasons: [`${gateName} INCOMPLETE on ${moduleId}: declared {${present.join(', ')}} but missing [${missing.join(', ')}]. Generator MUST emit the full field set to make the arithmetic verifiable. FIX: add the missing keys to ${moduleId}.derived_parameters.`],
+    affected: [moduleId],
+  }
+}
+
 // ─── gates ──────────────────────────────────────────────────────────────────
 
 /** cells × Ah × V / 1000 ≈ nameplate kWh (any electrochemical store). */
@@ -73,13 +92,30 @@ const cellsAhVoltageCapacityGate: ArithmeticGate = {
       const nameplate = num(dp, 'nameplate_capacity_mwh') !== null
         ? (num(dp, 'nameplate_capacity_mwh') as number) * 1000
         : num(dp, 'capacity_kwh_total', 'capacity_kwh_gross', 'capacity_kwh_nameplate', 'capacity_kwh')
-      if (!cells || !Ah || !V || !nameplate) continue
-      const product = (cells * Ah * V) / 1000
-      const errPct = Math.abs(product - nameplate) / nameplate
+
+      // Trigger: cell_count OR nameplate present → this module is an
+      // electrochemical store. Either signal alone is unambiguous: a
+      // non-electrochemical module never declares cell_count, and a module
+      // that declares its own capacity_kwh is the energy-source module.
+      const hasTrigger = cells !== null || nameplate !== null
+      if (!hasTrigger) continue
+
+      const present: string[] = []
+      const missing: string[] = []
+      if (cells !== null) present.push(`cell_count=${cells}`); else missing.push('cell_count')
+      if (Ah !== null) present.push(`cell_capacity_ah=${Ah}`); else missing.push('cell_capacity_ah')
+      if (V !== null) present.push(`cell_voltage_v=${V}`); else missing.push('cell_voltage_v')
+      if (nameplate !== null) present.push(`capacity_kwh=${nameplate}`); else missing.push('capacity_kwh')
+      if (missing.length > 0) return incompleteResult('capacity', m.module, missing, present)
+
+      const product = (cells! * Ah! * V!) / 1000
+      const errPct = Math.abs(product - nameplate!) / nameplate!
       if (errPct <= 0.02) {
         return { score: 1000, passed: true, reasons: [`capacity OK on ${m.module}: ${cells}×${Ah}×${V}/1000 = ${product.toFixed(0)} ≈ ${nameplate} kWh`], affected: [m.module] }
       }
-      return { score: -5000, passed: false, reasons: [`capacity FAIL on ${m.module}: ${cells}×${Ah}×${V}/1000 = ${product.toFixed(0)} but declared ${nameplate} (${(errPct * 100).toFixed(1)}% off)`], affected: [m.module] }
+      const correctCells = Math.ceil(nameplate! * 1000 / (Ah! * V!))
+      const correctNameplate = product
+      return { score: -5000, passed: false, reasons: [`capacity FAIL on ${m.module}: ${cells}×${Ah}×${V}/1000 = ${product.toFixed(1)} but declared ${nameplate} (${(errPct * 100).toFixed(1)}% off). FIX: either set cell_count=${correctCells} to match nameplate, or set capacity_kwh=${correctNameplate.toFixed(1)} to match cell topology.`], affected: [m.module] }
     }
     return emptyResult()
   },
@@ -95,11 +131,19 @@ const moduleCellCountGate: ArithmeticGate = {
       const cells = num(dp, 'cell_count')
       const mods = num(dp, 'module_count', 'modules_count')
       const cpm = num(dp, 'cells_per_module')
-      if (!cells || !mods || !cpm) continue
-      if (mods * cpm === cells) {
+      // Trigger: cell_count is the strongest signal. If a module declares
+      // cell_count but doesn't break it down into module_count × cells_per_module,
+      // the pack topology is unverifiable.
+      if (cells === null) continue
+      const present: string[] = [`cell_count=${cells}`]
+      const missing: string[] = []
+      if (mods !== null) present.push(`module_count=${mods}`); else missing.push('module_count')
+      if (cpm !== null) present.push(`cells_per_module=${cpm}`); else missing.push('cells_per_module')
+      if (missing.length > 0) return incompleteResult('module_cell_count', m.module, missing, present)
+      if (mods! * cpm! === cells) {
         return { score: 500, passed: true, reasons: [`mod-count OK on ${m.module}: ${mods}×${cpm}=${cells}`], affected: [m.module] }
       }
-      return { score: -2000, passed: false, reasons: [`mod-count FAIL on ${m.module}: ${mods}×${cpm}=${mods * cpm} ≠ ${cells}`], affected: [m.module] }
+      return { score: -2000, passed: false, reasons: [`mod-count FAIL on ${m.module}: ${mods}×${cpm}=${mods! * cpm!} ≠ ${cells}. FIX: pick integer (module_count, cells_per_module) that multiplies to ${cells}.`], affected: [m.module] }
     }
     return emptyResult()
   },
@@ -116,12 +160,23 @@ const seriesStackVoltageGate: ArithmeticGate = {
       const mps = num(dp, 'modules_per_string')
       const V = num(dp, 'cell_voltage_v', 'cell_voltage_nominal_v')
       const bus = num(dp, 'dc_bus_voltage_v', 'dc_bus_voltage_nominal_v', 'nominal_voltage_v')
-      if (!cpm || !mps || !V || !bus) continue
-      const stack = cpm * mps * V
-      if (approxEqual(stack, bus, 0.02)) {
+      // Trigger: bus voltage OR cells_per_module declared on a module signals
+      // electrochemical stack topology. Either alone is enough to demand the
+      // series-V arithmetic be verifiable.
+      const hasTrigger = bus !== null || cpm !== null
+      if (!hasTrigger) continue
+      const present: string[] = []
+      const missing: string[] = []
+      if (cpm !== null) present.push(`cells_per_module=${cpm}`); else missing.push('cells_per_module')
+      if (mps !== null) present.push(`modules_per_string=${mps}`); else missing.push('modules_per_string')
+      if (V !== null) present.push(`cell_voltage_v=${V}`); else missing.push('cell_voltage_v')
+      if (bus !== null) present.push(`dc_bus_voltage_v=${bus}`); else missing.push('dc_bus_voltage_v')
+      if (missing.length > 0) return incompleteResult('series_stack_voltage', m.module, missing, present)
+      const stack = cpm! * mps! * V!
+      if (approxEqual(stack, bus!, 0.02)) {
         return { score: 800, passed: true, reasons: [`series-V OK on ${m.module}: ${cpm}×${mps}×${V}=${stack.toFixed(1)}≈${bus}`], affected: [m.module] }
       }
-      return { score: -2000, passed: false, reasons: [`series-V FAIL on ${m.module}: ${cpm}×${mps}×${V}=${stack.toFixed(1)} ≠ ${bus}`], affected: [m.module] }
+      return { score: -2000, passed: false, reasons: [`series-V FAIL on ${m.module}: ${cpm}×${mps}×${V}=${stack.toFixed(1)} ≠ ${bus}. FIX: pick (cells_per_module, modules_per_string) whose product × ${V}V = ${bus}V (need ${Math.round(bus! / V!)} cells in series total).`], affected: [m.module] }
     }
     return emptyResult()
   },
@@ -139,12 +194,21 @@ const usableEnergyClosureGate: ArithmeticGate = {
         : num(dp, 'capacity_kwh_total', 'capacity_kwh_gross', 'capacity_kwh')
       const usable = num(dp, 'usable_capacity_kwh', 'capacity_kwh_usable', 'usable_kwh')
       const dod = num(dp, 'dod_fraction', 'dod_max')
-      if (!nameplate || !usable || !dod) continue
-      const expected = nameplate * dod
-      if (approxEqual(expected, usable, 0.01)) {
+      // Trigger: any of {nameplate, usable, dod} declared → this is an
+      // energy-storage module and the DoD relationship is verifiable.
+      const hasTrigger = nameplate !== null || usable !== null || dod !== null
+      if (!hasTrigger) continue
+      const present: string[] = []
+      const missing: string[] = []
+      if (nameplate !== null) present.push(`nameplate_kwh=${nameplate}`); else missing.push('capacity_kwh (nameplate)')
+      if (usable !== null) present.push(`usable_kwh=${usable}`); else missing.push('usable_capacity_kwh')
+      if (dod !== null) present.push(`dod_fraction=${dod}`); else missing.push('dod_fraction')
+      if (missing.length > 0) return incompleteResult('usable_energy_closure', m.module, missing, present)
+      const expected = nameplate! * dod!
+      if (approxEqual(expected, usable!, 0.01)) {
         return { score: 600, passed: true, reasons: [`usable OK on ${m.module}: ${nameplate}×${dod}=${expected.toFixed(0)}≈${usable}`], affected: [m.module] }
       }
-      return { score: -1800, passed: false, reasons: [`usable FAIL on ${m.module}: ${nameplate}×${dod}=${expected.toFixed(0)} ≠ ${usable}`], affected: [m.module] }
+      return { score: -1800, passed: false, reasons: [`usable FAIL on ${m.module}: ${nameplate}×${dod}=${expected.toFixed(0)} ≠ ${usable}. FIX: set usable_capacity_kwh=${expected.toFixed(1)} OR adjust dod_fraction to ${(usable! / nameplate!).toFixed(3)}.`], affected: [m.module] }
     }
     return emptyResult()
   },
@@ -160,12 +224,21 @@ const copThermalElectricalGate: ArithmeticGate = {
       const cop = num(dp, 'cop_target', 'cop', 'cop_rated')
       const thermal = num(dp, 'rated_thermal_kw', 'heat_output_kw', 'thermal_capacity_kw')
       const electric = num(dp, 'rated_electrical_kw', 'compressor_power_kw', 'electrical_input_kw')
-      if (!cop || !thermal || !electric) continue
-      const expected = thermal / cop
-      if (approxEqual(expected, electric, 0.05)) {
+      // Trigger: any of {cop, thermal, electric} declared → this is a heat-
+      // moving device and the COP relationship is verifiable.
+      const hasTrigger = cop !== null || thermal !== null || electric !== null
+      if (!hasTrigger) continue
+      const present: string[] = []
+      const missing: string[] = []
+      if (cop !== null) present.push(`cop=${cop}`); else missing.push('cop_target')
+      if (thermal !== null) present.push(`rated_thermal_kw=${thermal}`); else missing.push('rated_thermal_kw')
+      if (electric !== null) present.push(`rated_electrical_kw=${electric}`); else missing.push('rated_electrical_kw')
+      if (missing.length > 0) return incompleteResult('cop_thermal_electrical', m.module, missing, present)
+      const expected = thermal! / cop!
+      if (approxEqual(expected, electric!, 0.05)) {
         return { score: 800, passed: true, reasons: [`COP OK on ${m.module}: ${thermal}/${cop}=${expected.toFixed(2)}≈${electric}`], affected: [m.module] }
       }
-      return { score: -1500, passed: false, reasons: [`COP FAIL on ${m.module}: ${thermal}/${cop}=${expected.toFixed(2)} ≠ ${electric}`], affected: [m.module] }
+      return { score: -1500, passed: false, reasons: [`COP FAIL on ${m.module}: ${thermal}/${cop}=${expected.toFixed(2)} ≠ ${electric}. FIX: set rated_electrical_kw=${expected.toFixed(2)} OR adjust COP to ${(thermal! / electric!).toFixed(2)}.`], affected: [m.module] }
     }
     return emptyResult()
   },
@@ -181,12 +254,21 @@ const refrigerantMassFlowGate: ArithmeticGate = {
       const flow = num(dp, 'refrigerant_mass_flow_kg_s')
       const dh = num(dp, 'enthalpy_change_kj_kg', 'evap_delta_h_kj_kg', 'condenser_delta_h_kj_kg')
       const thermal = num(dp, 'rated_thermal_kw', 'heat_output_kw')
-      if (!flow || !dh || !thermal) continue
-      const expected = flow * dh
-      if (approxEqual(expected, thermal, 0.05)) {
+      // Trigger: any of {flow, dh, thermal} declared on this module → phase-
+      // change loop. Mass-flow arithmetic verifiable.
+      const hasTrigger = flow !== null || dh !== null || (thermal !== null && (num(dp, 'refrigerant') !== null || /^thermal_management/i.test(m.module) || /chiller|refrigerant|heat.?pump/i.test(JSON.stringify(dp ?? {}))))
+      if (!hasTrigger) continue
+      const present: string[] = []
+      const missing: string[] = []
+      if (flow !== null) present.push(`refrigerant_mass_flow_kg_s=${flow}`); else missing.push('refrigerant_mass_flow_kg_s')
+      if (dh !== null) present.push(`enthalpy_change_kj_kg=${dh}`); else missing.push('enthalpy_change_kj_kg')
+      if (thermal !== null) present.push(`rated_thermal_kw=${thermal}`); else missing.push('rated_thermal_kw')
+      if (missing.length > 0) return incompleteResult('refrigerant_mass_flow', m.module, missing, present)
+      const expected = flow! * dh!
+      if (approxEqual(expected, thermal!, 0.05)) {
         return { score: 600, passed: true, reasons: [`refrigerant OK on ${m.module}: ${flow}×${dh}=${expected.toFixed(1)}≈${thermal}`], affected: [m.module] }
       }
-      return { score: -1200, passed: false, reasons: [`refrigerant FAIL on ${m.module}: ${flow}×${dh}=${expected.toFixed(1)} ≠ ${thermal}`], affected: [m.module] }
+      return { score: -1200, passed: false, reasons: [`refrigerant FAIL on ${m.module}: ${flow}×${dh}=${expected.toFixed(1)} ≠ ${thermal}. FIX: set refrigerant_mass_flow_kg_s=${(thermal! / dh!).toFixed(4)} OR enthalpy_change_kj_kg=${(thermal! / flow!).toFixed(1)}.`], affected: [m.module] }
     }
     return emptyResult()
   },
@@ -203,12 +285,22 @@ const ledPpfdAreaGate: ArithmeticGate = {
       const area = num(dp, 'canopy_area_m2', 'growing_area_m2')
       const efficacy = num(dp, 'led_efficacy_umol_j', 'photon_efficacy')
       const ledKw = num(dp, 'led_power_kw', 'lighting_power_kw')
-      if (!ppfd || !area || !efficacy || !ledKw) continue
-      const expectedKw = (ppfd * area) / efficacy / 1000
-      if (approxEqual(expectedKw, ledKw, 0.10)) {
+      // Trigger: any of {ppfd, ledKw} declared → photosynthetic system.
+      // area/efficacy alone are too generic to be sole triggers.
+      const hasTrigger = ppfd !== null || ledKw !== null
+      if (!hasTrigger) continue
+      const present: string[] = []
+      const missing: string[] = []
+      if (ppfd !== null) present.push(`ppfd=${ppfd}`); else missing.push('ppfd_umol_m2_s')
+      if (area !== null) present.push(`canopy_area_m2=${area}`); else missing.push('canopy_area_m2')
+      if (efficacy !== null) present.push(`led_efficacy=${efficacy}`); else missing.push('led_efficacy_umol_j')
+      if (ledKw !== null) present.push(`led_power_kw=${ledKw}`); else missing.push('led_power_kw')
+      if (missing.length > 0) return incompleteResult('led_ppfd_area', m.module, missing, present)
+      const expectedKw = (ppfd! * area!) / efficacy! / 1000
+      if (approxEqual(expectedKw, ledKw!, 0.10)) {
         return { score: 600, passed: true, reasons: [`LED-power OK on ${m.module}: ${ppfd}×${area}/${efficacy}/1000≈${expectedKw.toFixed(1)}kW`], affected: [m.module] }
       }
-      return { score: -1200, passed: false, reasons: [`LED-power FAIL on ${m.module}: ${expectedKw.toFixed(1)}kW vs declared ${ledKw}kW`], affected: [m.module] }
+      return { score: -1200, passed: false, reasons: [`LED-power FAIL on ${m.module}: ${expectedKw.toFixed(1)}kW vs declared ${ledKw}kW. FIX: set led_power_kw=${expectedKw.toFixed(2)} OR adjust ppfd/area/efficacy to match declared power.`], affected: [m.module] }
     }
     return emptyResult()
   },
@@ -224,12 +316,21 @@ const irrigationFlowGate: ArithmeticGate = {
       const plants = num(dp, 'plant_count', 'total_plants')
       const per = num(dp, 'flow_per_plant_l_h', 'water_per_plant_l_h')
       const total = num(dp, 'total_flow_l_h', 'irrigation_flow_l_h')
-      if (!plants || !per || !total) continue
-      const expected = plants * per
-      if (approxEqual(expected, total, 0.05)) {
+      // Trigger: any of {plants, per, total} declared → fluid-delivery
+      // system. Verifiable.
+      const hasTrigger = plants !== null || per !== null || total !== null
+      if (!hasTrigger) continue
+      const present: string[] = []
+      const missing: string[] = []
+      if (plants !== null) present.push(`plant_count=${plants}`); else missing.push('plant_count')
+      if (per !== null) present.push(`flow_per_plant_l_h=${per}`); else missing.push('flow_per_plant_l_h')
+      if (total !== null) present.push(`total_flow_l_h=${total}`); else missing.push('total_flow_l_h')
+      if (missing.length > 0) return incompleteResult('irrigation_flow', m.module, missing, present)
+      const expected = plants! * per!
+      if (approxEqual(expected, total!, 0.05)) {
         return { score: 500, passed: true, reasons: [`flow OK on ${m.module}: ${plants}×${per}=${expected.toFixed(0)}≈${total}`], affected: [m.module] }
       }
-      return { score: -1000, passed: false, reasons: [`flow FAIL on ${m.module}: ${plants}×${per}=${expected.toFixed(0)} ≠ ${total}`], affected: [m.module] }
+      return { score: -1000, passed: false, reasons: [`flow FAIL on ${m.module}: ${plants}×${per}=${expected.toFixed(0)} ≠ ${total}. FIX: set total_flow_l_h=${expected.toFixed(1)} OR adjust flow_per_plant_l_h to ${(total! / plants!).toFixed(3)}.`], affected: [m.module] }
     }
     return emptyResult()
   },

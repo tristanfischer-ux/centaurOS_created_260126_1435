@@ -1563,6 +1563,8 @@ function CoverPage({
   engineCSummary,
   manualReviewBadges,
   provisionalClassRegistry,
+  acceptanceStatus,
+  physicsCritique,
 }: {
   subject: string
   projectId: string
@@ -1588,13 +1590,51 @@ function CoverPage({
     /** Generator model name, if a payload was attached. */
     generatorModel?: string
   }
+  /**
+   * 2026-05-20 BESS iter-6 universal fix: when state.acceptanceStatus ===
+   * 'blocked' (set by chain when physics_critic.engineering_plausibility ≤ 3
+   * OR brief_to_design_fidelity ≤ 3), render a dark-red DO-NOT-PROCURE
+   * banner at the top of the cover. The PDF is still emitted as a first-cut
+   * scaffold, but the reader must NOT treat it as procurement-grade.
+   */
+  acceptanceStatus?: string
+  physicsCritique?: { scores?: { brief_to_design_fidelity?: number; engineering_plausibility?: number; internal_coherence?: number; part_realism?: number; honesty_signal?: number } } | null
 }) {
   // Tristan 2026-05-17: "On the front cover there should be some kind of
   // number or what the price is right at the front of it." Hoist the BoM
   // grand total onto the cover so the headline figure greets the reader
   // before they reach §6.
+  // 2026-05-20 BESS iter-6 council fix: DO-NOT-PROCURE banner when chain
+  // promoted acceptanceStatus to 'blocked' (physics critic ≤ 3/10).
+  const isBlocked = acceptanceStatus === 'blocked'
+  const plaus = physicsCritique?.scores?.engineering_plausibility
+  const fidel = physicsCritique?.scores?.brief_to_design_fidelity
+
   return (
     <Page size="A4" style={{ ...PAGE_STYLE, justifyContent: 'center', paddingHorizontal: 60 }}>
+      {isBlocked ? (
+        <View style={{
+          marginBottom: 18,
+          padding: 14,
+          backgroundColor: '#7f1d1d',
+          borderRadius: 4,
+          borderLeftWidth: 5,
+          borderLeftColor: '#fca5a5',
+        }}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#fee2e2', letterSpacing: 2, marginBottom: 6 }}>
+            DO NOT PROCURE — DESIGN BLOCKED
+          </Text>
+          <Text style={{ fontSize: 10, color: '#fee2e2', lineHeight: 1.5 }}>
+            The physics critic flagged this design with engineering plausibility{' '}
+            {typeof plaus === 'number' ? `${plaus}/10` : 'below 3/10'} and brief-to-design fidelity{' '}
+            {typeof fidel === 'number' ? `${fidel}/10` : 'below 3/10'}. The report below is a first-cut
+            engineering scaffold only — it contains first-principles violations (incorrect electrical
+            sizing, hydraulic inconsistency, fabricated part numbers, or capacity-arithmetic contradictions)
+            and is NOT procurement-grade. Resolve the high-severity findings in the physics appendix
+            before sharing externally or quoting suppliers.
+          </Text>
+        </View>
+      ) : null}
       <View style={{ marginBottom: 16 }}>
         <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 2, marginBottom: 12 }}>
           FORGE ENGINEERING REPORT
@@ -4528,7 +4568,7 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
 
   return (
     <Document>
-      <CoverPage subject={subject} projectId={project} heroImagePath={heroImages.cover} bomTotals={bomTotals} costStack={costStack} priceReality={priceReality} pendingPartsCount={pendingPartsCount} engineCSummary={state.engine_c_summary || null} manualReviewBadges={manualReviewBadges} provisionalClassRegistry={provisionalClassRegistry} />
+      <CoverPage subject={subject} projectId={project} heroImagePath={heroImages.cover} bomTotals={bomTotals} costStack={costStack} priceReality={priceReality} pendingPartsCount={pendingPartsCount} engineCSummary={state.engine_c_summary || null} manualReviewBadges={manualReviewBadges} provisionalClassRegistry={provisionalClassRegistry} acceptanceStatus={state?.acceptanceStatus} physicsCritique={state?.physicsCritique} />
       {/* Note: §2.5 connection map + optional exploded view is rendered just
           below. Wrapper component below adds a 2nd page when exploded image
           exists for the product class. */}

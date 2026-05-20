@@ -85,6 +85,39 @@ function targetPerformanceValue(state: any): number | null {
   return null
 }
 
+/**
+ * Unit-aware target_performance reader (added 2026-05-20, BESS iter-6 universal fix).
+ *
+ * The bug it closes: BESS metric_compute multiplied the raw `target_performance.value`
+ * by 1000 assuming the unit was always MWh. The 4927444a brief actually said
+ * `{ value: 500, unit: "kWh" }`, so 500 → 500,000 → £/kWh divisor 500k → £1.19/kWh
+ * was rendered on the cover as "£1.2 per kWh installed — 99% below typical"
+ * when the real number was £1,191/kWh.
+ *
+ * This helper reads the unit field, normalises it (kwh/MWh/Wh/etc.), and converts
+ * to the caller's target unit. Falls back to the raw number when the unit is
+ * unknown — caller still assumes its expected unit, so unit-tagged briefs
+ * convert correctly and untagged briefs preserve current behaviour.
+ */
+function targetPerformanceValueAs(state: any, targetUnit: string): number | null {
+  const tp = state?.parsedBrief?.constraints?.target_performance
+  const v = tp?.value
+  const unit = String(tp?.unit ?? '').toLowerCase().trim()
+  if (typeof v !== 'number' || !Number.isFinite(v) || v <= 0) return null
+  const t = targetUnit.toLowerCase().trim()
+  if (unit === '' || unit === t) return v
+  const families: Record<string, number>[] = [
+    { wh: 0.001, kwh: 1, mwh: 1000, gwh: 1_000_000 },
+    { w: 0.001, kw: 1, mw: 1000, gw: 1_000_000 },
+    { g: 0.001, kg: 1, t: 1000, tonne: 1000, tonnes: 1000 },
+    { ml: 0.001, l: 1, m3: 1000 },
+  ]
+  for (const f of families) {
+    if (unit in f && t in f) return (v * f[unit]) / f[t]
+  }
+  return v
+}
+
 function maxMassKg(state: any): number | null {
   const v = state?.parsedBrief?.constraints?.max_mass_kg?.value
   if (typeof v === 'number' && Number.isFinite(v) && v > 0) return v
@@ -155,10 +188,15 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
   bess: {
     natural_metric: '£/kWh installed (utility-scale LFP container)',
     metric_compute: (state) => {
-      const mwh = keyMetricNumber(state, 'usable_capacity_mwh') || targetPerformanceValue(state)
-      if (!mwh) return null
-      // brief target_performance is in MWh; convert to kWh
-      return mwh * 1000
+      // 2026-05-20 universal fix (council BESS iter-6): brief unit-ambiguity
+      // bug. The 4927444a brief said `target_performance.value=500, unit=kWh`,
+      // but the old code blindly multiplied by 1000 assuming MWh. That made
+      // the cover show "£1.2 per kWh installed — 99% below typical" when the
+      // real value was £1,191/kWh. targetPerformanceValueAs reads the brief
+      // unit and converts correctly (kWh→kWh = identity, MWh→kWh = ×1000).
+      const kwhFromKM = keyMetricNumber(state, 'usable_capacity_mwh')
+      if (typeof kwhFromKM === 'number' && kwhFromKM > 0) return kwhFromKM * 1000
+      return targetPerformanceValueAs(state, 'kwh')
     },
     // Engine D multiplier (L=0.15, OH=0.18, M=0.25, C=0, I=0.50) = 2.54×.
     // Raw-BoM band £60-180/kWh × 2.54 = £153-458/kWh installed (multiplier-
@@ -321,7 +359,7 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
   'ev-charger': {
     natural_metric: '£/kW installed (150 kW DC fast EV charger)',
     metric_compute: (state) => {
-      return keyMetricNumber(state, 'peak_power_kw') || targetPerformanceValue(state)
+      return keyMetricNumber(state, 'peak_power_kw') || targetPerformanceValueAs(state, 'kw')
     },
     // Engine D multiplier (L=0.18, OH=0.15, M=0.30, C=0.20, I=0.35) = 2.86×.
     // Raw band £140-260/kW × 2.86 = £400-743/kW (multiplier-derived). Grok
@@ -372,7 +410,7 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
     metric_compute: (state) => {
       return keyMetricNumber(state, 'design_thermal_kw')
         || keyMetricNumber(state, 'thermal_output_kw')
-        || targetPerformanceValue(state)
+        || targetPerformanceValueAs(state, 'kw')
     },
     // Engine D multiplier (L=0.20, OH=0.15, M=0.30, C=0.35, I=0.80) = 4.36×.
     // Raw band £600-1200/kW × 4.36 = £2616-5231/kW (multiplier-derived).
@@ -443,7 +481,7 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
   residential_ess: {
     natural_metric: '£/kWh installed (5-15 kWh residential ESS)',
     metric_compute: (state) => {
-      const kwh = keyMetricNumber(state, 'usable_capacity_kwh') || targetPerformanceValue(state)
+      const kwh = keyMetricNumber(state, 'usable_capacity_kwh') || targetPerformanceValueAs(state, 'kwh')
       return kwh
     },
     // Engine D multiplier (L=0.12, OH=0.13, M=0.28, C=0.30, I=0.40) = 2.95×.
@@ -471,7 +509,7 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
   pv_string_inverter: {
     natural_metric: '£/kW installed (3-50 kW PV string inverter)',
     metric_compute: (state) => {
-      return keyMetricNumber(state, 'peak_power_kw') || targetPerformanceValue(state)
+      return keyMetricNumber(state, 'peak_power_kw') || targetPerformanceValueAs(state, 'kw')
     },
     // Engine D multiplier (L=0.10, OH=0.10, M=0.20, C=0.25, I=0.20) = 2.18×.
     // Raw band £80-180/kW × 2.18 = £174-392/kW (multiplier-derived). Grok
@@ -503,7 +541,7 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
   motor_drive_vfd: {
     natural_metric: '£/kW installed (7.5-75 kW industrial VFD)',
     metric_compute: (state) => {
-      return keyMetricNumber(state, 'rated_power_kw') || targetPerformanceValue(state)
+      return keyMetricNumber(state, 'rated_power_kw') || targetPerformanceValueAs(state, 'kw')
     },
     // Engine D multiplier (L=0.15, OH=0.18, M=0.30, C=0.20, I=0.25) = 2.65×.
     // Raw band £100-350/kW × 2.65 = £265-926/kW (multiplier-derived). Grok
@@ -559,7 +597,7 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
     metric_compute: (state) => {
       return keyMetricNumber(state, 'cooling_capacity_kw')
         || keyMetricNumber(state, 'thermal_capacity_kw')
-        || targetPerformanceValue(state)
+        || targetPerformanceValueAs(state, 'kw')
     },
     // Engine D multiplier (L=0.20, OH=0.18, M=0.28, C=0.20, I=0.55) = 3.37×.
     // Raw band £150-400/kW × 3.37 = £506-1348/kW (multiplier-derived). Grok
