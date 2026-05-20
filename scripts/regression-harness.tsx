@@ -208,6 +208,67 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // === Additional universal invariants ===
+
+  // I6. Module count — full taxonomy decomposition usually emits 8-12 modules
+  const modules: any[] = state?.moduleDecomposition?.modules ?? []
+  assertions.push(assertEq(
+    'I6.module_count',
+    'moduleDecomposition.modules count within [6, 14]',
+    modules.length,
+    (n) => n >= 6 && n <= 14,
+    (n) => `${n} modules emitted`,
+  ))
+
+  // I7. Cost Repair Summary present (proves Cost Repair Loop ran)
+  if (state?.cost_repair_summary) {
+    const summary = state.cost_repair_summary
+    const reviewed = (summary.corrected_count ?? 0) + (summary.manual_sourcing_count ?? 0) + (summary.leave_as_is_count ?? 0)
+    assertions.push(assertEq(
+      'I7.cost_repair_ratio',
+      'Cost Repair reviewed >= 50% of flagged lines',
+      summary.flagged_count > 0 ? reviewed / summary.flagged_count : 1,
+      (r) => r >= 0.5,
+      (r) => `reviewed ${reviewed}/${summary.flagged_count} flagged (${Math.round(r * 100)}%)`,
+    ))
+  }
+
+  // I8. Supplier validation summary — if present, urls_replaced + already_reconciled >= 50% of candidates
+  if (state?.supplier_validation_summary) {
+    const sv = state.supplier_validation_summary
+    const safe = (sv.urls_replaced ?? 0) + (sv.already_reconciled ?? 0)
+    assertions.push(assertEq(
+      'I8.supplier_reconcile_ratio',
+      'Supplier validation: >= 50% of candidates have reconciled URLs',
+      sv.total_candidates > 0 ? safe / sv.total_candidates : 1,
+      (r) => r >= 0.5,
+      (r) => `${safe}/${sv.total_candidates} reconciled (${Math.round(r * 100)}%)`,
+    ))
+  }
+
+  // VF-specific additional invariants
+  if (productClass === 'vertical_farm' || productClass === 'verticalfarm') {
+    const eo = modules.find((m: any) => m.module === 'energy_conversion_transduction')
+    const eoDp = eo?.derived_parameters ?? {}
+    // Total LED installed power for 100 m² canopy at 200 W/m² = 20 kW floor;
+    // 300 W/m² = 30 kW ceiling. Accept anything in [10, 40] kW for safety.
+    const ledKw = Number(
+      eoDp.led_installed_power_kw
+      ?? eoDp.total_led_power_kw
+      ?? eoDp.peak_led_power_kw
+      ?? 0
+    )
+    if (ledKw > 0) {
+      assertions.push(assertEq(
+        'VF.led_power_realistic',
+        'VF total LED installed power in [10, 40] kW for ~100 m² canopy',
+        ledKw,
+        (n) => n >= 10 && n <= 40,
+        (n) => `LED power = ${n} kW (typical 20-30 kW for commercial leafy greens at 100 m²)`,
+      ))
+    }
+  }
+
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }
 
