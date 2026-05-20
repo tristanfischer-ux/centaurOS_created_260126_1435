@@ -815,6 +815,181 @@ const fluidPressureBalanceGate: ArithmeticGate = {
   },
 }
 
+/**
+ * Brief-constraint propagation gate (2026-05-20 iter-9 Step 3).
+ *
+ * Verify chain finding: "LED density 694 W/m² vs brief target 200 W/m² (3.5× over)".
+ * Generator emitted a design where derived_parameters violated the brief
+ * constraints, and no gate caught it. This gate compares any module's
+ * derived_parameters numeric fields against the brief's
+ * target_performance + safety_standards if there's a matching key.
+ *
+ * Universal: works for any class. Reads parsedBrief from state via the
+ * passed `productClass` parameter — but since the existing gate API
+ * doesn't pass parsedBrief, we read it via the brief_block_pointer the
+ * chain attaches to modules at decomposition time. Falls back to silent
+ * skip if no brief data reachable.
+ *
+ * Bridges via a magic field: when chain decomposition runs, it stamps
+ * `(modules as any).__briefConstraints = parsedBrief.constraints` on the
+ * first module so this gate can read it without changing the public
+ * GateResult signature. Documented at the call site in
+ * scripts/serial-design-chain-v2.tsx.
+ */
+const briefConstraintPropagationGate: ArithmeticGate = {
+  name: 'brief_constraint_propagation',
+  description: 'derived_parameters values that have a corresponding brief constraint must respect the brief (within 10% tolerance unless tighter)',
+  evaluate(modules) {
+    // Brief constraints attached to the modules array by the chain.
+    const briefConstraints = (modules as any).__briefConstraints
+    if (!briefConstraints) return emptyResult()
+    // Constraint keys that correlate directly with derived_parameters keys.
+    // For each (briefKey, dpKey), if both are present, |dp - brief|/brief > 0.10 → fail.
+    const mappings: Array<{ briefKey: string; dpKey: string; field: string; tolerance: number; mode: 'less_than' | 'greater_than' | 'within' }> = [
+      { briefKey: 'target_performance', dpKey: 'ppfd_umol_m2_s', field: 'PPFD', tolerance: 0.20, mode: 'within' },
+      { briefKey: 'target_performance', dpKey: 'led_power_w', field: 'LED panel W', tolerance: 0.20, mode: 'within' },
+      { briefKey: 'target_performance', dpKey: 'cooling_capacity_kw', field: 'Cooling kW', tolerance: 0.15, mode: 'within' },
+      { briefKey: 'target_performance', dpKey: 'rated_thermal_kw', field: 'Thermal kW', tolerance: 0.15, mode: 'within' },
+      { briefKey: 'target_performance', dpKey: 'capacity_kwh', field: 'Capacity kWh', tolerance: 0.05, mode: 'within' },
+      { briefKey: 'max_mass_kg', dpKey: 'mass_kg', field: 'Mass kg', tolerance: 0, mode: 'less_than' },
+      { briefKey: 'unit_cost_ceiling', dpKey: 'unit_cost_gbp', field: 'Unit cost £', tolerance: 0, mode: 'less_than' },
+    ]
+    for (const m of modules) {
+      const dp = m.derived_parameters
+      if (!dp) continue
+      for (const map of mappings) {
+        const dpVal = num(dp as any, map.dpKey)
+        if (dpVal === null) continue
+        const briefEntry = briefConstraints[map.briefKey]
+        const briefVal = briefEntry?.value !== undefined ? num({ v: briefEntry.value }, 'v') : null
+        if (briefVal === null || briefVal <= 0) continue
+        if (map.mode === 'less_than') {
+          if (dpVal > briefVal) {
+            return { score: -2000, passed: false, reasons: [`brief constraint ${map.field} VIOLATED on ${m.module}: design=${dpVal} > brief.${map.briefKey}=${briefVal}. FIX: reduce ${map.dpKey} to ≤ ${briefVal} OR explicitly justify the override in design decisions.`], affected: [m.module] }
+          }
+        } else if (map.mode === 'greater_than') {
+          if (dpVal < briefVal) {
+            return { score: -2000, passed: false, reasons: [`brief constraint ${map.field} VIOLATED on ${m.module}: design=${dpVal} < brief.${map.briefKey}=${briefVal}. FIX: increase ${map.dpKey} to ≥ ${briefVal}.`], affected: [m.module] }
+          }
+        } else {
+          const errPct = Math.abs(dpVal - briefVal) / briefVal
+          if (errPct > map.tolerance) {
+            return { score: -2000, passed: false, reasons: [`brief constraint ${map.field} DRIFT on ${m.module}: design=${dpVal} vs brief.${map.briefKey}=${briefVal} (${(errPct * 100).toFixed(0)}% off, tolerance ${(map.tolerance * 100).toFixed(0)}%). FIX: align ${map.dpKey} to ${briefVal} ±${(map.tolerance * 100).toFixed(0)}%.`], affected: [m.module] }
+          }
+        }
+      }
+    }
+    return emptyResult()
+  },
+}
+
+/**
+ * Closed-loop heat-rejection gate (2026-05-20 iter-9 Step 3).
+ *
+ * Verify chain finding: "design includes a chilled water loop with a
+ * 25 kW sensible cooling coil, a pump, and a 50L buffer tank, but
+ * there is no chiller or external heat rejection source connected
+ * to this loop. Without a chiller to remove heat from the water, the
+ * loop cannot provide any continuous cooling."
+ *
+ * Rule: any module that declares a fluid loop (cooling_capacity_kw +
+ * pump-related derived_parameters) MUST have a heat-rejection source
+ * (chiller, dry cooler, condenser, heat exchanger). Detection by
+ * sub-module / word inspection for chiller-class components.
+ *
+ * Universal: applies to every product class with a chilled-water or
+ * coolant loop (BESS, VF HVAC, data centre, EV charger DC stack).
+ */
+const closedFluidLoopHeatRejectionGate: ArithmeticGate = {
+  name: 'closed_fluid_loop_heat_rejection',
+  description: 'any module with a chilled/coolant loop must include a heat-rejection device (chiller, dry cooler, condenser)',
+  evaluate(modules) {
+    for (const m of modules) {
+      const dp = m.derived_parameters
+      if (!dp) continue
+      // Trigger: declares cooling capacity + something pump-related (manifold/pump/flow)
+      const hasCoolingKw = num(dp, 'cooling_capacity_kw', 'thermal_capacity_kw') !== null
+      const hasFlow = num(dp, 'coolant_flow_rate_lpm', 'flow_rate_lpm', 'cold_plate_count') !== null
+      if (!hasCoolingKw || !hasFlow) continue
+
+      // Search the module's words for chiller/dry-cooler/condenser indicators
+      const subs = ((m as any).sub_modules ?? []) as any[]
+      const blob = JSON.stringify(subs ?? []).toLowerCase()
+      const rejectionPatterns = /(chiller|dry[\s-]?cooler|cooling[\s-]?tower|condenser|heat[\s-]?reject|outdoor[\s-]?unit|fluid[\s-]?cooler)/
+      if (rejectionPatterns.test(blob)) {
+        return { score: 400, passed: true, reasons: [`closed-loop OK on ${m.module}: cooling loop declared + heat-rejection device present`], affected: [m.module] }
+      }
+      return { score: -2200, passed: false, reasons: [`closed-loop INCOMPLETE on ${m.module}: cooling_capacity_kw + pump declared but NO heat-rejection device found (no chiller / dry cooler / condenser / cooling tower / heat exchanger in sub-modules). Without it the loop cannot dissipate heat continuously. FIX: add a chiller / dry cooler / condenser word to one of this module's sub-modules, OR route heat to environmental_interface.`], affected: [m.module] }
+    }
+    return emptyResult()
+  },
+}
+
+/**
+ * Part-number-implied-capacity gate (2026-05-20 iter-9 Step 3).
+ *
+ * Verify chain finding: "Copeland ZR18K5E-TFD compressor for an '18 kW
+ * cooling capacity' system. However, the ZR18K5E has a nominal capacity
+ * of only 18,000 BTU/hr, which equates to 5.27 kW of cooling capacity
+ * under standard ARI conditions. This is 12.73 kW short of the required
+ * 18 kW peak refrigeration load."
+ *
+ * Common LLM hallucination: confuse the model-number-as-capacity (e.g.
+ * "ZR18K" means 18,000 BTU/hr ≈ 5.3 kW, NOT 18 kW). Parse part_numbers
+ * for known manufacturer capacity-encoding suffixes (Copeland ZR/ZP
+ * scrolls use BTU/hr × 1000 suffix) and compare against claimed kW.
+ *
+ * Universal: applies to any module with HVAC compressor parts. Pattern
+ * bank can grow; today's bank handles Copeland scroll convention.
+ */
+const partNumberCapacityVsModelGate: ArithmeticGate = {
+  name: 'part_number_capacity_vs_model',
+  description: 'compressor SKU model-number-implied capacity matches claimed kW (catches Copeland ZR18K = 18000 BTU/hr ≠ 18 kW)',
+  evaluate(modules) {
+    // Pattern bank: (regex_for_part_number, capacity_inferer_function, suggestion)
+    // Returns kW implied by the model number, or null if pattern doesn't apply.
+    const PATTERNS: Array<{ re: RegExp; impliedKw: (m: RegExpMatchArray) => number | null; hint: string }> = [
+      // Copeland scroll: ZP/ZR + 2-3 digits = BTU/hr × 1000 (cooling)
+      // e.g. ZR18K = 18,000 BTU/hr ≈ 5.27 kW; ZR72K ≈ 21.1 kW; ZP380K ≈ 111 kW
+      { re: /\b(?:ZR|ZP|ZF|ZB)(\d{2,4})K/i, impliedKw: (m) => parseInt(m[1], 10) * 1000 / 3412, hint: 'Copeland ZR/ZP/ZF scroll: ZRxxxK suffix is BTU/hr × 1000 (e.g. ZR18K = 18,000 BTU/hr ≈ 5.3 kW). For 18 kW cooling use ZR72K-class.' },
+      // Mean Well LED driver: HLG-NNNH-XX or CSP-NNN-XX where NNN is watts
+      // e.g. HLG-320H-48 = 320 W, CSP-3000-48 = 3000 W
+      { re: /\b(?:HLG|CSP|XLG|ELG|LRS|LCM)-?(\d{3,4})/i, impliedKw: (m) => parseInt(m[1], 10) / 1000, hint: 'Mean Well driver series: HLG-NNN / CSP-NNN suffix is power in watts. HLG-320H = 320 W; need CSP-3000 class for 3 kW.' },
+    ]
+    for (const m of modules) {
+      const dp = m.derived_parameters
+      const subs = ((m as any).sub_modules ?? []) as any[]
+      const claimedKw = num(dp, 'cooling_capacity_kw', 'rated_thermal_kw', 'thermal_capacity_kw', 'rated_electrical_kw', 'driver_power_w')
+      if (claimedKw === null) continue
+      for (const sm of subs) {
+        for (const w of (sm.words ?? [])) {
+          const mods = (w as any)?.modifier_characters ?? []
+          const pn = String((mods as any[]).find((mc: any) => String(mc?.kind ?? '').toLowerCase() === 'part_number')?.value ?? '')
+          if (!pn) continue
+          for (const pat of PATTERNS) {
+            const match = pn.match(pat.re)
+            if (!match) continue
+            const implied = pat.impliedKw(match)
+            if (implied === null || !Number.isFinite(implied) || implied <= 0) continue
+            // For LED drivers, compare to driver_power_w (already in W not kW)
+            // Convert claimed for fair comparison
+            const claimedComparable = pat.re.source.includes('HLG|CSP') ? (claimedKw / 1000) : claimedKw  // claimed driver_power_w is W not kW
+            const claimedToCompare = pat.re.source.includes('HLG|CSP') ? (num(dp, 'driver_power_w') ?? null) : claimedKw
+            if (claimedToCompare === null) continue
+            const claimedKwForCheck = pat.re.source.includes('HLG|CSP') ? (claimedToCompare / 1000) : claimedToCompare
+            const ratio = claimedKwForCheck / implied
+            void claimedComparable
+            if (ratio >= 2.0) {
+              return { score: -2500, passed: false, reasons: [`SKU CAPACITY MISMATCH on ${m.module}.${(sm as any).id}.${(w as any).id}: part_number "${pn}" implies ~${implied.toFixed(1)} kW but design claims ${claimedKwForCheck.toFixed(1)} kW (${ratio.toFixed(1)}× over). ${pat.hint}`], affected: [m.module] }
+            }
+          }
+        }
+      }
+    }
+    return emptyResult()
+  },
+}
+
 // ─── Registry ───────────────────────────────────────────────────────────────
 
 export const UNIVERSAL_ARITHMETIC_GATES: ArithmeticGate[] = [
@@ -835,6 +1010,9 @@ export const UNIVERSAL_ARITHMETIC_GATES: ArithmeticGate[] = [
   driverLoadPowerBalanceGate,
   fluidPressureBalanceGate,
   fanStaticPressureFeasibilityGate,
+  briefConstraintPropagationGate,
+  closedFluidLoopHeatRejectionGate,
+  partNumberCapacityVsModelGate,
 ]
 
 export function runArithmeticGates(modules: ModuleSpec[]): {

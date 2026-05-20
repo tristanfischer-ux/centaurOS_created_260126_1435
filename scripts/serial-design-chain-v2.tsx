@@ -1941,6 +1941,11 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   let finalIters = 0
   while (repairIter < PHASE2_MAX_ITERS && !allPassed) {
     const t = translate(design.modules ?? [], design.cross_module_grammar_links ?? [])
+    // 2026-05-20 iter-9 Step 3: stamp brief constraints onto the translated
+    // modules array so the briefConstraintPropagationGate can compare
+    // derived_parameters against brief.target_performance / max_mass_kg /
+    // unit_cost_ceiling. The gate reads (modules as any).__briefConstraints.
+    ;(t.modules as any).__briefConstraints = parsedResult.data?.constraints ?? null
     const arith = runArithmeticGates(t.modules)
     const grammar = runGrammarGates(t.modules, t.crossLinks, productClass)
     finalArith = arith
