@@ -2616,6 +2616,29 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     console.error('[chain] CHAIN_SKIP_SUPPLIERS=1 — skipping suppliers enrichment step')
   }
 
+  // ── Supplier Contact Validation (Sprint 3A, Tristan 2026-05-20 fifth
+  // review): post-process state.suppliers, for each candidate verify the
+  // website_url's host apex shares tokens with the company name. If not,
+  // do a Brave search "{name} UK" and replace with a reconciling result.
+  // If no reconciling result, drop the bad website/email. Universal
+  // across product classes. Fail-soft. Skip via
+  // CHAIN_SKIP_SUPPLIER_VALIDATION=1.
+  if (process.env.CHAIN_SKIP_SUPPLIER_VALIDATION !== '1') {
+    const tVal = Date.now()
+    try {
+      execFileSync('npx', ['tsx', resolve(__dirname, 'validate-supplier-contacts.tsx'), statePath, '--write'], {
+        stdio: 'inherit',
+        cwd: resolve(__dirname, '..'),
+      })
+      logAction({ step: 'supplier_contact_validation', latency_ms: Date.now() - tVal, ok: true })
+    } catch (err) {
+      console.error(`[chain] supplier-contact-validation failed: ${(err as Error).message}; continuing without`)
+      logAction({ step: 'supplier_contact_validation', latency_ms: Date.now() - tVal, ok: false, error: String(err).slice(0, 200) })
+    }
+  } else {
+    console.error('[chain] CHAIN_SKIP_SUPPLIER_VALIDATION=1 — skipping supplier-contact-validation step')
+  }
+
   // ── Deployment envelope (Task #248, 2026-05-19): persist the canonical
   // shipping/installation envelope for the product class onto state. The PA
   // pipeline (stages/3-size-layout.ts) already does this but is NOT reachable
