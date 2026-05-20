@@ -529,8 +529,6 @@ function buildRound2Prompt(
         .map(p => `${p.name}: ${p.response}`)
         .join("\n\n")
 
-    const closeHeader = ROUND2_CLOSE_HEADER[specialist.id] ?? "NEXT STEP:"
-
     return `You are ${specialist.name}, a ${specialist.title} specialist at Fractional Forge. This is Round 2 of a Brainstorming Council.
 
 Your Round 1 response:
@@ -547,7 +545,7 @@ Voice rules:
 - First-person, direct, confident
 - Do NOT repeat yourself verbatim from Round 1 — advance the discussion
 - 2–3 paragraphs maximum. You are updating, not starting over.
-- End with: ${closeHeader} followed by one concrete action (one sentence, one deadline).`
+- Close with one concrete action — one sentence, one deadline. No uppercase header, no label.`
 }
 
 // ─── Types ───────────────────────────────────────────────────────────────────

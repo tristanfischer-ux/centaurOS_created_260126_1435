@@ -830,8 +830,9 @@ export async function getSupplierDirectoryStats(): Promise<SupplierDirectoryStat
   // stats are shown before search on the authenticated /marketplace page.
   const admin = createAdminClient()
 
-  // Run all four chart-data queries in parallel
-  const [categoryRes, capabilitiesRes, materialsRes, countryRes] = await Promise.allSettled([
+  // Run all four chart-data queries + the summary-stats query in parallel.
+  // The summary query uses head:true so PostgREST returns only a COUNT — no row payload.
+  const [categoryRes, capabilitiesRes, materialsRes, countryRes, totalRes, certsRes] = await Promise.allSettled([
     // Category / supplier_type breakdown — read all attributes, aggregate client-side
     admin
       .from('marketplace_listings')
@@ -852,22 +853,51 @@ export async function getSupplierDirectoryStats(): Promise<SupplierDirectoryStat
       .in('category', ['Products', 'Services'])
       .not('materials', 'is', null),
 
-    // Countries — read country_iso
+    // Countries — read country_iso (also used to count distinct countries)
     admin
       .from('marketplace_listings')
       .select('country_iso')
       .in('category', ['Products', 'Services'])
       .not('country_iso', 'is', null),
+
+    // Summary: total count (head:true → no rows, just count header)
+    admin
+      .from('marketplace_listings')
+      .select('id', { count: 'exact', head: true })
+      .in('category', ['Products', 'Services']),
+
+    // Certifications — pull the JSONB column, count non-empty arrays client-side
+    // (PostgREST cannot express `jsonb_array_length > 0` directly in a filter)
+    admin
+      .from('marketplace_listings')
+      .select('certifications')
+      .in('category', ['Products', 'Services'])
+      .not('certifications', 'is', null),
   ])
 
-  // ── Hardcoded summary stats (queried 2026-04-25, project jyarhvinengfyrwgtskq) ──
-  // DECISION: Same pattern as getInvestorDirectoryStats — live count on 20K+ rows
-  // adds unnecessary latency. Refresh alongside the Nightshift push script.
+  // ── Live summary stats (replaces hardcoded 2026-04-25 snapshot which had
+  // drifted ~3.2k below true count by 2026-05-20). `getSupplierDirectoryStats`
+  // is wrapped at the page-component level with `unstable_cache(..., { revalidate: 300 })`
+  // so we pay the COUNT cost at most once per 5 minutes per region.
+  const totalCount = totalRes.status === 'fulfilled' ? (totalRes.value.count ?? 0) : 0
+  const certsCount = certsRes.status === 'fulfilled' && certsRes.value.data
+    ? (certsRes.value.data as Array<{ certifications: unknown }>).filter(r => {
+        const c = r.certifications
+        return Array.isArray(c) ? c.length > 0 : false
+      }).length
+    : 0
+  const distinctCountries = countryRes.status === 'fulfilled' && countryRes.value.data
+    ? new Set(
+        (countryRes.value.data as Array<{ country_iso: string }>)
+          .map(r => r.country_iso)
+          .filter((c): c is string => typeof c === 'string' && c.length > 0)
+      ).size
+    : 0
   const HARDCODED_STATS = {
-    total: 19930,         // queried 2026-04-25
-    verified: 19,         // queried 2026-04-25
-    withCertifications: 14134, // queried 2026-04-25 (jsonb_array_length > 0)
-    countries: 18,        // queried 2026-04-25 (distinct country_iso)
+    total: totalCount,
+    verified: 0,               // no `verified` column on marketplace_listings — kept for type compat
+    withCertifications: certsCount,
+    countries: distinctCountries,
   }
 
   // ── Category breakdown ────────────────────────────────────────────────────────

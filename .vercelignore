@@ -10,6 +10,11 @@ mobile-team-screenshots/
 mobile-verification/
 settings-verification/
 scripts/extracted_datasheet_specs/
+/report-compiler-prototype/
+/iter-outputs/
+/handovers/
+/tmp/
+/.claude/worktrees/
 
 # Test/debug artifacts (NOT public/ — those are production assets)
 screenshots/*.png
