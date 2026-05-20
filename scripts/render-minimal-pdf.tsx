@@ -3019,6 +3019,245 @@ function subModuleBomSubtotal(bomTotals: BomTotals | null, moduleId: string, sub
   return { lines: sub.parts as BomLineWithStatus[], subtotal: sub.subtotal_gbp }
 }
 
+// ─── ITER-10.5 (Tristan-defined 2026-05-20) ────────────────────────────────
+//
+// Chain V2-style BoM rendering with separate Notes block beneath each
+// sub-module. Replaces the iter-10 cramped 3-deep-numbered inline BoM with
+// 4-letter status badges. Tristan reference: image #2 (Chain V2 BoM look).
+//
+// Reader experience: the eye sees a clean tabular BoM (Part / Mfr / P/N /
+// Qty / Unit / Line / Src · Ref + sub-total). Parts that need attention get
+// a small superscript number after the part name. The Notes section beneath
+// (italics, smaller font, numbered list) carries the narrative for each
+// flagged row — replacement recommendations, verification flags, custom-
+// source requirements, manual review observations.
+
+/** A single Notes-block entry. word_id (if present) links the note back to
+ *  the BoM row via superscript number. */
+interface SubModuleNote {
+  idx: number
+  word_id?: string
+  text: string
+  severity?: 'info' | 'warn' | 'error'
+}
+
+/** Unicode superscript helper. Helvetica covers ⁰-⁹ glyphs. */
+function toSuperscript(n: number): string {
+  const sup: Record<string, string> = {
+    '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+    '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+  }
+  return String(n).split('').map(c => sup[c] ?? c).join('')
+}
+
+/** Source-method short label for the BoM SRC column. */
+function srcLabelForRow(row: BomPartRow): string {
+  const s = String(row.source_method ?? '').toLowerCase()
+  if (s.includes('distributor') || s === 'web' || s.includes('web')) return 'Web'
+  if (s.includes('lm') || s.includes('estimate') || row.price_tier === 'estimate') return 'Est.'
+  if (s.includes('manufacturer')) return 'Mfr'
+  return '—'
+}
+
+/** Engine C price-reality flag for the BoM REF column. */
+function priceRealityRefForRow(row: BomPartRow): string {
+  const flag = row.engine_c_flag
+  if (flag === 'in_range') return 'OK'
+  if (flag === 'over') return '>2x'
+  if (flag === 'under') return '<.5x'
+  return '-'
+}
+
+/** Plain-English note text for a flagged BoM row.
+ *  Replaces the cramped inline italic sub-row from iter-10. */
+function noteTextForFlaggedRow(row: BomPartRow, recommendations: any[]): string | null {
+  const c = classifyVerificationStatus(row, recommendations)
+  if (c.status === 'verified') return null
+  if (!c.subRow) return null
+  // Strip the iter-10 arrow/symbol prefixes; they made sense alongside a
+  // badge but now the note IS the signal.
+  return c.subRow.replace(/^[→ⓘ]\s*/u, '').replace(/^Use instead:\s*/, 'Replacement recommended — use instead: ')
+}
+
+/** Collect notes for one sub-module from every source the chain emits.
+ *  Numbers them sequentially; the noteIndexMap is what the BoM renderer
+ *  uses for superscripts. */
+function noteCollectorForSubModule(
+  bomLines: BomPartRow[],
+  recommendations: any[],
+  manualReviewBadges: ManualReviewBadge[],
+  state: any,
+  moduleId: string,
+  subModuleId: string,
+): SubModuleNote[] {
+  const notes: SubModuleNote[] = []
+  // 1. Per-row replacement / verification / custom-source notes
+  for (const row of bomLines) {
+    const text = noteTextForFlaggedRow(row, recommendations)
+    if (text) {
+      notes.push({ idx: notes.length + 1, word_id: row.word_id, text, severity: 'warn' })
+    }
+  }
+  // 2. Manual review badges scoped to this sub-module (badges may carry a
+  //    sub_module_id or module_id matcher; we accept either + a part-number
+  //    fallback so legacy state.json files still render the content).
+  for (const b of manualReviewBadges ?? []) {
+    const bAny = b as any
+    const bSub = String(bAny.sub_module_id ?? '')
+    const bMod = String(bAny.module_id ?? '')
+    if (bSub && bSub !== subModuleId) continue
+    if (!bSub && bMod && bMod !== moduleId) continue
+    if (!bSub && !bMod) continue  // module-level badges handled at module bottom
+    const text = String(bAny.narrative ?? bAny.summary ?? bAny.label ?? '').trim()
+    if (!text) continue
+    notes.push({ idx: notes.length + 1, text, severity: 'warn' })
+  }
+  // 3. Physics-critic findings whose where_path resolves to this sub-module
+  const issues: any[] = Array.isArray(state?.physicsCritique?.issues) ? state.physicsCritique.issues : []
+  for (const i of issues) {
+    const sev = String(i.severity ?? '').toLowerCase()
+    if (sev !== 'high' && sev !== 'critical') continue
+    const where = String(i.where ?? '')
+    if (!where.startsWith(moduleId)) continue
+    // where ~ "energy_conversion_transduction/sub_modules[0]/words[1]"
+    const subMatch = where.match(/sub_modules\[(\d+)\]/)
+    if (!subMatch) continue
+    // We don't have the index→id mapping reliably here; trust the
+    // module-level Engineering Review Notes block to catch these too.
+    // To avoid duplicate noise, skip — they'll render in module-bottom block.
+  }
+  return notes
+}
+
+/** Chain V2-style BoM table per sub-module (Tristan reference image #2).
+ *  7 columns: PART · MANUFACTURER · PART NUMBER · QTY · UNIT (£) · LINE (£) · SRC · REF
+ *  Superscript number on PART column if noteIndexMap has the row's word_id. */
+function SubModuleBomBlock({
+  bomLines,
+  subtotal,
+  subModuleName,
+  noteIndexMap,
+}: {
+  bomLines: BomPartRow[]
+  subtotal: number
+  subModuleName: string
+  noteIndexMap: Map<string, number>
+}) {
+  if (bomLines.length === 0) return null
+  return (
+    <View style={{ marginTop: 8, marginBottom: 6, marginLeft: 36 }}>
+      {/* Header row */}
+      <View style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: RULE, paddingBottom: 3 }}>
+        <Text style={{ flex: 2.6, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>PART</Text>
+        <Text style={{ flex: 1.4, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>MANUFACTURER</Text>
+        <Text style={{ flex: 1.6, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>PART NUMBER</Text>
+        <Text style={{ width: 30, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>QTY</Text>
+        <Text style={{ width: 50, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>UNIT (£)</Text>
+        <Text style={{ width: 55, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>LINE (£)</Text>
+        <Text style={{ width: 60, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, paddingLeft: 6 }}>SRC · REF</Text>
+      </View>
+      {/* Data rows */}
+      {bomLines.map((row, ri) => {
+        const noteIdx = noteIndexMap.get(row.word_id)
+        const partLabel = noteIdx ? `${row.word_name ?? '—'}${toSuperscript(noteIdx)}` : (row.word_name ?? '—')
+        const unitPriceCell = row.unit_price_gbp > 0
+          ? `~£${row.unit_price_gbp.toFixed(2)}`
+          : '—'
+        const lineCell = row.line_total_gbp > 0
+          ? `£${row.line_total_gbp.toFixed(2)}`
+          : '—'
+        const src = srcLabelForRow(row)
+        const ref = priceRealityRefForRow(row)
+        const refColor = ref === '>2x' ? '#b91c1c' : ref === '<.5x' ? '#1d4ed8' : ref === 'OK' ? '#15803d' : MUTED
+        return (
+          <View
+            key={`bom-${ri}`}
+            style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}
+          >
+            <Text style={{ flex: 2.6, fontSize: 9, color: INK }}>{partLabel}</Text>
+            <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT }}>{row.manufacturer ?? '—'}</Text>
+            <Text style={{ flex: 1.6, fontSize: 8.5, color: INK_SOFT, fontFamily: 'Helvetica-Bold' }}>{row.part_number ?? '—'}</Text>
+            <Text style={{ width: 30, fontSize: 9, color: INK, textAlign: 'right' }}>×{row.quantity ?? 1}</Text>
+            <Text style={{ width: 50, fontSize: 9, color: INK, textAlign: 'right' }}>{unitPriceCell}</Text>
+            <Text style={{ width: 55, fontSize: 9, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>{lineCell}</Text>
+            <View style={{ width: 60, paddingLeft: 6, flexDirection: 'row', alignItems: 'baseline' }}>
+              <Text style={{ fontSize: 8, color: MUTED }}>{src}</Text>
+              <Text style={{ fontSize: 8, color: refColor, fontFamily: 'Helvetica-Bold', marginLeft: 4 }}>{ref}</Text>
+            </View>
+          </View>
+        )
+      })}
+      {/* Sub-total row */}
+      <View style={{ flexDirection: 'row', paddingTop: 5, paddingBottom: 3, borderTopWidth: 0.6, borderTopColor: RULE }}>
+        <Text style={{ flex: 7.6, fontSize: 8.5, color: INK_SOFT, fontStyle: 'italic' }}>
+          Sub-total — {subModuleName}
+        </Text>
+        <Text style={{ width: 55, fontSize: 9.5, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>
+          £{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </Text>
+        <View style={{ width: 60 }} />
+      </View>
+    </View>
+  )
+}
+
+/** Notes block beneath a sub-module BoM. Italic, ≤8pt, numbered list. */
+function NotesBlock({ notes }: { notes: SubModuleNote[] }) {
+  if (notes.length === 0) return null
+  return (
+    <View style={{ marginLeft: 36, marginTop: 4, marginBottom: 8, paddingLeft: 6, paddingTop: 4, borderLeftWidth: 1.5, borderLeftColor: RULE }}>
+      <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK_SOFT, marginBottom: 3, letterSpacing: 0.4 }}>
+        NOTES
+      </Text>
+      {notes.map(n => (
+        <Text
+          key={n.idx}
+          style={{ fontSize: 8, color: INK_SOFT, lineHeight: 1.5, marginBottom: 2.5, fontStyle: 'italic' }}
+        >
+          <Text style={{ fontFamily: 'Helvetica-Bold', color: ACCENT }}>{n.idx}. </Text>
+          {n.text}
+        </Text>
+      ))}
+    </View>
+  )
+}
+
+/** Module-level Design Trade-offs block (Phase F will populate properly;
+ *  for now reads state.designDecisionsReview.choices filtered by scope
+ *  matching the moduleId). Drops engine-internal labels per Tristan. */
+function ModuleDesignTradeOffsBlock({ state, moduleId }: { state: any; moduleId: string }) {
+  const review = state?.designDecisionsReview
+  if (!review || !Array.isArray(review.choices) || review.choices.length === 0) return null
+  const scopeMatchesModule = (scope: string): boolean => {
+    if (!scope) return false
+    const s = String(scope).toLowerCase()
+    // accept exact module match, sub-module path that starts with module, or "<module>." prefix
+    return s === moduleId || s.startsWith(moduleId + '/') || s.startsWith(moduleId + '.') || s.includes(moduleId)
+  }
+  const choices = review.choices.filter((c: any) => scopeMatchesModule(String(c.scope ?? '')))
+  if (choices.length === 0) return null
+  return (
+    <View style={{ marginTop: 14, paddingTop: 10, paddingHorizontal: 12, paddingBottom: 8, backgroundColor: '#fbfcfe', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 4 }} wrap={false}>
+      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, letterSpacing: 0.6, marginBottom: 6 }}>
+        DESIGN TRADE-OFFS — this module
+      </Text>
+      {choices.map((c: any, idx: number) => (
+        <View key={`tradeoff-${idx}`} style={{ marginBottom: 6 }}>
+          <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold' }}>{String(c.what ?? '').replace(/\s+/g, ' ').trim()}</Text>
+            {c.alternative ? ` — chosen over: ${String(c.alternative).replace(/\s+/g, ' ').trim()}.` : ''}
+          </Text>
+          {c.rationale ? (
+            <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.45, marginTop: 2 }}>
+              {String(c.rationale).replace(/\s+/g, ' ').trim()}
+            </Text>
+          ) : null}
+        </View>
+      ))}
+    </View>
+  )
+}
+
 function ModuleSection({
   index,
   moduleSpec,
@@ -3029,6 +3268,7 @@ function ModuleSection({
   bomTotals,
   state,
   partRecommendations,
+  manualReviewBadges,
 }: {
   index: number
   moduleSpec: any
@@ -3039,6 +3279,7 @@ function ModuleSection({
   bomTotals?: BomTotals | null
   state?: any
   partRecommendations?: any[]
+  manualReviewBadges?: ManualReviewBadge[]
 }) {
   const id = moduleSpec.module
   const title = module_title(moduleSpec)
@@ -3082,17 +3323,14 @@ function ModuleSection({
     paragraph: v.paragraph || v.sentence,
   }))
 
-  // ITER-10 IA restructure: gather module-level status strip data + review notes
+  // ITER-10.5: status strip is COST ONLY (Tristan D15). Review-note count,
+  // part count, and procurement-exception count chips are dropped — Tristan
+  // said only Cost is scanned by the reader.
   const moduleBom = bomTotals?.allMods.find(m => m.module === moduleSpec.module) ?? null
   const moduleCostGbp = moduleBom?.subtotal_gbp ?? 0
-  const modulePartCount = moduleBom?.subs.reduce((n, sm) => n + sm.parts.length, 0) ?? 0
   const reviewNotes = state ? reviewNotesForModule(state, moduleSpec.module) : []
-  const procurementExceptions = (moduleBom?.subs ?? []).flatMap(s => s.parts).filter(p => {
-    const c = classifyVerificationStatus(p, partRecommendations ?? [])
-    return c.status === 'replaced' || c.status === 'verify' || c.status === 'custom_source'
-  }).length
-
   const recs = partRecommendations ?? []
+  const badges = manualReviewBadges ?? []
 
   return (
     <Page size="A4" style={PAGE_STYLE}>
@@ -3105,18 +3343,12 @@ function ModuleSection({
         <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 2 }}>
           {title}
         </Text>
-        {/* ITER-10 status strip (council #9) — module-level metrics at a glance */}
-        {(moduleCostGbp > 0 || modulePartCount > 0 || reviewNotes.length > 0) ? (
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginTop: 8, paddingTop: 6, borderTopWidth: 0.5, borderTopColor: RULE_SOFT }}>
-            {moduleCostGbp > 0 ? <Text style={{ fontSize: 9, color: INK_SOFT }}><Text style={{ color: MUTED }}>Cost </Text><Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>£{Math.round(moduleCostGbp).toLocaleString()}</Text></Text> : null}
-            {modulePartCount > 0 ? <Text style={{ fontSize: 9, color: INK_SOFT }}><Text style={{ color: MUTED }}>Parts </Text><Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{modulePartCount}</Text></Text> : null}
-            <Text style={{ fontSize: 9, color: reviewNotes.length > 0 ? '#92400e' : INK_SOFT }}>
-              <Text style={{ color: MUTED }}>Review notes </Text>
-              <Text style={{ fontFamily: 'Helvetica-Bold', color: reviewNotes.length > 0 ? '#92400e' : INK }}>{reviewNotes.length}</Text>
-            </Text>
-            <Text style={{ fontSize: 9, color: procurementExceptions > 0 ? '#b91c1c' : INK_SOFT }}>
-              <Text style={{ color: MUTED }}>Procurement exceptions </Text>
-              <Text style={{ fontFamily: 'Helvetica-Bold', color: procurementExceptions > 0 ? '#b91c1c' : INK }}>{procurementExceptions}</Text>
+        {/* ITER-10.5: Cost-only strip (Tristan D15). */}
+        {moduleCostGbp > 0 ? (
+          <View style={{ flexDirection: 'row', marginTop: 8, paddingTop: 6, borderTopWidth: 0.5, borderTopColor: RULE_SOFT }}>
+            <Text style={{ fontSize: 10, color: INK_SOFT }}>
+              <Text style={{ color: MUTED }}>Cost </Text>
+              <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>£{moduleCostGbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
             </Text>
           </View>
         ) : null}
@@ -3148,26 +3380,27 @@ function ModuleSection({
       <View style={{ borderTopWidth: 0.6, borderTopColor: RULE_SOFT }}>
         {subModules.map(sm => {
           const proseChunks = break_paragraph(sm.paragraph || '—')
-          // ITER-10 (C1 + C2): inline BoM per sub-module with verification status
+          // ITER-10.5: clean Chain V2 BoM + numbered Notes block (Tristan ref
+          // image #2). Replaces the cramped 3-deep numbering + 4-letter
+          // status badges of iter-10.
           const { lines: subBomLines, subtotal: subBomSubtotal } = subModuleBomSubtotal(bomTotals ?? null, moduleSpec.module, sm.id)
+          const notes = state ? noteCollectorForSubModule(subBomLines, recs, badges, state, moduleSpec.module, sm.id) : []
+          const noteIndexMap = new Map<string, number>()
+          for (const n of notes) {
+            if (n.word_id) noteIndexMap.set(n.word_id, n.idx)
+          }
           return (
             <View
               key={sm.id}
-              wrap={false}
               style={{ paddingVertical: 11, borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT }}
             >
-              <View style={{ flexDirection: 'row', marginBottom: 5, alignItems: 'baseline' }}>
+              <View style={{ flexDirection: 'row', marginBottom: 5, alignItems: 'baseline' }} wrap={false}>
                 <Text style={{ width: 36, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT_SOFT }}>
                   {index}.{sm.idx}
                 </Text>
                 <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK }}>
                   {britishise(sm.name.charAt(0).toUpperCase() + sm.name.slice(1))}
                 </Text>
-                {subBomSubtotal > 0 ? (
-                  <Text style={{ fontSize: 10, color: INK_SOFT, fontFamily: 'Helvetica-Bold' }}>
-                    £{Math.round(subBomSubtotal).toLocaleString()}
-                  </Text>
-                ) : null}
               </View>
               {proseChunks.map((chunk, ci) => (
                 <Text
@@ -3177,52 +3410,34 @@ function ModuleSection({
                   {partLinkMap && partLinkMap.size > 0 ? renderProseWithLinks(chunk, partLinkMap) : chunk}
                 </Text>
               ))}
-              {/* ITER-10 C1 + C2: inline BoM table per sub-module with verification badges */}
-              {subBomLines.length > 0 ? (
-                <View style={{ marginLeft: 36, marginTop: 6, marginBottom: 4 }}>
-                  <View style={{ flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: RULE_SOFT, paddingBottom: 3 }}>
-                    <Text style={{ width: 30, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>#</Text>
-                    <Text style={{ flex: 3, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>PART</Text>
-                    <Text style={{ flex: 2, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>MFR · P/N</Text>
-                    <Text style={{ width: 30, fontSize: 7.5, color: MUTED, letterSpacing: 0.5, textAlign: 'right' }}>QTY</Text>
-                    <Text style={{ width: 50, fontSize: 7.5, color: MUTED, letterSpacing: 0.5, textAlign: 'right' }}>£</Text>
-                    <Text style={{ width: 70, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>STATUS</Text>
-                  </View>
-                  {subBomLines.map((row, ri) => {
-                    const c = classifyVerificationStatus(row, recs)
-                    const badge = v2StatusBadge(c.status)
-                    return (
-                      <View key={`r-${ri}`}>
-                        <View style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'flex-start' }}>
-                          <Text style={{ width: 30, fontSize: 8, color: MUTED }}>{index}.{sm.idx}.{ri + 1}</Text>
-                          <Text style={{ flex: 3, fontSize: 8.5, color: INK }}>{row.word_name ?? '—'}</Text>
-                          <Text style={{ flex: 2, fontSize: 8, color: INK_SOFT }}>
-                            {row.manufacturer ?? ''}
-                            {row.manufacturer && row.part_number ? ' · ' : ''}
-                            {row.part_number ?? ''}
-                          </Text>
-                          <Text style={{ width: 30, fontSize: 8.5, color: INK, textAlign: 'right' }}>×{row.quantity ?? 1}</Text>
-                          <Text style={{ width: 50, fontSize: 8.5, color: INK, textAlign: 'right' }}>£{row.line_total_gbp ? Math.round(row.line_total_gbp).toLocaleString() : '—'}</Text>
-                          <View style={{ width: 70, paddingLeft: 2 }}>
-                            <View style={{ alignSelf: 'flex-start', paddingHorizontal: 4, paddingVertical: 1, backgroundColor: badge.bg, borderRadius: 2 }}>
-                              <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: badge.fg, letterSpacing: 0.3 }}>{badge.sym} {badge.label}</Text>
-                            </View>
-                          </View>
-                        </View>
-                        {c.subRow ? (
-                          <View style={{ paddingLeft: 30, paddingRight: 4, paddingVertical: 3, backgroundColor: '#fafafa', borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
-                            <Text style={{ fontSize: 7.5, color: '#475569', lineHeight: 1.4, fontStyle: 'italic' }}>{c.subRow}</Text>
-                          </View>
-                        ) : null}
-                      </View>
-                    )
-                  })}
-                </View>
-              ) : null}
+              <SubModuleBomBlock
+                bomLines={subBomLines}
+                subtotal={subBomSubtotal}
+                subModuleName={britishise(sm.name)}
+                noteIndexMap={noteIndexMap}
+              />
+              <NotesBlock notes={notes} />
             </View>
           )
         })}
       </View>
+
+      {/* ITER-10.5 Phase F: Per-module Design Trade-offs (folded in from the
+          deleted standalone DesignTradeOffsPage per Tristan directive). */}
+      {state ? <ModuleDesignTradeOffsBlock state={state} moduleId={moduleSpec.module} /> : null}
+
+      {/* Module total — sits below trade-offs, immediately before Engineering
+          Review Notes. Mirrors the Chain V2 module-total row. */}
+      {moduleCostGbp > 0 ? (
+        <View style={{ marginTop: 10, paddingVertical: 8, paddingHorizontal: 10, backgroundColor: '#f1f5f9', borderRadius: 4, flexDirection: 'row', alignItems: 'baseline' }} wrap={false}>
+          <Text style={{ flex: 1, fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK }}>
+            Module {index} total — {title}
+          </Text>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT }}>
+            £{moduleCostGbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </Text>
+        </View>
+      ) : null}
 
       {/* ITER-10 C3: Engineering Review Notes block at the bottom of each module */}
       {reviewNotes.length > 0 ? (
@@ -5234,6 +5449,7 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
           bomTotals={bomTotals}
           state={state}
           partRecommendations={Array.isArray(state?.partRecommendations) ? state.partRecommendations : []}
+          manualReviewBadges={manualReviewBadges}
         />
       ))}
       {/* Phase H/J will merge SystemLevelRisksPage + RiskPage into a single
