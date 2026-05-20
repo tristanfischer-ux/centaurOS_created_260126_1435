@@ -3081,12 +3081,13 @@ function SubModuleBomBlock({
         </Text>
         <View style={{ width: 60 }} />
       </View>
-      {/* Column legend — explains the SOURCE · CHECK abbreviations so the
-          reader knows what "Web", "Est.", ">2x", "<.5x", "OK" mean.
-          Rendered after every sub-module BoM table per Tristan: "each
-          time you do it, you're going to have to say what it is". */}
+      {/* Column legend — explains the SOURCE · CHECK abbreviations in
+          plain English. Tristan 2026-05-20: "the corpus means nothing to
+          the user — need to explain what it does." Drops the internal
+          "corpus" term and describes the price-sanity check as comparing
+          against typical prices for similar components. */}
       <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 4, lineHeight: 1.5, fontStyle: 'italic' }}>
-        SOURCE: Web = distributor catalogue · Est. = web estimate · Mfr = manufacturer site · — = no source.  CHECK (vs reference corpus): OK = within typical range · &gt;2x = price more than 2× the corpus median · &lt;.5x = price less than half the corpus median · - = no reference data.
+        SOURCE: Web = found in a distributor catalogue (DigiKey / Mouser / Farnell etc.) · Est. = web estimate, not a live quote · Mfr = found on the manufacturer&apos;s own site · — = no source recorded.  PRICE CHECK (against typical prices for similar components): OK = price sits in the normal range · &gt;2x = price looks more than 2× higher than typical · &lt;.5x = price looks less than half of typical · - = no comparable parts on record to check against.
       </Text>
     </View>
   )
