@@ -231,7 +231,13 @@ const VERTICAL_FARM: ClassConnections = {
   connections: [
     { module_a: 'energy_conversion_transduction', module_b: 'structure_containment', kind: 'electrical', applies_because: 'LED drivers power tier-level LED arrays mounted on the rack structure.' },
     { module_a: 'mass_fluid_transport_process', module_b: 'structure_containment',   kind: 'fluid',      applies_because: 'Fertigation manifolds run alongside the growing trays, supplying nutrient solution.' },
-    { module_a: 'energy_storage_source', module_b: 'mass_fluid_transport_process',   kind: 'fluid',      applies_because: 'Water + nutrient reservoirs feed the fertigation system.' },
+    // 2026-05-20 VF iter-7 fix (council finding I — K10 cross-class bleed):
+    // removed bogus "energy_storage_source ↔ mass_fluid_transport_process" edge.
+    // A vertical farm has NO energy_storage_source module — that name is BESS
+    // terminology. Fertigation water + nutrient tanks live INSIDE
+    // mass_fluid_transport_process itself. Previously this edge fired as
+    // "Unrepaired Gate on cross module required links / Energy Storage Source"
+    // on the VF Design Decisions page, leaking BESS terminology into VF reports.
     { module_a: 'environmental_interface', module_b: 'structure_containment',        kind: 'thermal',    applies_because: 'HVAC + dehumidifier maintain the grow-room climate around the racks.' },
     { module_a: 'environmental_interface', module_b: 'mass_fluid_transport_process', kind: 'fluid',      applies_because: 'CO2 dosing + humidity control feed into the grow-room atmosphere.' },
     { module_a: 'control_compute_communication', module_b: 'sensing_instrumentation', kind: 'data',      applies_because: 'PLC reads pH, EC, PAR, temp, RH, CO2 sensors and drives the actuators.' },

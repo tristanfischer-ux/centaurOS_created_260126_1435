@@ -814,13 +814,28 @@ const crossModuleRequiredLinksGate: GrammarGate = {
       }
     }
 
+    // 2026-05-20 iter-8 council fix (I): cross-class bleed guard. A required
+    // connection that references a module which doesn't exist in the actual
+    // design must NOT fire as a missing-link failure — that's a class-
+    // connections registry bug (e.g. VF had a bogus "energy_storage_source"
+    // edge inherited from BESS terminology). Build the set of modules
+    // actually emitted, and skip required-edges whose endpoints are absent.
+    const emittedModuleIds = new Set<string>((modules ?? []).map((m: any) => String(m?.module ?? '')).filter(Boolean))
     const missing: string[] = []
+    const skipped_registry_bugs: string[] = []
     for (const req of block.connections) {
+      if (!emittedModuleIds.has(req.module_a) || !emittedModuleIds.has(req.module_b)) {
+        skipped_registry_bugs.push(`${req.module_a} ↔ ${req.module_b} (not in design — class-connections registry references a module the chain didn't emit)`)
+        continue
+      }
       const key = `${req.module_a}<->${req.module_b}`
       const kinds = declared.get(key)
       if (!kinds || !kinds.has(req.kind)) {
         missing.push(`${req.module_a} ↔ ${req.module_b} [${req.kind}] — ${req.applies_because}`)
       }
+    }
+    if (skipped_registry_bugs.length > 0) {
+      console.error(`[grammar] cross_module_required_links: skipped ${skipped_registry_bugs.length} registry bug(s) for ${block.display_name}: ${skipped_registry_bugs.slice(0, 3).join(' | ')}`)
     }
 
     if (missing.length === 0) {
