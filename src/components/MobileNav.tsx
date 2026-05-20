@@ -113,7 +113,7 @@ const mainNavigation = [
     { name: "Brainstorming", shortName: "Brain", href: "/agents", icon: UsersRound },
     { name: "The Forge", shortName: "Forge", href: "/the-forge-v2", icon: Hammer },
     { name: "Investors", shortName: "Invest", href: "/investors", icon: Building2 },
-    { name: "Suppliers", shortName: "Supply", href: "/marketplace", icon: Store },
+    // Suppliers removed from mobile nav 2026-05-20 — see sidebar/data/marketplace.ts.
 ]
 
 // Drawer — Me section.
