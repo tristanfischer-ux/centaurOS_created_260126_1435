@@ -367,6 +367,26 @@ function checkBriefConstraintViolation(brief: any, p: RepairPatchOut): string | 
     }
   }
 
+  // ITER-10.5 Sprint 2A (Tristan 2026-05-20): block mutation of
+  // performance-defining derived parameters. The chain on iter-10.5-v2 run
+  // emitted "LED installed power 0.9 kW" for a 100 m² growing area
+  // (commercial leafy-greens typical 200-300 W/m² → 20-30 kW). The Physics
+  // Repair Loop accepted that as fine because no guard prevented it from
+  // SLASHING the LED power to make some other arithmetic work.
+  //
+  // Rule (universal across product classes): mutations on the
+  // performance-defining keys below are rejected. If physics says LED is
+  // wrong, the fix is to pick a DIFFERENT LED model with appropriate
+  // total power — not to slash the total power to make an arithmetic gate
+  // pass. Same applies to yield density, energy-per-kg, water-per-kg.
+  // These keys are not always brief-pinned but their values flow from
+  // brief-pinned inputs (canopy × density = total yield), so allowing the
+  // repair loop to mutate them defeats brief-constraint propagation.
+  const perfKeyRe = /^(led_installed_power_kw|total_led_power_kw|led_power_density_kw_per_m2|peak_led_power_kw|photon_flux_umol_per_m2_s|ppfd_umol_per_m2_s|canopy_ppfd_umol_per_m2_s|yield_density_kg_per_m2_per_year|yield_kg_per_m2_per_year|energy_per_kg_kwh|water_per_kg_l|peak_electrical_load_kw|sensible_heat_load_kw|cooling_capacity_kw)$/
+  if (p.op === 'set_derived_parameter' && perfKeyRe.test(String(p.key ?? ''))) {
+    return `set_derived_parameter on ${p.key} violates brief-driven performance value — pick a different component with the right rating instead of mutating the derived parameter`
+  }
+
   return null
 }
 
