@@ -223,27 +223,38 @@ async function classifyOnTheFly(
   const prompt = `Classify each hardware part below into ONE of these 20 component classes:
 ${classList}
 
-Class guidance (CRITICAL — read carefully before assigning oem_subsystem):
-- oem_subsystem: ONLY for big pre-built modules with substantial BoM inside them — compressors, fully-assembled inverters / PSUs / GPU boards, complete BMS mainboards, complete pump units (>£100 each). Do NOT use for: small control PCBs, displays, sensors, MCBs, contactors, gauges, MCU modules — those have their own dedicated classes.
-- electronic_ic: ICs, MCUs, ASICs, FPGAs, RTC chips, ADCs (chip-level)
-- electronic_pcb: bare PCB or small PCBA / control board (£20-£200) — anti-icing controller, comms board, daughter card
-- sensor: thermistor, Hall, IMU, pressure gauge, temperature probe, flow sensor, encoder, transducer
-- optical: LEDs, photodiodes, displays (LCD, OLED), lenses
-- safety_consumable: fuses, MCBs, RCDs, contactors, breakers, fire-suppression cartridges
-- thermal: heatsinks, cold plates, fans, TIM, plate heat exchangers (BPHE), evaporators, condensers
-- fluid_path: pipes, copper tubing, valves, manifolds, fittings, hoses, expansion vessels
-- magnetic: transformers, large inductors (>100uH), motor magnets, motor stators
-- motor_actuator: BLDC/stepper/servo motor units, solenoids, linear actuators (the motor itself, not its driver)
-- electronic_power_module: SiC/IGBT modules / integrated power stages (the silicon — not the assembled PSU)
-- electronic_passive: discrete resistors, capacitors, MLCCs, small ferrites
-- electronic_discrete: discrete diodes, MOSFETs, BJTs, TVS
-- electronic_connector: headers, terminal blocks, USB-C, RJ45, Molex/JST
-- electronic_cable: cable assemblies, harnesses, ribbon, coax
-- structural_metal: chassis, brackets, sheet metal, weldments, frames
-- structural_polymer: injection-moulded plastics, gaskets, polymer housings, mouldings
-- mechanical_fastener: bolts, nuts, washers, pins, springs, rivets
-- mechanical_assembly: hinges, bearings, gears, fans (as a complete unit), pumps (small)
-- battery_cell: lithium-ion cells, lead-acid, supercapacitors
+Class guidance (CRITICAL — read carefully):
+
+oem_subsystem: ONLY for BIG (>£200 typical, >£100 minimum) pre-built modules with substantial BoM inside them — full hermetic compressors, fully-assembled inverters / PSUs / GPU boards / complete BMS mainboards, complete pump assemblies >£100. NEVER for: DC-DC converters, Wi-Fi antennas, emergency stop buttons, RCDs, contactors, MCBs, EMI filters, small pumps <£100, thermostats, gauges, MCU modules, antennas of any kind, push-buttons, relays. Those have their own dedicated classes. RULE OF THUMB: if the part contains the word "antenna", "button", "filter", "thermostat", "switch", "relay", "gauge", "sensor", "converter" — it is NOT oem_subsystem.
+
+electronic_ic: ICs, MCUs, ASICs, FPGAs, RTC chips, ADCs (chip-level only). NOT controller boards.
+electronic_pcb: bare PCB or small PCBA / control board (£15-£200). Heat pump controller, anti-icing board, comms board, DC-DC CONVERTER modules, thermostat boards, display PCBAs, expansion-valve drivers.
+sensor: thermistor, Hall, IMU, pressure gauge, temperature probe, flow sensor, encoder, transducer, GAS LEAK SENSOR, leak detector, propane sensor.
+optical: LEDs, photodiodes, displays (LCD, OLED), lenses. ALSO: WIFI ANTENNAS, ANTENNAS of any kind (radio modules are antenna+IC together — classify as 'optical' if just antenna element; 'electronic_pcb' if module).
+safety_consumable: fuses, MCBs, RCDs, contactors, breakers, EMERGENCY STOP BUTTONS, e-stop devices, fire-suppression cartridges, isolation switches, isolators.
+thermal: heatsinks, cold plates, fans (cooling fans, condenser fans, evaporator fans — fan ASSEMBLIES go to mechanical_assembly), TIM, plate heat exchangers (BPHE), evaporators, condensers.
+fluid_path: pipes, copper tubing, valves (service valves, expansion valves, isolation valves, relief valves), manifolds, fittings, hoses, expansion vessels, refrigerant lines.
+magnetic: transformers, EMI FILTERS, line filters, large inductors (>100uH), motor magnets, motor stators, chokes, RF chokes.
+motor_actuator: BLDC/stepper/servo motor units, solenoids, linear actuators (the motor itself, not its driver). NOT pumps with motor — pumps go to mechanical_assembly.
+electronic_power_module: SiC/IGBT power modules / integrated power stages (the silicon dies — not the assembled PSU).
+electronic_passive: discrete resistors, capacitors (including DC-LINK capacitors regardless of physical size), MLCCs, small ferrites, varistors, MOVs.
+electronic_discrete: discrete diodes, MOSFETs, BJTs, TVS, single transistors.
+electronic_connector: headers, terminal blocks, USB-C, RJ45, Molex/JST, SAE flares, Schrader caps.
+electronic_cable: cable assemblies, harnesses, ribbon, coax, mains-cordsets.
+structural_metal: chassis, brackets, sheet metal, weldments, frames, base pans, mounting bars.
+structural_polymer: injection-moulded plastics, gaskets, polymer housings, mouldings, EPDM/HNBR/PTFE seals (small).
+mechanical_fastener: bolts, nuts, washers, pins, springs, rivets, anti-vibration mounts.
+mechanical_assembly: hinges, bearings, gears, fan ASSEMBLIES (motor+blade as unit), small PUMP ASSEMBLIES (<£100 like circulator pumps), compressor SHELLS, valve actuators.
+battery_cell: lithium-ion cells, lead-acid, supercapacitors.
+
+ANTI-EXAMPLES (these are recurring mis-classifications — DO NOT repeat):
+- "Wi-Fi antenna" → optical (or sensor), NEVER oem_subsystem
+- "emergency stop button" → safety_consumable, NEVER oem_subsystem
+- "DC-DC converter" → electronic_pcb, NEVER oem_subsystem
+- "EMI filter" → magnetic, NEVER oem_subsystem
+- "Modbus comms board" → electronic_pcb, NEVER oem_subsystem
+- "small circulator pump" → mechanical_assembly, NEVER oem_subsystem
+- "potting compound" → structural_polymer (or 'unknown' for chemicals), NEVER oem_subsystem
 
 PARTS:
 ${partsJson}
@@ -275,13 +286,47 @@ No prose, no markdown.`
     const parsed = JSON.parse(m[0])
     if (!Array.isArray(parsed)) return result
     const valid = new Set<string>([...COMPONENT_CLASS_ORDER, 'unknown'])
+    // 2026-05-19 firestorm iter-5 fix: defence-in-depth post-filter. Even with
+    // tightened prompt + anti-examples, Flash-Lite occasionally returns
+    // oem_subsystem for small parts (DC-DC, antenna, e-stop, EMI filter,
+    // potting compound) because the prompt is long and the model's class
+    // attribution is heuristic. The £600 oem_subsystem reference price × W3
+    // scale = £113.20 — the SAME mis-price observed 5× in iter-3 BoMs across
+    // unrelated parts. Override here when the part name contains a forbidden
+    // keyword for that class.
+    const OEM_SUBSYSTEM_FORBIDDEN = /\b(antenna|button|filter|converter|thermostat|gauge|sensor|relay|contactor|switch|isolator|fuse|breaker|terminal|grommet|gasket|seal|grease|compound|potting|adhesive|silicone|paint|lubricant|fluid|coolant|water|gas|refrigerant|propane|oxygen|nitrogen|gel|wire|cable|hose|pipe|tube|fitting|bolt|nut|washer|spring|pin|rivet|clip|bracket|mount|stand|hinge|bearing)/i
+    const overrideClass = (partName: string, currentClass: string): string => {
+      if (currentClass !== 'oem_subsystem') return currentClass
+      if (!OEM_SUBSYSTEM_FORBIDDEN.test(partName)) return currentClass
+      // Forbidden keyword found in oem_subsystem-classified part. Override.
+      const lower = partName.toLowerCase()
+      if (/\b(antenna)\b/.test(lower)) return 'optical'
+      if (/\b(button|switch|isolator|breaker|fuse|relay|contactor)\b/.test(lower)) return 'safety_consumable'
+      if (/\b(converter|board|pcb|controller|module|driver)\b/.test(lower)) return 'electronic_pcb'
+      if (/\b(filter|choke|inductor|transformer)\b/.test(lower)) return 'magnetic'
+      if (/\b(thermostat|gauge|sensor|probe)\b/.test(lower)) return 'sensor'
+      if (/\b(gasket|seal|grommet|potting|compound|adhesive|silicone)\b/.test(lower)) return 'structural_polymer'
+      if (/\b(hose|pipe|tube|fitting|valve)\b/.test(lower)) return 'fluid_path'
+      if (/\b(cable|wire|harness)\b/.test(lower)) return 'electronic_cable'
+      if (/\b(bolt|nut|washer|spring|pin|rivet)\b/.test(lower)) return 'mechanical_fastener'
+      if (/\b(bracket|mount|hinge|bearing)\b/.test(lower)) return 'mechanical_assembly'
+      // Forbidden keyword present but no obvious bucket — mark unknown
+      return 'unknown'
+    }
+    let overrideCount = 0
     for (const r of parsed) {
       const idx = Number(r.idx)
-      const cls = String(r.component_class ?? '').trim()
+      let cls = String(r.component_class ?? '').trim()
       if (!Number.isFinite(idx) || !valid.has(cls)) continue
       const ctx = parts[idx]?.ctx
       if (!ctx) continue
+      const original = cls
+      cls = overrideClass(ctx.word_name, cls)
+      if (cls !== original) overrideCount += 1
       result.set(ctx.word_id, cls as ComponentClass | 'unknown')
+    }
+    if (overrideCount > 0) {
+      console.log(`[estimate] Engine B classifier override: ${overrideCount} parts moved out of oem_subsystem`)
     }
   } catch (err) {
     console.error('[estimate] on-the-fly classify failed:', err)
