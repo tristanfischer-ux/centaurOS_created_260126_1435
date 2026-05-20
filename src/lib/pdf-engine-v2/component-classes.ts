@@ -684,40 +684,47 @@ export const PRODUCT_CLASS_REFERENCE_OVERRIDES: Record<string, Partial<Record<Co
   // Post-override raw lands at £52k × cost-stack compound 1.656× × W3 0.30 =
   // £25,869 (band £15-45k, 14% under centre — in band).
   'vertical-farm': {
-    // Calibrated 2026-05-18 for desktop 15 kg/week unit; expanded 2026-05-20
-    // (iter-8 council finding A) for containerised 100m² VF (efe55422).
-    // Previous overrides covered 4 classes; containerised VF additionally
-    // emits structural_metal (40ft container, trolley frames), optical (LED
-    // grow panels), thermal (PIR sandwich panels, cooling coils),
-    // mechanical_assembly (doors, ramps), electronic_pcb (PLC, HMI), and
-    // magnetic (transformers, contactors). Without overrides the curve
-    // collapsed every line to £3.38/£4.05/£468 anchor tiers.
-    oem_subsystem: 2000.0,          // LED rack module, HVAC compressor, water-treatment skid (£500-£3k mixed)
-    motor_actuator: 80.0,           // circulation pumps + nutrient dosing pumps (£20-£200)
-    fluid_path: 25.0,               // irrigation fittings + valves (£5-£60)
-    sensor: 30.0,                   // pH/EC/temp/light sensors (£10-£100)
-    optical: 200.0,                 // Osram PHYTOVYNE-class horticultural LED grow panels (£100-£400)
-    structural_metal: 800.0,        // 40ft ISO container shell, trolley frames, custom-fab metalwork (£200-£8000)
-    thermal: 100.0,                 // Kingspan PIR sandwich panels, DX cooling coils, dehumidifier coils (£30-£3000)
-    mechanical_assembly: 60.0,      // container doors, trolley castors, threshold ramps (£20-£500)
-    electronic_pcb: 200.0,          // Siemens PLC, I/O modules, HMI panel (£50-£500)
-    electronic_power_module: 60.0,  // LED drivers, VFDs (£30-£500)
-    magnetic: 80.0,                 // VFD chokes, transformers, contactor coils (£30-£300)
-    safety_consumable: 50.0,        // E-stop buttons, safety relays, fire extinguishers (£15-£300)
+    // Iter-8 calibration (commit 349751e9d) expanded VF from 4 to 12
+    // component classes; verify chain (job a3e05161) showed BoM landed
+    // £372/m² installed — band is £600-1200/m² so 38% below low end.
+    // Iter-9 Step 4 (2026-05-20): tighten the under-priced classes.
+    //
+    // Per real commercial VF benchmarks (AeroFarms / GrowUp / Vertical
+    // Future / Babylon procurement quotes 2023-25):
+    //  - LED grow panels for 100 m² horticultural: ~£200-£400 each at
+    //    1000/yr volume (Osram PHYTOVYNE, Samsung LM301H assemblies)
+    //  - DX cooling coils 15-25 kW: £1,500-£4,000 each
+    //  - PIR sandwich panels Kingspan KS1000RW 80mm: £200-£350/panel
+    //    (60 panels × £300 = £18k for a 40ft container shell)
+    //  - 40ft Hi-Cube ISO container: £4,000-£8,000 raw
+    //  - Trolley steel frames custom-fab (1.2 × 2.0 × 2.4 m, 250 kg
+    //    per tier): £1,200-£2,000 each
+    oem_subsystem: 2500.0,          // ↑ from 2000 — LED rack module / HVAC compressor / water-treatment skid (£500-£5k mixed)
+    motor_actuator: 100.0,          // ↑ from 80 — pump motors at 1000/yr volume
+    fluid_path: 30.0,               // ~ — irrigation fittings + valves
+    sensor: 35.0,                   // ~ — pH/EC/temp/light sensors
+    optical: 400.0,                 // ↑↑ from 200 — Osram PHYTOVYNE / Samsung LM301H horticultural LED panels (40 × £400 = £16k for 100m²)
+    structural_metal: 1500.0,       // ↑↑ from 800 — 40ft ISO container shell £5k, trolley frames £1.5k, panels & rails
+    thermal: 300.0,                 // ↑↑ from 100 — Kingspan PIR panels £300/panel, DX cooling coils £1-4k
+    mechanical_assembly: 100.0,     // ↑ from 60 — insulated doors £400, trolley castors, ramps
+    electronic_pcb: 300.0,          // ↑ from 200 — Siemens PLC + I/O modules £200-£800
+    electronic_power_module: 80.0,  // ↑ from 60 — LED drivers (Mean Well CSP-class)
+    magnetic: 100.0,                // ↑ from 80 — VFD chokes + transformers
+    safety_consumable: 75.0,        // ↑ from 50 — Pilz SIL3 relay ~£200, E-stop buttons £30-£80
   },
   vertical_farm: {
-    oem_subsystem: 2000.0,
-    motor_actuator: 80.0,
-    fluid_path: 25.0,
-    sensor: 30.0,
-    optical: 200.0,
-    structural_metal: 800.0,
-    thermal: 100.0,
-    mechanical_assembly: 60.0,
-    electronic_pcb: 200.0,
-    electronic_power_module: 60.0,
-    magnetic: 80.0,
-    safety_consumable: 50.0,
+    oem_subsystem: 2500.0,
+    motor_actuator: 100.0,
+    fluid_path: 30.0,
+    sensor: 35.0,
+    optical: 400.0,
+    structural_metal: 1500.0,
+    thermal: 300.0,
+    mechanical_assembly: 100.0,
+    electronic_pcb: 300.0,
+    electronic_power_module: 80.0,
+    magnetic: 100.0,
+    safety_consumable: 75.0,
   },
 
   // 200 L single-use mammalian bioreactor (GMP). Industrial-heavy 100/yr.

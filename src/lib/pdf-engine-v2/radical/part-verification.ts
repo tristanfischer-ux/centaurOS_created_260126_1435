@@ -1019,6 +1019,49 @@ export function patternLooksLikeDescriptionNotSku(partNumber: string): { fake: b
     return { fake: true, reason: `contains descriptor word + suffix ("${s.slice(0, 30)}"), not a SKU` }
   }
 
+  // Pattern 5 (iter-9 Step 6, 2026-05-20): trade-name-without-model-suffix.
+  // Real catalogue SKUs almost always carry a model-discriminator code
+  // after the brand. "PHYTOVYNE R1500" looked plausible to iter-7 reviewers
+  // but doesn't exist in the Osram catalogue; "OR120" returns Orange Amps
+  // guitar amp not ORCA Grow LED reflector. Heuristic: an all-caps trade
+  // name (≥5 letters, no digits) followed by a single short alphanumeric
+  // code (3-6 chars), separated by a space. Real SKUs typically have more
+  // discriminating structure (suffix sub-codes, dashes, mixed case).
+  if (/^[A-Z]{5,}\s+[A-Z0-9]{3,6}$/.test(s)) {
+    return { fake: true, reason: `trade-name + short code without manufacturer-typical discriminator ("${s.slice(0, 30)}"); likely hallucinated SKU` }
+  }
+
+  // Pattern 6 (iter-9 Step 6): model-prefix-only patterns like "HC-40-ISO-2024"
+  // — descriptive dimensions used as a fake SKU. Real container manufacturer
+  // SKUs use codes like "CIMC-D03-02B" not "HC-40-ISO-2024".
+  // Heuristic: an all-uppercase code containing a 4-digit year (≥1990 ≤2099).
+  if (/\b(19[9]\d|20\d{2})\b/.test(s) && /^[A-Z]/.test(s) && s.length <= 30 && /-/.test(s)) {
+    return { fake: true, reason: `contains a year suffix in what looks like a SKU ("${s.slice(0, 30)}"); manufacturers rarely encode year in SKU` }
+  }
+
+  // Pattern 7 (iter-9 Step 6): rating-as-SKU like "18K Compressor" or
+  // "30A 500V DC Fuse" — capacity + part-type strings used as model number.
+  if (/^\d+[a-zA-Z]{1,3}\s+[A-Z]/i.test(s) && /\b(compressor|driver|relay|breaker|fuse|sensor|valve|pump|motor|battery|cell|panel|coil|tank)\b/i.test(s)) {
+    return { fake: true, reason: `capacity-prefixed component name used as SKU ("${s.slice(0, 30)}"); rating + type ≠ catalogue part number` }
+  }
+
+  // Pattern 8 (iter-9 Step 6): obvious misspellings of common brand names.
+  // Captures the "BobaCAT 5" iter-7 example. Limited to a few high-signal
+  // cases where the LLM mis-capitalised a known brand.
+  const misspellings = [
+    /\bBobaCAT\b/i,           // Bobcat misspelled
+    /\bPheonix\b/i,           // Phoenix misspelled
+    /\bSeimens\b/i,           // Siemens misspelled
+    /\bDaffoss\b/i,           // Danfoss misspelled
+    /\bAllan[-\s]?Bradley\b/, // Allen-Bradley misspelled
+    /\bRockville\b.*Automation/i,  // Rockwell Automation misspelled
+  ]
+  for (const re of misspellings) {
+    if (re.test(s)) {
+      return { fake: true, reason: `apparent brand-name misspelling ("${s.slice(0, 30)}"); manufacturer catalogue not found under this spelling` }
+    }
+  }
+
   return { fake: false, reason: '' }
 }
 

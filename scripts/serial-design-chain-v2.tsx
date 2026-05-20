@@ -2060,6 +2060,9 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
         drone: 'consumer_cinematography_drone',
         agv: 'automated_guided_vehicle_agv',
         amr: 'autonomous_mobile_robot_amr',
+        // 2026-05-20 iter-9 Step 5: vertical-farm graph added — chain previously
+        // logged "NO_GRAPH for vertical_farm" because no K10 graph existed.
+        'vertical-farm': 'vertical_farm',
       }
       const aliased = ALIASES[k10ProductClass]
       if (aliased) graph = getClassReferenceGraph(aliased)
@@ -2632,6 +2635,9 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
         drone: 'consumer_cinematography_drone',
         agv: 'automated_guided_vehicle_agv',
         amr: 'autonomous_mobile_robot_amr',
+        // 2026-05-20 iter-9 Step 5: vertical-farm graph added — chain previously
+        // logged "NO_GRAPH for vertical_farm" because no K10 graph existed.
+        'vertical-farm': 'vertical_farm',
       }
       const aliased = ENVELOPE_ALIASES[productClass.toLowerCase()]
       let envelope = (aliased ? defaultEnvelopeForClass(aliased) : null)

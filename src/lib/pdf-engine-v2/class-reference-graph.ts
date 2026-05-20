@@ -500,6 +500,7 @@ export async function ensureGraphsRegistered(): Promise<void> {
   await import('./class-reference-graphs/pv-module-residential.js')
   await import('./class-reference-graphs/pv-string-inverter.js')
   await import('./class-reference-graphs/vehicle-battery-pack.js')
+  await import('./class-reference-graphs/vertical-farm.js')
   await import('./class-reference-graphs/vfd-motor-drive.js')
   await import('./class-reference-graphs/wind-turbine-small.js')
 }
