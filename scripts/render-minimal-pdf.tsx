@@ -2200,7 +2200,7 @@ function PerformanceCardPage({ state, project }: { state: any; project: string }
 // Reader can immediately see "this report ships with N flagged decisions
 // trading reliability for capex/speed" rather than discovering it in the
 // fine print.
-function DesignDecisionsPage({ state, project }: { state: any; project: string }) {
+function DesignTradeOffsPage({ state, project }: { state: any; project: string }) {
   const review = state?.designDecisionsReview
   if (!review || !Array.isArray(review.choices) || review.choices.length === 0) return null
 
@@ -4838,7 +4838,7 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
       <PerformanceCardPage state={state} project={project} />
       {state.brief?.was_revised ? <BriefRevisionNoticePage state={state} project={project} /> : null}
       <BriefPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
-      <DesignDecisionsPage state={state} project={project} />
+      <DesignTradeOffsPage state={state} project={project} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
       {modules.map((m: any, idx: number) => (
         <ModuleSection
