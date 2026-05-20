@@ -79,7 +79,7 @@ const VERTICAL_FARM: ProductClassGraph = {
     },
     {
       class: 'control_compute_communication',
-      role: 'control',
+      role: 'subsystem',
       required: true,
       display: 'Industrial PLC (Siemens / Allen-Bradley) + I/O modules + Modbus TCP + 24VDC UPS + SD logging for HACCP / BRCGS',
     },
@@ -187,7 +187,7 @@ const VERTICAL_FARM: ProductClassGraph = {
       from_class: 'environmental_interface',
       to_class: 'mass_fluid_transport_process',
       protocol: 'physical',
-      mechanism: 'fluid_pipe',
+      mechanism: 'fluid_routing',
       mechanical: {
         connector: 'condensate drain pan + P-trap (McAlpine V33M) + condensate recovery pump (Grundfos CR 1-2)',
       },
@@ -216,7 +216,7 @@ const VERTICAL_FARM: ProductClassGraph = {
       from_class: 'mass_fluid_transport_process',
       to_class: 'structure_containment',
       protocol: 'physical',
-      mechanism: 'fluid_pipe',
+      mechanism: 'fluid_routing',
       mechanical: {
         connector: 'NFT channels (HydroGarden NFT-1200) + irrigation manifolds + WRAS-approved dual-check valves',
       },
