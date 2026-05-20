@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
 import { cn } from '@/lib/utils'
 import { BrowserFrame } from './browser-frame'
-import { Hammer, TrendingUp, Target, ShoppingCart, Briefcase, Flame, Users } from 'lucide-react'
+import { Hammer, TrendingUp, ShoppingCart, Briefcase } from 'lucide-react'
 
 interface ShowcaseTab {
   id: string
@@ -65,12 +65,12 @@ const TABS: ShowcaseTab[] = [
       { text: 'Partner contacts included', position: 'bottom-[15%] right-[5%]' },
     ],
   },
-  // 4. Specialists — the 13 AI agents
+  // 3. Specialists — the 13 brainstorming specialists (lives at /agents)
   {
     id: 'specialists',
     label: 'Specialists',
     icon: <Briefcase className="h-4 w-4" />,
-    url: 'fractionalforge.app/specialists',
+    url: 'fractionalforge.app/agents',
     image: '/images/screenshots/specialists-huddles.png',
     headline: '13 specialist AI agents',
     description: 'Strategy, CTO, engineering, manufacturing, supply chain, finance, legal, sales, marketing, product, HR, fundraising, and chief of staff. They fill expertise gaps across every discipline.',
@@ -93,48 +93,11 @@ const TABS: ShowcaseTab[] = [
       { text: 'Reach out to real suppliers', position: 'top-[50%] left-[5%]' },
     ],
   },
-  // 6. Strategy — objectives and tasks for distributed teams
-  {
-    id: 'strategy',
-    label: 'Strategy',
-    icon: <Target className="h-4 w-4" />,
-    url: 'fractionalforge.app/strategy',
-    image: '/images/screenshots/strategy-river.png',
-    headline: 'Keep a distributed team aligned',
-    description: 'Break your strategy into objectives and those into weekly tasks. Assign work to teammates or directly to the 13 specialist AI agents — everyone knows what they are doing and why.',
-    callouts: [
-      { text: 'Objectives into weekly tasks', position: 'top-[15%] left-[5%]' },
-      { text: 'Live progress across the team', position: 'top-[45%] right-[5%]' },
-    ],
-  },
-  // 7. Team — your full team visualised
-  {
-    id: 'team',
-    label: 'Team',
-    icon: <Users className="h-4 w-4" />,
-    url: 'fractionalforge.app/team',
-    image: '/images/screenshots/team.png',
-    headline: 'Your team, visualised',
-    description: 'See every role covered and every gap at a glance. 13 specialist AI agents plus your human team — organised by function with live workload and capacity tracking.',
-    callouts: [
-      { text: 'Coverage + gaps', position: 'top-[15%] left-[5%]' },
-      { text: 'Live capacity tracking', position: 'bottom-[15%] right-[5%]' },
-    ],
-  },
-  // 8. Cash Burn — financial modelling
-  {
-    id: 'cash-burn',
-    label: 'Cash Burn',
-    icon: <Flame className="h-4 w-4" />,
-    url: 'fractionalforge.app/cash-burn',
-    image: '/images/screenshots/cash-burn.png',
-    headline: 'Runway and P&L in one place',
-    description: 'Model what is going out, what is coming in, and your resulting profit and loss. Test scenarios, project runway against current burn, and see where things tighten.',
-    callouts: [
-      { text: 'Scenario modelling', position: 'top-[15%] right-[5%]' },
-      { text: 'Runway projection', position: 'top-[45%] left-[5%]' },
-    ],
-  },
+  // Strategy / Team / Cash Burn tabs removed 2026-05-20 — none of those
+  // routes are in the simplified app nav (Welcome / My Profile / Brainstorm /
+  // The Forge / Investors). Don't market a product the founder can't access
+  // from the sidebar. The underlying pages still exist for legacy users;
+  // restore by re-adding the ShowcaseTab entries from git history.
 ]
 
 const ROTATION_MS = 6000
