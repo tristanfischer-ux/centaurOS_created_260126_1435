@@ -1964,6 +1964,36 @@ function formatMetricValue(rawValue: string, rawUnit: string | undefined): strin
  *  can be embedded inside the Brief page (Tristan 2026-05-20 third review:
  *  "performance characteristics data should just go into the briefing
  *  requirements as one section"). */
+/** Round a Performance Card metric value to a sensible number of decimals
+ *  for display. Avoids the float-overflow look ("0.0090000000000000001
+ *  kW/m²") and preserves units/strings as-is. Tristan 2026-05-20 fifth
+ *  review: "what is going on with the decimal place?" */
+function formatPerfValue(v: unknown): string {
+  if (v == null) return '—'
+  if (typeof v === 'number') {
+    if (!Number.isFinite(v)) return '—'
+    if (v === 0) return '0'
+    const abs = Math.abs(v)
+    if (abs >= 1000) return v.toLocaleString(undefined, { maximumFractionDigits: 0 })
+    if (abs >= 100) return v.toFixed(0)
+    if (abs >= 10) return v.toFixed(1)
+    if (abs >= 1) return v.toFixed(2)
+    if (abs >= 0.01) return v.toFixed(3)
+    return v.toPrecision(2)
+  }
+  const s = String(v).trim()
+  // Numeric-string with unit suffix → split, round number part, recombine.
+  const m = s.match(/^(-?\d+\.\d+)(\s*\S.*)?$/)
+  if (m) {
+    const num = parseFloat(m[1])
+    if (Number.isFinite(num)) {
+      const rounded = formatPerfValue(num)
+      return rounded + (m[2] ?? '')
+    }
+  }
+  return s
+}
+
 function PerformanceCardBody({ state }: { state: any }) {
   const card = state?.performanceCard
   if (!card || !Array.isArray(card.sections) || card.sections.length === 0) return null
@@ -2026,7 +2056,7 @@ function PerformanceCardBody({ state }: { state: any }) {
                     ) : null}
                   </View>
                   <Text style={{ flex: 2, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: m.value !== null ? INK : '#94a3b8', textAlign: 'right' }}>
-                    {m.value !== null ? String(m.value) : '—'}
+                    {m.value !== null ? formatPerfValue(m.value) : '—'}
                   </Text>
                   <Text style={{ flex: 2, fontSize: 9.5, color: INK_SOFT, textAlign: 'right' }}>
                     {m.brief_target !== null ? String(m.brief_target) : ''}
@@ -2404,7 +2434,8 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
         </View>
       ) : null}
 
-      <ManualReviewSectionNote badges={(manualReviewBadges ?? []).filter(b => b.id === 'g0_physics' || b.id === 'g1b_compliance')} />
+      {/* ITER-10.5 fifth review (Tristan 2026-05-20): Manual Review
+          callouts removed from non-cover pages. */}
 
       <PhysicalSpecBlock modules={modules} deploymentEnvelope={state.deploymentEnvelope ?? null} />
 
@@ -2479,7 +2510,7 @@ function ModuleConnectionMapPage({
         Figure 1. The {ordered.length} modules and how they connect.
       </Text>
 
-      <ManualReviewSectionNote badges={(manualReviewBadges ?? []).filter(b => b.id === 'g4_grammar' || b.id === 'k10_grammar')} />
+      {/* Manual Review callout removed per Tristan fifth review. */}
 
       <View style={{ alignItems: 'center', marginBottom: 16 }}>
         <Svg width={W} height={H}>
@@ -3480,7 +3511,7 @@ function CompliancePage({ state, project, manualReviewBadges }: { state: any; pr
       <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
         Standards that govern this product class. Compliance is dictated by jurisdiction + use case BEFORE the design exists; the design downstream must demonstrate conformity with the mandatory items below.
       </Text>
-      <ManualReviewSectionNote badges={(manualReviewBadges ?? []).filter(b => b.id === 'g1b_compliance')} />
+      {/* Manual Review callout removed per Tristan fifth review. */}
       <Text style={{ fontSize: 10, color: INK_SOFT, marginBottom: 18, lineHeight: 1.55 }}>
         {clean_prose(classBlock.compliance_summary)}
       </Text>
@@ -3509,11 +3540,9 @@ function CompliancePage({ state, project, manualReviewBadges }: { state: any; pr
         </View>
       ))}
 
-      <View style={{ marginTop: 16, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT_SOFT }}>
-        <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>
-          Compliance cost and lead-time estimates are tracked in the underlying registry but withheld from this report until the Bill of Materials exists and a full assumptions ledger (test-house rates, notified-body fees, recertification cadence) can be cross-referenced. Numbers without that grounding are unreliable.
-        </Text>
-      </View>
+      {/* Compliance cost callout removed per Tristan 2026-05-20 fifth
+          review — internal disclosure of the registry's withheld fields
+          isn't useful in a customer-facing PDF. */}
 
       <PageFooter />
     </Page>
@@ -3546,7 +3575,7 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
       <Text style={{ fontSize: 10, color: MUTED, marginBottom: 10 }}>
         Class-level pre-mitigation hazards a {classBlock.display_name.toLowerCase()} design must address. Each hazard is rated on three 1-5 scales whose product gives a single risk priority number — higher means worse before mitigation.
       </Text>
-      <ManualReviewSectionNote badges={(manualReviewBadges ?? []).filter(b => b.id === 'g3_completeness')} />
+      {/* Manual Review callout removed per Tristan fifth review. */}
       <View style={{ marginBottom: 12, padding: 8, backgroundColor: '#f7f8fa', borderRadius: 3 }}>
         <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55, marginBottom: 2 }}>
           <Text style={{ fontFamily: 'Helvetica-Bold' }}>Severity</Text> — how bad the outcome is if the hazard occurs (1 = inconvenience, 5 = injury / fire / total loss).
@@ -3565,14 +3594,16 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
         {clean_prose(classBlock.hazard_summary)}
       </Text>
 
-      {/* Header row */}
+      {/* Header row — ITER-10.5 fifth review (Tristan 2026-05-20):
+          shorter column headers so they don't wrap. Full names spelled
+          out in the legend above. */}
       <View style={{ flexDirection: 'row', borderBottomWidth: 0.8, borderBottomColor: INK, paddingBottom: 4, marginBottom: 4 }}>
         <Text style={{ width: 50,  fontSize: 8, color: MUTED, letterSpacing: 0.6 }}>CODE</Text>
         <Text style={{ flex: 3,    fontSize: 8, color: MUTED, letterSpacing: 0.6 }}>HAZARD</Text>
-        <Text style={{ width: 56,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>SEVERITY</Text>
-        <Text style={{ width: 64,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>LIKELIHOOD</Text>
-        <Text style={{ width: 72,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>DETECTABILITY</Text>
-        <Text style={{ width: 64,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>RISK PRIORITY</Text>
+        <Text style={{ width: 34,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>SEV</Text>
+        <Text style={{ width: 34,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>LIK</Text>
+        <Text style={{ width: 34,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>DET</Text>
+        <Text style={{ width: 40,  fontSize: 8, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>RP</Text>
       </View>
 
       {sorted.map((h: ClassHazard, idx) => {
@@ -3583,10 +3614,10 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
             <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
               <Text style={{ width: 50, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: ACCENT }}>{h.code}</Text>
               <Text style={{ flex: 3,    fontSize: 9.5, color: INK }}>{clean_prose(h.title)}</Text>
-              <Text style={{ width: 56,  fontSize: 9.5, color: INK_SOFT, textAlign: 'right' }}>{h.severity_pre}</Text>
-              <Text style={{ width: 64,  fontSize: 9.5, color: INK_SOFT, textAlign: 'right' }}>{h.likelihood_pre}</Text>
-              <Text style={{ width: 72,  fontSize: 9.5, color: INK_SOFT, textAlign: 'right' }}>{h.detectability}</Text>
-              <Text style={{ width: 64,  fontSize: 10, fontFamily: 'Helvetica-Bold', color: rpnColor, textAlign: 'right' }}>{rpn}</Text>
+              <Text style={{ width: 34,  fontSize: 9.5, color: INK_SOFT, textAlign: 'right' }}>{h.severity_pre}</Text>
+              <Text style={{ width: 34,  fontSize: 9.5, color: INK_SOFT, textAlign: 'right' }}>{h.likelihood_pre}</Text>
+              <Text style={{ width: 34,  fontSize: 9.5, color: INK_SOFT, textAlign: 'right' }}>{h.detectability}</Text>
+              <Text style={{ width: 40,  fontSize: 10, fontFamily: 'Helvetica-Bold', color: rpnColor, textAlign: 'right' }}>{rpn}</Text>
             </View>
             <View style={{ marginTop: 4, paddingLeft: 50 }}>
               <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 4 }}>{clean_prose(h.mechanism)}</Text>
@@ -4314,7 +4345,7 @@ function BillOfMaterialsPage({
             <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
               Bill of Materials
             </Text>
-            <ManualReviewSectionNote badges={(manualReviewBadges ?? []).filter(b => b.id === 'g2_cost_reality' || b.id === 'g5_parts')} />
+            {/* Manual Review callout removed per Tristan fifth review. */}
             <Text style={{ fontSize: 10, color: MUTED, marginBottom: 12 }}>
               Every part word in every sub-module is listed below. Price provenance: <Text style={{ color: '#065f46' }}>✓ ACTUAL</Text> = live distributor quote (DigiKey / Mouser / Farnell). <Text style={{ color: '#92400e' }}>~ ESTIMATE</Text> = price from web judgement, not a live quote. <Text style={{ color: '#6b7280' }}>? TBD</Text> = no price found yet; line total excluded from sub-totals. Click any part number to open its source page.{'\n'}
               Reference-anchor (Engine C): right-margin badge <Text style={{ color: '#065f46', fontFamily: 'Helvetica-Bold' }}>OK</Text> = unit price within 0.5x-2.0x of the Phase 4 corpus reference median for similar components, <Text style={{ color: '#9f1239', fontFamily: 'Helvetica-Bold' }}>&gt; 2x</Text> = over reference, <Text style={{ color: '#1e40af', fontFamily: 'Helvetica-Bold' }}>&lt; .5x</Text> = under reference, <Text style={{ color: '#9ca3af', fontFamily: 'Helvetica-Bold' }}>-</Text> = no priced reference in corpus (common for niche / bespoke parts).
@@ -4569,13 +4600,11 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
   if (!hasAnyCandidate) return null
 
   const renderCandidateCard = (c: any, idx: number) => {
-    // ITER-10.5 (Tristan 2026-05-20 fourth review): single-column layout —
-    // company identity at top, capability + fit bullets + contact CTA
-    // below as a single column. Source / confidence badges removed
-    // ("unnecessary information"). Email + website both go through name
-    // reconciliation; bad-domain emails (info@cambridgehok.co.uk under
-    // "GrowUp Urban Farms") are dropped from the render entirely, not
-    // just logged.
+    // ITER-10.5 (Tristan 2026-05-20 fifth review): suppliers with no
+    // reconciled contact info (no valid URL AND no valid email) are
+    // DROPPED — "having principal contractors with no website seems
+    // highly dubious". A name + capability with no way to reach the
+    // company is a dead lead.
     const location = [c.city, c.country].filter(Boolean).join(', ') || (c.ch_verified ? 'Location on Companies House record' : '')
     const urlReconciles = c.website_url ? supplierUrlReconciles(String(c.name ?? ''), String(c.website_url)) : true
     const websiteText = (c.website_url && urlReconciles)
@@ -4589,9 +4618,12 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
     if (rawEmail && !emailReconciles) {
       console.error(`[render-minimal-pdf] supplier name-email mismatch suppressed: name="${c.name}" email="${rawEmail}"`)
     }
-    // Email also fully dropped when the website itself didn't reconcile —
-    // the email is usually derived from the same wrong-company web search.
     const emailToUse: string | null = (rawEmail && emailReconciles && urlReconciles) ? rawEmail : null
+    // ITER-10.5 fifth review: drop card entirely when no reachable contact.
+    if (!websiteText && !emailToUse) {
+      console.error(`[render-minimal-pdf] supplier card dropped: no valid contact for "${c.name}"`)
+      return null
+    }
     const capability: string = clean_prose(String(c.capability_oneliner ?? '')).trim()
     const fitBullets: string[] = Array.isArray(c.fit_bullets)
       ? c.fit_bullets.map((b: any) => clean_prose(String(b ?? '')).trim()).filter((b: string) => b.length > 0).slice(0, 3)
@@ -5210,7 +5242,11 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
       <RiskPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       <SuppliersPage state={state} project={project} />
       <CompliancePage state={state} project={project} manualReviewBadges={manualReviewBadges} />
-      <DesignDecisionsPage state={state} project={project} />
+      {/* ITER-10.5 fifth review (Tristan 2026-05-20): standalone Design
+          Decisions page deleted — "this section seems orphaned, what is
+          it doing?". Unrepaired-gate decisions already surface inline
+          via per-sub-module Notes + module-level Engineering check
+          paragraphs. */}
     </Document>
   )
 }
