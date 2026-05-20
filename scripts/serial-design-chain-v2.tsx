@@ -2428,6 +2428,19 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   } catch (err) {
     console.error(`[chain] performance card build failed: ${(err as Error).message}`)
   }
+  // 2026-05-20 iter-8 (Tristan + council CAPEX/OPEX/Reliability framing):
+  // Surface every design choice the chain made, sourced from existing state
+  // (no Generator invention at render time). Renderer shows as
+  // "Design Trade-offs" page after Brief.
+  try {
+    const { buildDesignDecisionsReview } = await import('../src/lib/pdf-engine-v2/design-decisions-review')
+    ;(state as any).designDecisionsReview = buildDesignDecisionsReview(state)
+    const dd = (state as any).designDecisionsReview
+    console.error(`[chain] design decisions review: ${dd.summary.total} choices (${dd.summary.applied} applied, ${dd.summary.flagged} flagged, ${dd.summary.blocked} blocked)`)
+    logAction({ step: 'design_decisions_review', ...dd.summary })
+  } catch (err) {
+    console.error(`[chain] design decisions review build failed: ${(err as Error).message}`)
+  }
   const statePath = resolve(outDir, 'state.json')
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   logAction({ step: 'save_state', path: statePath, accepted: allPassed, acceptance_status: acceptanceStatus, decision_count: designDecisions.length })

@@ -2182,6 +2182,106 @@ function PerformanceCardPage({ state, project }: { state: any; project: string }
   )
 }
 
+// ─── Section 1.5: Design Trade-offs (Tristan + council 2026-05-20) ─────────
+//
+// Surfaces every design choice the chain made, sourced from existing state.
+// No LLM invention at render time — every entry is provable from a state path.
+// Council framing (Grok + Gemini): CAPEX / OPEX / Reliability instead of
+// speed/cost/quality, because the audience (founders, investors, EPC engineers)
+// makes physical-financial trade-offs, not software-PM trade-offs.
+//
+// Each row shows:
+//   WHAT (the choice the chain made)
+//   ALTERNATIVE (the option not chosen, sourced from state or class registry)
+//   GAINED (which of CAPEX↓/OPEX↓/Reliability↑ improved)
+//   SACRIFICED (which axis was given up)
+//   STATUS (applied / flagged_for_review / blocked)
+//
+// Reader can immediately see "this report ships with N flagged decisions
+// trading reliability for capex/speed" rather than discovering it in the
+// fine print.
+function DesignDecisionsPage({ state, project }: { state: any; project: string }) {
+  const review = state?.designDecisionsReview
+  if (!review || !Array.isArray(review.choices) || review.choices.length === 0) return null
+
+  const axisLabel = (a: string): string => {
+    if (a === 'capex') return 'CAPEX'
+    if (a === 'opex') return 'OPEX'
+    if (a === 'reliability') return 'Reliability'
+    return a
+  }
+  const axisChip = (axis: string, mode: 'gained' | 'sacrificed') => {
+    const isGained = mode === 'gained'
+    const arrow = axis === 'reliability' ? (isGained ? '↑' : '↓') : (isGained ? '↓' : '↑')
+    const bg = isGained ? '#dcfce7' : '#fee2e2'
+    const fg = isGained ? '#15803d' : '#b91c1c'
+    return (
+      <View key={`${mode}-${axis}`} style={{ marginRight: 4, marginTop: 2, paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 3, backgroundColor: bg }}>
+        <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: fg }}>
+          {arrow} {axisLabel(axis)}
+        </Text>
+      </View>
+    )
+  }
+  const statusChip = (status: string) => {
+    const sty = status === 'blocked'
+      ? { bg: '#7f1d1d', fg: '#fee2e2', label: 'BLOCKED' }
+      : status === 'flagged_for_review'
+        ? { bg: '#fef3c7', fg: '#92400e', label: 'FLAGGED FOR REVIEW' }
+        : { bg: '#e0e7ff', fg: '#3730a3', label: 'APPLIED' }
+    return (
+      <View style={{ paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 3, backgroundColor: sty.bg }}>
+        <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: sty.fg, letterSpacing: 0.5 }}>{sty.label}</Text>
+      </View>
+    )
+  }
+
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section 1.5 · Design Trade-offs" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Design Trade-offs
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14, lineHeight: 1.55 }}>
+        Every meaningful choice the chain made during this run, with the alternative not chosen and the compromise on the CAPEX / OPEX / Reliability triangle. Sourced from chain state — not invented for the report.
+      </Text>
+
+      <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4 }}>
+        <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>
+          {review.summary.total} choice{review.summary.total === 1 ? '' : 's'} surfaced — {review.summary.applied} applied, {review.summary.flagged} flagged for review, {review.summary.blocked} blocked. The triangle is read "you can have two of three": every choice improves one or two axes at the cost of the third.
+        </Text>
+      </View>
+
+      {review.choices.map((c: any, idx: number) => (
+        <View key={c.id ?? `choice-${idx}`} style={{ marginBottom: 12, padding: 12, borderRadius: 4, borderLeftWidth: 3, borderLeftColor: c.status === 'blocked' ? '#b91c1c' : c.status === 'flagged_for_review' ? '#d97706' : ACCENT, backgroundColor: '#fbfcfe' }} wrap={false}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
+            <Text style={{ fontSize: 8.5, color: MUTED, letterSpacing: 1, marginRight: 8 }}>
+              {String(c.scope ?? '').toUpperCase()} · CHOICE {idx + 1}
+            </Text>
+            {statusChip(c.status)}
+          </View>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
+            {c.what}
+          </Text>
+          <View style={{ marginBottom: 6 }}>
+            <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 1, letterSpacing: 0.8 }}>ALTERNATIVE NOT CHOSEN</Text>
+            <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>{c.alternative}</Text>
+          </View>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
+            <Text style={{ fontSize: 8.5, color: MUTED, marginRight: 6, letterSpacing: 0.8 }}>GAINED</Text>
+            {(c.trade_off?.gained ?? []).map((a: string) => axisChip(a, 'gained'))}
+            <Text style={{ fontSize: 8.5, color: MUTED, marginLeft: 10, marginRight: 6, letterSpacing: 0.8 }}>SACRIFICED</Text>
+            {(c.trade_off?.sacrificed ?? []).map((a: string) => axisChip(a, 'sacrificed'))}
+          </View>
+          <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>{c.rationale}</Text>
+        </View>
+      ))}
+
+      <PageFooter />
+    </Page>
+  )
+}
+
 // ─── Section 1: Brief & Requirements ───────────────────────────────────────
 
 // ─── Brief Revision Notice (Phase 0 2026-05-15) ────────────────────────────
@@ -4738,6 +4838,7 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
       <PerformanceCardPage state={state} project={project} />
       {state.brief?.was_revised ? <BriefRevisionNoticePage state={state} project={project} /> : null}
       <BriefPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
+      <DesignDecisionsPage state={state} project={project} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
       {modules.map((m: any, idx: number) => (
         <ModuleSection
@@ -4810,7 +4911,7 @@ async function main() {
     || state.brief?.parsed_original?.projectName
     || state.parsedBrief?.projectName
     // First non-empty line of the brief text — last-resort but truthful.
-    || (typeof state.brief?.revised_text === 'string' && state.brief.revised_text.trim().split('\n').find((l: string) => l.trim())?.replace(/^#+\s*/, '').replace(/^Project Brief:\s*/i, '').replace(/^(?:[^.!?\n]{1,160}[.!?]|[^\n]{1,100}\b).*$/s, (m) => {
+    || (typeof state.brief?.revised_text === 'string' && state.brief.revised_text.trim().split('\n').find((l: string) => l.trim())?.replace(/^#+\s*/, '').replace(/^Project Brief:\s*/i, '').replace(/^(?:[^.!?\n]{1,160}[.!?]|[^\n]{1,100}\b).*$/s, (m: string) => {
         // 2026-05-20 iter-8 council fix G: title truncation — the legacy
         // slice(0,80) cut "Primary Constraint" mid-word on the VF cover.
         // Now: prefer the first sentence terminator within 160 chars; if
@@ -4821,7 +4922,7 @@ async function main() {
         const lastSpace = trimmed.lastIndexOf(' ')
         return lastSpace > 30 ? trimmed.slice(0, lastSpace) : trimmed
       }))
-    || (typeof state.brief?.original_text === 'string' && state.brief.original_text.trim().split('\n').find((l: string) => l.trim())?.replace(/^#+\s*/, '').replace(/^Project Brief:\s*/i, '').replace(/^(?:[^.!?\n]{1,160}[.!?]|[^\n]{1,100}\b).*$/s, (m) => {
+    || (typeof state.brief?.original_text === 'string' && state.brief.original_text.trim().split('\n').find((l: string) => l.trim())?.replace(/^#+\s*/, '').replace(/^Project Brief:\s*/i, '').replace(/^(?:[^.!?\n]{1,160}[.!?]|[^\n]{1,100}\b).*$/s, (m: string) => {
         // 2026-05-20 iter-8 council fix G: title truncation — the legacy
         // slice(0,80) cut "Primary Constraint" mid-word on the VF cover.
         // Now: prefer the first sentence terminator within 160 chars; if
