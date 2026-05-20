@@ -430,7 +430,17 @@ export function buildPerformanceCard(state: any): PerformanceCard {
       resolved[m.id] = row
       rows.push(row)
 
-      if ((status === 'delta' || status === 'out_of_range') && (note || brief !== null)) {
+      // Sprint 2C (Tristan 2026-05-20): also surface metrics that have
+      // an inline NOTE even when status stays 'ok' or 'computed'. Inline
+      // notes are produced by metric.note(raw, state) callbacks that
+      // catch domain-specific issues (e.g. "LED installed power 0.9 kW
+      // — Low for leafy greens, typical 0.20-0.30 kW/m²"). Previously
+      // these only surfaced inline next to the row — now they also
+      // bubble to the headline warnings strip so the reader can see at
+      // a glance which metrics need attention. Universal across product
+      // classes — every metric.note() callback already classifies
+      // domain-typical ranges per class.
+      if (note || ((status === 'delta' || status === 'out_of_range') && brief !== null)) {
         warnings.push({ id: m.id, section: section.name, label: m.label, status, note: note ?? `target ${brief}` })
       }
     }
