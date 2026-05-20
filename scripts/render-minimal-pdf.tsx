@@ -254,6 +254,11 @@ function toTitleCaseEng(input: string): string {
     if (/^[A-Z]{2,}\d*$/.test(tok)) return tok
     const upper = tok.toUpperCase()
     if (ACRONYMS.has(upper)) return upper
+    // Physical unit tokens after a number: leave lowercase ("m²", "kg", "kW",
+    // "ppfd"). Detected when token is single-letter or short-with-symbols and
+    // the previous non-space token is a number. Without this, "100 m²" gets
+    // title-cased to "100 M²" which is incorrect SI notation.
+    if (/^[a-z]{1,4}[²³°]?$/.test(tok)) return tok.toLowerCase()
     const lower = tok.toLowerCase()
     if (idx > 0 && SMALL_WORDS.has(lower)) return lower
     return lower.charAt(0).toUpperCase() + lower.slice(1)
@@ -1606,11 +1611,15 @@ function CoverPage({
   acceptanceStatus,
   physicsCritique,
   briefEnvelope,
+  productClass,
+  state,
 }: {
   subject: string
   projectId: string
   heroImagePath?: string | null
   briefEnvelope?: { widthMm: number; depthMm: number; heightMm: number; label: string } | null
+  productClass?: string
+  state?: any
   bomTotals?: BomTotals | null
   costStack?: CostStack | null
   priceReality?: PriceReality | null
@@ -1852,6 +1861,8 @@ function CoverPage({
                 label={briefEnvelope.label}
                 maxBoxW={207}
                 maxBoxH={170}
+                productClass={productClass}
+                state={state}
               />
             </View>
           ) : (
@@ -3413,6 +3424,8 @@ function ModuleSection({
               label={env.label}
               maxBoxW={300}
               maxBoxH={240}
+              productClass={String(state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? '')}
+              state={state}
             />
             <Text style={{ fontSize: 8, color: MUTED, marginTop: 10, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 36 }}>
               Module {index} ({title}) sits within the envelope above. Per-module class render suppressed because the static PNG library does not match this envelope scale.
@@ -5011,10 +5024,84 @@ function readBriefEnvelopeDimensions(state: any): { widthMm: number; depthMm: nu
   return null
 }
 
+/** Sprint 0 v1 (Tristan 2026-05-20): class-aware iconography rendered
+ *  INSIDE the EnvelopeOutline. Each product class has its own primitives:
+ *  vertical_farm = trolley silhouettes; energy_storage = rack columns;
+ *  heat_pump = compressor + HX silhouettes. Iconography is proportional
+ *  to the envelope so the reader can see what FITS inside, not just the
+ *  shell. Universal — every class gets the same treatment per its own
+ *  primitives. Reverts to plain envelope when class has no iconography
+ *  registered yet. */
+function classIconography(
+  productClass: string,
+  state: any,
+  w: number,
+  h: number,
+): React.ReactElement | null {
+  const slug = String(productClass ?? '').toLowerCase()
+  const md = state?.moduleDecomposition?.modules ?? []
+  const struct = md.find((m: any) => m?.module === 'structure_containment')
+  const dp = struct?.derived_parameters ?? {}
+
+  if (slug.startsWith('vertical_farm') || slug.startsWith('verticalfarm') || slug.startsWith('cea')) {
+    // Trolley count from derived_parameters or default to 8
+    const trolleyCount = Number(dp.trolley_count ?? dp.mobile_trolley_count ?? 8) || 8
+    const tiers = Number(dp.tier_count ?? dp.tiers_per_trolley ?? 5) || 5
+    // Trolleys arranged along the width — assume container is wide,
+    // trolleys are deep. Show trolley fronts as filled rectangles.
+    const slots = Math.min(trolleyCount, 8)
+    const slotPadding = 4
+    const slotWidth = (w - slotPadding * 2) / slots
+    const trolleyW = Math.max(2, slotWidth * 0.8)
+    const trolleyH = h * 0.78
+    return (
+      <View style={{ position: 'absolute', top: h * 0.11, left: slotPadding, flexDirection: 'row', justifyContent: 'space-between', width: w - slotPadding * 2 }}>
+        {Array.from({ length: slots }).map((_, i) => (
+          <View key={`tr-${i}`} style={{ width: trolleyW, height: trolleyH, backgroundColor: '#dbeafe', borderWidth: 0.6, borderColor: ACCENT_SOFT, borderRadius: 1 }}>
+            {/* Tier markers — horizontal lines */}
+            {Array.from({ length: Math.min(tiers, 6) - 1 }).map((__, ti) => (
+              <View key={`t-${ti}`} style={{ height: 0.4, backgroundColor: ACCENT_SOFT, marginTop: trolleyH / tiers - 0.4 }} />
+            ))}
+          </View>
+        ))}
+      </View>
+    )
+  }
+
+  if (slug.startsWith('bess') || slug === 'energy_storage' || slug.startsWith('battery')) {
+    // BESS racks arranged in columns inside the enclosure
+    const moduleCount = Number(dp.rack_count ?? dp.module_count ?? 6) || 6
+    const slots = Math.min(moduleCount, 8)
+    const slotPadding = 4
+    const slotWidth = (w - slotPadding * 2) / slots
+    const rackW = Math.max(2, slotWidth * 0.75)
+    const rackH = h * 0.82
+    return (
+      <View style={{ position: 'absolute', top: h * 0.09, left: slotPadding, flexDirection: 'row', justifyContent: 'space-between', width: w - slotPadding * 2 }}>
+        {Array.from({ length: slots }).map((_, i) => (
+          <View key={`rk-${i}`} style={{ width: rackW, height: rackH, backgroundColor: '#fef3c7', borderWidth: 0.6, borderColor: '#d97706', borderRadius: 1 }} />
+        ))}
+      </View>
+    )
+  }
+
+  if (slug.startsWith('heat') || slug.startsWith('hp_') || slug.startsWith('heatpump')) {
+    // Heat pump: compressor pad + HX block
+    return (
+      <View style={{ position: 'absolute', top: h * 0.15, left: w * 0.1, width: w * 0.8, height: h * 0.7, flexDirection: 'row' }}>
+        <View style={{ flex: 1.4, marginRight: w * 0.02, backgroundColor: '#dbeafe', borderWidth: 0.6, borderColor: ACCENT_SOFT, borderRadius: 1 }} />
+        <View style={{ flex: 1, backgroundColor: '#fee2e2', borderWidth: 0.6, borderColor: '#b91c1c', borderRadius: 1 }} />
+      </View>
+    )
+  }
+
+  return null
+}
+
 /** Proportional outline placeholder for when the static class hero is the
  *  wrong scale. Renders a front-view rectangle scaled to fit the available
  *  box (maxW × maxH) using the brief's actual aspect ratio, plus dimension
- *  labels. */
+ *  labels + class-specific iconography (trolleys / racks / HX blocks). */
 function EnvelopeOutline({
   widthMm,
   depthMm,
@@ -5022,6 +5109,8 @@ function EnvelopeOutline({
   label,
   maxBoxW,
   maxBoxH,
+  productClass,
+  state,
 }: {
   widthMm: number
   depthMm: number
@@ -5029,6 +5118,8 @@ function EnvelopeOutline({
   label: string
   maxBoxW: number
   maxBoxH: number
+  productClass?: string
+  state?: any
 }) {
   // Front view = widthMm × heightMm. Fit into maxBoxW × maxBoxH preserving ratio.
   const aspect = widthMm / heightMm
@@ -5038,6 +5129,7 @@ function EnvelopeOutline({
   // Mini depth indicator — a smaller rectangle offset behind the front face,
   // proportional to depth-vs-width.
   const depthOffset = Math.min(12, Math.max(4, (depthMm / widthMm) * 20))
+  const iconography = (productClass && state) ? classIconography(productClass, state, w, h) : null
   return (
     <View style={{ alignItems: 'center', justifyContent: 'center', width: maxBoxW, padding: 4 }}>
       <Text style={{ fontSize: 7, color: MUTED, letterSpacing: 0.8, marginBottom: 6 }}>
@@ -5047,11 +5139,16 @@ function EnvelopeOutline({
         {/* Back face (depth cue) */}
         <View style={{ position: 'absolute', top: 0, left: depthOffset, width: w, height: h, borderWidth: 0.6, borderColor: RULE, backgroundColor: '#f1f5f9' }} />
         {/* Front face */}
-        <View style={{ position: 'absolute', top: depthOffset, left: 0, width: w, height: h, borderWidth: 1, borderColor: ACCENT, backgroundColor: '#ffffff', alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'center', paddingHorizontal: 8 }}>{label}</Text>
-          <Text style={{ fontSize: 7.5, color: INK_SOFT, marginTop: 3, textAlign: 'center', paddingHorizontal: 8 }}>
-            {(widthMm / 1000).toFixed(2)} m W × {(heightMm / 1000).toFixed(2)} m H{depthMm ? ` × ${(depthMm / 1000).toFixed(2)} m D` : ''}
-          </Text>
+        <View style={{ position: 'absolute', top: depthOffset, left: 0, width: w, height: h, borderWidth: 1, borderColor: ACCENT, backgroundColor: '#ffffff' }}>
+          {/* Class-specific iconography inside the envelope */}
+          {iconography}
+          {/* Centred label overlay */}
+          <View style={{ position: 'absolute', top: 0, left: 0, width: w, height: h, alignItems: 'center', justifyContent: 'center' }}>
+            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, textAlign: 'center', paddingHorizontal: 8, backgroundColor: 'rgba(255,255,255,0.85)' }}>{label}</Text>
+            <Text style={{ fontSize: 7.5, color: INK_SOFT, marginTop: 3, textAlign: 'center', paddingHorizontal: 8, backgroundColor: 'rgba(255,255,255,0.85)' }}>
+              {(widthMm / 1000).toFixed(2)} m W × {(heightMm / 1000).toFixed(2)} m H{depthMm ? ` × ${(depthMm / 1000).toFixed(2)} m D` : ''}
+            </Text>
+          </View>
         </View>
       </View>
       <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 8, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 4 }}>
@@ -5286,7 +5383,7 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
 
   return (
     <Document>
-      <CoverPage subject={subject} projectId={project} heroImagePath={heroImages.cover} briefEnvelope={briefEnvelope} bomTotals={bomTotals} costStack={costStack} priceReality={priceReality} pendingPartsCount={pendingPartsCount} engineCSummary={state.engine_c_summary || null} manualReviewBadges={manualReviewBadges} provisionalClassRegistry={provisionalClassRegistry} acceptanceStatus={state?.acceptanceStatus} physicsCritique={state?.physicsCritique} />
+      <CoverPage subject={subject} projectId={project} heroImagePath={heroImages.cover} briefEnvelope={briefEnvelope} bomTotals={bomTotals} costStack={costStack} priceReality={priceReality} pendingPartsCount={pendingPartsCount} engineCSummary={state.engine_c_summary || null} manualReviewBadges={manualReviewBadges} provisionalClassRegistry={provisionalClassRegistry} acceptanceStatus={state?.acceptanceStatus} physicsCritique={state?.physicsCritique} productClass={String(state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? '')} state={state} />
       {/* ITER-10.5 (Tristan-defined 2026-05-20):
           Brief sits immediately after Cover. Operational Headline is folded
           INTO BriefPage as a banner at the top (HeadlinePage component
