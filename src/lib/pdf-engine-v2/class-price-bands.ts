@@ -99,7 +99,7 @@ function targetPerformanceValue(state: any): number | null {
  * unknown — caller still assumes its expected unit, so unit-tagged briefs
  * convert correctly and untagged briefs preserve current behaviour.
  */
-function targetPerformanceValueAs(state: any, targetUnit: string): number | null {
+export function targetPerformanceValueAs(state: any, targetUnit: string): number | null {
   const tp = state?.parsedBrief?.constraints?.target_performance
   const v = tp?.value
   const unit = String(tp?.unit ?? '').toLowerCase().trim()

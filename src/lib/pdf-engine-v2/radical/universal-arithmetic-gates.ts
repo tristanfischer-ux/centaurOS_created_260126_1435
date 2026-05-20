@@ -844,13 +844,25 @@ const briefConstraintPropagationGate: ArithmeticGate = {
     const briefConstraints = (modules as any).__briefConstraints
     if (!briefConstraints) return emptyResult()
     // Constraint keys that correlate directly with derived_parameters keys.
-    // For each (briefKey, dpKey), if both are present, |dp - brief|/brief > 0.10 → fail.
-    const mappings: Array<{ briefKey: string; dpKey: string; field: string; tolerance: number; mode: 'less_than' | 'greater_than' | 'within' }> = [
-      { briefKey: 'target_performance', dpKey: 'ppfd_umol_m2_s', field: 'PPFD', tolerance: 0.20, mode: 'within' },
-      { briefKey: 'target_performance', dpKey: 'led_power_w', field: 'LED panel W', tolerance: 0.20, mode: 'within' },
-      { briefKey: 'target_performance', dpKey: 'cooling_capacity_kw', field: 'Cooling kW', tolerance: 0.15, mode: 'within' },
-      { briefKey: 'target_performance', dpKey: 'rated_thermal_kw', field: 'Thermal kW', tolerance: 0.15, mode: 'within' },
-      { briefKey: 'target_performance', dpKey: 'capacity_kwh', field: 'Capacity kWh', tolerance: 0.05, mode: 'within' },
+    // For each (briefKey, dpKey), if both are present, |dp - brief|/brief > tolerance → fail.
+    //
+    // 2026-05-20 Task #94 (BESS unit-oscillation forensic, council
+    // a829fc8f8f71303e3): `brief_unit_field` declares which canonical-
+    // unit field on briefEntry to read. The chain's pre-pass normaliser
+    // (scripts/serial-design-chain-v2.tsx:normaliseBriefConstraintsForGates)
+    // populates these per the brief's declared unit family. When the
+    // brief_unit_field is set and the canonical field is null, the
+    // mapping silently skips — that's the brief's unit family not
+    // matching this dpKey's family (energy brief vs power dpKey, etc.).
+    // The legacy `.value` fallback only fires for mappings without
+    // brief_unit_field (max_mass_kg, unit_cost_ceiling) which already
+    // carry the right unit by convention.
+    const mappings: Array<{ briefKey: string; dpKey: string; field: string; tolerance: number; mode: 'less_than' | 'greater_than' | 'within'; brief_unit_field?: string }> = [
+      { briefKey: 'target_performance', dpKey: 'ppfd_umol_m2_s', field: 'PPFD', tolerance: 0.20, mode: 'within', brief_unit_field: 'value_umol_m2_s' },
+      { briefKey: 'target_performance', dpKey: 'led_power_w', field: 'LED panel W', tolerance: 0.20, mode: 'within', brief_unit_field: 'value_w' },
+      { briefKey: 'target_performance', dpKey: 'cooling_capacity_kw', field: 'Cooling kW', tolerance: 0.15, mode: 'within', brief_unit_field: 'value_kw' },
+      { briefKey: 'target_performance', dpKey: 'rated_thermal_kw', field: 'Thermal kW', tolerance: 0.15, mode: 'within', brief_unit_field: 'value_kw' },
+      { briefKey: 'target_performance', dpKey: 'capacity_kwh', field: 'Capacity kWh', tolerance: 0.05, mode: 'within', brief_unit_field: 'value_kwh' },
       { briefKey: 'max_mass_kg', dpKey: 'mass_kg', field: 'Mass kg', tolerance: 0, mode: 'less_than' },
       { briefKey: 'unit_cost_ceiling', dpKey: 'unit_cost_gbp', field: 'Unit cost £', tolerance: 0, mode: 'less_than' },
     ]
@@ -861,7 +873,18 @@ const briefConstraintPropagationGate: ArithmeticGate = {
         const dpVal = num(dp as any, map.dpKey)
         if (dpVal === null) continue
         const briefEntry = briefConstraints[map.briefKey]
-        const briefVal = briefEntry?.value !== undefined ? num({ v: briefEntry.value }, 'v') : null
+        if (!briefEntry) continue
+        // Unit-family check: if mapping declares a brief_unit_field, only
+        // fire when the chain's normaliser populated that field. A null
+        // means the brief's unit family doesn't match this dpKey's family
+        // (e.g. brief target_performance.unit='MWh' on a power dpKey).
+        let briefVal: number | null = null
+        if (map.brief_unit_field) {
+          const v = briefEntry[map.brief_unit_field]
+          briefVal = typeof v === 'number' && Number.isFinite(v) ? v : null
+        } else {
+          briefVal = briefEntry.value !== undefined ? num({ v: briefEntry.value }, 'v') : null
+        }
         if (briefVal === null || briefVal <= 0) continue
         if (map.mode === 'less_than') {
           if (dpVal > briefVal) {
@@ -872,6 +895,16 @@ const briefConstraintPropagationGate: ArithmeticGate = {
             return { score: -2000, passed: false, reasons: [`brief constraint ${map.field} VIOLATED on ${m.module}: design=${dpVal} < brief.${map.briefKey}=${briefVal}. FIX: increase ${map.dpKey} to ≥ ${briefVal}.`], affected: [m.module] }
           }
         } else {
+          // Magnitude sanity guard (Task #94, defence-in-depth): if dpVal
+          // and briefVal differ by >1000×, the normaliser missed a unit
+          // family. Emit an UNFIXABLE failure rather than demanding the
+          // model align — Physics Repair has no way to close a 1000×
+          // gap that's actually a unit-conversion bug, and chasing it
+          // wedges the loop (BESS iter-9 oscillated 9 iters).
+          const ratio = dpVal / briefVal
+          if (ratio > 1000 || ratio < 1e-3) {
+            return { score: -2000, passed: false, reasons: [`UNIT MISMATCH on ${m.module}: design=${dpVal} (${map.dpKey}) vs brief.${map.briefKey}=${briefVal} differs by ${ratio > 1 ? '×' + Math.round(ratio) : '÷' + Math.round(1 / ratio)}. NOT auto-fixable — likely brief unit family not normalised by chain pre-pass. Check parsedBrief.constraints.${map.briefKey}.unit + extend normaliseBriefConstraintsForGates if missing.`], affected: [m.module] }
+          }
           const errPct = Math.abs(dpVal - briefVal) / briefVal
           if (errPct > map.tolerance) {
             return { score: -2000, passed: false, reasons: [`brief constraint ${map.field} DRIFT on ${m.module}: design=${dpVal} vs brief.${map.briefKey}=${briefVal} (${(errPct * 100).toFixed(0)}% off, tolerance ${(map.tolerance * 100).toFixed(0)}%). FIX: align ${map.dpKey} to ${briefVal} ±${(map.tolerance * 100).toFixed(0)}%.`], affected: [m.module] }

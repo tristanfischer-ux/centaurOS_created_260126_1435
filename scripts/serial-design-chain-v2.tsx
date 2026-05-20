@@ -60,7 +60,7 @@ import {
 import { runPhysicsLedger } from '../src/lib/pdf-engine-v2/stages/0.1-physics-ledger'
 import { runComplianceGate, type ComplianceGateResult } from '../src/lib/pdf-engine-v2/stages/3.5-compliance-gate'
 import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/lib/pdf-engine-v2/stages/1.8-brief-target-reconciliation'
-import { resolvePriceBand } from '../src/lib/pdf-engine-v2/class-price-bands'
+import { resolvePriceBand, targetPerformanceValueAs } from '../src/lib/pdf-engine-v2/class-price-bands'
 import { resolveCostStack, computeCostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
@@ -121,6 +121,52 @@ import {
   getActionLogger,
   type ActionType,
 } from '../src/lib/pdf-engine-v2/lib/action-logger'
+
+/**
+ * Pre-pass normaliser for brief constraints (Task #94, BESS unit-
+ * oscillation forensic 2026-05-20). The briefConstraintPropagationGate
+ * compares derived_parameters values against brief constraints, but the
+ * gate previously read target_performance.value as a naked number with
+ * no unit awareness — so a brief declaring 3.5 MWh got treated as 3.5
+ * kWh and Physics Repair oscillated indefinitely. This normaliser reads
+ * target_performance.{value,unit}, detects the unit family, and writes
+ * canonical-unit fields onto a SHALLOW CLONE of the constraints object.
+ * The gate's mapping table looks up the right canonical field per row
+ * (capacity_kwh → value_kwh, cooling_capacity_kw → value_kw, etc.) and
+ * silently skips when the brief's unit family doesn't match the dpKey's
+ * family — so cooling_capacity_kw stops false-firing on energy briefs.
+ *
+ * Universal: works for BESS (MWh→kWh), HAPS (W→kW), drone (g→kg),
+ * vertical-farm (ha→m²), bioreactor (m³→L). Falls back to identity when
+ * unit is absent or unknown — magnitude-guard in the gate backstops.
+ */
+function normaliseBriefConstraintsForGates(parsedBrief: any): any {
+  const c = parsedBrief?.constraints
+  if (!c) return null
+  const clone: any = JSON.parse(JSON.stringify(c))
+  const tp = clone?.target_performance
+  if (tp && typeof tp.value === 'number' && typeof tp.unit === 'string') {
+    const unit = String(tp.unit).toLowerCase().trim()
+    const state = { parsedBrief: { constraints: c } } as any
+    if (['wh', 'kwh', 'mwh', 'gwh'].includes(unit)) {
+      tp.value_kwh = targetPerformanceValueAs(state, 'kwh')
+      tp.value_wh = targetPerformanceValueAs(state, 'wh')
+    } else if (['w', 'kw', 'mw', 'gw'].includes(unit)) {
+      const kw = targetPerformanceValueAs(state, 'kw')
+      tp.value_kw = kw
+      tp.value_w = kw !== null ? kw * 1000 : null
+    } else if (['g', 'kg', 't', 'tonne', 'tonnes'].includes(unit)) {
+      tp.value_kg = targetPerformanceValueAs(state, 'kg')
+    } else if (['cm2', 'm2', 'ha'].includes(unit)) {
+      tp.value_m2 = targetPerformanceValueAs(state, 'm2')
+    } else if (['ml', 'l', 'm3'].includes(unit)) {
+      tp.value_l = targetPerformanceValueAs(state, 'l')
+    } else if (unit === 'umol/m2/s' || unit === 'μmol/m²/s' || unit.includes('ppfd')) {
+      tp.value_umol_m2_s = tp.value
+    }
+  }
+  return clone
+}
 
 function logAction(record: Record<string, any>): void {
   const logger = getActionLogger()
@@ -2031,7 +2077,26 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     // modules array so the briefConstraintPropagationGate can compare
     // derived_parameters against brief.target_performance / max_mass_kg /
     // unit_cost_ceiling. The gate reads (modules as any).__briefConstraints.
-    ;(t.modules as any).__briefConstraints = parsedResult.data?.constraints ?? null
+    //
+    // 2026-05-20 BESS unit-oscillation forensic (Task #94, council
+    // a829fc8f8f71303e3): the gate previously read briefConstraints
+    // .target_performance.value as a naked number with no unit awareness.
+    // A brief declaring 3.5 MWh was treated as 3.5 kWh and Physics Repair
+    // chased capacity_kwh=3.5 every iter, oscillating against the cell
+    // topology (5120×280×3.2/1000=4587.5 kWh). Same gate also drift-
+    // checked cooling_capacity_kw / led_power_w against the same naked
+    // value — apples-to-oranges across power/thermal/photon-flux families.
+    //
+    // Fix: pre-pass normaliser populates per-family canonical-unit fields
+    // (value_kwh, value_kw, value_w, value_kg, value_m2, value_umol_m2_s)
+    // on target_performance based on the brief's declared unit family.
+    // The gate's mapping table now declares brief_unit_field per row;
+    // mappings whose canonical field is null on the brief skip silently
+    // (unit-family mismatch), so cooling_capacity_kw stops false-firing
+    // on energy briefs. Magnitude guard in the gate catches the remaining
+    // unit-mismatch cases that slip through (>1000× ratio). Universal
+    // across product classes.
+    ;(t.modules as any).__briefConstraints = normaliseBriefConstraintsForGates(parsedResult.data ?? {}) ?? null
     const arith = runArithmeticGates(t.modules)
     const grammar = runGrammarGates(t.modules, t.crossLinks, productClass)
     finalArith = arith
