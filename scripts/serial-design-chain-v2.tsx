@@ -62,7 +62,7 @@ import { runComplianceGate, type ComplianceGateResult } from '../src/lib/pdf-eng
 import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/lib/pdf-engine-v2/stages/1.8-brief-target-reconciliation'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
-import { verifyAllParts, stripUnverifiedParts, recommendReplacementsForStripped, buildTechnicalSummary, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
+import { verifyAllParts, stripUnverifiedParts, recommendReplacementsForStripped, buildTechnicalSummary, enrichWithRagSuggestions, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
 import { runPhysicsCritic, type CritiqueReport } from '../src/lib/pdf-engine-v2/radical/physics-critic'
 // Phase C pipeline integration REVERTED 2026-05-15 per coding council (5/5
 // REVERT). Registry pre-seed of reviewer prompts caused score regression and
@@ -2254,6 +2254,28 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     const counts = { verified: 0, unverified: 0, uncertain: 0, skip: 0 }
     for (const v of partVerifications) counts[v.status]++
     console.error(`[chain] part verification: ${partVerifications.length} parts checked — verified=${counts.verified}, unverified=${counts.unverified}, uncertain=${counts.uncertain}, skip=${counts.skip}`)
+
+    // ── G5 catalogue RAG (Task #69 — 2026-05-20). For every unverified
+    // or uncertain part, look up the closest semantically-similar REAL part
+    // in the Phase 4 corpus (~/.forge-truth/forge-truth.db,
+    // pretraining_extracted_parts, ~25k embedded rows). When the corpus has
+    // a strong match, attach it as g5_rag_suggestion on the PartVerification
+    // row; the renderer surfaces "Plausible alternative based on corpus: ..."
+    // next to the unverified BoM line. Universal across product classes.
+    // Fail-soft: if OPENAI_API_KEY / corpus missing, skip silently.
+    if (process.env.CHAIN_SKIP_G5_RAG !== '1') {
+      const tRag = Date.now()
+      try {
+        const ragStats = await enrichWithRagSuggestions(design.modules ?? [], partVerifications)
+        const total = ragStats.suggestions_high + ragStats.suggestions_medium + ragStats.suggestions_low
+        console.error(`[chain] G5 RAG: ${ragStats.queries_in} queries → ${total} suggestions (high=${ragStats.suggestions_high}, medium=${ragStats.suggestions_medium}, low=${ragStats.suggestions_low}, below_threshold=${ragStats.suggestions_below_threshold}, corpus=${ragStats.corpus_rows} rows)${ragStats.error ? ` — error: ${ragStats.error}` : ''}`)
+        logAction({ step: 'g5_rag_suggestions', latency_ms: Date.now() - tRag, ...ragStats })
+      } catch (err) {
+        console.error(`[chain] G5 RAG threw: ${(err as Error).message}; continuing without`)
+        logAction({ step: 'g5_rag_suggestions', latency_ms: Date.now() - tRag, ok: false, error: String(err).slice(0, 200) })
+      }
+    }
+
     strippedParts = stripUnverifiedParts(design.modules ?? [], partVerifications)
     if (strippedParts.stripped > 0) {
       console.error(`[chain] part verification: stripped ${strippedParts.stripped} high-confidence fake part_numbers`)
@@ -2417,6 +2439,11 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
       part_name: v.word_name,
       reason: v.reasoning,
       fallback_action: (v as any).fallback_action ?? null,
+      // Task #69 (2026-05-20): G5 catalogue RAG suggestion. Populated by
+      // enrichWithRagSuggestions earlier in this stage. NULL when corpus has
+      // no usable match. Renderer's NotesBlock + manual-review appendix
+      // surface this as "Plausible alternative based on corpus: ..." when set.
+      rag_suggestion: v.g5_rag_suggestion ?? null,
     }))
   const g5ManualReview = g5UnverifiedParts.length > 0
   //

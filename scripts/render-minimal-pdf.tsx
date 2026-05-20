@@ -1208,16 +1208,37 @@ function collectManualReviewBadges(state: any): ManualReviewBadge[] {
   }
 
   // G5 — Part-number verification. State holds an array of unverified parts.
+  // 2026-05-20 Task #69: each unverified part may also carry a `rag_suggestion`
+  // — a corpus-grounded plausible alternative SKU sourced from the Phase 4
+  // corpus via cosine similarity. When present, surface it inline so the
+  // engineer has a starting point rather than just a "couldn't verify" dead end.
   const g5Parts: any[] = Array.isArray(state?.g5UnverifiedParts) ? state.g5UnverifiedParts : []
   if (state?.g5ManualReview === true || g5Parts.length > 0) {
-    const lines = g5Parts.slice(0, 40).map(p => `  · ${p.part_number ?? '(no SKU)'}${p.part_name ? ` — ${p.part_name}` : ''}${p.reason ? `\n    ${p.reason}` : ''}${p.fallback_action ? `\n    fallback: ${p.fallback_action}` : ''}`)
+    const lines = g5Parts.slice(0, 40).map(p => {
+      const head = `  · ${p.part_number ?? '(no SKU)'}${p.part_name ? ` — ${p.part_name}` : ''}`
+      const reason = p.reason ? `\n    ${p.reason}` : ''
+      const fallback = p.fallback_action ? `\n    fallback: ${p.fallback_action}` : ''
+      // RAG suggestion line — only render when a corpus-grounded alternative exists.
+      const rag = p.rag_suggestion
+      let ragLine = ''
+      if (rag && rag.match && rag.match.part_number) {
+        const sim = typeof rag.similarity === 'number' ? rag.similarity.toFixed(2) : '?'
+        const conf = rag.confidence ? ` [${rag.confidence}]` : ''
+        const mfr = rag.match.manufacturer ? `${rag.match.manufacturer} ` : ''
+        ragLine = `\n    Plausible alternative based on corpus: ${mfr}${rag.match.part_number} (similarity ${sim})${conf}`
+      }
+      return head + reason + fallback + ragLine
+    })
     const more = g5Parts.length > 40 ? `\n  …and ${g5Parts.length - 40} more.` : ''
+    // Count parts with RAG suggestions for the summary line.
+    const ragCount = g5Parts.filter(p => p.rag_suggestion && p.rag_suggestion.match && p.rag_suggestion.match.part_number).length
+    const ragSummary = ragCount > 0 ? ` ${ragCount} have plausible corpus-grounded alternatives surfaced below.` : ''
     out.push({
       id: 'g5_parts',
       label: 'Part-number verification',
       severity: 'warn',
-      summary: `${g5Parts.length} part number${g5Parts.length === 1 ? '' : 's'} could not be confirmed against DigiKey, Mouser, Farnell, or manufacturer-domain web search — manual sourcing required.`,
-      appendix: ['Stage 4.5 part-number verification did not find these SKUs at DigiKey, Mouser, Farnell, or via a Brave manufacturer-domain search. Each line is flagged in the Bill of Materials with an amber "?" badge; the supplier-resolution fallback for each is recorded below.', '', lines.join('\n') + more].join('\n'),
+      summary: `${g5Parts.length} part number${g5Parts.length === 1 ? '' : 's'} could not be confirmed against DigiKey, Mouser, Farnell, or manufacturer-domain web search — manual sourcing required.${ragSummary}`,
+      appendix: ['Stage 4.5 part-number verification did not find these SKUs at DigiKey, Mouser, Farnell, or via a Brave manufacturer-domain search. Each line is flagged in the Bill of Materials with an amber "?" badge; the supplier-resolution fallback for each is recorded below.', ragCount > 0 ? `\n${ragCount} unverified part${ragCount === 1 ? ' has' : 's have'} a corpus-grounded plausible alternative (from ~/.forge-truth/forge-truth.db, ${'~'}25k embedded real parts) — surfaced inline as "Plausible alternative based on corpus: …". These are similarity-ranked suggestions, NOT verified substitutes; the engineer must confirm against datasheets before procuring.\n` : '', lines.join('\n') + more].filter(Boolean).join('\n'),
     })
   }
 

@@ -24,6 +24,7 @@
 import type { ModuleSpec } from '../types/module-decomposition'
 import { normaliseKind } from './universal-grammar-gates'
 import { urlResolves } from '../parts-catalogue/url-resolves'
+import { lookupCorpusSuggestions, type RagQuery, type RagSuggestion } from './g5-rag'
 
 export interface PartCandidate {
   /** Stable id: module::sub_module::word::part_number for cross-referencing. */
@@ -72,6 +73,18 @@ export interface PartVerification extends PartCandidate {
   distributor_price_gbp?: number | null
   distributor_availability?: string | null
   distributor_datasheet_url?: string | null
+  /** G5 catalogue RAG suggestion (Task #69 2026-05-20). Populated AFTER the
+   * tier-1..5 cascade returns "unverified" — if the Phase 4 corpus
+   * (~/.forge-truth/forge-truth.db) has a real part semantically similar to
+   * the fabricated SKU, this carries the suggested substitute + similarity.
+   *
+   * The renderer reads this and surfaces "Plausible alternative based on
+   * corpus: <SKU> (similarity 0.X)" alongside the unverified-part note.
+   *
+   * NULL / absent → no usable corpus match (either similarity < threshold
+   * or RAG step failed soft). Engine still surfaces the unverified verdict
+   * but without an alternative suggestion. */
+  g5_rag_suggestion?: RagSuggestion | null
   /** LLM model + timestamp for traceability. */
   generated_by: string
   generated_at: string
@@ -1385,4 +1398,120 @@ export function buildTechnicalSummary(modules: ModuleSpec[], moduleId: string, s
     }
   }
   return ''
+}
+
+/**
+ * Build a technical summary for a word from a ModuleSpec[] — variant of
+ * `buildTechnicalSummary` that takes word context (manufacturer/part_number
+ * are still on the word at G5 RAG time, before any stripping). Used by
+ * enrichWithRagSuggestions to give the embedder rich context.
+ *
+ * Returns an empty string when the word can't be located.
+ */
+function buildPreStripTechnicalSummary(
+  modules: ModuleSpec[],
+  moduleId: string,
+  subModuleId: string,
+  wordId: string,
+): string {
+  for (const m of modules ?? []) {
+    if (m.module !== moduleId) continue
+    for (const sm of ((m as any).sub_modules ?? [])) {
+      if (sm.id !== subModuleId) continue
+      for (const w of (sm.words ?? [])) {
+        if (String(w.id) !== wordId) continue
+        const mods = Array.isArray(w.modifier_characters) ? w.modifier_characters : []
+        const parts: string[] = []
+        for (const mc of mods) {
+          const k = normaliseKind(String(mc?.kind ?? ''))
+          // Skip manufacturer + part_number — they're already the head of the
+          // composed query text. Quantity isn't a semantic signal.
+          if (k === 'manufacturer' || k === 'part_number' || k === 'quantity') continue
+          const v = String(mc?.value ?? '').trim()
+          if (!v) continue
+          parts.push(`${k}: ${v}`)
+        }
+        return parts.join('; ')
+      }
+    }
+  }
+  return ''
+}
+
+/**
+ * G5 catalogue RAG step (Tristan Task #69 — 2026-05-20).
+ *
+ * After the tier-1..5 verification cascade returns its verdicts, this function
+ * looks up each "unverified" or "uncertain" row against the Phase 4 corpus
+ * (`~/.forge-truth/forge-truth.db` table `pretraining_extracted_parts`,
+ * ~25k embedded real parts). When the corpus has a semantically similar
+ * REAL part, the suggestion is attached to the PartVerification as
+ * `g5_rag_suggestion` and surfaces in the BoM via the renderer.
+ *
+ * Mutates the verifications array IN PLACE (sets `g5_rag_suggestion` on each
+ * matched row) and returns a stats object for the action log.
+ *
+ * Fail-soft: if OPENAI_API_KEY missing, corpus missing, or OpenAI call
+ * errors, this is a no-op — caller continues with the un-annotated array.
+ *
+ * Universal across product classes — embedding similarity is the only signal,
+ * no class-specific logic.
+ */
+export async function enrichWithRagSuggestions(
+  modules: ModuleSpec[],
+  verifications: PartVerification[],
+  options: { dbPath?: string; apiKey?: string } = {},
+): Promise<{
+  queries_in: number
+  suggestions_high: number
+  suggestions_medium: number
+  suggestions_low: number
+  suggestions_below_threshold: number
+  corpus_rows: number
+  error?: string
+}> {
+  // Only enrich rows the cascade couldn't fully verify. "uncertain" is
+  // included because the engineer still benefits from a corpus hint even
+  // when the verifier couldn't decide.
+  const targets = verifications.filter(v => v.status === 'unverified' || v.status === 'uncertain')
+  if (targets.length === 0) {
+    return {
+      queries_in: 0,
+      suggestions_high: 0,
+      suggestions_medium: 0,
+      suggestions_low: 0,
+      suggestions_below_threshold: 0,
+      corpus_rows: 0,
+    }
+  }
+
+  const queries: RagQuery[] = targets.map(v => ({
+    id: v.id,
+    word_name: v.word_name,
+    manufacturer: v.manufacturer,
+    part_number: v.part_number,
+    technical_summary: buildPreStripTechnicalSummary(modules, v.module, v.sub_module_id, v.word_id),
+  }))
+
+  const { suggestions, stats } = await lookupCorpusSuggestions(queries, options)
+
+  // Index by id and attach to the matching PartVerification entries.
+  if (suggestions.size > 0) {
+    const byId = new Map<string, PartVerification>()
+    for (const v of verifications) byId.set(v.id, v)
+    for (const [id, sug] of suggestions) {
+      const v = byId.get(id)
+      if (v) v.g5_rag_suggestion = sug
+    }
+  }
+
+  return {
+    queries_in: stats.queries_in,
+    suggestions_high: stats.suggestions_high,
+    suggestions_medium: stats.suggestions_medium,
+    suggestions_low: stats.suggestions_low,
+    suggestions_below_threshold: stats.suggestions_below_threshold,
+    corpus_rows: stats.corpus_rows,
+    error: stats.error,
+  }
 }
