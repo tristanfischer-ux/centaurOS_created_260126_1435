@@ -2,7 +2,6 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { ProductShowcase } from "@/components/marketing/product-showcase"
 import { useState, useEffect } from "react"
 import {
   motion,
@@ -409,8 +408,11 @@ export default function MarketingPage() {
         {/* ═══ Section 5: Pricing Teaser ═══ */}
         <PricingTeaserSection />
 
-        {/* ═══ Section 6: Product Showcase (ForgeOS platform) ═══ */}
-        <ProductShowcaseSection />
+        {/* Section 6 (Product Showcase) removed 2026-05-20 — internal-app
+            screenshots showed an out-of-date sidebar; Tristan's call is that
+            the app UI is "pretty boring to look at" right now, so the
+            marketing page now leans on the PDF build-report narrative
+            without screenshots. Component file stays in repo for future use. */}
 
         {/* ═══ Section 7: From the Founder ═══ */}
         <FounderArticlesSection />
@@ -812,14 +814,6 @@ function PricingTeaserSection() {
 /* ═══════════════════════════════════════════════════════════════════════════
  * SECTION 7: FAQ
  * ═══════════════════════════════════════════════════════════════════════ */
-
-function ProductShowcaseSection() {
-  return (
-    <section className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background border-t border-muted">
-      <ProductShowcase />
-    </section>
-  )
-}
 
 function FAQSection() {
   return (
