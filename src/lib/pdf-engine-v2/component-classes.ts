@@ -684,16 +684,40 @@ export const PRODUCT_CLASS_REFERENCE_OVERRIDES: Record<string, Partial<Record<Co
   // Post-override raw lands at £52k × cost-stack compound 1.656× × W3 0.30 =
   // £25,869 (band £15-45k, 14% under centre — in band).
   'vertical-farm': {
+    // Calibrated 2026-05-18 for desktop 15 kg/week unit; expanded 2026-05-20
+    // (iter-8 council finding A) for containerised 100m² VF (efe55422).
+    // Previous overrides covered 4 classes; containerised VF additionally
+    // emits structural_metal (40ft container, trolley frames), optical (LED
+    // grow panels), thermal (PIR sandwich panels, cooling coils),
+    // mechanical_assembly (doors, ramps), electronic_pcb (PLC, HMI), and
+    // magnetic (transformers, contactors). Without overrides the curve
+    // collapsed every line to £3.38/£4.05/£468 anchor tiers.
     oem_subsystem: 2000.0,          // LED rack module, HVAC compressor, water-treatment skid (£500-£3k mixed)
     motor_actuator: 80.0,           // circulation pumps + nutrient dosing pumps (£20-£200)
     fluid_path: 25.0,               // irrigation fittings + valves (£5-£60)
     sensor: 30.0,                   // pH/EC/temp/light sensors (£10-£100)
+    optical: 200.0,                 // Osram PHYTOVYNE-class horticultural LED grow panels (£100-£400)
+    structural_metal: 800.0,        // 40ft ISO container shell, trolley frames, custom-fab metalwork (£200-£8000)
+    thermal: 100.0,                 // Kingspan PIR sandwich panels, DX cooling coils, dehumidifier coils (£30-£3000)
+    mechanical_assembly: 60.0,      // container doors, trolley castors, threshold ramps (£20-£500)
+    electronic_pcb: 200.0,          // Siemens PLC, I/O modules, HMI panel (£50-£500)
+    electronic_power_module: 60.0,  // LED drivers, VFDs (£30-£500)
+    magnetic: 80.0,                 // VFD chokes, transformers, contactor coils (£30-£300)
+    safety_consumable: 50.0,        // E-stop buttons, safety relays, fire extinguishers (£15-£300)
   },
   vertical_farm: {
     oem_subsystem: 2000.0,
     motor_actuator: 80.0,
     fluid_path: 25.0,
     sensor: 30.0,
+    optical: 200.0,
+    structural_metal: 800.0,
+    thermal: 100.0,
+    mechanical_assembly: 60.0,
+    electronic_pcb: 200.0,
+    electronic_power_module: 60.0,
+    magnetic: 80.0,
+    safety_consumable: 50.0,
   },
 
   // 200 L single-use mammalian bioreactor (GMP). Industrial-heavy 100/yr.
@@ -901,6 +925,50 @@ export function referenceUnitCostFor(
   }
   const c = COMPONENT_CURVES[componentClass]
   return c ? c.reference_unit_cost_gbp : 0
+}
+
+/**
+ * Absolute per-component-class minimum unit cost — applied as a clamp AFTER
+ * the volume curve. Universal fix 2026-05-20 (iter-8 council finding A): the
+ * VF iter-7 BoM showed catastrophic under-pricing — 40ft ISO container at
+ * £3.38 (real ~£5,000), Osram LED panel £0.38 (real ~£250), Kingspan PIR
+ * panel £0.33 (real ~£300), Pilz PNOZ S4 safety relay £0.03 (real £150-300).
+ *
+ * The cause was the curve fallback producing impossibly low values when the
+ * product_class had no override AND the high-volume curve multiplier was
+ * tiny. The fix: a class-level floor that the curve cannot dip below
+ * regardless of volume.
+ *
+ * These are the absolute minimum unit costs at ANY production volume. The
+ * curve can still go ABOVE the floor (high-margin or low-volume cases) but
+ * never below. Engineering sanity floors — anything cheaper would suggest
+ * a misclassified part rather than a real high-volume economy.
+ */
+export const COMPONENT_CLASS_FLOORS_GBP: Partial<Record<ComponentClass, number>> = {
+  electronic_ic: 5,             // Industrial IC / MCU minimum at 100k/yr
+  electronic_passive: 0.3,      // R/C/L discrete passive at volume
+  electronic_discrete: 0.3,     // Diode, small MOSFET, BJT minimum
+  electronic_pcb: 12,           // Industrial PLC/controller PCB minimum
+  electronic_connector: 0.8,    // Industrial connector minimum
+  electronic_cable: 1.5,        // Industrial cable per metre, even at 10k/yr
+  electronic_power_module: 35,  // IGBT/MOSFET module minimum
+  sensor: 4,                    // Cheapest industrial sensor
+  motor_actuator: 25,           // Smallest industrial motor/actuator
+  magnetic: 15,                 // Transformer, choke, contactor coil
+  optical: 6,                   // LED / display / lens / photodiode minimum
+  structural_metal: 40,         // Bare custom-fab steel piece minimum
+  structural_polymer: 0.8,      // Plastic enclosure / pad / spacer
+  mechanical_fastener: 0.05,    // Bolt / nut / washer high-volume minimum
+  mechanical_assembly: 15,      // Industrial assembly/bracket minimum
+  battery_cell: 25,             // LFP prismatic floor at 50k+/yr — never £0.10
+  thermal: 25,                  // Heat exchanger / insulation panel / heatsink
+  fluid_path: 2,                // Industrial fitting/valve minimum
+  safety_consumable: 3,         // E-stop button, gasket, fire cartridge
+  oem_subsystem: 150,           // "OEM subsystem" implies a complete sub-assembly
+}
+
+export function componentClassFloorGbp(componentClass: ComponentClass): number {
+  return COMPONENT_CLASS_FLOORS_GBP[componentClass] ?? 0
 }
 
 // ---------------------------------------------------------------------------

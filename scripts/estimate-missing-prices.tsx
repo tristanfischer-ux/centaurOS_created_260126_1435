@@ -51,6 +51,7 @@ import {
   interpolateCurve,
   defaultVolumeFor,
   referenceUnitCostFor,
+  componentClassFloorGbp,
   type ComponentClass,
 } from '../src/lib/pdf-engine-v2/component-classes'
 
@@ -412,7 +413,7 @@ function curveEstimateFor(
   cls: ComponentClass,
   annualVolume: number,
   productClassSlug?: string | null,
-): { central: number; low: number; high: number; multiplier: number; reference: number } {
+): { central: number; low: number; high: number; multiplier: number; reference: number; floored?: boolean } {
   const c = COMPONENT_CURVES[cls]
   // Engine B (2026-05-18 BESS investigation): the reference unit cost can be
   // overridden per (product_class, component_class) so industrial-heavy hosts
@@ -423,13 +424,26 @@ function curveEstimateFor(
   // the magnitude anchor shifts.
   const ref = referenceUnitCostFor(cls, productClassSlug)
   const m = interpolateCurve(c.curve, annualVolume)
-  const central = ref * m
+  const raw = ref * m
+  // 2026-05-20 iter-8 council fix A: floor clamp. VF iter-7 BoM showed
+  // catastrophic under-pricing — 40ft ISO container at £3.38, Osram LED panel
+  // £0.38, Kingspan PIR £0.33, Pilz PNOZ S4 safety relay £0.03. Curve fallback
+  // produced impossibly low values when ref was small and multiplier was tiny.
+  // Engineering sanity floor per component class (universal — applies to every
+  // product) clamps the curve so it can't produce values that would suggest
+  // misclassification rather than real economy. Curve can still go ABOVE the
+  // floor for low-volume / high-margin cases. See COMPONENT_CLASS_FLOORS_GBP
+  // in component-classes.ts for the table.
+  const floor = componentClassFloorGbp(cls)
+  const floored = floor > 0 && raw < floor
+  const central = floored ? floor : raw
   return {
     central: round2(central),
     low: round2(central * 0.7),
     high: round2(central * 1.3),
     multiplier: m,
     reference: ref,
+    floored,
   }
 }
 
