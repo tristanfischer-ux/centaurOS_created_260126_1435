@@ -1900,7 +1900,10 @@ function CoverPage({
             <Text style={{ fontSize: 8.5, color: '#bae6fd', marginTop: 4 }}>
               {bomTotals.totalRows} part lines across {bomTotals.allMods.length} modules · {bomTotals.actualPriced} live distributor quotes · {bomTotals.estimatePriced} web estimates · {bomTotals.tbdRows} TBD
             </Text>
-            <ManualReviewCoverStrip badges={manualReviewBadges ?? []} />
+            {/* ITER-10.5 third+ review (Tristan 2026-05-20): no Manual
+                Review callout strip on cover, even in the no-cost-stack
+                fallback path. The badges are still emitted to state for
+                downstream consumers but not surfaced as cover-page noise. */}
           </View>
         ) : null}
         {/* ITER-10.5 third review (Tristan 2026-05-20): cover cleanup
