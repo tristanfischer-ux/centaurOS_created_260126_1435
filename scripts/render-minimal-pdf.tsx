@@ -431,6 +431,10 @@ type BomPartRow = {
   engine_b_curve_multiplier?: number
   engine_b_reference_unit_cost_gbp?: number
   engine_b_annual_volume?: number
+  /** ITER-10.5 Sprint 1A: 'curve' or 'flash_lite_unknown_class' means
+   *  Engine B already volume-anchored this row; applyBatchEconomics must
+   *  NOT apply the W3 scale a second time. */
+  engine_b_estimate_source?: string
   // Engine C (2026-05-18) — reference-product anchoring. Written by
   // scripts/enrich-state-with-reference-anchor.tsx before render. Each row
   // carries the cosine-retrieved corpus median + flag verdict.
@@ -657,6 +661,17 @@ function computeBomTotals(state: any): BomTotals | null {
             : undefined,
           engine_b_annual_volume: typeof v?.engine_b_annual_volume === 'number'
             ? v.engine_b_annual_volume
+            : undefined,
+          // ITER-10.5 Sprint 1A (Tristan 2026-05-20): propagate
+          // engine_b_estimate_source so applyBatchEconomics() can correctly
+          // skip the W3 scale factor on already-volume-anchored rows
+          // (engine_b_estimate_source='curve' or 'flash_lite_unknown_class').
+          // The field was missing from BomPartRow which meant the
+          // rowAlreadyVolumeAnchored() check ALWAYS returned false and the
+          // W3 scale double-counted on top of Engine B — direct cause of the
+          // £112.50 container (£375 Engine B × 0.3 W3 = £112.50).
+          engine_b_estimate_source: typeof v?.engine_b_estimate_source === 'string'
+            ? v.engine_b_estimate_source
             : undefined,
           // Engine C reference-anchor — written by enrich-state-with-
           // reference-anchor.tsx onto the verification row. Stays undefined

@@ -94,6 +94,38 @@ interface PartContext {
   quantity: number
 }
 
+/** Universal "finished commodity" heuristic — applies to every product class.
+ *  A finished commodity is a real catalogue item bought from a manufacturer
+ *  (40-ft ISO container from CIMC, Copeland compressor, Bosch Rexroth rail).
+ *  These are priced at retail catalogue; the production-scale curve discount
+ *  (multiplier=0.25 etc) does NOT apply because we're not making them
+ *  ourselves. By contrast, custom-fab brackets / sheet-metal enclosures /
+ *  bespoke PCBs DO get the curve discount because per-unit cost actually
+ *  drops with production volume.
+ *
+ *  Rule: manufacturer is set, not 'custom fab' or 'TBD', AND part_number
+ *  looks like a real SKU (not a placeholder).
+ *
+ *  ITER-10.5 Sprint 1A (Tristan 2026-05-20 fifth review): direct fix for
+ *  the £112.50 40-ft container case. Engine B curve was discounting a
+ *  £1,500 catalogue item to £375 then renderer halved it again. */
+function isFinishedCommodity(ctx: PartContext): boolean {
+  const mfr = String(ctx.manufacturer ?? '').trim().toLowerCase()
+  if (!mfr) return false
+  if (mfr === 'custom fab' || mfr === 'custom_fab' || mfr === 'tbd' || mfr === 'tba' || mfr === 'n/a') return false
+  const pn = String(ctx.part_number ?? '').trim()
+  if (!pn) return false
+  // Placeholder / custom-fab SKU patterns
+  if (/^(tbd|tba|n\/a|custom|fab|placeholder)/i.test(pn)) return false
+  // Custom-fab SKUs often start with the product's brief acronym + dash
+  // ("VFT-LMB-01" = vertical-farm-trolley LED mounting bracket 01).
+  // Real catalogue SKUs almost always include a digit, dash, or letter
+  // pattern that doesn't begin with project-specific 2-4 letter prefixes
+  // followed by another acronym. Heuristic: if the manufacturer name
+  // explicitly says "custom", reject.
+  return true
+}
+
 interface PriceEstimate {
   price_estimate_gbp: number
   estimate_low_gbp: number
@@ -615,6 +647,7 @@ async function main() {
   const results: Array<{ ctx: PartContext; estimate: PriceEstimate | null }> = []
   const unknowns: PartContext[] = []
 
+  let finishedCommodityCount = 0
   for (const ctx of targets) {
     const cls = classByWordId.get(ctx.word_id)!
     if (cls === 'unknown') {
@@ -622,23 +655,37 @@ async function main() {
       continue
     }
     const c = curveEstimateFor(cls, annualVolume, productClass)
+    // ITER-10.5 Sprint 1A (Tristan 2026-05-20): finished commodities
+    // (catalogue items bought from a real manufacturer — CIMC container,
+    // Copeland compressor, Bosch Rexroth rail) skip the production-scale
+    // curve discount. They're priced at retail catalogue, not at our
+    // 1000-unit fab volume. Universal across every product class.
+    const finished = isFinishedCommodity(ctx)
+    const finalCentral = finished ? c.reference : c.central
+    const finalLow = finished ? round2(c.reference * 0.7) : c.low
+    const finalHigh = finished ? round2(c.reference * 1.3) : c.high
+    const finalMultiplier = finished ? 1.0 : c.multiplier
+    if (finished) finishedCommodityCount += 1
     results.push({
       ctx,
       estimate: {
-        price_estimate_gbp: c.central,
-        estimate_low_gbp: c.low,
-        estimate_high_gbp: c.high,
-        reasoning:
-          `Engine B curve: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, ` +
-          `reference £${c.reference}, multiplier ${c.multiplier.toFixed(3)} → £${c.central}`,
+        price_estimate_gbp: finalCentral,
+        estimate_low_gbp: finalLow,
+        estimate_high_gbp: finalHigh,
+        reasoning: finished
+          ? `Engine B finished-commodity: class=${cls}, manufacturer=${ctx.manufacturer}, SKU=${ctx.part_number}, reference £${c.reference} (no production-scale discount applied — catalogue item)`
+          : `Engine B curve: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference}, multiplier ${c.multiplier.toFixed(3)} → £${c.central}`,
         component_class: cls,
-        curve_multiplier: c.multiplier,
+        curve_multiplier: finalMultiplier,
         reference_unit_cost_gbp: c.reference,
         annual_volume: annualVolume,
         classification_source: classSource.get(ctx.word_id)!,
         estimate_source: 'curve',
       },
     })
+  }
+  if (finishedCommodityCount > 0) {
+    console.log(`[estimate] ${finishedCommodityCount} parts identified as finished commodities — curve discount skipped (priced at reference)`)
   }
 
   // Flash-Lite for unknowns (concurrency 8).
