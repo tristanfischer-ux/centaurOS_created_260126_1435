@@ -4810,8 +4810,28 @@ async function main() {
     || state.brief?.parsed_original?.projectName
     || state.parsedBrief?.projectName
     // First non-empty line of the brief text — last-resort but truthful.
-    || (typeof state.brief?.revised_text === 'string' && state.brief.revised_text.trim().split('\n').find((l: string) => l.trim())?.replace(/^#+\s*/, '').replace(/^Project Brief:\s*/i, '').slice(0, 80))
-    || (typeof state.brief?.original_text === 'string' && state.brief.original_text.trim().split('\n').find((l: string) => l.trim())?.replace(/^#+\s*/, '').replace(/^Project Brief:\s*/i, '').slice(0, 80))
+    || (typeof state.brief?.revised_text === 'string' && state.brief.revised_text.trim().split('\n').find((l: string) => l.trim())?.replace(/^#+\s*/, '').replace(/^Project Brief:\s*/i, '').replace(/^(?:[^.!?\n]{1,160}[.!?]|[^\n]{1,100}\b).*$/s, (m) => {
+        // 2026-05-20 iter-8 council fix G: title truncation — the legacy
+        // slice(0,80) cut "Primary Constraint" mid-word on the VF cover.
+        // Now: prefer the first sentence terminator within 160 chars; if
+        // none, fall back to the last word boundary within 100 chars.
+        const sentEnd = m.search(/[.!?](?=\s|$)/)
+        if (sentEnd >= 0 && sentEnd < 160) return m.slice(0, sentEnd + 1)
+        const trimmed = m.slice(0, 100)
+        const lastSpace = trimmed.lastIndexOf(' ')
+        return lastSpace > 30 ? trimmed.slice(0, lastSpace) : trimmed
+      }))
+    || (typeof state.brief?.original_text === 'string' && state.brief.original_text.trim().split('\n').find((l: string) => l.trim())?.replace(/^#+\s*/, '').replace(/^Project Brief:\s*/i, '').replace(/^(?:[^.!?\n]{1,160}[.!?]|[^\n]{1,100}\b).*$/s, (m) => {
+        // 2026-05-20 iter-8 council fix G: title truncation — the legacy
+        // slice(0,80) cut "Primary Constraint" mid-word on the VF cover.
+        // Now: prefer the first sentence terminator within 160 chars; if
+        // none, fall back to the last word boundary within 100 chars.
+        const sentEnd = m.search(/[.!?](?=\s|$)/)
+        if (sentEnd >= 0 && sentEnd < 160) return m.slice(0, sentEnd + 1)
+        const trimmed = m.slice(0, 100)
+        const lastSpace = trimmed.lastIndexOf(' ')
+        return lastSpace > 30 ? trimmed.slice(0, lastSpace) : trimmed
+      }))
     || (productClass ? humanise(productClass) : 'Engineering Report')
   ) as string
   // Title case + preserve engineering acronyms (drawer 227e3c8fd74fcd32 bug #10:

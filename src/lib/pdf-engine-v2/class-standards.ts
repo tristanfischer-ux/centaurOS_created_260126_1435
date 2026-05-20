@@ -319,27 +319,72 @@ export function getClassStandards(productClass: string): ClassStandards {
  *
  * Returns a unified, de-duplicated list keyed by canonical code.
  */
+/**
+ * Canonicalise a regulation code for de-duplication. Two codes that refer to
+ * the same regulation but use different formats (e.g. "MD 2006/42/EC" and
+ * "2006/42/EC", or "ISO 22000" and "ISO22000") must collapse to the same key.
+ *
+ * Universal fix 2026-05-20 (iter-8 council finding J): the VF iter-7 PDF
+ * showed "MD 2006/42/EC" AND "2006/42/EC" as two separate rows in the same
+ * compliance matrix. The class-standards registry can declare "MD 2006/42/EC"
+ * while the brief author declares "2006/42/EC" (or "Machinery Directive
+ * 2006/42/EC") — without canonicalisation, the merge produces duplicates.
+ *
+ * Conservative rules — only collapse forms we're confident refer to the same
+ * regulation. Aggressive normalisation (e.g. stripping years like ":2010")
+ * risks merging genuinely different standards.
+ *
+ *  - lowercase
+ *  - strip known category prefixes when followed by an EU regulation number:
+ *      MD / LVD / EMC / RoHS / WEEE / ATEX / PED / RED / MDR / IVDR
+ *  - strip leading "regulation (ec) " / "directive " / "council directive " /
+ *    "council regulation (ec) "
+ *  - collapse internal whitespace
+ *  - normalise slashes (any unicode dash → hyphen)
+ *
+ * A regulation number pattern: YYYY/NNN/EC, YYYY/NN/EC, or YYYY/NN/EU.
+ */
+function canonicaliseStandardCode(raw: string): string {
+  let s = String(raw ?? '').toLowerCase().trim()
+  if (!s) return s
+  // Normalise dashes/em-dashes/en-dashes to plain hyphen
+  s = s.replace(/[–—‐]/g, '-')
+  // Collapse whitespace
+  s = s.replace(/\s+/g, ' ')
+  // Strip leading "regulation (ec) ", "directive ", "council directive ",
+  // "council regulation (ec) ", "commission regulation (eu) ", etc.
+  s = s.replace(/^(council\s+)?(commission\s+)?(regulation|directive)\s+(\(e[cu]\)\s+)?/, '')
+  // Strip known EU directive category prefixes when followed by an
+  // EU regulation number pattern YYYY/NN/EC or YYYY/NN/EU (or 3-digit middle).
+  s = s.replace(/^(md|lvd|emc|rohs|weee|atex|ped|red|mdr|ivdr)\s+(?=\d{4}\/\d{2,3}\/(?:ec|eu))/, '')
+  return s.trim()
+}
+
 export function mergeBriefAndClassStandards(
   productClass: string,
   briefStandards: Array<{ standard?: string; code?: string; source_grade?: string; source?: string }> | null | undefined,
 ): RegulatoryStandard[] {
   const classBlock = getClassStandards(productClass)
-  const byCode = new Map<string, RegulatoryStandard>()
+  // Map from CANONICAL key → the RegulatoryStandard we've decided to keep.
+  // Different display codes (e.g. "MD 2006/42/EC", "2006/42/EC") collapse to
+  // one canonical key, so duplicates never reach the renderer.
+  const byCanonical = new Map<string, RegulatoryStandard>()
 
-  // Seed with class-registered standards
-  for (const s of classBlock.standards) byCode.set(s.code, s)
+  // Seed with class-registered standards. If the class registry itself
+  // contains duplicates (a registry bug), the first wins.
+  for (const s of classBlock.standards) {
+    const key = canonicaliseStandardCode(s.code)
+    if (!byCanonical.has(key)) byCanonical.set(key, s)
+  }
 
-  // Layer in brief-declared standards; if the brief names a code we already have,
-  // keep the class entry (richer metadata) but bump confidence by annotating.
+  // Layer in brief-declared standards; if the brief names a code we already
+  // have under any equivalent form, keep the class entry (richer metadata).
   for (const bs of briefStandards ?? []) {
     const code = (bs.code ?? bs.standard ?? '').trim()
     if (!code) continue
-    if (byCode.has(code)) {
-      // Already in registry — keep richer class entry as-is
-      continue
-    }
-    // Unknown to registry — add as a brief-only entry with placeholder metadata
-    byCode.set(code, {
+    const key = canonicaliseStandardCode(code)
+    if (byCanonical.has(key)) continue
+    byCanonical.set(key, {
       code,
       title: bs.standard ?? code,
       jurisdiction: 'industry',
@@ -351,5 +396,8 @@ export function mergeBriefAndClassStandards(
     })
   }
 
-  return Array.from(byCode.values())
+  return Array.from(byCanonical.values())
 }
+
+// Exposed for unit tests / chain code that needs to compare against a canonical key.
+export const __test_canonicaliseStandardCode = canonicaliseStandardCode
