@@ -3162,7 +3162,7 @@ function SubModuleBomBlock({
             style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}
           >
             <Text style={{ flex: 2.6, fontSize: 9, color: INK }}>
-              {row.word_name ? toTitleCaseEng(row.word_name) : '—'}
+              {row.word_name ? toTitleCaseEng(normalise_unicode(row.word_name)) : '—'}
               {noteIdx ? <Text style={NOTE_MARK_STYLE}> {noteIdx}</Text> : null}
             </Text>
             <Text style={{ flex: 1.4, fontSize: 8.5, color: INK_SOFT }}>{row.manufacturer ?? '—'}</Text>
