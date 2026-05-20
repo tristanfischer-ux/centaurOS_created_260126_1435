@@ -214,6 +214,10 @@ export function InvestorDeckSearchClient({
   // via `recordSearchClick`. Cleared between searches; `null` = no
   // telemetry available (anonymous user, telemetry insert failed, etc.).
   const [searchQueryLogId, setSearchQueryLogId] = useState<string | null>(null)
+  // Founder's raise extracted from the deck — used to render the RaiseChequeStrip
+  // comparison on each card. Units: GBP major (cheque_min_cents / 100).
+  const [founderChequeMin, setFounderChequeMin] = useState<number | null>(null)
+  const [founderChequeMax, setFounderChequeMax] = useState<number | null>(null)
 
   const isPaid = PAID_TIERS.has(tier)
   const isFree = tier === 'free'
@@ -255,10 +259,20 @@ export function InvestorDeckSearchClient({
           const extResult = await extractThesisFromText(trimmed);
           if ('thesis' in extResult) {
             overrideThesis = extResult.thesis;
+            // Store founder's raise for the RaiseChequeStrip on each card
+            const minCents = extResult.thesis.cheque_min_cents
+            const maxCents = extResult.thesis.cheque_max_cents
+            setFounderChequeMin(minCents != null && minCents > 0 ? minCents / 100 : null)
+            setFounderChequeMax(maxCents != null && maxCents > 0 ? maxCents / 100 : null)
+          } else {
+            setFounderChequeMin(null)
+            setFounderChequeMax(null)
           }
           setDeckTextForInsights(trimmed);
         } else {
           setDeckTextForInsights(undefined);
+          setFounderChequeMin(null)
+          setFounderChequeMax(null)
         }
 
         const result = await searchInvestors({
@@ -687,6 +701,8 @@ export function InvestorDeckSearchClient({
                 onRevealWhyFit={isPaid ? () => handleRevealWhyFit(firm.id) : undefined}
                 isLocked={false}
                 isPaid={isPaid}
+                founderMin={founderChequeMin}
+                founderMax={founderChequeMax}
                 onTrackClick={(clickType) => {
                   // Phase A.5 — fire-and-forget; no UI gate.
                   if (!searchQueryLogId) return
@@ -730,6 +746,8 @@ export function InvestorDeckSearchClient({
               onRevealWhyFit={undefined}
               isLocked={true}
               isPaid={false}
+              founderMin={founderChequeMin}
+              founderMax={founderChequeMax}
             />
           ))}
 
