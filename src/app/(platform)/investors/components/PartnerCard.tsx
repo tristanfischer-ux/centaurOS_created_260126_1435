@@ -6,8 +6,9 @@
  */
 
 import { Badge } from '@/components/ui/badge'
-import { Lock, Linkedin, Link2, Mail, User } from 'lucide-react'
+import { Lock, Linkedin, Link2, Mail, User, AlertTriangle } from 'lucide-react'
 import type { InvestorContact, InvestorTierAccess } from '@/actions/investors'
+import { emailLooksMismatched } from '@/lib/contacts/email-name-match'
 
 interface PartnerCardProps {
   contact: InvestorContact
@@ -115,14 +116,25 @@ export function PartnerCard({ contact, access, onViewDetails }: PartnerCardProps
 
           {/* Email — visible or locked (only show lock if contact actually has an email) */}
           {access.deepAccess && contact.email ? (
-            <a
-              href={`mailto:${contact.email}`}
-              className="text-international-orange hover:underline text-xs flex items-center gap-1"
-            >
-              <Mail className="h-3 w-3" />
-              {contact.email}
-              {renderTierBadge(contact.email_tier, contact.email_verified)}
-            </a>
+            <div className="flex flex-col gap-1">
+              <a
+                href={`mailto:${contact.email}`}
+                className="text-international-orange hover:underline text-xs flex items-center gap-1"
+              >
+                <Mail className="h-3 w-3" />
+                {contact.email}
+                {renderTierBadge(contact.email_tier, contact.email_verified)}
+              </a>
+              {emailLooksMismatched(contact.full_name, contact.email) && (
+                <span
+                  className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-800 w-fit"
+                  title="The local-part of this email does not appear to match the contact's name. Verify before reaching out — the upstream enrichment may have attached a colleague's address by mistake."
+                >
+                  <AlertTriangle className="h-2.5 w-2.5" />
+                  Email needs verification
+                </span>
+              )}
+            </div>
           ) : !access.deepAccess && contact.has_email ? (
             <span className="text-xs text-muted-foreground flex items-center gap-1">
               <Mail className="h-3 w-3" />

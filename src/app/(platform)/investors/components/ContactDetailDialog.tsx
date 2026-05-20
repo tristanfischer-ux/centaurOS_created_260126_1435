@@ -26,7 +26,9 @@ import {
   User,
   FileText,
   Handshake,
+  AlertTriangle,
 } from 'lucide-react'
+import { emailLooksMismatched } from '@/lib/contacts/email-name-match'
 
 // INTENT: Tier-aware email verification badge mirroring PartnerCard logic. See
 // PartnerCard.tsx for full tier vocabulary commentary.
@@ -190,6 +192,15 @@ export function ContactDetailDialog({ contactId, open, onOpenChange }: ContactDe
                       <p className="text-xs text-muted-foreground mt-0.5 ml-6">
                         {describeVerification(contact.email_tier, contact.email_verified_at)}
                       </p>
+                    )}
+                    {emailLooksMismatched(contact.full_name, contact.email) && (
+                      <span
+                        className="mt-1 ml-6 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-800 w-fit"
+                        title="The local-part of this email does not appear to match the contact's name. Verify before reaching out — the upstream enrichment may have attached a colleague's address by mistake."
+                      >
+                        <AlertTriangle className="h-3 w-3" />
+                        Email needs verification
+                      </span>
                     )}
                   </div>
                 ) : contact.has_email ? (

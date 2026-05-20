@@ -27,6 +27,7 @@ import {
   ExternalLink,
   Loader2,
   FileText,
+  AlertTriangle,
 } from "lucide-react"
 import {
   searchContacts,
@@ -34,6 +35,7 @@ import {
   type ContactSearchFilters,
 } from "@/actions/investors"
 import { ContactDetailDialog } from "./ContactDetailDialog"
+import { emailLooksMismatched } from "@/lib/contacts/email-name-match"
 import Link from "next/link"
 
 // ---------------------------------------------------------------------------
@@ -322,6 +324,7 @@ function ContactRow({ contact, onSelect }: { contact: ContactSearchResult; onSel
           hasEmail={contact.has_email}
           emailTier={contact.email_tier}
           emailVerified={contact.email_verified}
+          fullName={contact.full_name}
         />
       </td>
 
@@ -397,15 +400,18 @@ function EmailCell({
   hasEmail,
   emailTier,
   emailVerified,
+  fullName,
 }: {
   email: string | null
   hasEmail: boolean
   emailTier: string | null
   emailVerified: boolean | null
+  fullName: string | null
 }): React.ReactElement {
   // User has access and email exists
   if (email) {
     const badge = renderTierBadgeSmall(emailTier, emailVerified)
+    const mismatched = emailLooksMismatched(fullName, email)
     return (
       <span className="inline-flex items-center gap-1.5 max-w-[260px]">
         <a
@@ -415,6 +421,15 @@ function EmailCell({
           {email}
         </a>
         {badge}
+        {mismatched && (
+          <span
+            className="inline-flex items-center gap-0.5 text-[10px] font-medium px-1 py-0 rounded border border-amber-300 bg-amber-50 text-amber-800 shrink-0"
+            title="The local-part of this email does not appear to match the contact's name. Verify before reaching out."
+          >
+            <AlertTriangle className="h-2.5 w-2.5" />
+            Verify
+          </span>
+        )}
       </span>
     )
   }

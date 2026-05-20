@@ -34,7 +34,9 @@ import {
   Mail,
   Newspaper,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react'
+import { emailLooksMismatched } from '@/lib/contacts/email-name-match'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -376,6 +378,15 @@ function PartnerDetailView({
               <p className="text-sm">
                 <span className="text-muted-foreground">Email:</span>{' '}
                 <a href={`mailto:${contact.email}`} className="text-international-orange hover:underline">{contact.email}</a>
+                {emailLooksMismatched(contact.full_name, contact.email) && (
+                  <span
+                    className="ml-2 inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded border border-amber-300 bg-amber-50 text-amber-800 align-middle"
+                    title="The local-part of this email does not appear to match the contact's name. Verify before reaching out."
+                  >
+                    <AlertTriangle className="h-2.5 w-2.5" />
+                    Email needs verification
+                  </span>
+                )}
               </p>
             )}
             {linkedinUrl && (
