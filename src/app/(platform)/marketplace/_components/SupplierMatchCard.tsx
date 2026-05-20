@@ -31,10 +31,11 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Loader2, Sparkles, Heart } from 'lucide-react'
+import { Loader2, Sparkles, Heart, CheckCircle2, AlertCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { MarketplaceListing } from '@/actions/marketplace'
-import { generateSupplierWhyFit } from '@/actions/suppliers'
+import { explainSupplierFit } from '@/actions/suppliers'
+import type { SupplierFitExplanation } from '@/actions/suppliers'
 
 // ---------------------------------------------------------------------------
 // Supplier pillar score computation
@@ -228,8 +229,51 @@ function SupplierTypeChip({ type }: { type: string }) {
 }
 
 // ---------------------------------------------------------------------------
-// Why-fit button — on-demand, bottom-right of card
+// Structured why-fit expander — Gemini 3.5 Flash, 24 h cached
 // ---------------------------------------------------------------------------
+
+/**
+ * Renders the structured supplier-fit explanation returned by explainSupplierFit.
+ * Visual pattern mirrors investor MatchCard's "Why they might back you" section:
+ * a summary sentence + up to 4 green-tick strengths + up to 2 amber gap flags.
+ */
+function StructuredFitPanel({ explanation }: { explanation: SupplierFitExplanation }) {
+  return (
+    <div className="mt-2 rounded-md border border-border bg-muted/30 px-3 py-2.5 space-y-2">
+      {/* Summary */}
+      <p className="text-xs text-foreground leading-relaxed">{explanation.fit_summary}</p>
+
+      {/* Strengths */}
+      {explanation.why_strong.length > 0 && (
+        <ul className="space-y-1">
+          {explanation.why_strong.map((bullet, i) => (
+            <li key={i} className="flex items-start gap-1.5">
+              <CheckCircle2 className="h-3 w-3 shrink-0 mt-0.5 text-green-600" />
+              <span className="text-xs text-foreground leading-relaxed">{bullet}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Gaps */}
+      {explanation.gaps.length > 0 && (
+        <ul className="space-y-1">
+          {explanation.gaps.map((gap, i) => (
+            <li key={i} className="flex items-start gap-1.5">
+              <AlertCircle className="h-3 w-3 shrink-0 mt-0.5 text-amber-500" />
+              <span className="text-xs text-muted-foreground leading-relaxed">{gap}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {/* Cache indicator — subtle, not shown to non-dev users */}
+      {explanation.from_cache && (
+        <p className="text-[10px] text-muted-foreground/60 text-right">cached · Gemini 3.5 Flash</p>
+      )}
+    </div>
+  )
+}
 
 function WhyFitExpander({
   listingId,
@@ -239,7 +283,7 @@ function WhyFitExpander({
   searchQuery: string
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [whyFit, setWhyFit] = useState<string | null>(null)
+  const [explanation, setExplanation] = useState<SupplierFitExplanation | null>(null)
   const [fetchError, setFetchError] = useState(false)
   const [isPending, startTransition] = useTransition()
 
@@ -254,18 +298,18 @@ function WhyFitExpander({
     }
 
     // Already fetched — just show it.
-    if (whyFit || fetchError) {
+    if (explanation || fetchError) {
       setExpanded(true)
       return
     }
 
-    // First expand — call the server action.
+    // First expand — call the structured explainer action.
     setExpanded(true)
     startTransition(async () => {
       try {
-        const result = await generateSupplierWhyFit(listingId, searchQuery)
+        const result = await explainSupplierFit(listingId, searchQuery)
         if (result.ok) {
-          setWhyFit(result.whyFit)
+          setExplanation(result.explanation)
         } else {
           setFetchError(true)
         }
@@ -293,20 +337,20 @@ function WhyFitExpander({
       </button>
 
       {expanded && (
-        <div className="mt-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-foreground leading-relaxed">
-          {isPending ? (
-            <span className="flex items-center gap-1.5 text-muted-foreground">
+        isPending ? (
+          <div className="mt-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
               <Loader2 className="h-3 w-3 animate-spin" />
               Analysing match…
             </span>
-          ) : fetchError ? (
-            <span className="text-muted-foreground italic">
-              Could not generate insight — try refining your description.
-            </span>
-          ) : whyFit ? (
-            whyFit
-          ) : null}
-        </div>
+          </div>
+        ) : fetchError ? (
+          <div className="mt-2 rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground italic">
+            Could not generate insight — try refining your description.
+          </div>
+        ) : explanation ? (
+          <StructuredFitPanel explanation={explanation} />
+        ) : null
       )}
     </div>
   )
