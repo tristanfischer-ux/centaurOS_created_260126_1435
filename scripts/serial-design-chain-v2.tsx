@@ -42,7 +42,7 @@ for (const envPath of [
 import { runBriefParsing } from '../src/lib/pdf-engine-v2/stages/0-brief-generation'
 import { runResearchSynthesis } from '../src/lib/pdf-engine-v2/stages/1-research'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
-import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT } from '../src/lib/pdf-engine-v2/prompts'
+import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { translate } from '../src/lib/pdf-engine-v2/radical/universal-translator'
 import { runArithmeticGates } from '../src/lib/pdf-engine-v2/radical/universal-arithmetic-gates'
@@ -1819,6 +1819,59 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     logAction({ step: 'canonical_product_class_override', llm_emitted: llmEmitted, canonical: currentProductClass, overridden: true })
   } else {
     logAction({ step: 'canonical_product_class_override', llm_emitted: String(design?.product_class ?? ''), canonical: currentProductClass, overridden: false })
+  }
+
+  // ── STEP 8.5: +1 domain specialist (R4.5) — Task #65, 2026-05-20.
+  //
+  // CONDITIONAL fifth reviewer that brings CLASS-SPECIFIC engineering knowledge
+  // the four general reviewers don't reliably surface. Runs AFTER R4 (so it sees
+  // the design that all four general reviewers have iterated on) and AFTER the
+  // canonical product_class override (so the specialist lookup uses the
+  // deterministic classifier's slug, not the LLM's free-form string).
+  //
+  // Universal across classes — looks up SPECIALIST_PROMPTS[product_class] via
+  // getSpecialistPrompt(). Unknown classes skip cleanly. Currently registered:
+  // vertical_farm, energy_storage (BESS), heat_pump_residential, drone, auv.
+  // See src/lib/pdf-engine-v2/prompts.ts for the table.
+  //
+  // Cost: one Grok 4.3 call per chain run (~£0.04). Fail-soft — chain continues
+  // if the specialist step errors. Skip with CHAIN_SKIP_SPECIALIST=1.
+  if (process.env.CHAIN_SKIP_SPECIALIST === '1') {
+    console.error(`\n[chain] STEP 8.5: specialist review SKIPPED (CHAIN_SKIP_SPECIALIST=1)`)
+    logAction({ step: 'specialist_review', class: currentProductClass, applied: false, skipped_by_env: true, patches_count: 0 })
+  } else {
+    const specialist = getSpecialistPrompt(currentProductClass)
+    if (!specialist) {
+      console.error(`\n[chain] STEP 8.5: no specialist registered for "${currentProductClass}" — skipping`)
+      logAction({ step: 'specialist_review', class: currentProductClass, applied: false, patches_count: 0, reason: 'no_specialist_registered' })
+    } else {
+      console.error(`\n[chain] STEP 8.5: domain specialist (${specialist.key}) review`)
+      try {
+        const r45 = await runReviewerStep({
+          label: `STEP 8.5: R4.5 ${specialist.key} specialist`,
+          model: GROK_4_3,
+          fallbackModel: GLM_5_1,
+          systemAppend: specialist.prompt,
+          thinkingLevel: 'high',
+          brief: currentBriefText,
+          parsedBrief: parsedResult.data,
+          research,
+          currentDesign: design,
+          rawDumpPath: resolve(outDir, '8-5-specialist.raw.txt'),
+          keyMetrics,
+        })
+        design = r45.design
+        writeFileSync(resolve(outDir, '8-5-specialist.json'), JSON.stringify(design, null, 2))
+        // r45 doesn't return the patch count directly — derive it from delta
+        // before/after summaries already logged inside runReviewerStep. We pass
+        // the latency + applied=true here; structural detail lives in the
+        // STEP 8.5 LLM record emitted by runReviewerStep itself.
+        logAction({ step: 'specialist_review', class: currentProductClass, specialist_key: specialist.key, applied: true, latency_ms: r45.latency_ms })
+      } catch (err) {
+        console.error(`[chain] specialist review threw: ${(err as Error).message}; continuing without`)
+        logAction({ step: 'specialist_review', class: currentProductClass, specialist_key: specialist.key, applied: false, error: String(err).slice(0, 200) })
+      }
+    }
   }
 
   // ── Physics Repair Loop (Tristan 2026-05-20 directive)
