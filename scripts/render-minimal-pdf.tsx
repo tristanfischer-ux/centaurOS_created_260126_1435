@@ -3616,21 +3616,54 @@ function CompliancePage({ state, project, manualReviewBadges }: { state: any; pr
 // here.
 
 function RiskPage({ state, project, manualReviewBadges }: { state: any; project: string; manualReviewBadges?: ManualReviewBadge[] }) {
+  // ITER-10.5 Phase J (Tristan Q1 answer B, 2026-05-20): merged
+  // SystemLevelRisks INTO RiskPage as the first sub-block. Council
+  // flagged two separate risk sections as redundant; one consolidated
+  // section under "Risk & Integration Analysis" reads cleaner.
+  const systemRisks = gatherSystemLevelRisks(state)
   const productClass = String(state.moduleDecomposition?.product_class ?? '')
   if (!productClass) return null
   const classBlock = getClassHazards(productClass)
-  if (classBlock.hazards.length === 0) return null
+  if (classBlock.hazards.length === 0 && systemRisks.length === 0) return null
   const sorted = [...classBlock.hazards].sort((a, b) => computeHazardRPN(b) - computeHazardRPN(a))
 
   return (
     <Page size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Section 3 · Risk & Failure-Mode Analysis" project={project} />
+      <PageHeader section="Section 3 · Risk & Integration Analysis" project={project} />
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Risk & Failure-Mode Analysis
+        Risk & Integration Analysis
       </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 10 }}>
-        Class-level pre-mitigation hazards a {classBlock.display_name.toLowerCase()} design must address. Each hazard is rated on three 1-5 scales whose product gives a single risk priority number — higher means worse before mitigation.
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14, lineHeight: 1.55 }}>
+        Two views in one section: (1) cumulative cross-cutting issues that span more than one module — checked together because no single module's review would catch them; and (2) class-level pre-mitigation hazards a {classBlock.display_name.toLowerCase()} design must address, rated on three 1-5 scales whose product gives a single risk priority.
       </Text>
+
+      {/* (1) Cross-cutting system-level findings */}
+      {systemRisks.length > 0 ? (
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 8, letterSpacing: 0.6 }}>
+            CROSS-CUTTING SYSTEM FINDINGS
+          </Text>
+          {systemRisks.map((r, ri) => (
+            <View key={r.id || ri} style={{ marginBottom: 10, padding: 12, backgroundColor: '#ffe4e6', borderLeftWidth: 4, borderLeftColor: '#b91c1c', borderRadius: 4 }} wrap={false}>
+              <Text style={{ fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.8 }}>{r.id}</Text>
+              <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#7f1d1d', marginTop: 3, marginBottom: 4 }}>{r.issue}</Text>
+              <Text style={{ fontSize: 9.5, color: '#475569', lineHeight: 1.5, marginBottom: 3 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Why it matters: </Text>{r.why_it_matters}
+              </Text>
+              <Text style={{ fontSize: 9.5, color: '#475569', lineHeight: 1.5 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Action: </Text>{r.action}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {/* (2) Class-level Failure-Mode register */}
+      {classBlock.hazards.length > 0 ? (
+        <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 8, letterSpacing: 0.6 }}>
+          CLASS-LEVEL FAILURE-MODE REGISTER
+        </Text>
+      ) : null}
       {/* Manual Review callout removed per Tristan fifth review. */}
       <View style={{ marginBottom: 12, padding: 8, backgroundColor: '#f7f8fa', borderRadius: 3 }}>
         <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55, marginBottom: 2 }}>
@@ -5289,12 +5322,10 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
           manualReviewBadges={manualReviewBadges}
         />
       ))}
-      {/* ITER-10.5 (Tristan 2026-05-20 second review): risk and suppliers
-          sit directly beneath the modules. Compliance + design decisions
-          move to the back. Phase H/J will still merge SystemLevelRisks +
-          RiskPage into one "Risk & Integration Analysis" section; for now
-          both render in the new order. */}
-      <SystemLevelRisksPage state={state} project={project} />
+      {/* ITER-10.5 Phase J (Tristan Q1 answer B, 2026-05-20): MERGED.
+          RiskPage now embeds the SystemLevelRisks content as its first
+          sub-block under "Risk & Integration Analysis". The standalone
+          SystemLevelRisksPage component is no longer called. */}
       <RiskPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       <SuppliersPage state={state} project={project} />
       <CompliancePage state={state} project={project} manualReviewBadges={manualReviewBadges} />
