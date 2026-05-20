@@ -435,6 +435,15 @@ type BomPartRow = {
    *  Engine B already volume-anchored this row; applyBatchEconomics must
    *  NOT apply the W3 scale a second time. */
   engine_b_estimate_source?: string
+  // Sprint 1B Cost Repair Loop — surfaced inline in the Notes block per
+  // sub-module so the reader sees the verdict on every flagged line.
+  cost_repair_action?: 'corrected' | 'manual_sourcing_required' | 'leave_as_is'
+  cost_repair_reasoning?: string
+  cost_repair_source?: string
+  cost_repair_confidence?: 'high' | 'medium' | 'low'
+  cost_repair_corrected_price_gbp?: number
+  cost_repair_previous_price_gbp?: number
+  cost_repair_excluded_from_subtotal?: boolean
   // Engine C (2026-05-18) — reference-product anchoring. Written by
   // scripts/enrich-state-with-reference-anchor.tsx before render. Each row
   // carries the cosine-retrieved corpus median + flag verdict.
@@ -666,13 +675,20 @@ function computeBomTotals(state: any): BomTotals | null {
           // engine_b_estimate_source so applyBatchEconomics() can correctly
           // skip the W3 scale factor on already-volume-anchored rows
           // (engine_b_estimate_source='curve' or 'flash_lite_unknown_class').
-          // The field was missing from BomPartRow which meant the
-          // rowAlreadyVolumeAnchored() check ALWAYS returned false and the
-          // W3 scale double-counted on top of Engine B — direct cause of the
-          // £112.50 container (£375 Engine B × 0.3 W3 = £112.50).
           engine_b_estimate_source: typeof v?.engine_b_estimate_source === 'string'
             ? v.engine_b_estimate_source
             : undefined,
+          // Sprint 1B (Cost Repair Loop): propagate verdict + reasoning so
+          // the per-sub-module Notes block can surface it.
+          cost_repair_action: (v?.cost_repair_action === 'corrected' || v?.cost_repair_action === 'manual_sourcing_required' || v?.cost_repair_action === 'leave_as_is')
+            ? v.cost_repair_action : undefined,
+          cost_repair_reasoning: typeof v?.cost_repair_reasoning === 'string' ? v.cost_repair_reasoning : undefined,
+          cost_repair_source: typeof v?.cost_repair_source === 'string' ? v.cost_repair_source : undefined,
+          cost_repair_confidence: (v?.cost_repair_confidence === 'high' || v?.cost_repair_confidence === 'medium' || v?.cost_repair_confidence === 'low')
+            ? v.cost_repair_confidence : undefined,
+          cost_repair_corrected_price_gbp: typeof v?.cost_repair_corrected_price_gbp === 'number' ? v.cost_repair_corrected_price_gbp : undefined,
+          cost_repair_previous_price_gbp: typeof v?.cost_repair_previous_price_gbp === 'number' ? v.cost_repair_previous_price_gbp : undefined,
+          cost_repair_excluded_from_subtotal: v?.cost_repair_excluded_from_subtotal === true ? true : undefined,
           // Engine C reference-anchor — written by enrich-state-with-
           // reference-anchor.tsx onto the verification row. Stays undefined
           // for legacy state files that never ran enrichment.
@@ -3030,6 +3046,31 @@ function noteCollectorForSubModule(
     if (text) {
       notes.push({ idx: notes.length + 1, word_id: row.word_id, text, severity: 'warn' })
     }
+  }
+  // 1b. Sprint 1B Cost Repair Loop verdicts — surface inline so the
+  // reader sees why a price was changed (or why we couldn't price the
+  // line at all).
+  for (const row of bomLines) {
+    if (!row.cost_repair_action) continue
+    if (row.cost_repair_action === 'corrected' && row.cost_repair_previous_price_gbp && row.cost_repair_corrected_price_gbp) {
+      const conf = row.cost_repair_confidence ? ` (confidence: ${row.cost_repair_confidence})` : ''
+      const src = row.cost_repair_source ? ` Source: ${row.cost_repair_source}.` : ''
+      notes.push({
+        idx: notes.length + 1,
+        word_id: row.word_id,
+        text: `Cost review — price updated from £${row.cost_repair_previous_price_gbp.toFixed(2)} to £${row.cost_repair_corrected_price_gbp.toFixed(2)} after corpus comparison flagged an outlier.${conf} ${row.cost_repair_reasoning ?? ''}${src}`.trim(),
+        severity: 'info',
+      })
+    } else if (row.cost_repair_action === 'manual_sourcing_required') {
+      notes.push({
+        idx: notes.length + 1,
+        word_id: row.word_id,
+        text: `Cost review — manual sourcing required. ${row.cost_repair_reasoning ?? 'Neither the current price nor the corpus median is reliable; engineer to source per drawing/spec before procurement.'}`,
+        severity: 'error',
+      })
+    }
+    // 'leave_as_is' verdicts intentionally produce no Note — the price
+    // was confirmed correct by the fixer and shouldn't add visual noise.
   }
   // 2. Manual review badges scoped to this sub-module (badges may carry a
   //    sub_module_id or module_id matcher; we accept either + a part-number

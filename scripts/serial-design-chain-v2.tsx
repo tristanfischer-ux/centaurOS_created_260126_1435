@@ -2567,6 +2567,29 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     console.error('[chain] CHAIN_SKIP_ENGINE_C=1 — skipping Engine C reference-anchor step')
   }
 
+  // ── Cost Repair Loop (Sprint 1B, Tristan 2026-05-20 fifth review):
+  // Engine C flags >2x / <.5x outliers but does NOT correct. This step
+  // closes the loop — asks a fixer model (Grok 4.3 by default) to either
+  // (a) correct the price with cited source, (b) declare manual sourcing
+  // required, or (c) declare the corpus comparison misleading.
+  // Universal across product classes. Fail-soft.
+  // Skip via CHAIN_SKIP_COST_REPAIR=1.
+  if (process.env.CHAIN_SKIP_COST_REPAIR !== '1') {
+    const tCostRepair = Date.now()
+    try {
+      execFileSync('npx', ['tsx', resolve(__dirname, 'cost-repair.tsx'), statePath, '--write'], {
+        stdio: 'inherit',
+        cwd: resolve(__dirname, '..'),
+      })
+      logAction({ step: 'cost_repair_loop', latency_ms: Date.now() - tCostRepair, ok: true })
+    } catch (err) {
+      console.error(`[chain] cost-repair failed: ${(err as Error).message}; continuing without`)
+      logAction({ step: 'cost_repair_loop', latency_ms: Date.now() - tCostRepair, ok: false, error: String(err).slice(0, 200) })
+    }
+  } else {
+    console.error('[chain] CHAIN_SKIP_COST_REPAIR=1 — skipping cost-repair step')
+  }
+
   // ── Engine D (suppliers, 2026-05-19): spawn enrich-state-with-suppliers.tsx
   // to populate state.suppliers + state.suppliers_provenance. The renderer's
   // SuppliersPage (render-minimal-pdf.tsx:4049) reads state.suppliers and
