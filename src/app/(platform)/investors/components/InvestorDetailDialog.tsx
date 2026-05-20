@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { formatFundSize } from '@/lib/format'
+import { RaiseChequeStrip } from '@/app/(public-investors)/investors/components/RaiseChequeStrip'
 import {
   getInvestorById,
   getInvestorContacts,
@@ -48,6 +49,11 @@ interface InvestorDetailDialogProps {
    *  + Pitch Guidance callouts. Optional: when omitted, those callouts are
    *  skipped but the Match Scorecard still renders. */
   query?: string
+  /** Founder's target raise lower bound in GBP major units (cheque_min_cents / 100).
+   *  When provided, the RaiseChequeStrip shows a comparison with the investor's cheque range. */
+  founderMin?: number | null
+  /** Founder's target raise upper bound in GBP major units. */
+  founderMax?: number | null
 }
 
 type DialogView =
@@ -507,6 +513,8 @@ function InvestorMainView({
   contacts,
   matchResult,
   query,
+  founderMin,
+  founderMax,
   onSelectPartner,
   onSelectCompany,
 }: {
@@ -514,6 +522,8 @@ function InvestorMainView({
   contacts: InvestorContact[]
   matchResult?: FirmMatchResult
   query?: string
+  founderMin?: number | null
+  founderMax?: number | null
   onSelectPartner: (c: InvestorContact) => void
   onSelectCompany: (c: NonNullable<InvestorFirm['attributes']['portfolio_companies']>[number]) => void
 }) {
@@ -570,6 +580,15 @@ function InvestorMainView({
       {/* News Intelligence section — live web-searched data. Placed after the
           scorecard / match panels so founders see fit-signal first. */}
       <InvestorIntelSection firmId={firm.id} />
+
+      {/* Raise vs cheque comparison strip — shows above the text sections so founders
+          can see at a glance whether this investor writes cheques in their range. */}
+      <RaiseChequeStrip
+        founderMin={founderMin}
+        founderMax={founderMax}
+        investorMin={attrs.cheque_range_gbp?.min}
+        investorMax={attrs.cheque_range_gbp?.max}
+      />
 
       {/* Forge Capital order — Tristan 2026-04-27: Investment Thesis →
           Ideal Company Profile → Investment Pattern → Team Expertise →
@@ -691,7 +710,7 @@ function InvestorMainView({
 // Main Component
 // ---------------------------------------------------------------------------
 
-export function InvestorDetailDialog({ firmId, open, onOpenChange, query }: InvestorDetailDialogProps) {
+export function InvestorDetailDialog({ firmId, open, onOpenChange, query, founderMin, founderMax }: InvestorDetailDialogProps) {
   const [firm, setFirm] = useState<InvestorFirm | null>(null)
   const [contacts, setContacts] = useState<InvestorContact[]>([])
   const [matchResult, setMatchResult] = useState<FirmMatchResult | undefined>(undefined)
@@ -836,6 +855,8 @@ export function InvestorDetailDialog({ firmId, open, onOpenChange, query }: Inve
             contacts={contacts}
             matchResult={matchResult}
             query={query}
+            founderMin={founderMin}
+            founderMax={founderMax}
             onSelectPartner={(c) => setView({ type: 'partner', contact: c })}
             onSelectCompany={(c) => setView({ type: 'portfolio', company: c })}
           />

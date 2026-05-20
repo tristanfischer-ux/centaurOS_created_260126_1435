@@ -46,6 +46,7 @@ import { PersonalisedInsight } from './components/PersonalisedInsight'
 import { FactStrip } from './components/FactStrip'
 import { DeepDossierContent } from './components/DeepDossierContent'
 import { SourceEvidence } from './components/SourceEvidence'
+import { RaiseChequeStrip } from '@/app/(public-investors)/investors/components/RaiseChequeStrip'
 import {
   ArrowLeft,
   Briefcase,
@@ -441,6 +442,21 @@ export default async function InvestorDetailPage({ params }: PageProps) {
             Co-Investment → Fund Performance → Data Panorama → Notes →
             Similar Investors. */}
         <div className="space-y-6">
+            {/* Raise vs cheque comparison strip — compact at-a-glance comparison.
+                Placed above the Match Scorecard per brief spec. Investor data is
+                always available; founder data requires a pasted deck on /investors
+                (not available on this server-rendered page) so only the investor row
+                renders here. The strip is still useful: it surfaces the cheque range
+                prominently instead of burying it in the Fund Details card below. */}
+            {(attrs.cheque_range_gbp?.min != null || attrs.cheque_range_gbp?.max != null) && (
+              <div className="px-1">
+                <RaiseChequeStrip
+                  investorMin={attrs.cheque_range_gbp?.min ?? undefined}
+                  investorMax={attrs.cheque_range_gbp?.max ?? undefined}
+                />
+              </div>
+            )}
+
             {/* Match Scorecard — Forge Capital 6-pillar breakdown of how
                 this investor matches the foundry's profile. Renders only
                 when match data is available (foundry profile exists). */}

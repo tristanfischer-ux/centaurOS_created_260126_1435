@@ -32,6 +32,7 @@ import type {
   InvestorMatchOutputView,
   FirmMatchResult,
 } from '@/actions/investors'
+import { RaiseChequeStrip } from './RaiseChequeStrip'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -111,6 +112,14 @@ export interface MatchCardProps {
    * The parent uses this to kick off a background fetch of the deep profile.
    */
   onRequestDeepProfile?: () => void
+  /**
+   * Founder's target raise lower bound in GBP major units (e.g. 500000 = £500K).
+   * Derived from the extracted deck thesis (cheque_min_cents / 100).
+   * When absent the strip shows only the investor's cheque row without comparison.
+   */
+  founderMin?: number | null
+  /** Founder's target raise upper bound in GBP major units. */
+  founderMax?: number | null
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -130,6 +139,8 @@ export function MatchCard({
   initialCardState = 'closed',
   deepProfile,
   onRequestDeepProfile,
+  founderMin,
+  founderMax,
 }: MatchCardProps) {
   const [cardState, setCardState] = useState<MatchCardState>(initialCardState)
   // Track whether we've already requested the deep profile to avoid double-firing
@@ -145,6 +156,9 @@ export function MatchCard({
   // Meta line: {geo} · {cheque-range} · {stage}
   const chequeMin  = attrs.cheque_range_gbp?.min
   const chequeMax  = attrs.cheque_range_gbp?.max
+  // Investor cheque bounds for the RaiseChequeStrip comparison
+  const investorChequeMin = chequeMin != null && chequeMin > 0 ? chequeMin : null
+  const investorChequeMax = chequeMax != null && chequeMax > 0 ? chequeMax : null
   const chequeStr  = chequeMin || chequeMax
     ? [chequeMin ? `£${fmtCheque(chequeMin)}` : null, chequeMax ? `£${fmtCheque(chequeMax)}` : null]
         .filter(Boolean).join('–')
@@ -331,6 +345,14 @@ export function MatchCard({
         {/* ── Chip row: stage focus · cheque range ── */}
         <ClosedChipRow attrs={attrs} firmType={firmType} />
 
+        {/* ── Raise vs cheque comparison strip ── */}
+        <RaiseChequeStrip
+          founderMin={founderMin}
+          founderMax={founderMax}
+          investorMin={investorChequeMin}
+          investorMax={investorChequeMax}
+        />
+
         {/* ── Thesis excerpt — full text, no truncation ── */}
         {thesis && (
           <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
@@ -447,6 +469,14 @@ export function MatchCard({
 
       {/* ── Metadata chip row ── */}
       <ClosedChipRow attrs={attrs} firmType={firmType} />
+
+      {/* ── Raise vs cheque comparison strip ── */}
+      <RaiseChequeStrip
+        founderMin={founderMin}
+        founderMax={founderMax}
+        investorMin={investorChequeMin}
+        investorMax={investorChequeMax}
+      />
 
       {/* ── 6-column scorecard grid (Forge Capital renderScoreDimS pattern) ── */}
       <div className="grid gap-1.5 mb-2.5" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
