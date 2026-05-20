@@ -658,6 +658,96 @@ const cellDischargeRateGate: ArithmeticGate = {
   },
 }
 
+/**
+ * Power balance gate (2026-05-20 iter-8 council fix B): aggregate driver
+ * power must equal or exceed aggregate load power (within 5% margin).
+ *
+ * Closes the LED 10× mismatch class — VF iter-7 physics critic caught
+ * "500W Osram PHYTOVYNE R1500 LED panels paired with 50W Inventronics
+ * EUM050S050ST drivers — LEDs run at 10% capacity, fail to deliver target
+ * PPFD". The capacity gate (cells × Ah × V) didn't fire because LED panel
+ * power and driver power weren't surfaced as a derived parameter.
+ *
+ * Universal: applies to any product with driver/PSU + load components.
+ * BESS pre-charge contactor + DC-link cap, EV charger AC-DC, heat pump
+ * controller + EXV — all share the "PSU rating ≥ load draw" pattern.
+ */
+const driverLoadPowerBalanceGate: ArithmeticGate = {
+  name: 'driver_load_power_balance',
+  description: 'aggregate driver/PSU power ≥ aggregate load power × 0.95',
+  evaluate(modules) {
+    for (const m of modules) {
+      const dp = m.derived_parameters
+      const driverCount = num(dp, 'driver_count', 'psu_count', 'led_driver_count')
+      const driverPowerW = num(dp, 'driver_power_w', 'psu_power_w', 'led_driver_power_w')
+      const loadCount = num(dp, 'led_count', 'panel_count', 'load_count', 'led_panel_count')
+      const loadPowerW = num(dp, 'led_power_w', 'panel_power_w', 'load_power_w', 'led_panel_power_w')
+      // Trigger: any of the four fields present → this module declares a
+      // power-balance relationship and the arithmetic is verifiable.
+      const hasTrigger = driverCount !== null || driverPowerW !== null || loadCount !== null || loadPowerW !== null
+      if (!hasTrigger) continue
+      const present: string[] = []
+      const missing: string[] = []
+      if (driverCount !== null) present.push(`driver_count=${driverCount}`); else missing.push('driver_count')
+      if (driverPowerW !== null) present.push(`driver_power_w=${driverPowerW}`); else missing.push('driver_power_w')
+      if (loadCount !== null) present.push(`load_count=${loadCount}`); else missing.push('load_count (panel_count / led_count)')
+      if (loadPowerW !== null) present.push(`load_power_w=${loadPowerW}`); else missing.push('load_power_w (panel_power_w / led_power_w)')
+      if (missing.length > 0) return incompleteResult('driver_load_power_balance', m.module, missing, present)
+      const driverTotalW = driverCount! * driverPowerW!
+      const loadTotalW = loadCount! * loadPowerW!
+      const ratio = driverTotalW / loadTotalW
+      if (ratio >= 0.95) {
+        return { score: 700, passed: true, reasons: [`power balance OK on ${m.module}: ${driverCount}×${driverPowerW}W driver = ${driverTotalW}W ≥ ${loadCount}×${loadPowerW}W load = ${loadTotalW}W (${(ratio * 100).toFixed(0)}%)`], affected: [m.module] }
+      }
+      const requiredDriverW = Math.ceil(loadTotalW / driverCount!)
+      return { score: -3000, passed: false, reasons: [`power balance FAIL on ${m.module}: ${driverTotalW}W driver capacity < ${loadTotalW}W load (${(ratio * 100).toFixed(0)}% — loads will be starved). FIX: upsize each driver to ≥ ${requiredDriverW}W OR increase driver_count to ${Math.ceil(loadTotalW / driverPowerW!)} to match load.`], affected: [m.module] }
+    }
+    return emptyResult()
+  },
+}
+
+/**
+ * Pressure balance gate (2026-05-20 iter-8 council fix D): pump rated
+ * pressure must meet or exceed downstream membrane/system required pressure.
+ *
+ * Closes the RO pump pressure mismatch class — VF iter-7 physics critic
+ * caught "Dow Filmtec BW30-4040 RO membrane needs 15 bar (150 m head);
+ * Grundfos CR 1-2 rated 2.5 bar — 6× short, zero RO permeate". No gate
+ * existed for fluid-system pressure budget.
+ *
+ * Universal: applies to any product with a pump driving against a known
+ * required pressure (RO, hydraulic, refrigerant, hydronic systems).
+ */
+const fluidPressureBalanceGate: ArithmeticGate = {
+  name: 'fluid_pressure_balance',
+  description: 'pump_rated_bar ≥ required_pressure_bar (membrane / loop / nozzle)',
+  evaluate(modules) {
+    for (const m of modules) {
+      const dp = m.derived_parameters
+      const pumpBar = num(dp, 'pump_rated_bar', 'pump_pressure_bar', 'pump_rated_pressure_bar')
+      const pumpHeadM = num(dp, 'pump_rated_head_m', 'pump_head_m')
+      const requiredBar = num(dp, 'required_pressure_bar', 'membrane_required_bar', 'system_required_bar', 'loop_required_bar')
+      // Trigger: any pressure-related field declared → this is a pumped
+      // fluid system. If pump and required are both missing, the gate can't
+      // verify and surfaces as INCOMPLETE rather than silently skipping.
+      const hasTrigger = pumpBar !== null || pumpHeadM !== null || requiredBar !== null
+      if (!hasTrigger) continue
+      const present: string[] = []
+      const missing: string[] = []
+      const effectivePumpBar = pumpBar !== null ? pumpBar : (pumpHeadM !== null ? pumpHeadM * 0.0981 : null)
+      if (effectivePumpBar !== null) present.push(`pump_rated=${effectivePumpBar.toFixed(2)}bar${pumpHeadM !== null && pumpBar === null ? ` (from ${pumpHeadM}m head)` : ''}`); else missing.push('pump_rated_bar (or pump_rated_head_m)')
+      if (requiredBar !== null) present.push(`required=${requiredBar}bar`); else missing.push('required_pressure_bar')
+      if (missing.length > 0) return incompleteResult('fluid_pressure_balance', m.module, missing, present)
+      if (effectivePumpBar! >= requiredBar!) {
+        return { score: 600, passed: true, reasons: [`pressure OK on ${m.module}: pump ${effectivePumpBar!.toFixed(2)}bar ≥ required ${requiredBar}bar`], affected: [m.module] }
+      }
+      const shortfall = ((requiredBar! - effectivePumpBar!) / requiredBar!) * 100
+      return { score: -2500, passed: false, reasons: [`pressure FAIL on ${m.module}: pump ${effectivePumpBar!.toFixed(2)}bar < required ${requiredBar}bar (${shortfall.toFixed(0)}% short → zero/negligible delivery). FIX: select a higher-stage pump rated ≥ ${requiredBar}bar (e.g. multi-stage CR 1-${Math.ceil(requiredBar! / 1.5)}) OR reduce required pressure if the loop allows.`], affected: [m.module] }
+    }
+    return emptyResult()
+  },
+}
+
 // ─── Registry ───────────────────────────────────────────────────────────────
 
 export const UNIVERSAL_ARITHMETIC_GATES: ArithmeticGate[] = [
@@ -675,6 +765,8 @@ export const UNIVERSAL_ARITHMETIC_GATES: ArithmeticGate[] = [
   costCeilingGate,
   massBudgetGate,
   cellDischargeRateGate,
+  driverLoadPowerBalanceGate,
+  fluidPressureBalanceGate,
 ]
 
 export function runArithmeticGates(modules: ModuleSpec[]): {
