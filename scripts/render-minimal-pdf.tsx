@@ -2050,84 +2050,6 @@ function formatMetricValue(rawValue: string, rawUnit: string | undefined): strin
   return unit ? `${withCommas} ${unit}` : withCommas
 }
 
-function HeadlinePage({ state, project }: { state: any; project: string }) {
-  const km = state.keyMetrics
-  if (!km) return null
-  // OPERATIONAL ONLY (Tristan directive 2026-05-15). Financial fields stripped
-  // because capex/opex/revenue/payback are fabricated without a Bill of
-  // Materials and an explicit assumptions ledger. They will return in a later
-  // phase computed from the BoM, not invented by an LLM.
-  const FINANCIAL_KIDS = new Set(['capex_gbp', 'opex_gbp_per_year', 'revenue_gbp_per_year', 'roi_payback_years'])
-  const isFinancial = (m: any) => m && (FINANCIAL_KIDS.has(String(m.id ?? '')) || /£|gbp|capex|opex|revenue|payback/i.test(String(m.unit ?? '') + ' ' + String(m.label ?? '')))
-  const headlineRow = (m: any, accentValue = false) => {
-    if (!m || m.value == null) return null
-    if (isFinancial(m)) return null  // belt-and-braces: even if legacy state.json has financials, don't render
-    const formatted = formatMetricValue(String(m.value), m.unit)
-    if (!formatted) return null
-    return (
-      <View
-        key={m.id ?? m.label}
-        style={{ flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}
-      >
-        <Text style={{ flex: 2, fontSize: 11, color: INK_SOFT }}>{m.label}</Text>
-        <Text style={{ flex: 2, fontSize: accentValue ? 18 : 13, fontFamily: 'Helvetica-Bold', color: accentValue ? ACCENT : INK, textAlign: 'right' }}>
-          {formatted}
-        </Text>
-      </View>
-    )
-  }
-  return (
-    <Page size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Section 0 · Operational Headline" project={project} />
-      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Operational Headline
-      </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 18 }}>
-        What this design must deliver, physically and operationally. The modules and sub-modules that follow are in service of these numbers.
-      </Text>
-
-      <View style={{ borderTopWidth: 0.6, borderTopColor: RULE_SOFT }}>
-        {headlineRow(km.headline_output, true)}
-        {headlineRow(km.headline_constraint)}
-        {headlineRow(km.utilisation)}
-        {(km.supporting_metrics ?? []).filter((m: any) => !isFinancial(m)).slice(0, 4).map((m: any) => headlineRow(m))}
-      </View>
-
-      {km.deployment_context ? (
-        <View style={{ marginTop: 18, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
-          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
-            Deployment context
-          </Text>
-          <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>
-            {clean_prose(km.deployment_context)}
-          </Text>
-        </View>
-      ) : null}
-
-      <View style={{ marginTop: 18, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT_SOFT }}>
-        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
-          Financial metrics suppressed
-        </Text>
-        <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55 }}>
-          Capital expenditure, operating expenditure, revenue, and payback are deliberately omitted at this stage. They will be added in a later phase that aggregates per-component costs from the Bill of Materials and references an explicit assumptions ledger (electricity tariffs, grid-service prices, labour rates, maintenance schedule). Numbers invented before the BoM exists are unreliable and have been removed.
-        </Text>
-      </View>
-
-      <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 18, marginBottom: 4 }}>
-        Assumptions
-      </Text>
-      {[km.headline_output, km.headline_constraint, km.utilisation, ...(km.supporting_metrics ?? [])]
-        .filter((m: any) => m?.notes && !isFinancial(m))
-        .map((m: any, i: number) => (
-          <Text key={i} style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.55, marginBottom: 3 }}>
-            • {m.label}: {clean_prose(m.notes)}
-          </Text>
-        ))}
-
-      <PageFooter />
-    </Page>
-  )
-}
 
 // ─── Section 0.5: Performance Characteristics (Tristan 2026-05-20) ─────────
 //
@@ -2251,87 +2173,6 @@ function PerformanceCardPage({ state, project }: { state: any; project: string }
 // Reader can immediately see "this report ships with N flagged decisions
 // trading reliability for capex/speed" rather than discovering it in the
 // fine print.
-function DesignTradeOffsPage({ state, project }: { state: any; project: string }) {
-  const review = state?.designDecisionsReview
-  if (!review || !Array.isArray(review.choices) || review.choices.length === 0) return null
-
-  const axisLabel = (a: string): string => {
-    if (a === 'capex') return 'CAPEX'
-    if (a === 'opex') return 'OPEX'
-    if (a === 'reliability') return 'Reliability'
-    return a
-  }
-  const axisChip = (axis: string, mode: 'gained' | 'sacrificed') => {
-    const isGained = mode === 'gained'
-    const arrow = axis === 'reliability' ? (isGained ? '↑' : '↓') : (isGained ? '↓' : '↑')
-    const bg = isGained ? '#dcfce7' : '#fee2e2'
-    const fg = isGained ? '#15803d' : '#b91c1c'
-    return (
-      <View key={`${mode}-${axis}`} style={{ marginRight: 4, marginTop: 2, paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 3, backgroundColor: bg }}>
-        <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: fg }}>
-          {arrow} {axisLabel(axis)}
-        </Text>
-      </View>
-    )
-  }
-  const statusChip = (status: string) => {
-    const sty = status === 'blocked'
-      ? { bg: '#7f1d1d', fg: '#fee2e2', label: 'BLOCKED' }
-      : status === 'flagged_for_review'
-        ? { bg: '#fef3c7', fg: '#92400e', label: 'FLAGGED FOR REVIEW' }
-        : { bg: '#e0e7ff', fg: '#3730a3', label: 'APPLIED' }
-    return (
-      <View style={{ paddingVertical: 1.5, paddingHorizontal: 5, borderRadius: 3, backgroundColor: sty.bg }}>
-        <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: sty.fg, letterSpacing: 0.5 }}>{sty.label}</Text>
-      </View>
-    )
-  }
-
-  return (
-    <Page size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Section 1.5 · Design Trade-offs" project={project} />
-      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Design Trade-offs
-      </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14, lineHeight: 1.55 }}>
-        Every meaningful choice the chain made during this run, with the alternative not chosen and the compromise on the CAPEX / OPEX / Reliability triangle. Sourced from chain state — not invented for the report.
-      </Text>
-
-      <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#f7f8fa', borderRadius: 4 }}>
-        <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>
-          {review.summary.total} choice{review.summary.total === 1 ? '' : 's'} surfaced — {review.summary.applied} applied, {review.summary.flagged} flagged for review, {review.summary.blocked} blocked. The triangle is read "you can have two of three": every choice improves one or two axes at the cost of the third.
-        </Text>
-      </View>
-
-      {review.choices.map((c: any, idx: number) => (
-        <View key={c.id ?? `choice-${idx}`} style={{ marginBottom: 12, padding: 12, borderRadius: 4, borderLeftWidth: 3, borderLeftColor: c.status === 'blocked' ? '#b91c1c' : c.status === 'flagged_for_review' ? '#d97706' : ACCENT, backgroundColor: '#fbfcfe' }} wrap={false}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}>
-            <Text style={{ fontSize: 8.5, color: MUTED, letterSpacing: 1, marginRight: 8 }}>
-              {String(c.scope ?? '').toUpperCase()} · CHOICE {idx + 1}
-            </Text>
-            {statusChip(c.status)}
-          </View>
-          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
-            {c.what}
-          </Text>
-          <View style={{ marginBottom: 6 }}>
-            <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 1, letterSpacing: 0.8 }}>ALTERNATIVE NOT CHOSEN</Text>
-            <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>{c.alternative}</Text>
-          </View>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginBottom: 6 }}>
-            <Text style={{ fontSize: 8.5, color: MUTED, marginRight: 6, letterSpacing: 0.8 }}>GAINED</Text>
-            {(c.trade_off?.gained ?? []).map((a: string) => axisChip(a, 'gained'))}
-            <Text style={{ fontSize: 8.5, color: MUTED, marginLeft: 10, marginRight: 6, letterSpacing: 0.8 }}>SACRIFICED</Text>
-            {(c.trade_off?.sacrificed ?? []).map((a: string) => axisChip(a, 'sacrificed'))}
-          </View>
-          <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.5 }}>{c.rationale}</Text>
-        </View>
-      ))}
-
-      <PageFooter />
-    </Page>
-  )
-}
 
 // ─── Section 1: Brief & Requirements ───────────────────────────────────────
 
@@ -2621,15 +2462,54 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
   const whyNow = clean_prose(bp.why_now)
   const modules = state.moduleDecomposition?.modules ?? []
 
+  // Iter-10.5: operational-headline banner folded INTO the Brief page (Tristan
+  // directive 2026-05-20). Compact 3-metric strip with optional deployment
+  // context callout. Replaces the standalone HeadlinePage.
+  const km = state.keyMetrics
+  const FINANCIAL_KIDS = new Set(['capex_gbp', 'opex_gbp_per_year', 'revenue_gbp_per_year', 'roi_payback_years'])
+  const isFinancial = (m: any) => m && (FINANCIAL_KIDS.has(String(m.id ?? '')) || /£|gbp|capex|opex|revenue|payback/i.test(String(m.unit ?? '') + ' ' + String(m.label ?? '')))
+  const headlineMetric = (m: any, accentValue = false) => {
+    if (!m || m.value == null) return null
+    if (isFinancial(m)) return null
+    const formatted = formatMetricValue(String(m.value), m.unit)
+    if (!formatted) return null
+    return (
+      <View key={m.id ?? m.label} style={{ flex: 1, paddingHorizontal: 8, borderLeftWidth: 0.6, borderLeftColor: RULE_SOFT }}>
+        <Text style={{ fontSize: 8, color: MUTED, letterSpacing: 0.6, marginBottom: 2 }}>{String(m.label ?? '').toUpperCase()}</Text>
+        <Text style={{ fontSize: accentValue ? 16 : 12, fontFamily: 'Helvetica-Bold', color: accentValue ? ACCENT : INK }}>
+          {formatted}
+        </Text>
+      </View>
+    )
+  }
+
   return (
     <Page size="A4" style={PAGE_STYLE}>
       <PageHeader section="Section 1 · Brief & Requirements" project={project} />
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
         Brief and Requirements
       </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 18 }}>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
         What the product is and what it must do.
       </Text>
+
+      {km ? (
+        <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }} wrap={false}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, letterSpacing: 0.8, marginBottom: 8 }}>
+            OPERATIONAL HEADLINE — what this design must deliver
+          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'stretch' }}>
+            {headlineMetric(km.headline_output, true)}
+            {headlineMetric(km.headline_constraint)}
+            {headlineMetric(km.utilisation)}
+          </View>
+          {km.deployment_context ? (
+            <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginTop: 10, fontStyle: 'italic' }}>
+              {clean_prose(km.deployment_context)}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       <ManualReviewSectionNote badges={(manualReviewBadges ?? []).filter(b => b.id === 'g0_physics' || b.id === 'g1b_compliance')} />
 
@@ -5257,186 +5137,7 @@ function SystemLevelRisksPage({ state, project }: { state: any; project: string 
   )
 }
 
-/**
- * Section 8 Issue Index (council #2 — skim-by-issue-type for procurement +
- * compliance readers). All Engineering Review Notes + part exceptions +
- * compliance gaps grouped by category with module + page refs.
- */
-function IssueIndexPage({ state, project, bomTotals, partRecommendations }: { state: any; project: string; bomTotals?: BomTotals | null; partRecommendations?: any[] }) {
-  const allNotes = gatherEngineeringReviewNotes(state)
-  const sysNotes = gatherSystemLevelRisks(state)
-  const moduleOrder: string[] = (state?.moduleDecomposition?.modules ?? []).map((m: any) => m.module)
-  // Group review notes by role
-  const byRole = new Map<string, EngineeringReviewNote[]>()
-  for (const n of [...sysNotes, ...allNotes]) {
-    const k = n.role.toUpperCase()
-    if (!byRole.has(k)) byRole.set(k, [])
-    byRole.get(k)!.push(n)
-  }
-  // Part verification exceptions from bomTotals
-  const recs = partRecommendations ?? []
-  const partExceptions: Array<{ moduleId: string; subId: string; lineNum: string; row: BomPartRow; status: VerificationStatusV2 }> = []
-  if (bomTotals) {
-    for (const m of bomTotals.allMods) {
-      const mIdx = moduleOrder.indexOf(m.module) + 1
-      for (let smi = 0; smi < m.subs.length; smi++) {
-        const sm = m.subs[smi]
-        for (let pi = 0; pi < sm.parts.length; pi++) {
-          const c = classifyVerificationStatus(sm.parts[pi], recs)
-          if (c.status !== 'verified') {
-            partExceptions.push({ moduleId: m.module, subId: sm.id, lineNum: `${mIdx}.${smi + 1}.${pi + 1}`, row: sm.parts[pi], status: c.status })
-          }
-        }
-      }
-    }
-  }
-  // Compliance gaps from complianceGate
-  const cgGaps: Array<{ code: string; reason: string }> = []
-  const cgReason = String(state?.complianceGate?.reason ?? '')
-  if (cgReason && (state?.complianceGate?.verdict === 'WARN' || state?.complianceGate?.verdict === 'HALT')) {
-    cgGaps.push({ code: state.complianceGate.verdict ?? 'WARN', reason: cgReason })
-  }
-  const hasAny = byRole.size > 0 || partExceptions.length > 0 || cgGaps.length > 0
-  if (!hasAny) return null
-  return (
-    <Page size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Section 8 · Issue Index" project={project} />
-      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Issue Index
-      </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 18, lineHeight: 1.55 }}>
-        All engineering review notes + part verification exceptions + compliance gaps, grouped by category, with module references. For readers who skim by issue type rather than by module.
-      </Text>
-      {byRole.size > 0 ? (
-        <View style={{ marginBottom: 14 }}>
-          <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 1.5, marginBottom: 4 }}>★ ENGINEERING REVIEW NOTES ({Array.from(byRole.values()).reduce((s, a) => s + a.length, 0)})</Text>
-          {Array.from(byRole.entries()).map(([role, notes]) => notes.map((n, ni) => (
-            <View key={`${role}-${ni}`} style={{ flexDirection: 'row', gap: 8, paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
-              <Text style={{ width: 90, fontSize: 7.5, color: MUTED, letterSpacing: 0.8 }}>{role}</Text>
-              <Text style={{ flex: 1, fontSize: 9, color: INK }}>{n.id} — {n.issue}</Text>
-              <Text style={{ fontSize: 8.5, color: ACCENT, textDecoration: 'underline' }}>{n.module_id === 'system' ? 'System' : `Module ${moduleOrder.indexOf(n.module_id) + 1}`}</Text>
-            </View>
-          )))}
-        </View>
-      ) : null}
-      {partExceptions.length > 0 ? (
-        <View style={{ marginBottom: 14 }}>
-          <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 1.5, marginBottom: 4 }}>★ PART NUMBERS NEEDING VERIFICATION ({partExceptions.length})</Text>
-          {partExceptions.slice(0, 30).map((e, ei) => {
-            const b = v2StatusBadge(e.status)
-            return (
-              <View key={ei} style={{ flexDirection: 'row', gap: 8, paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
-                <Text style={{ width: 50, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>{e.lineNum}</Text>
-                <Text style={{ flex: 1, fontSize: 9, color: INK }}>{e.row.word_name ?? '—'} ({e.row.manufacturer ?? ''} {e.row.part_number ?? ''})</Text>
-                <View style={{ alignSelf: 'center', paddingHorizontal: 4, paddingVertical: 1, backgroundColor: b.bg, borderRadius: 2 }}>
-                  <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: b.fg }}>{b.sym} {b.label}</Text>
-                </View>
-              </View>
-            )
-          })}
-          {partExceptions.length > 30 ? (
-            <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic' }}>
-              ...and {partExceptions.length - 30} more. See module BoM tables inline for full list.
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
-      {cgGaps.length > 0 ? (
-        <View style={{ marginBottom: 14 }}>
-          <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 1.5, marginBottom: 4 }}>★ COMPLIANCE GAPS ({cgGaps.length})</Text>
-          {cgGaps.map((g, gi) => (
-            <View key={gi} style={{ flexDirection: 'row', gap: 8, paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
-              <Text style={{ width: 50, fontSize: 7.5, color: MUTED, letterSpacing: 0.5 }}>{g.code}</Text>
-              <Text style={{ flex: 1, fontSize: 9, color: INK }}>{g.reason}</Text>
-              <Text style={{ fontSize: 8.5, color: ACCENT, textDecoration: 'underline' }}>Compliance</Text>
-            </View>
-          ))}
-        </View>
-      ) : null}
-      <PageFooter />
-    </Page>
-  )
-}
 
-/**
- * Section 9 Engineering QA Summary (council recommendation — methodology
- * table replacing the raw appendix dump). Category names, not internal gate
- * names. One page max.
- */
-function EngineeringQASummaryPage({ state, project, bomTotals, partRecommendations }: { state: any; project: string; bomTotals?: BomTotals | null; partRecommendations?: any[] }) {
-  const arith = state?.grammarVerdicts?.arithmetic ?? null
-  const grammar = state?.grammarVerdicts?.grammar ?? null
-  const arithPassed = arith?.passed ?? 0
-  const arithFired = arith?.fired ?? 0
-  const grammarPassed = grammar?.passed ?? 0
-  const grammarFired = grammar?.fired ?? 0
-  const totalChecks = arithFired + grammarFired
-  const totalPassed = arithPassed + grammarPassed
-  const issues: any[] = Array.isArray(state?.physicsCritique?.issues) ? state.physicsCritique.issues : []
-  const highCount = issues.filter((i: any) => String(i.severity).toLowerCase() === 'high').length
-  const medCount = issues.filter((i: any) => String(i.severity).toLowerCase() === 'med').length
-  const cgVerdict = state?.complianceGate?.verdict ?? '—'
-  const cgMandatoryCovered = state?.complianceGate?.mandatory_covered ?? 0
-  const cgMandatoryTotal = state?.complianceGate?.mandatory_total ?? 0
-  const k10 = state?.moduleDecomposition?.k10ShadowResult ?? state?.k10ShadowResult
-  const k10Verdict = k10?.verdict ?? 'NO_GRAPH'
-  const k10Matched = k10?.matched_edges ?? 0
-  const k10Missing = Array.isArray(k10?.missing_required) ? k10.missing_required.length : 0
-  const recs = partRecommendations ?? []
-  let verified = 0, replaced = 0, verify = 0, customSource = 0
-  if (bomTotals) {
-    for (const m of bomTotals.allMods) for (const s of m.subs) for (const p of s.parts) {
-      const c = classifyVerificationStatus(p, recs)
-      if (c.status === 'verified') verified++
-      else if (c.status === 'replaced') replaced++
-      else if (c.status === 'verify') verify++
-      else customSource++
-    }
-  }
-  const rows = [
-    { label: 'Engineering arithmetic', method: 'Power, flow, pressure, thermal-load, capacity relationships between modules must close to within tolerance.', outcome: `${arithPassed} of ${arithFired} passed`, ok: arithPassed === arithFired && arithFired > 0 },
-    { label: 'Engineering plausibility', method: 'Peer review by an independent reviewer model for first-principles violations (impossible fan curves, undersized drivers, missing heat rejection).', outcome: `${highCount} high${highCount > 0 ? ' — see Review Notes' : ''}${medCount > 0 ? `, ${medCount} med` : ''}`, ok: highCount === 0 },
-    { label: 'Part-number verification', method: 'Catalogue lookups (DigiKey / Mouser / Farnell / Brave) on every emitted SKU.', outcome: `${verified} verified · ${replaced} replaced · ${verify} verify · ${customSource} custom`, ok: replaced + verify === 0 },
-    { label: 'Compliance coverage', method: 'Required standards for the product class and declared jurisdictions.', outcome: `${cgMandatoryCovered}/${cgMandatoryTotal} mandatory covered (${cgVerdict})`, ok: cgVerdict === 'PASS' },
-    { label: 'Cross-module interfaces', method: 'Required cross-module connections (safety chains, comms links, fluid loops) explicitly specified.', outcome: k10Verdict === 'NO_GRAPH' ? 'Topology graph not registered for this class' : `${k10Matched} explicit · ${k10Missing} require sign-off`, ok: k10Missing === 0 && k10Verdict !== 'NO_GRAPH' },
-    { label: 'Brief-constraint propagation', method: 'Brief-pinned values (canopy area, envelope, yield target, supply current) preserved through the design pipeline.', outcome: state?.physicsRepair?.ran ? `${state.physicsRepair.patches_applied_total} patches applied, ${state.physicsRepair.final_high_count} HIGH remain` : 'no repair iters needed', ok: true },
-  ]
-  return (
-    <Page size="A4" style={PAGE_STYLE}>
-      <PageHeader section="Section 9 · Engineering QA Summary" project={project} />
-      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
-        Engineering QA Summary
-      </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 18, lineHeight: 1.55 }}>
-        Methodology of the automated checks the chain ran on this design + their outcomes. Detail for any flagged item lives inline in the relevant module's Engineering Review Notes.
-      </Text>
-      <View style={{ padding: 14, backgroundColor: '#f0f9ff', borderLeftWidth: 4, borderLeftColor: '#0284c7', borderRadius: 4 }}>
-        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#075985', marginBottom: 3 }}>Verification methodology + outcomes</Text>
-        <Text style={{ fontSize: 8.5, color: '#075985', fontStyle: 'italic', marginBottom: 12 }}>Pass/fail counts. Detail is inline in the relevant module's Review Notes; this page is a methodology summary, not a log.</Text>
-        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#cbd5e1', paddingBottom: 4 }}>
-          <Text style={{ flex: 2, fontSize: 8, color: MUTED, letterSpacing: 0.8, fontFamily: 'Helvetica-Bold' }}>CHECK CATEGORY</Text>
-          <Text style={{ flex: 4, fontSize: 8, color: MUTED, letterSpacing: 0.8, fontFamily: 'Helvetica-Bold' }}>WHAT IT DOES</Text>
-          <Text style={{ flex: 2.5, fontSize: 8, color: MUTED, letterSpacing: 0.8, fontFamily: 'Helvetica-Bold', textAlign: 'right' }}>OUTCOME</Text>
-        </View>
-        {rows.map((r, ri) => (
-          <View key={ri} style={{ flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 0.4, borderBottomColor: '#cbd5e1', alignItems: 'flex-start' }}>
-            <Text style={{ flex: 2, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: INK }}>{r.label}</Text>
-            <Text style={{ flex: 4, fontSize: 9, color: INK_SOFT, lineHeight: 1.45 }}>{r.method}</Text>
-            <View style={{ flex: 2.5, alignItems: 'flex-end' }}>
-              <View style={{ paddingHorizontal: 5, paddingVertical: 2, borderRadius: 2, backgroundColor: r.ok ? '#dcfce7' : '#fef3c7' }}>
-                <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: r.ok ? '#15803d' : '#92400e' }}>{r.outcome}</Text>
-              </View>
-            </View>
-          </View>
-        ))}
-      </View>
-      <Text style={{ fontSize: 9, color: MUTED, marginTop: 14, lineHeight: 1.5 }}>
-        This report is a first-cut engineering scaffold generated from your brief. Items in Engineering Review Notes + Issue Index are calls for human engineering judgement before procurement — not declarations that the design is wrong. The chain has run all of the above checks and surfaced what an engineer should think about; final sign-off is yours.
-      </Text>
-      <PageFooter />
-    </Page>
-  )
-}
 
 function MinimalDocument({ state, subject }: { state: any; subject: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
@@ -5506,19 +5207,17 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
   return (
     <Document>
       <CoverPage subject={subject} projectId={project} heroImagePath={heroImages.cover} bomTotals={bomTotals} costStack={costStack} priceReality={priceReality} pendingPartsCount={pendingPartsCount} engineCSummary={state.engine_c_summary || null} manualReviewBadges={manualReviewBadges} provisionalClassRegistry={provisionalClassRegistry} acceptanceStatus={state?.acceptanceStatus} physicsCritique={state?.physicsCritique} />
-      {/* Note: §2.5 connection map + optional exploded view is rendered just
-          below. Wrapper component below adds a 2nd page when exploded image
-          exists for the product class. */}
-      {state.keyMetrics ? <HeadlinePage state={state} project={project} /> : null}
-      <PerformanceCardPage state={state} project={project} />
+      {/* ITER-10.5 (Tristan-defined 2026-05-20):
+          Brief sits immediately after Cover. Operational Headline is folded
+          INTO BriefPage as a banner at the top (HeadlinePage component
+          deleted). Standalone DesignTradeOffsPage is removed — trade-offs
+          fold into each module in Phase F. IssueIndexPage and
+          EngineeringQASummaryPage are removed — Tristan: "I don't think it
+          adds much value". SystemLevelRisksPage moves to AFTER modules. */}
       {state.brief?.was_revised ? <BriefRevisionNoticePage state={state} project={project} /> : null}
       <BriefPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
-      <DesignTradeOffsPage state={state} project={project} />
+      <PerformanceCardPage state={state} project={project} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
-      {/* ITER-10 (council #1): System-Level Risks BEFORE individual modules.
-          Catches cumulative cross-cutting issues (total power, total mass)
-          that no single module's review notes would surface. */}
-      <SystemLevelRisksPage state={state} project={project} />
       {modules.map((m: any, idx: number) => (
         <ModuleSection
           key={m.module}
@@ -5532,31 +5231,19 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
             m.module,
             state,
           )}
-          /* ITER-10 (C1+C2+C3): pass bomTotals + state + partRecommendations
-             through so each module section renders its own inline sub-module
-             BoM with verification badges + Engineering Review Notes. The old
-             standalone BillOfMaterialsPage + PartsPendingVerificationPage +
-             ManualReviewAppendixPage are removed below. */
           bomTotals={bomTotals}
           state={state}
           partRecommendations={Array.isArray(state?.partRecommendations) ? state.partRecommendations : []}
         />
       ))}
+      {/* Phase H/J will merge SystemLevelRisksPage + RiskPage into a single
+          "Risk & Integration Analysis" section (Tristan Q1 answer: B). For
+          now both render; the merge happens in a later commit. */}
+      <SystemLevelRisksPage state={state} project={project} />
       <CompliancePage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       <RiskPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
       <DesignDecisionsPage state={state} project={project} />
       <SuppliersPage state={state} project={project} />
-      {/* ITER-10 IA restructure (council-validated 2026-05-20):
-          REMOVED — Appendix A (PartsPendingVerificationPage): content now
-            inline in each module's BoM via classifyVerificationStatus + sub-rows
-          REMOVED — Standalone BillOfMaterialsPage: BoM is now inline per
-            sub-module within ModuleSection (sub-module subtotals + grand total
-            still visible; cover-card cost stack unchanged)
-          REPLACED — ManualReviewAppendixPage: most content moved inline to
-            module Engineering Review Notes; what remains in the QA Summary
-            below is the methodology + numeric outcomes (no raw machine output) */}
-      <IssueIndexPage state={state} project={project} bomTotals={bomTotals} partRecommendations={Array.isArray(state?.partRecommendations) ? state.partRecommendations : []} />
-      <EngineeringQASummaryPage state={state} project={project} bomTotals={bomTotals} partRecommendations={Array.isArray(state?.partRecommendations) ? state.partRecommendations : []} />
     </Document>
   )
 }
