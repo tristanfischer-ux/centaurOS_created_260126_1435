@@ -198,19 +198,45 @@ function workingVolumeLitres(state: any): number | null {
   return null
 }
 
-// HAPS wingspan from the product description ("50-metre-wingspan").
+// HAPS wingspan from the product description.
+// Handles all variants: "50-metre wingspan", "50-metre-wingspan",
+// "50 m wingspan", "50m wingspan", "wingspan: 50 m", "wingspan of 50 metres".
+// 2026-05-21 (Tristan HAPS forensic): the original regex required hyphen
+// or no separator between metre and wingspan, missing "50-metre wingspan"
+// (the form the brief parser actually emits). That caused cost_reality_band
+// to fall through to verdict='unavailable' and the cover price-reality
+// banner never fired — a £153k HAPS shipping with no "98% BELOW typical"
+// flag. Falls back to brief.original_text + parsedBrief.constraints
+// .max_dimensions_mm.w (mm→m) as additional sources.
 function wingspanMetres(state: any): number | null {
-  const text: string = state?.parsedBrief?.product_description || ''
-  const m = text.match(/(\d{1,3}(?:\.\d+)?)\s*-?\s*metre-?wingspan/i)
-  if (m) {
-    const n = parseFloat(m[1])
-    if (Number.isFinite(n) && n > 0) return n
+  const candidates: string[] = [
+    state?.parsedBrief?.product_description ?? '',
+    state?.brief?.original_text ?? '',
+    state?.brief?.revised_text ?? '',
+  ].filter(Boolean)
+  for (const text of candidates) {
+    // Form 1: "50-metre wingspan" / "50-metre-wingspan" / "50 metre wingspan"
+    const m = text.match(/(\d{1,3}(?:\.\d+)?)\s*[-\s]?\s*metres?[\s-]+wingspan/i)
+    if (m) {
+      const n = parseFloat(m[1])
+      if (Number.isFinite(n) && n > 0) return n
+    }
+    // Form 2: "wingspan ... 50 m" / "wingspan of 50 metres" / "wingspan: 50 m"
+    const m2 = text.match(/wingspan[\s:.\-of]{0,12}(\d{1,3}(?:\.\d+)?)\s*(?:m\b|metres?)/i)
+    if (m2) {
+      const n = parseFloat(m2[1])
+      if (Number.isFinite(n) && n > 0) return n
+    }
+    // Form 3: "50 m wingspan" / "50m wingspan"
+    const m3 = text.match(/(\d{1,3}(?:\.\d+)?)\s*m\s+wingspan/i)
+    if (m3) {
+      const n = parseFloat(m3[1])
+      if (Number.isFinite(n) && n > 0) return n
+    }
   }
-  const m2 = text.match(/wingspan[^0-9]{0,12}(\d{1,3}(?:\.\d+)?)\s*m\b/i)
-  if (m2) {
-    const n = parseFloat(m2[1])
-    if (Number.isFinite(n) && n > 0) return n
-  }
+  // Fallback: envelope max_dimensions_mm.w as wingspan (mm → m)
+  const wMm = Number(state?.parsedBrief?.constraints?.max_dimensions_mm?.w ?? 0)
+  if (wMm > 0) return wMm / 1000
   return null
 }
 
