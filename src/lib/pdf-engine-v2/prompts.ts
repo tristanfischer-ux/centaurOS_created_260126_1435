@@ -2068,6 +2068,19 @@ Mandatory macro-assembly emissions when applicable (NOT exhaustive — same prin
 
 For each macro-assembly: emit ONE sub_module with that purpose, name it descriptively, populate words[] with the primary physical part(s) carrying real material + mass + dimension modifiers, AND set the appropriate component_class on those words via the manufacturer/part_number modifiers. DO NOT decompose a 50m composite wing into 200 micro-components; the spar is one item priced as one item.
 
+CRITICAL — SIZE-AWARE QUANTITY for macro-assemblies (Tristan 2026-05-21 "fix these issues permanently"): Engine B applies class-floor unit costs per item. For a small bracket that's £25/unit × qty=1 = £25 (correct). For a 50m carbon-fibre wing spar that's an aerospace-grade structural_polymer at £800/unit (the class median for aerospace prepreg per kg-or-ply). But the spar is NOT one £800 item — it's 50 metres of cured composite costing £8k/metre raw, totalling £400k. The Stage 1.7 macro-assembly emission MUST encode this scale via the QUANTITY modifier on the word.
+
+Universal rule: macro-assembly words MUST have a quantity modifier that represents the scale unit, NOT 1:
+  - Wing spar / wing skin / fuselage shell / boom: quantity = wingspan_metres OR length_metres of the structure. Example: 50m HAPS spar → qty=50 (per-metre Engine B priced).
+  - Solar laminate / PV array / heat-exchanger area: quantity = area_m2. Example: 25 m² GaAs solar → qty=25.
+  - Battery pack / fuel tank / fluid reservoir: quantity = capacity_kwh OR volume_litres. Example: 18 kWh Li-S pack → qty=18.
+  - ISO container shells / pressure hulls: quantity = volume_m3 OR length_metres. Example: 40-ft container shell → qty=33 (m³).
+  - Refrigerant charge / lubricant: quantity = mass_kg.
+
+This lets Engine B's per-unit class anchor multiply correctly: £800/m × 50m = £40k for the spar, £1500/m² × 25m² = £37.5k for the solar, £1500/kWh × 18 kWh = £27k for the battery. The renderer's BoM line shows "50× carbon-fibre wing spar @ £800" or aggregates with the modifier_characters quantity. PERMANENT FIX — this is universal across product classes; the brief's envelope dimensions feed the quantity directly.
+
+When emitting a macro-assembly, populate modifier_characters with: \\{ kind: 'quantity', value: '×N' \\} where N is the envelope dimension or capacity from parsedBrief.constraints. If the brief gives max_dimensions_mm.w = 50000 for a 50m wing, qty=50 (metres). If target_performance.value = 18, unit = kWh, battery_pack qty=18.
+
 Rationale: Engine B has class-specific reference unit cost overrides per product class (component-classes.ts:800+). Those overrides only fire if the WORDS in the BoM are named in a way that matches the class anchors. A generic "wing skin" word matches the cheapest class median; a "carbon-fibre wing skin assembly" word matches the aerospace-grade override. The naming is the lever — be specific.
 
 If the brief is ambiguous about a macro-assembly's existence, emit it anyway with applicability="medium" — a missing £200k spar is a worse error than an emitted spar the design might not need.`
