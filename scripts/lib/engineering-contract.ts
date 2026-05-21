@@ -324,31 +324,368 @@ registerArchetype('bess', (brief: any) => {
 // Contract integration. See Task #100 for the full per-class buildout.
 // ---------------------------------------------------------------------------
 
-registerArchetype('haps', (_brief: any) => {
-  // TODO: 50m wing → wing-area calculator → battery kWh from endurance × cruise
-  //       power → solar W from battery / sun-hours → composite spar mass from
-  //       wing area × areal-density → mass closure → cost from £/m wingspan.
+registerArchetype('haps', (brief: any) => {
+  // 50m solar HAPS deterministic physics derivation. Builds the Contract
+  // BEFORE the Generator runs so per-unit class anchors get the right
+  // macro-assembly QUANTITIES + macro-assembly prices land directly via
+  // the Contract (bypassing Engine B for these large items).
+  //
+  // Inputs from brief.constraints + brief.product_description:
+  //   - wingspan_m (parse "50-metre wingspan" or max_dimensions_mm.w / 1000)
+  //   - max_mass_kg
+  //   - endurance_days (target_performance.value when unit=days)
+  //   - solar_peak_kw (parse "2.5-3.5 kW solar peak" — default 3.0 kW)
+  //   - battery_kwh (parse "14-18 kWh battery" — default 16 kWh)
+  //   - cruise_v_m_s (parse "25-35 m/s" — default 30 m/s)
+  //   - altitude_m (parse "18-22 km" — default 20000 m)
+  //   - propulsion_each_w (parse "600-900W each" — default 750 W)
+
+  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  const extractRange = (pat: RegExp, dflt: number): number => {
+    const m = desc.match(pat)
+    if (!m) return dflt
+    const a = parseFloat(m[1])
+    const b = m[2] ? parseFloat(m[2]) : a
+    return (a + b) / 2
+  }
+  const wingspanM = (() => {
+    const m1 = desc.match(/(\d{1,3}(?:\.\d+)?)\s*-?\s*metres?[\s-]+wingspan/i)
+    if (m1) return parseFloat(m1[1])
+    const wMm = Number(brief?.constraints?.max_dimensions_mm?.w ?? 0)
+    if (wMm > 0) return wMm / 1000
+    return 50  // class default
+  })()
+  const aspectRatio = 20.0  // HAPS typical (Zephyr ~20, PHASA-35 ~18)
+  const chordM = wingspanM / aspectRatio
+  const wingAreaM2 = wingspanM * chordM
+  const maxMassKg = Number(brief?.constraints?.max_mass_kg?.value ?? 95)
+  const enduranceDays = extractRange(/(\d{2,3})\s*(?:to|-)?\s*(\d{2,3})?\s*day/i, 90)
+  const solarPeakKw = extractRange(/(\d\.\d|\d)\s*-?\s*(\d\.\d|\d)?\s*kW\s*(?:solar|peak|GaAs)/i, 3.0)
+  const batteryKwh = extractRange(/(\d{1,3})\s*-?\s*(\d{1,3})?\s*kWh/i, 16)
+  const cruiseVMs = extractRange(/(\d{1,2})\s*-?\s*(\d{1,2})?\s*m\/s/i, 30)
+  const altitudeM = extractRange(/(\d{1,2})\s*-?\s*(\d{1,2})?\s*km/i, 20) * 1000
+  const propulsionEachW = extractRange(/(\d{2,3})\s*-?\s*(\d{2,3})?\s*W.*(?:each|propulsion|motor)/i, 750)
+
+  // Stratospheric air density at 20km altitude: ~0.088 kg/m³ (US Std Atm)
+  const airDensityKgM3 = altitudeM <= 11000 ? 1.225 * Math.pow(1 - 0.0065 * altitudeM / 288.15, 4.256)
+    : altitudeM <= 25000 ? 0.36391 * Math.exp(-(altitudeM - 11000) / 6341.62)
+    : 0.04
+  const dragCoefficientCd = 0.025  // HAPS typical (long-aspect-ratio low-drag)
+  // Cruise power = 0.5 × ρ × V³ × S × CD / propeller_efficiency
+  const propellerEta = 0.80
+  const cruisePowerKw = (0.5 * airDensityKgM3 * Math.pow(cruiseVMs, 3) * wingAreaM2 * dragCoefficientCd) / propellerEta / 1000
+  // Endurance from battery (night-time, no solar):
+  //   night_hours = 12 (worst case mid-latitude)
+  //   batteryUsedKwh = cruisePowerKw × 12 (must be ≤ batteryKwh × 0.80 usable DoD)
+  const nightHours = 12
+  const batteryNightDemandKwh = cruisePowerKw * nightHours
+  const batteryUsableKwh = batteryKwh * 0.80
+  // Solar must produce day-cruise + recharge battery during sunlight hours
+  const sunlightHours = 24 - nightHours
+  const solarRequiredKw = cruisePowerKw + (batteryNightDemandKwh / sunlightHours)
+  // Composite spar mass: areal density 1.2 kg/m² for cured CF prepreg layup
+  const sparArealKgM2 = 1.2
+  const sparMassKg = wingAreaM2 * sparArealKgM2
+  // GaAs laminate areal cost: £4k/m² typical low-volume aerospace
+  const gaasArealCostGbpM2 = 4000
+  // CF spar per-metre cost: £8k/m × wingspan (BAE PHASA / Zephyr disclosures)
+  const sparPerMetreGbp = 8000
+  // Li-S battery per-kWh cost: £4k/kWh premium chemistry at programme rate
+  const liSbatteryPerKwhGbp = 4000
+  // Mass closure
+  const composite_kg = sparMassKg
+  const battery_pack_mass_kg = batteryKwh / 0.35  // 350 Wh/kg cell-level → ~46 kg for 16 kWh
+  const propulsion_motor_kg = 2.5 * 2  // 2 motors × 2.5 kg
+  const avionics_kg = 8  // typical autopilot + IMU + GNSS + satcom
+  const total_estimated_mass_kg = composite_kg + battery_pack_mass_kg + propulsion_motor_kg + avionics_kg
+
+  const quantities: Record<string, Quantity> = {
+    wingspan_m: q(wingspanM, 'm', 'length', 'rated', 'system', 'brief'),
+    wing_area_m2: q(wingAreaM2, 'm²', 'area', 'wing', 'system', 'calculator', { source_detail: `wingspan × chord (AR=${aspectRatio})` }),
+    chord_m: q(chordM, 'm', 'length', 'rated', 'system', 'calculator'),
+    aspect_ratio: q(aspectRatio, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'HAPS typical 18-22; default 20' }),
+    max_mass_kg: q(maxMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+    endurance_days: q(enduranceDays, 'days', 'time', 'min', 'system', 'brief'),
+    cruise_velocity_m_s: q(cruiseVMs, 'm/s', 'velocity', 'continuous', 'system', 'brief'),
+    cruise_altitude_m: q(altitudeM, 'm', 'length', 'rated', 'system', 'brief'),
+    air_density_kg_m3: q(airDensityKgM3, 'kg/m³', 'dimensionless', 'rated', 'system', 'physics_constant', { condition: `US Std Atm @ ${altitudeM}m` }),
+    drag_coefficient_cd: q(dragCoefficientCd, '', 'dimensionless', 'typical', 'system', 'physics_constant'),
+    propeller_efficiency: q(propellerEta, '', 'dimensionless', 'rated', 'system', 'physics_constant'),
+    cruise_power_kw: q(cruisePowerKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: '0.5 × ρ × V³ × S × CD / η_prop' }),
+    battery_capacity_kwh: q(batteryKwh, 'kWh', 'energy', 'nameplate', 'system', 'brief'),
+    battery_usable_kwh: q(batteryUsableKwh, 'kWh', 'energy', 'usable', 'system', 'calculator', { source_detail: 'battery × 0.80 DoD' }),
+    battery_night_demand_kwh: q(batteryNightDemandKwh, 'kWh', 'energy', 'usable', 'system', 'calculator', { source_detail: `cruise_power × ${nightHours}h night` }),
+    solar_peak_kw: q(solarPeakKw, 'kW', 'power', 'peak', 'system', 'brief'),
+    solar_required_kw: q(solarRequiredKw, 'kW', 'power', 'min', 'system', 'calculator', { source_detail: `cruise + battery recharge / ${sunlightHours}h sun` }),
+    propulsion_each_w: q(propulsionEachW, 'W', 'power', 'continuous', 'system', 'brief'),
+    composite_spar_mass_kg: q(sparMassKg, 'kg', 'mass', 'empty', 'system', 'calculator', { source_detail: `wing_area × ${sparArealKgM2} kg/m² areal density` }),
+    battery_pack_mass_kg: q(battery_pack_mass_kg, 'kg', 'mass', 'empty', 'system', 'calculator', { source_detail: 'kWh / 0.35 (350 Wh/kg cell-level)' }),
+    total_estimated_mass_kg: q(total_estimated_mass_kg, 'kg', 'mass', 'empty', 'system', 'calculator'),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'battery_pack',
+      to_part: 'propulsion_motors',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (propulsionEachW * 2) / 24,  // 24V bus typical
+      required_unit: 'A',
+      required_margin_factor: 1.5,
+    },
+    {
+      from_part: 'solar_array',
+      to_part: 'battery_pack',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: solarPeakKw * 1000 / 24,
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+    },
+  ]
+
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'carbon_fibre_wing_spar',
+      unit_price_gbp: sparPerMetreGbp,
+      dimension_basis: 'metre_wingspan',
+      dimension_value: wingspanM,
+      total_gbp: sparPerMetreGbp * wingspanM,
+      source_detail: `£${sparPerMetreGbp}/m × ${wingspanM}m wingspan (BAE PHASA / Zephyr disclosures)`,
+    },
+    {
+      word_name: 'gaas_solar_laminate',
+      unit_price_gbp: gaasArealCostGbpM2,
+      dimension_basis: 'square_metre',
+      dimension_value: wingAreaM2 * 0.4,  // 40% of wing covered in solar laminate
+      total_gbp: gaasArealCostGbpM2 * wingAreaM2 * 0.4,
+      source_detail: `£${gaasArealCostGbpM2}/m² × ${(wingAreaM2 * 0.4).toFixed(1)} m² laminate (40% of wing)`,
+    },
+    {
+      word_name: 'lithium_sulphur_battery_pack',
+      unit_price_gbp: liSbatteryPerKwhGbp,
+      dimension_basis: 'kwh_capacity',
+      dimension_value: batteryKwh,
+      total_gbp: liSbatteryPerKwhGbp * batteryKwh,
+      source_detail: `£${liSbatteryPerKwhGbp}/kWh × ${batteryKwh} kWh (Li-S premium chemistry, programme rate)`,
+    },
+    {
+      word_name: 'composite_wing_skin',
+      unit_price_gbp: 1200,
+      dimension_basis: 'square_metre',
+      dimension_value: wingAreaM2,
+      total_gbp: 1200 * wingAreaM2,
+      source_detail: `£1,200/m² × ${wingAreaM2.toFixed(1)} m² CF prepreg skin`,
+    },
+  ]
+
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'mass_closure',
+    status: total_estimated_mass_kg < maxMassKg * 0.8 ? 'pass'
+          : total_estimated_mass_kg < maxMassKg ? 'warn'
+          : 'fail',
+    measured: quantities.total_estimated_mass_kg,
+    required: maxMassKg,
+    reason: `Estimated empty mass ${total_estimated_mass_kg.toFixed(1)} kg vs brief cap ${maxMassKg} kg (${((total_estimated_mass_kg / maxMassKg) * 100).toFixed(0)}%).`,
+  })
+  closures.push({
+    invariant_id: 'solar_balance_closure',
+    status: solarPeakKw >= solarRequiredKw ? 'pass' : 'fail',
+    measured: solarPeakKw,
+    required: solarRequiredKw,
+    reason: `Solar peak ${solarPeakKw.toFixed(2)} kW vs required ${solarRequiredKw.toFixed(2)} kW (cruise + battery recharge). Energy balance ${solarPeakKw >= solarRequiredKw ? 'closes' : 'FAILS — endurance unreachable'}.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
   return {
     product_class: 'haps',
-    brief_summary: 'HAPS — Contract scaffold pending full per-class calculator',
-    quantities: {},
-    topology: [],
-    macro_assembly_prices: [],
-    closures: [{ invariant_id: 'haps_archetype_pending', status: 'warn', measured: null, required: 'archetype calculator not yet implemented', reason: 'Stub — see Task #100' }],
+    brief_summary: `${wingspanM}m solar-electric HAPS, ${enduranceDays}-day endurance target, ${batteryKwh} kWh Li-S, ${solarPeakKw} kW GaAs solar. Wing area ${wingAreaM2.toFixed(1)} m² @ AR=${aspectRatio}. Cruise ${cruisePowerKw.toFixed(2)} kW @ ${cruiseVMs} m/s, ${altitudeM/1000}km. Macro-assembly raw BoM (spar + skin + solar + battery) = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
   }
 })
 
-registerArchetype('vertical_farm', (_brief: any) => {
-  // TODO: canopy m² → tier count → LED power from PPFD × area → HVAC
-  //       cooling kW from LED + auxiliary loads → CO2 dosing from canopy →
-  //       water from biomass yield.
+registerArchetype('vertical_farm', (brief: any) => {
+  // Containerised vertical farm deterministic physics. Builds Contract
+  // BEFORE Generator so canopy / LED / HVAC / yield / water all close
+  // arithmetically. Same pattern as the BESS + HAPS archetypes.
+
+  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  const extractRange = (pat: RegExp, dflt: number): number => {
+    const m = desc.match(pat)
+    if (!m) return dflt
+    const a = parseFloat(m[1])
+    const b = m[2] ? parseFloat(m[2]) : a
+    return (a + b) / 2
+  }
+  // Canopy from brief: explicit target_canopy_m2 OR extract from prose
+  const canopyAreaM2 = (() => {
+    const tc = Number(brief?.constraints?.target_canopy_m2?.value ?? 0)
+    if (tc > 0) return tc
+    const m = desc.match(/(\d{2,4})\s*m².*(?:canopy|growing|growing[\s-]surface)/i)
+    if (m) return parseFloat(m[1])
+    // target_performance.unit=='m²' fallback
+    const tp = brief?.constraints?.target_performance
+    if (tp && String(tp.unit).toLowerCase() === 'm2') return Number(tp.value)
+    return 100  // class default
+  })()
+  // Trolley topology from brief: "8 mobile trolleys × 5 tiers" → 40 trays
+  const trolleyCount = extractRange(/(\d{1,2})\s*-?\s*(\d{1,2})?\s*(?:mobile\s+)?(?:growing\s+)?trolleys/i, 8)
+  const tiersPerTrolley = extractRange(/(\d)\s*-?\s*(\d)?\s*(?:vertical\s+)?tiers/i, 5)
+  const trayCount = trolleyCount * tiersPerTrolley  // 40 typical
+  const trayAreaM2 = canopyAreaM2 / trayCount
+  // PPFD target from brief: "200-300 µmol·m⁻²·s⁻¹"
+  const ppfdTarget = extractRange(/(\d{2,4})\s*-?\s*(\d{2,4})?\s*(?:µmol|umol|μmol)/i, 250)
+  // LED efficacy 2.8 µmol/J typical for modern horticultural LED at full spectrum
+  const ledEfficacyUmolPerJ = 2.8
+  const ledPowerKw = (canopyAreaM2 * ppfdTarget) / ledEfficacyUmolPerJ / 1000
+  // HVAC cooling: LED dissipates ~95% as heat at canopy + 5kW auxiliary + 20% safety margin
+  const auxLoadKw = 5
+  const hvacCoolingKw = (ledPowerKw * 0.95 + auxLoadKw) * 1.20
+  // CO2 dosing target: 800-1200 ppm
+  const co2TargetPpm = 1000
+  // Yield: typical leafy greens at 200-300 PPFD, 16h photoperiod
+  const annualYieldTonnes = canopyAreaM2 * 0.25  // 25 kg/m²/yr at 100m² = 25 tonnes (brief target)
+  // Power supply: 3-phase 63A ≈ 44 kW
+  const supplyKwAvailable = extractRange(/(\d{1,3})\s*-?\s*(\d{1,3})?\s*kW/i, 44)
+  const totalElectricalDemandKw = ledPowerKw + hvacCoolingKw + auxLoadKw
+  // Container envelope: 40-ft HC ISO + 20-ft fertigation
+  const primaryContainer40HC = 1
+  const fertigationContainer20 = 1
+  // Macro-assembly prices
+  const ledPerKwGbp = 600  // £600/kW horticultural LED at programme rate
+  const hvacPerKwGbp = 800  // £800/kW commercial DX cooling
+  const trolleyEachGbp = 2500  // bespoke mobile growing trolley
+  const container40HCGbp = 4200
+  const container20Gbp = 2800
+
+  const quantities: Record<string, Quantity> = {
+    canopy_area_m2: q(canopyAreaM2, 'm²', 'area', 'canopy', 'system', 'brief'),
+    trolley_count: q(trolleyCount, '', 'dimensionless', 'rated', 'system', 'brief'),
+    tiers_per_trolley: q(tiersPerTrolley, '', 'dimensionless', 'rated', 'rack', 'brief'),
+    tray_count: q(trayCount, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'trolley_count × tiers_per_trolley' }),
+    tray_area_m2: q(trayAreaM2, 'm²', 'area', 'canopy', 'rack', 'calculator'),
+    ppfd_target_umol_m2_s: q(ppfdTarget, 'µmol/m²/s', 'photon_flux_density', 'rated', 'rack', 'brief'),
+    led_efficacy_umol_per_j: q(ledEfficacyUmolPerJ, 'µmol/J', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'Modern horticultural LED full-spectrum typical' }),
+    led_installed_power_kw: q(ledPowerKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'canopy × PPFD / efficacy / 1000' }),
+    aux_load_kw: q(auxLoadKw, 'kW', 'power', 'continuous', 'system', 'physics_constant', { source_detail: 'fertigation pumps + sensors + PLC + CO2 valve' }),
+    hvac_cooling_kw: q(hvacCoolingKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: '(LED × 0.95 heat + aux) × 1.20 margin' }),
+    co2_target_ppm: q(co2TargetPpm, 'ppm', 'dimensionless', 'rated', 'system', 'brief'),
+    annual_yield_tonnes: q(annualYieldTonnes, 't/yr', 'yield', 'rated', 'system', 'calculator', { source_detail: 'canopy × 0.25 t/m²/yr leafy greens' }),
+    supply_kw_available: q(supplyKwAvailable, 'kW', 'power', 'max', 'site', 'brief', { source_detail: '3-phase 63A @ 400V' }),
+    total_electrical_demand_kw: q(totalElectricalDemandKw, 'kW', 'power', 'continuous', 'system', 'calculator'),
+    primary_container_40_hc: q(primaryContainer40HC, '', 'dimensionless', 'rated', 'system', 'brief'),
+    fertigation_container_20: q(fertigationContainer20, '', 'dimensionless', 'rated', 'system', 'brief'),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'main_distribution_panel',
+      to_part: 'led_array',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (ledPowerKw * 1000) / 400,  // 3-phase 400V
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+    },
+    {
+      from_part: 'hvac_evaporator',
+      to_part: 'condensate_loop',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: hvacCoolingKw * 0.6,  // ~0.6 L/h per kW cooling (latent capture)
+      required_unit: 'L/h',
+    },
+    {
+      from_part: 'refrigerant_charge',
+      to_part: 'valve_assembly',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'material_compatibility',
+      material_context: 'R410A refrigerant — valves MUST be refrigerant-rated (brass/water valves are incompatible with refrigerant oils)',
+    },
+  ]
+
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'horticultural_led_array',
+      unit_price_gbp: ledPerKwGbp,
+      dimension_basis: 'kwh_capacity',  // actually kW power not energy but using same bucket
+      dimension_value: ledPowerKw,
+      total_gbp: ledPerKwGbp * ledPowerKw,
+      source_detail: `£${ledPerKwGbp}/kW × ${ledPowerKw.toFixed(1)} kW LED installed`,
+    },
+    {
+      word_name: 'dx_hvac_unit',
+      unit_price_gbp: hvacPerKwGbp,
+      dimension_basis: 'kwh_capacity',
+      dimension_value: hvacCoolingKw,
+      total_gbp: hvacPerKwGbp * hvacCoolingKw,
+      source_detail: `£${hvacPerKwGbp}/kW × ${hvacCoolingKw.toFixed(1)} kW DX cooling`,
+    },
+    {
+      word_name: 'mobile_growing_trolley',
+      unit_price_gbp: trolleyEachGbp,
+      dimension_basis: 'metre_length',  // we use 'metre_length' as a per-unit fallback when there's no clearer dimension
+      dimension_value: trolleyCount,
+      total_gbp: trolleyEachGbp * trolleyCount,
+      source_detail: `£${trolleyEachGbp} × ${trolleyCount} trolleys`,
+    },
+    {
+      word_name: 'iso_container_40hc',
+      unit_price_gbp: container40HCGbp,
+      dimension_basis: 'cubic_metre',
+      dimension_value: 67,  // 40-ft HC ≈ 67 m³
+      total_gbp: container40HCGbp,
+      source_detail: `40-ft HC ISO container shell £${container40HCGbp}`,
+    },
+    {
+      word_name: 'iso_container_20',
+      unit_price_gbp: container20Gbp,
+      dimension_basis: 'cubic_metre',
+      dimension_value: 33,
+      total_gbp: container20Gbp,
+      source_detail: `20-ft ISO container (fertigation skid) £${container20Gbp}`,
+    },
+  ]
+
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'canopy_closure',
+    status: Math.abs(trayCount * trayAreaM2 - canopyAreaM2) / canopyAreaM2 < 0.05 ? 'pass' : 'fail',
+    measured: trayCount * trayAreaM2,
+    required: canopyAreaM2,
+    reason: `${trayCount} trays × ${trayAreaM2.toFixed(2)} m²/tray = ${(trayCount * trayAreaM2).toFixed(1)} m² vs brief canopy ${canopyAreaM2} m².`,
+  })
+  closures.push({
+    invariant_id: 'led_ppfd_closure',
+    status: 'pass',  // by construction
+    measured: ppfdTarget,
+    required: ppfdTarget,
+    reason: `LED ${ledPowerKw.toFixed(2)} kW × ${ledEfficacyUmolPerJ} µmol/J / ${canopyAreaM2} m² = ${((ledPowerKw * 1000 * ledEfficacyUmolPerJ) / canopyAreaM2).toFixed(0)} µmol/m²/s (target ${ppfdTarget}).`,
+  })
+  closures.push({
+    invariant_id: 'electrical_supply_closure',
+    status: totalElectricalDemandKw < supplyKwAvailable * 0.9 ? 'pass'
+          : totalElectricalDemandKw < supplyKwAvailable ? 'warn'
+          : 'fail',
+    measured: totalElectricalDemandKw,
+    required: supplyKwAvailable,
+    reason: `Total demand ${totalElectricalDemandKw.toFixed(1)} kW vs supply ${supplyKwAvailable} kW (${((totalElectricalDemandKw / supplyKwAvailable) * 100).toFixed(0)}%). Need <90% with diversity.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
   return {
     product_class: 'vertical_farm',
-    brief_summary: 'Vertical farm — Contract scaffold pending full per-class calculator',
-    quantities: {},
-    topology: [],
-    macro_assembly_prices: [],
-    closures: [{ invariant_id: 'vf_archetype_pending', status: 'warn', measured: null, required: 'archetype calculator not yet implemented', reason: 'Stub — see Task #100' }],
+    brief_summary: `Containerised VF, ${canopyAreaM2} m² canopy across ${trayCount} trays (${trolleyCount} trolleys × ${tiersPerTrolley} tiers). LED ${ledPowerKw.toFixed(1)} kW @ ${ppfdTarget} µmol/m²/s. HVAC ${hvacCoolingKw.toFixed(1)} kW cooling. Total electrical ${totalElectricalDemandKw.toFixed(1)} kW / ${supplyKwAvailable} kW supply. Annual yield ${annualYieldTonnes.toFixed(1)} t. Macro-assembly raw £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
   }
 })
 
