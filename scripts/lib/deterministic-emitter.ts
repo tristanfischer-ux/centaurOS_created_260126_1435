@@ -1400,6 +1400,38 @@ function emitBriefOverviewProse(p: BessParams, _brief: unknown): BriefOverviewPr
  * three placeholder fields under `brief_overview_prose`. All other fields
  * are immutable downstream.
  */
+/**
+ * Brief-shape gate (Q5 from the round-2 council 2026-05-21, unanimous).
+ *
+ * The hand-coded BESS template hardcodes utility-containerised topology
+ * (10 modules including ISO container shell + MV step-up transformer +
+ * 3-phase grid PCC + 18-rack steel structure). Applying this template to
+ * a residential 50 kWh ESS or a second-life DIY pack would emit a
+ * structurally invalid design: same MV gear, same container, scaled only
+ * by Contract.cell_count. The council called this "deterministic
+ * hallucination — worse than stochastic because unflagged."
+ *
+ * `canEmitBess` returns true only when the brief shape is inside the
+ * envelope the hand-coded template was designed for. Out-of-envelope
+ * briefs return false and the caller (chain orchestrator at Stage 1.7)
+ * falls back to the LLM Generator + Build #6c Contract-injected prompt.
+ *
+ * Envelope (utility-containerised BESS, 2-20 MWh nameplate):
+ *   - contract.product_class resolves to 'bess'
+ *   - contract.quantities.nameplate_capacity_kwh.value in [2000, 20000]
+ *
+ * Anything outside this range — residential (≤ 200 kWh), commercial
+ * (200-2000 kWh), utility-farm (≥ 20 MWh), DC-coupled solar+storage,
+ * second-life pack — falls back to LLM Generator. Future builds will
+ * register additional emitters per (class, envelope) tuple.
+ */
+export function canEmitBess(contract: ContractShape): boolean {
+  if (contract?.product_class !== 'bess') return false
+  const nameplate = contract?.quantities?.nameplate_capacity_kwh?.value
+  if (typeof nameplate !== 'number' || !Number.isFinite(nameplate)) return false
+  return nameplate >= 2000 && nameplate <= 20000
+}
+
 export function emitBessDesign(contract: ContractShape, brief: unknown): DeterministicDesign {
   const p = deriveBessParams(contract)
   const modules: DesignModule[] = [
