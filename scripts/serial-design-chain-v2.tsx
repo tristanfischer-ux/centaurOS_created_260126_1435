@@ -1795,9 +1795,18 @@ async function main() {
   const apiKey = process.env.OPENROUTER_API_KEY ?? ''
   let keyMetrics: KeyMetrics | null = null  // populated AFTER Phase 2 by headline-deriver
 
-  // ── Phase 1: Generator
-  console.error(`\n[chain] STEP 4: Generator (Gemini 3.1 Pro) ...`)
+  // ── Phase 1: Generator (Build #8 best-of-N — Tristan 2026-05-21
+  // council unanimous: "Best-of-N over parameterized candidates, scored
+  // by validators"). Generator emits N=GENERATOR_BEST_OF_N candidates
+  // in parallel; we score each by (a) Contract macro-assembly match
+  // count + (b) module/word density and pick the best. Directly
+  // attacks the LLM-variance regression observed across Loops 9-10-11
+  // (same brief, same code, status flipped accepted↔blocked run-to-run).
+  // Default N=3 — cost ~£0.20 extra per chain, ~30s extra latency at
+  // parallelism. Tunable via env.
+  console.error(`\n[chain] STEP 4: Generator (Gemini 3.1 Pro) — best-of-N ...`)
   const keyMetricsBlock = formatKeyMetricsBlock(keyMetrics)
+  const N_CANDIDATES = Number(process.env.GENERATOR_BEST_OF_N ?? 3)
   const genUser = `PRODUCT BRIEF:
 ${currentBriefText}
 
@@ -1808,19 +1817,90 @@ RESEARCH SYNTHESIS:
 ${research ? JSON.stringify(research) : '(not available)'}
 ${keyMetricsBlock}
 Generate the full engineering decomposition (brief_overview_prose + modules + sub-modules + cross_module_grammar_links + excluded_modules + rationale_excluded). Return ONLY JSON.`
-  const genResult = await callLlm({
-    model: GEMINI_3_1_PRO,
-    system: generatorSystem(),
-    user: genUser,
-    maxTokens: 150_000,
-    timeoutMs: 1_500_000,
-  })
-  writeFileSync(resolve(outDir, '4-generator.raw.txt'), genResult.text)
-  let design = await parseJson(genResult.text, { stage: 'generator', model: GEMINI_3_1_PRO })
+  const candidateResults = await Promise.all(
+    Array.from({ length: N_CANDIDATES }, (_, i) => callLlm({
+      model: GEMINI_3_1_PRO,
+      system: generatorSystem(),
+      user: genUser,
+      maxTokens: 150_000,
+      timeoutMs: 1_500_000,
+      temperature: i === 0 ? 0.2 : 0.4 + i * 0.1,  // first candidate low-T, others higher-T for diversity
+    } as any)),
+  )
+  // Score each candidate against the Contract (deterministic, no LLM).
+  type ScoredCandidate = { design: any; score: number; reasons: string[]; sumGen: ReturnType<typeof summarise>; raw: string; latency_ms: number; tokens_in: number; tokens_out: number }
+  const scored: ScoredCandidate[] = []
+  for (let i = 0; i < candidateResults.length; i++) {
+    const r = candidateResults[i]
+    let parsedDesign: any
+    try {
+      parsedDesign = await parseJson(r.text, { stage: `generator-cand-${i}`, model: GEMINI_3_1_PRO })
+    } catch (err) {
+      console.error(`[chain] candidate ${i + 1}/${N_CANDIDATES} parse failed: ${(err as Error).message}; skipping`)
+      continue
+    }
+    if (!parsedDesign || !Array.isArray(parsedDesign?.modules)) {
+      console.error(`[chain] candidate ${i + 1}/${N_CANDIDATES} missing modules array; skipping`)
+      continue
+    }
+    const sumGen = summarise(parsedDesign.modules)
+    // Build #8 score: macro-assembly match count (the more Contract
+    // macro-assemblies the candidate's word names cover, the better)
+    // + module density (more modules / sub-modules / words = richer
+    // first-cut, easier for reviewers to enrich vs build from scratch).
+    let macroMatches = 0
+    const contractMacros = (engineeringContract?.macro_assembly_prices ?? []) as Array<{ word_name: string }>
+    if (contractMacros.length > 0) {
+      const candidateWords: string[] = []
+      for (const m of parsedDesign.modules) {
+        for (const sm of (m?.sub_modules ?? [])) {
+          for (const w of (sm?.words ?? [])) {
+            const nh = String(w?.name_human || '').toLowerCase().replace(/[-\s]+/g, '_')
+            const wid = String(w?.id || '').toLowerCase().replace(/[-\s]+/g, '_')
+            const ccid = String(w?.content_character?.character_id || '').toLowerCase().replace(/[-\s]+/g, '_')
+            if (nh) candidateWords.push(nh)
+            if (wid) candidateWords.push(wid)
+            if (ccid) candidateWords.push(ccid)
+          }
+        }
+      }
+      for (const mp of contractMacros) {
+        const tokens = mp.word_name.split('_').filter(t => t.length >= 3)
+        if (tokens.length === 0) continue
+        const hit = candidateWords.some(cw => cw === mp.word_name || tokens.filter(t => cw.includes(t)).length / tokens.length >= 0.66)
+        if (hit) macroMatches += 1
+      }
+    }
+    // Density score normalised. Weights tunable.
+    const densityScore = Math.min(sumGen.modules / 10, 1) * 0.1 + Math.min(sumGen.sub_modules / 50, 1) * 0.3 + Math.min(sumGen.words / 150, 1) * 0.6
+    const macroScore = contractMacros.length > 0 ? (macroMatches / contractMacros.length) : 0.5  // no Contract macros = neutral
+    const score = macroScore * 0.7 + densityScore * 0.3
+    scored.push({ design: parsedDesign, score, reasons: [`macro_matches=${macroMatches}/${contractMacros.length}`, `modules=${sumGen.modules}`, `sub_modules=${sumGen.sub_modules}`, `words=${sumGen.words}`], sumGen, raw: r.text, latency_ms: r.latency_ms, tokens_in: r.tokens_in ?? 0, tokens_out: r.tokens_out ?? 0 })
+    console.error(`[chain]   candidate ${i + 1}/${N_CANDIDATES}: score=${score.toFixed(3)} (macro=${macroScore.toFixed(2)}, density=${densityScore.toFixed(2)}; ${sumGen.modules} mods, ${sumGen.words} words, ${macroMatches}/${contractMacros.length} macros)`)
+  }
+  if (scored.length === 0) throw new Error('All Generator candidates failed parsing')
+  scored.sort((a, b) => b.score - a.score)
+  const best = scored[0]
+  let design = best.design
+  console.error(`[chain] Generator best-of-${N_CANDIDATES}: picked candidate with score ${best.score.toFixed(3)} (${best.reasons.join(', ')})`)
+  writeFileSync(resolve(outDir, '4-generator.raw.txt'), best.raw)
   writeFileSync(resolve(outDir, '4-generator.json'), JSON.stringify(design, null, 2))
-  const sumGen = summarise(design.modules ?? [])
-  console.error(`[chain] Generator: ${sumGen.modules} modules, ${sumGen.sub_modules} sub-modules, ${sumGen.words} words, ${sumGen.grammar_links} grammar_links, ${sumGen.overview_chars} chars (${(genResult.latency_ms/1000).toFixed(1)}s)`)
-  logAction({ step: 'generator', model: GEMINI_3_1_PRO, latency_ms: genResult.latency_ms, tokens_in: genResult.tokens_in, tokens_out: genResult.tokens_out, summary: sumGen })
+  // Persist all candidate scores for audit
+  writeFileSync(resolve(outDir, '4-generator-candidates.json'), JSON.stringify(scored.map(s => ({ score: s.score, reasons: s.reasons, summary: s.sumGen })), null, 2))
+  const sumGen = best.sumGen
+  console.error(`[chain] Generator: ${sumGen.modules} modules, ${sumGen.sub_modules} sub-modules, ${sumGen.words} words, ${sumGen.grammar_links} grammar_links, ${sumGen.overview_chars} chars (${(best.latency_ms/1000).toFixed(1)}s)`)
+  logAction({
+    step: 'generator',
+    model: GEMINI_3_1_PRO,
+    latency_ms: best.latency_ms,
+    tokens_in: best.tokens_in,
+    tokens_out: best.tokens_out,
+    summary: sumGen,
+    best_of_n: N_CANDIDATES,
+    best_score: best.score,
+    best_reasons: best.reasons,
+    all_scores: scored.map(s => s.score),
+  })
 
   // ── Propagate brief constraints into design derived_parameters
   // (Tristan directive 2026-05-15): gates need anchors. Without this, the
