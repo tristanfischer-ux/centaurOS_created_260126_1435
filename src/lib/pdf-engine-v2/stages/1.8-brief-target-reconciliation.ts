@@ -323,7 +323,7 @@ export function runBriefTargetReconciliation(
   const modules: ModuleSpec[] = Array.isArray(design?.modules) ? design.modules : []
 
   for (const spec of TARGET_RECONCILIATIONS) {
-    const briefVal = readBriefValue(parsedBrief, spec.brief_key)
+    let briefVal = readBriefValue(parsedBrief, spec.brief_key)
     if (!briefVal) {
       // Brief didn't specify this target — not a comparison opportunity.
       continue

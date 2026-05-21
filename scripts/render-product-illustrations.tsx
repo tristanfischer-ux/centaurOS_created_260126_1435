@@ -294,7 +294,7 @@ function main(): void {
   // Always expose the Blender cover path separately so the renderer
   // could surface it on an exploded-view / appendix page later.
   if (coverPath) {
-    state.blender_cover_image_path = coverPath
+    (state as any).blender_cover_image_path = coverPath
   }
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   console.log(
