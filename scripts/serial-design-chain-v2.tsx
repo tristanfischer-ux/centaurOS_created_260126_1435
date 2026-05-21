@@ -43,6 +43,7 @@ import { runBriefParsing } from '../src/lib/pdf-engine-v2/stages/0-brief-generat
 import { runResearchSynthesis } from '../src/lib/pdf-engine-v2/stages/1-research'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { buildContractForChain, type EngineeringContract } from './lib/engineering-contract'
+import { canEmitBess, emitBessDesign } from './lib/deterministic-emitter'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { translate } from '../src/lib/pdf-engine-v2/radical/universal-translator'
@@ -1847,15 +1848,59 @@ async function main() {
   const apiKey = process.env.OPENROUTER_API_KEY ?? ''
   let keyMetrics: KeyMetrics | null = null  // populated AFTER Phase 2 by headline-deriver
 
-  // ── Phase 1: Generator (Build #8 best-of-N — Tristan 2026-05-21
-  // council unanimous: "Best-of-N over parameterized candidates, scored
-  // by validators"). Generator emits N=GENERATOR_BEST_OF_N candidates
-  // in parallel; we score each by (a) Contract macro-assembly match
-  // count + (b) module/word density and pick the best. Directly
-  // attacks the LLM-variance regression observed across Loops 9-10-11
-  // (same brief, same code, status flipped accepted↔blocked run-to-run).
-  // Default N=3 — cost ~£0.20 extra per chain, ~30s extra latency at
-  // parallelism. Tunable via env.
+  // ── Phase 1: Generator. Two paths.
+  //
+  // Path A (Build #17b 2026-05-21): Deterministic emitter. When env
+  // DETERMINISTIC_EMITTER=1 AND the (class, envelope) pair has a
+  // registered deterministic emitter that accepts the current Contract,
+  // we SKIP the LLM Generator entirely and construct the design from
+  // the frozen Contract + a hand-coded per-class template. Per the
+  // 6-seat full council plurality verdict (d) 2026-05-21, this removes
+  // the single largest source of chain variance (autoregressive token
+  // prediction cannot maintain coupled physical constraints across
+  // multi-stage generation). Currently registered: BESS at 2-20 MWh
+  // nameplate utility-containerised envelope (see canEmitBess).
+  //
+  // Path B (Build #8 best-of-N — existing): LLM Generator emits
+  // N=GENERATOR_BEST_OF_N candidates in parallel, each scored by Contract
+  // macro-assembly match count + density, best picked. Build #6c
+  // (Tristan 2026-05-21 council option (a)) injects the Contract block
+  // into the system prompt so the LLM is told the deterministic values
+  // verbatim, reducing variance for classes without a deterministic
+  // emitter. Default N=3.
+  //
+  // The deterministic path is currently EXPERIMENTAL — gated by an env
+  // flag so production chains stay on Path B until Loop 15+ validates
+  // the deterministic output ships PDFs ≥6/10 engineering_plausibility.
+  // Round-2 council 2026-05-21 (drawer drawer_forgeos_decisions_a4cec57d79eeea89)
+  // accepted Path A as interim scaffolding pending the proper parametric
+  // constraint solver (Build #17 v2, next session).
+  const useDeterministic = process.env.DETERMINISTIC_EMITTER === '1' && engineeringContract && canEmitBess(engineeringContract)
+  let design: any
+  if (useDeterministic) {
+    console.error(`\n[chain] STEP 4: Deterministic emitter (Build #17b — council d, BESS utility envelope ${(engineeringContract!.quantities.nameplate_capacity_kwh?.value / 1000).toFixed(1)} MWh nameplate) — bypassing LLM Generator`)
+    const tDet = Date.now()
+    design = emitBessDesign(engineeringContract as any, parsedResult.data)
+    const detLatencyMs = Date.now() - tDet
+    const sumDet = summarise(design.modules)
+    const detReasons = [`deterministic_emitter=bess`, `modules=${sumDet.modules}`, `sub_modules=${sumDet.sub_modules}`, `words=${sumDet.words}`]
+    console.error(`[chain] Deterministic emitter: ${sumDet.modules} modules, ${sumDet.sub_modules} sub-modules, ${sumDet.words} words, ${sumDet.grammar_links} grammar_links (${detLatencyMs}ms, byte-deterministic)`)
+    writeFileSync(resolve(outDir, '4-generator.json'), JSON.stringify(design, null, 2))
+    writeFileSync(resolve(outDir, '4-generator-candidates.json'), JSON.stringify([{ score: 1.0, reasons: detReasons, summary: sumDet }], null, 2))
+    logAction({
+      step: 'generator',
+      model: 'deterministic_emitter_bess',
+      latency_ms: detLatencyMs,
+      tokens_in: 0,
+      tokens_out: 0,
+      summary: sumDet,
+      best_of_n: 1,
+      best_score: 1.0,
+      best_reasons: detReasons,
+      all_scores: [1.0],
+      cost_usd: 0,
+    })
+  } else {
   console.error(`\n[chain] STEP 4: Generator (Gemini 3.1 Pro) — best-of-N ...`)
   const keyMetricsBlock = formatKeyMetricsBlock(keyMetrics)
   const N_CANDIDATES = Number(process.env.GENERATOR_BEST_OF_N ?? 3)
@@ -1933,7 +1978,7 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   if (scored.length === 0) throw new Error('All Generator candidates failed parsing')
   scored.sort((a, b) => b.score - a.score)
   const best = scored[0]
-  let design = best.design
+  design = best.design
   console.error(`[chain] Generator best-of-${N_CANDIDATES}: picked candidate with score ${best.score.toFixed(3)} (${best.reasons.join(', ')})`)
   writeFileSync(resolve(outDir, '4-generator.raw.txt'), best.raw)
   writeFileSync(resolve(outDir, '4-generator.json'), JSON.stringify(design, null, 2))
@@ -1953,6 +1998,7 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     best_reasons: best.reasons,
     all_scores: scored.map(s => s.score),
   })
+  }  // end Path B (LLM Generator best-of-N) — Path A (deterministic) handled above
 
   // ── Propagate brief constraints into design derived_parameters
   // (Tristan directive 2026-05-15): gates need anchors. Without this, the
