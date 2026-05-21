@@ -676,30 +676,50 @@ function computeBomTotals(state: any): BomTotals | null {
         let contract_override_reason: string | null = null
 
         // Build #4 (Tristan 2026-05-21, council unanimous): Engineering
-        // Contract macro-assembly pricing override. Class-anchors (£800
-        // for a structural_polymer) apply per-unit, but a 50m wing spar
-        // is one item costing £400k not £800. The Contract emits
-        // macro_assembly_prices keyed by canonical word_name; we match
-        // the current word's name_human / id against those entries and
-        // override line_total_gbp with the size-aware Contract value
-        // when a match exists. Universal across product classes.
+        // Contract macro-assembly pricing override. Loop 9 evidence:
+        // word-name matching was too narrow — HAPS Contract said £814k
+        // raw but only some macro-assemblies matched the LLM-emitted word
+        // names. Improved matcher: also checks the word's content_character
+        // .character_id (often a shorter slug like 'wing_spar') and any
+        // 'function_radical_primary' modifier, AND uses MAJORITY-token
+        // match (≥66% of tokens present) instead of ALL-tokens which was
+        // too strict.
         const macroPrices: Array<{ word_name: string; total_gbp: number; source_detail: string; unit_price_gbp: number; dimension_value: number }> = (state?.engineeringContract?.macro_assembly_prices ?? []) as any[]
         if (macroPrices.length > 0) {
-          const normalisedWordName = String(w.name_human || w.id || '')
-            .toLowerCase()
-            .replace(/\s+/g, '_')
-          // Try canonical-name match first, then substring match.
-          const exact = macroPrices.find(mp => mp.word_name && normalisedWordName === mp.word_name)
-          const substring = exact ? null : macroPrices.find(mp => {
-            const tokens = mp.word_name.split('_').filter(Boolean)
-            // Require ALL non-trivial tokens to appear in the word name.
-            return tokens.every(t => t.length >= 3 && normalisedWordName.includes(t))
-          })
-          const match = exact || substring
-          if (match && match.total_gbp > 0) {
-            unit_price_gbp = roundToPence(match.total_gbp / Math.max(qty, 1))
-            line_total_gbp = roundToPence(match.total_gbp)
-            contract_override_reason = `Contract macro-assembly: ${match.source_detail}`
+          // Build a set of word names + ids to match against (more candidates → more matches)
+          const candidates: string[] = []
+          const nameHuman = String(w.name_human || '').toLowerCase().replace(/[-\s]+/g, '_')
+          const wId = String(w.id || '').toLowerCase().replace(/[-\s]+/g, '_')
+          if (nameHuman) candidates.push(nameHuman)
+          if (wId) candidates.push(wId)
+          const cc = w.content_character
+          if (cc && typeof cc === 'object') {
+            const ccid = String(cc.character_id || '').toLowerCase().replace(/[-\s]+/g, '_')
+            if (ccid) candidates.push(ccid)
+          }
+
+          let bestMatch: typeof macroPrices[number] | null = null
+          let bestScore = 0
+          for (const mp of macroPrices) {
+            const tokens = mp.word_name.split('_').filter(t => t.length >= 3)
+            if (tokens.length === 0) continue
+            for (const cand of candidates) {
+              if (!cand) continue
+              if (cand === mp.word_name) {
+                bestMatch = mp; bestScore = 1.0; break  // exact wins
+              }
+              const matched = tokens.filter(t => cand.includes(t)).length
+              const score = matched / tokens.length
+              if (score >= 0.66 && score > bestScore) {
+                bestMatch = mp; bestScore = score
+              }
+            }
+            if (bestScore >= 1.0) break
+          }
+          if (bestMatch && bestMatch.total_gbp > 0) {
+            unit_price_gbp = roundToPence(bestMatch.total_gbp / Math.max(qty, 1))
+            line_total_gbp = roundToPence(bestMatch.total_gbp)
+            contract_override_reason = `Contract macro-assembly (${bestScore >= 1 ? 'exact' : `${Math.round(bestScore * 100)}% token match`}): ${bestMatch.source_detail}`
           }
         }
         const row: BomPartRow = {
@@ -1774,27 +1794,82 @@ function CoverPage({
     // from top.
     <Page size="A4" style={{ ...PAGE_STYLE, paddingHorizontal: 60 }}>
       <View style={{ marginBottom: 16 }}>
-        {isBlocked ? (
-          <View style={{
-            marginBottom: 14,
-            padding: 10,
-            backgroundColor: '#7f1d1d',
-            borderRadius: 4,
-            borderLeftWidth: 5,
-            borderLeftColor: '#fca5a5',
-          }}>
-            <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#fee2e2', letterSpacing: 2, marginBottom: 4 }}>
-              DO NOT PROCURE — DESIGN BLOCKED
-            </Text>
-            <Text style={{ fontSize: 9, color: '#fee2e2', lineHeight: 1.45 }}>
-              Physics critic engineering plausibility{' '}
-              {typeof plaus === 'number' ? `${plaus}/10` : 'below 3/10'}, brief-to-design fidelity{' '}
-              {typeof fidel === 'number' ? `${fidel}/10` : 'below 3/10'}. First-cut engineering scaffold —
-              contains first-principles violations and is NOT procurement-grade. Resolve high-severity findings
-              in the physics appendix before sharing externally or quoting suppliers.
-            </Text>
-          </View>
-        ) : null}
+        {/* Build #5: Engineering Contract closure-failure banner. Shows
+            specific deterministic findings (mass closure, solar balance,
+            etc.) instead of the generic Physics Critic "below 3/10" text.
+            The Contract's closures array carries reasons that are
+            actionable (e.g. "Estimated empty mass 208.7 kg vs brief cap
+            95 kg (220%)"). Universal — every Contract-enabled product
+            class surfaces its own closure failures. */}
+        {(() => {
+          const ec = state?.engineeringContract
+          const failClosures = Array.isArray(ec?.closures) ? ec.closures.filter((c: any) => c?.status === 'fail') : []
+          const warnClosures = Array.isArray(ec?.closures) ? ec.closures.filter((c: any) => c?.status === 'warn') : []
+          if (failClosures.length > 0) {
+            return (
+              <View style={{
+                marginBottom: 14,
+                padding: 10,
+                backgroundColor: '#7f1d1d',
+                borderRadius: 4,
+                borderLeftWidth: 5,
+                borderLeftColor: '#fca5a5',
+              }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#fee2e2', letterSpacing: 2, marginBottom: 4 }}>
+                  ENGINEERING CONTRACT — {failClosures.length} CLOSURE{failClosures.length === 1 ? '' : 'S'} FAILING
+                </Text>
+                {failClosures.slice(0, 3).map((c: any, i: number) => (
+                  <Text key={i} style={{ fontSize: 9, color: '#fee2e2', lineHeight: 1.45, marginBottom: 3 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold' }}>• {String(c.invariant_id ?? '').replace(/_/g, ' ')}:</Text>{' '}{String(c.reason ?? '')}
+                  </Text>
+                ))}
+                {failClosures.length > 3 ? (
+                  <Text style={{ fontSize: 9, color: '#fee2e2', fontStyle: 'italic' }}>
+                    + {failClosures.length - 3} more closure failure{failClosures.length - 3 === 1 ? '' : 's'} in the engineering appendix.
+                  </Text>
+                ) : null}
+              </View>
+            )
+          }
+          if (warnClosures.length > 0 && isBlocked) {
+            return (
+              <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#78350f', borderRadius: 4, borderLeftWidth: 5, borderLeftColor: '#fcd34d' }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#fef3c7', letterSpacing: 2, marginBottom: 4 }}>
+                  ENGINEERING CONTRACT — {warnClosures.length} CLOSURE WARNING{warnClosures.length === 1 ? '' : 'S'}
+                </Text>
+                {warnClosures.slice(0, 3).map((c: any, i: number) => (
+                  <Text key={i} style={{ fontSize: 9, color: '#fef3c7', lineHeight: 1.45, marginBottom: 3 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold' }}>• {String(c.invariant_id ?? '').replace(/_/g, ' ')}:</Text>{' '}{String(c.reason ?? '')}
+                  </Text>
+                ))}
+              </View>
+            )
+          }
+          if (isBlocked) {
+            return (
+              <View style={{
+                marginBottom: 14,
+                padding: 10,
+                backgroundColor: '#7f1d1d',
+                borderRadius: 4,
+                borderLeftWidth: 5,
+                borderLeftColor: '#fca5a5',
+              }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#fee2e2', letterSpacing: 2, marginBottom: 4 }}>
+                  DO NOT PROCURE — DESIGN BLOCKED
+                </Text>
+                <Text style={{ fontSize: 9, color: '#fee2e2', lineHeight: 1.45 }}>
+                  Physics critic engineering plausibility{' '}
+                  {typeof plaus === 'number' ? `${plaus}/10` : 'below 3/10'}, brief-to-design fidelity{' '}
+                  {typeof fidel === 'number' ? `${fidel}/10` : 'below 3/10'}. First-cut engineering scaffold —
+                  contains first-principles violations and is NOT procurement-grade. Resolve high-severity findings
+                  in the physics appendix before sharing externally or quoting suppliers.
+                </Text>
+              </View>
+            )
+          }
+          return null
+        })()}
         <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 2, marginBottom: 12 }}>
           FORGE ENGINEERING REPORT
         </Text>

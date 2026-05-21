@@ -190,8 +190,29 @@ export function registerArchetype(productClass: string, builder: ContractBuilder
   ARCHETYPE_REGISTRY[productClass] = builder
 }
 
+// Aliases — product_class slug variants emitted by the classifier that
+// should resolve to the same archetype. Loop 9 evidence: chain classified
+// as 'energy_storage' but archetype was registered as 'bess'. Universal
+// fix: register aliases so classifier output → archetype is robust.
+const ARCHETYPE_ALIASES: Record<string, string> = {
+  energy_storage: 'bess',
+  bess_utility_scale: 'bess',
+  battery_energy_storage: 'bess',
+  utility_bess: 'bess',
+  vertical_farm: 'vertical_farm',
+  verticalfarm: 'vertical_farm',
+  containerised_vertical_farm: 'vertical_farm',
+  vf: 'vertical_farm',
+  haps: 'haps',
+  high_altitude_pseudo_satellite: 'haps',
+  pseudo_satellite: 'haps',
+  stratospheric_uav: 'haps',
+}
+
 export function buildContract(productClass: string, parsedBrief: any): EngineeringContract | null {
-  const builder = ARCHETYPE_REGISTRY[productClass]
+  const key = String(productClass ?? '').toLowerCase().trim()
+  const canonical = ARCHETYPE_ALIASES[key] ?? key
+  const builder = ARCHETYPE_REGISTRY[canonical]
   if (!builder) return null
   return builder(parsedBrief)
 }
