@@ -578,6 +578,16 @@ export async function runPhysicsRepairLoop(opts: {
       }
     }
 
+    // 2026-05-21 (council a500be076cbc7db4c, Path B): no-regression
+    // guard. Snapshot currentModules BEFORE applying patches so we can
+    // revert if the iter makes the design WORSE (regressed plausibility
+    // or higher HIGH-finding count). Loop 1-4 evidence:
+    //   - BESS iter 1: HIGH 3 → 4 (regressed), plausibility unchanged
+    //   - VF: plausibility 2 → 3 → 5 → 4 (peaked then regressed)
+    // Without rollback, the regressed patches stay applied and the chain
+    // ships a worse design than it had before repair started.
+    const moduleSnapshot = JSON.parse(JSON.stringify(currentModules))
+
     // Apply patches directly to currentModules (id-based traversal — no need
     // to go through the path-based applyPatches() in universal-repair.ts).
     const applyLog: string[] = []
@@ -629,16 +639,41 @@ export async function runPhysicsRepairLoop(opts: {
     const highOut = newCritique.issues.filter(isHigh).length
     const plausibilityOut = newCritique.scores.engineering_plausibility
 
+    // 2026-05-21 (council Path B): no-regression rollback. If the iter
+    // made the design WORSE (more HIGH findings AND/OR lower
+    // plausibility), restore the snapshot and keep the previous
+    // critique. The chain ships the BEST design seen so far, not
+    // whatever happened last iter.
+    const regressed = (highOut > highInThisIter.length) || (plausibilityOut < plausibilityIn)
+    let rolledBackNote: string | null = null
+    if (regressed) {
+      // Splice the snapshot back into currentModules in-place so all
+      // outer references continue to point at the same array. JSON
+      // round-trip serialises the snapshot cleanly.
+      currentModules.length = 0
+      for (const m of moduleSnapshot) currentModules.push(m)
+      rolledBackNote = `ROLLED BACK iter ${iter}: high ${highInThisIter.length}→${highOut}, plausibility ${plausibilityIn}→${plausibilityOut}. Restoring snapshot.`
+    }
+
     result.iter_diagnostics.push({
       iter,
       high_in: highInThisIter.length,
       plausibility_in: plausibilityIn,
       patches_proposed: allPatchesRaw.length,
       patches_applied: appliedThisIter,
-      high_out: highOut,
-      plausibility_out: plausibilityOut,
-      unfixable_reason: unfixableCount > 0 ? `${unfixableCount} of ${findingsThisIter.length} findings declared unfixable; ${manualFlagCount} flagged for manual sourcing; apply_log: ${applyLog.slice(0, 3).join(' / ')}` : (applyLog.length > 0 ? `apply_log: ${applyLog.slice(0, 3).join(' / ')}` : null),
+      high_out: regressed ? highInThisIter.length : highOut,
+      plausibility_out: regressed ? plausibilityIn : plausibilityOut,
+      unfixable_reason: rolledBackNote
+        ?? (unfixableCount > 0 ? `${unfixableCount} of ${findingsThisIter.length} findings declared unfixable; ${manualFlagCount} flagged for manual sourcing; apply_log: ${applyLog.slice(0, 3).join(' / ')}` : (applyLog.length > 0 ? `apply_log: ${applyLog.slice(0, 3).join(' / ')}` : null)),
     })
+
+    if (regressed) {
+      // Keep currentCritique as it was — newCritique was the bad-design
+      // critique we're discarding. Break the loop because applying more
+      // patches on top of a rolled-back design just chases the same
+      // failure pattern.
+      break
+    }
 
     currentCritique = newCritique
 

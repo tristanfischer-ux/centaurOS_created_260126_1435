@@ -577,7 +577,31 @@ ACCEPTED: "ARM Cortex-M4 MCU PCB, STM32F427VGT6", "Pt100 RTD temperature sensor,
 
 Where the design implies a specific commercial part, NAME the manufacturer + part number (e.g. "CATL 280 Ah LFP prismatic cell" not "lithium cell"). Where it's a class, give the class spec (voltage / current / capacity / dimensions / comms protocol).
 
-Every sub-module MUST declare grammar_links to other sub-modules it physically/electrically/control-connects to.`
+Every sub-module MUST declare grammar_links to other sub-modules it physically/electrically/control-connects to.
+
+=== BRIEF ARITHMETIC CLOSURE CHECKLIST (Tristan 2026-05-21, council a500be076cbc7db4c) ===
+
+Loops 1-4 surfaced repeated first-principles violations that a Year-2 engineering student would catch with a calculator. Physics Critic scored 2-4/10 on engineering plausibility BECAUSE THE ISSUES ARE REAL — not over-strict scoring. The dominant pattern: Generator emits arithmetic that fails closure against the brief and against component datasheets; Physics Repair Loop can't fix it because the brief targets become unreachable once the design has shipped wrong quantities.
+
+BEFORE EMITTING the final design, RUN every applicable closure check below. For any check that fails, FIX THE NUMBERS in the design (cell_count, tray_count, choke rating, heatsink size) until it passes. SHOW your working in the relevant module's design_decisions or overview_paragraph_en. DO NOT emit and rely on downstream repair to catch these — the repair loop's brief-constraint guard correctly refuses to scale up component counts beyond the brief, so an out-of-closure design ships BLOCKED.
+
+UNIVERSAL closure checks (apply to every product class):
+
+(C1) MASS CLOSURE: Σ (component_mass_kg × quantity) ≤ brief.constraints.max_mass_kg, summed across ALL modules and sub-modules. The Physics Critic catches this with arithmetic — if 5,120 cells × 5.3 kg = 27,136 kg vs a 28,000 kg brief cap, that's already 97% of the budget with NO container, NO BMS, NO PCS. Either reduce cell_count, pick lighter cells, or document the override in design_decisions with a clear reason.
+
+(C2) CURRENT-RATING CLOSURE: every series-path component on a high-current bus MUST have current_rating ≥ continuous current at that node. If the bus is 1,250 A continuous, a 180 A inline choke is a 7× breach. List the bus current in derived_parameters; check each contactor / fuse / inductor / cable / busbar against it BEFORE emit.
+
+(C3) THERMAL CLOSURE: heatsink_kw ≥ dissipated_power_kw at worst case. A 1 MW inverter at 98% efficiency dissipates ~20 kW; a 5 kW heatsink is a 4× breach. Compute (1 − efficiency) × rated_power for each lossy component; sum the heat-rejection capacities; ratio MUST be ≥ 1.
+
+(C4) BRIEF-TARGET CLOSURE: capacity_kwh = cell_count × cell_voltage_v × cell_capacity_ah / 1000 must equal brief.constraints.target_performance.value (after unit conversion per parsedBrief.constraints.target_performance.unit). PPFD = (Σ LED_kW × efficacy_µmol/J) / canopy_m² must fall within brief target band. canopy_m² = tray_count × tray_area_m² must equal brief target ±5%. For HAPS: endurance_h ≈ usable_kwh × η / cruise_kw, and cruise_kw ≈ 0.5 × ρ × V³ × S × CD — show both ratios.
+
+(C5) MATERIAL COMPATIBILITY: refrigerant lines must use refrigerant-grade valves (NEVER brass / water valves on R410A / R32 / propane). Mineral-oil-filled tanks must contain oil-immersed equipment (NEVER dry-type transformers). High-voltage interrupters in oil-filled tanks must be oil-rated. List the working fluid / atmosphere per sub-module; pick parts compatible with it.
+
+(C6) DEPTH-OF-DISCHARGE CLOSURE: usable_capacity_kwh = nameplate_capacity_kwh × dod_fraction. If the brief calls for "3.5 MWh usable" and the design has dod_fraction = 0.80, the nameplate must be ≥ 3.5 / 0.80 = 4.375 MWh, NOT 3.5 MWh. Common error.
+
+How to surface this in your output: pick the 3-5 closure checks that apply to this brief and write a brief "ARITHMETIC CLOSURE" sub-section inside the OPERATIONAL OVERVIEW prose for the most relevant module (energy_storage_source for BESS, environmental_interface for VF, structure_containment + energy_conversion_transduction for HAPS). Two short paragraphs MAX showing the equations + actual numbers. The reader and the Physics Critic both want to see "5,120 cells × 5.3 kg = 27,136 kg, under 28,000 kg cap, 97% of mass budget" rather than just trusting the cell_count derived parameter. If a closure FAILS, this is where you document the decision (e.g. "cell_count reduced from 5,120 to 4,850 to fit the 28,000 kg cap, brief energy target re-checked: 4,850 × 280 × 3.2 / 1000 = 4,344 kWh nameplate — over the 3.5 MWh usable target at 80% DoD").
+
+Universal across product classes — every class has at least 3 of these checks (mass + current + brief-target).`
 }
 
 const REVIEWER_TEMPLATE = `You are a reviewer in an additive engineering design review chain. The design you receive is a hardware product decomposition: brief overview prose + 10-12 modules + per-module sub-modules with grammar_links + cross_module_grammar_links.
