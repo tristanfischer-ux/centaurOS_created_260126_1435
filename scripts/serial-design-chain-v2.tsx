@@ -42,6 +42,7 @@ for (const envPath of [
 import { runBriefParsing } from '../src/lib/pdf-engine-v2/stages/0-brief-generation'
 import { runResearchSynthesis } from '../src/lib/pdf-engine-v2/stages/1-research'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
+import { buildContractForChain, type EngineeringContract } from './lib/engineering-contract'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { translate } from '../src/lib/pdf-engine-v2/radical/universal-translator'
@@ -1494,6 +1495,47 @@ async function main() {
   console.error(`[chain] classification: ${classificationOriginal.productClass} (confidence=${classificationOriginal.confidence})`)
   logAction({ step: 'classify', product_class: classificationOriginal.productClass, confidence: classificationOriginal.confidence })
 
+  // ── Build #3: Engineering Contract construction (Tristan 2026-05-21
+  // 6/6 council unanimous: deterministic physics BEFORE Generator).
+  // The Contract becomes the canonical state object — quantities, topology
+  // constraints, macro-assembly prices, and arithmetic closures derived
+  // from the brief deterministically. Generator + downstream stages READ
+  // from the Contract; LLM no longer invents physics numbers it can't
+  // close. Per Grok: "until an external verifier with WRITE access to
+  // canonical state is the primary actor, every other variable being
+  // tuned is noise". This wires the Contract; subsequent builds plumb it
+  // into Performance Card / BoM / cost / prose stages.
+  let engineeringContract: EngineeringContract | null = null
+  try {
+    engineeringContract = buildContractForChain(classificationOriginal.productClass, parsedResultOriginal.data)
+    const failCount = engineeringContract.closures.filter(c => c.status === 'fail').length
+    const warnCount = engineeringContract.closures.filter(c => c.status === 'warn').length
+    const passCount = engineeringContract.closures.filter(c => c.status === 'pass').length
+    const macroAssemblyTotalGbp = engineeringContract.macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+    console.error(`[chain] engineering_contract: ${Object.keys(engineeringContract.quantities).length} quantities, ${engineeringContract.topology.length} topology edges, ${engineeringContract.macro_assembly_prices.length} macro-assemblies (total £${macroAssemblyTotalGbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}), closures: ${passCount} pass / ${warnCount} warn / ${failCount} fail`)
+    if (failCount > 0) {
+      for (const c of engineeringContract.closures.filter(c => c.status === 'fail')) {
+        console.error(`  ✕ [${c.invariant_id}] ${c.reason}`)
+      }
+    }
+    writeFileSync(resolve(outDir, '0.5-engineering-contract.json'), JSON.stringify(engineeringContract, null, 2))
+    logAction({
+      step: 'engineering_contract_built',
+      product_class: classificationOriginal.productClass,
+      quantities_count: Object.keys(engineeringContract.quantities).length,
+      topology_edges: engineeringContract.topology.length,
+      macro_assemblies: engineeringContract.macro_assembly_prices.length,
+      macro_assembly_total_gbp: Math.round(macroAssemblyTotalGbp),
+      closures_pass: passCount,
+      closures_warn: warnCount,
+      closures_fail: failCount,
+      ok: true,
+    })
+  } catch (err) {
+    console.error(`[chain] engineering_contract build failed: ${(err as Error).message}; continuing without Contract (LLM-only fallback)`)
+    logAction({ step: 'engineering_contract_built', ok: false, error: String(err).slice(0, 200) })
+  }
+
   // ── Phase 0 — brief refinement loop (Tristan 2026-05-15)
   // Auto-revise non-viable briefs along the lowest-priority relaxation path,
   // up to MAX_BRIEF_ITERS iterations. Each iter: plausibility critic → pick
@@ -2691,6 +2733,10 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     g5ManualReview,
     g5UnverifiedParts,
     acceptanceStatus,
+    // Engineering Contract (Build #3) — canonical deterministic state from
+    // brief. Downstream renderer / Performance Card / BoM read from this.
+    // Per 6/6 council unanimous verdict (commit 6dc4face1).
+    engineeringContract,
     savedAt: new Date().toISOString(),
   }
   // 2026-05-20 iter-8: build per-class performance card AFTER the rest of
