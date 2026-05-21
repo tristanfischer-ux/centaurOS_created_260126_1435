@@ -157,6 +157,77 @@ SHELL_ALPHA = 0.40  # transparent enough to see modules inside,
 # (2026-05-21 Tristan feedback: 0.22 was too faint at the small inset
 # sizes used for per-module images; 0.40 keeps the box legible)
 GROUND_TINT = (0.96, 0.96, 0.97)
+FOCAL_BOX_ALPHA = 0.18  # focal module's enclosing box is rendered as a
+# faint wireframe-ish translucent shell so its CONTENTS read primarily.
+# (2026-05-21 Tristan feedback: per-module renders MUST show internal
+# components inside the focal module's bounding box at recognisable scale.)
+
+
+# ── Component shape heuristics (universal, class-agnostic) ─────────────
+# Keyword → shape kind. Order matters: first match wins. Strings are
+# substring-matched against `word.name_human.lower()` AND
+# `word.content_character.character_id.lower()` (the latter is often a
+# shorter slug like 'led_driver_unit' or 'scroll_compressor').
+#
+# This table is intentionally class-agnostic — it works for any ForgeOS
+# product class. Add new keywords as the corpus grows; never branch on
+# product_class.
+
+_SHAPE_KEYWORDS: list[tuple[tuple[str, ...], str]] = [
+    # Order-sensitive: more specific first.
+    (("busbar", "wire", "cable", "harness"),                 "tube"),
+    (("led", "luminaire", "lamp", "lighting"),               "led_panel"),
+    (("pcb", "controller", "computer", "inverter", "drive",
+      "relay", "contactor"),                                 "pcb"),
+    (("compressor", "pump", "blower"),                       "cylinder_short"),
+    (("fan", "rotor"),                                       "fan"),
+    (("tank", "reservoir", "vessel", "drum"),                "cylinder_tall"),
+    (("coil", "heat_exchanger", "evaporator", "condenser",
+      "radiator"),                                           "coil"),
+    (("cell", "battery", "module_pack", "pouch", "prismatic"),
+                                                              "cell"),
+    (("rack", "frame", "skid", "trolley", "shelving", "tray",
+      "rail", "bracket"),                                    "frame"),
+    (("panel", "cabinet", "enclosure", "casing", "housing",
+      "container", "door"),                                  "panel_box"),
+    (("filter", "grille", "vent"),                           "thin_panel"),
+    (("solar", "pv", "photovoltaic"),                        "led_panel"),
+    (("motor", "actuator", "servo"),                         "cylinder_short"),
+    (("valve", "regulator", "sensor", "probe", "transducer"),
+                                                              "small_cyl"),
+    (("wing", "airfoil", "blade", "propeller"),              "thin_panel"),
+]
+
+
+def shape_for_word(name_human: str, character_id: str) -> str:
+    """Pick a shape kind from the word's labels. Returns one of the
+    keys understood by `add_component_shape`."""
+    hay = f"{name_human.lower()} {character_id.lower()}"
+    for keys, shape in _SHAPE_KEYWORDS:
+        for k in keys:
+            if k in hay:
+                return shape
+    return "cube"  # default: grey-ish cube
+
+
+def quantity_from_word(word: dict) -> int:
+    """Extract `×N` quantity from modifier_characters. Returns 1 on
+    miss. We do NOT instantiate N primitives — quantity drives a scale
+    label / mini-array packing, not literal count."""
+    mods = word.get("modifier_characters") or []
+    for mod in mods:
+        if not isinstance(mod, dict):
+            continue
+        if mod.get("kind") == "quantity":
+            v = str(mod.get("value") or "")
+            # Strip ×, x, ' ', commas → integer.
+            digits = "".join(ch for ch in v if ch.isdigit())
+            if digits:
+                try:
+                    return max(1, int(digits))
+                except ValueError:
+                    pass
+    return 1
 
 
 # ── CLI parsing ────────────────────────────────────────────────────────
@@ -276,9 +347,230 @@ def add_box(name: str, centre: tuple[float, float, float],
     obj = bpy.context.active_object
     obj.name = name
     obj.scale = (size[0] / 2.0, size[1] / 2.0, size[2] / 2.0)
-    bpy.ops.object.transform_apply(scale=True)
+    # Blender 5.x changed defaults: `transform_apply(scale=True)` now
+    # ALSO resets location to (0,0,0). Pass explicit kwargs so only
+    # scale is baked (otherwise every box renders at the origin).
+    bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     obj.data.materials.append(material)
     return obj
+
+
+def add_cylinder(name: str, centre: tuple[float, float, float],
+                 radius: float, height: float,
+                 material: "bpy.types.Material",
+                 vertices: int = 18) -> "bpy.types.Object":
+    bpy.ops.mesh.primitive_cylinder_add(
+        radius=radius, depth=height, location=centre, vertices=vertices,
+    )
+    obj = bpy.context.active_object
+    obj.name = name
+    obj.data.materials.append(material)
+    return obj
+
+
+# ── Component shape palette (used inside the focal module's box) ──────
+#
+# Per-shape RGB picks are deliberately ENGINEERING-LIKE rather than
+# clones of the parent module colour — that way components read as
+# distinct parts inside the box rather than dissolving into one mass.
+
+_COMP_COLOURS: dict[str, tuple[float, float, float]] = {
+    "cell":          (0.20, 0.45, 0.70),  # battery blue
+    "frame":         (0.45, 0.45, 0.50),  # steel grey
+    "cylinder_short":(0.65, 0.55, 0.40),  # brass/bronze (compressor/pump)
+    "cylinder_tall": (0.55, 0.65, 0.75),  # tank steel
+    "pcb":           (0.10, 0.45, 0.20),  # PCB green
+    "led_panel":     (1.00, 0.94, 0.70),  # warm LED
+    "fan":           (0.55, 0.55, 0.60),  # fan steel
+    "tube":          (0.75, 0.55, 0.30),  # copper
+    "panel_box":     (0.65, 0.65, 0.68),  # cabinet grey
+    "thin_panel":    (0.78, 0.78, 0.82),  # filter / vent
+    "coil":          (0.80, 0.50, 0.30),  # copper-ish coil
+    "small_cyl":     (0.50, 0.50, 0.55),  # sensor / valve
+    "cube":          (0.60, 0.60, 0.65),  # default
+}
+
+
+def add_component_shape(
+    shape: str,
+    name: str,
+    centre: tuple[float, float, float],
+    cell_size: tuple[float, float, float],
+    quantity: int,
+) -> None:
+    """Add a primitive matching `shape` inside the bounding `cell_size`
+    centred at `centre`. The primitive fills ~75% of the cell so there's
+    air between neighbours. `quantity` >1 is used only to pick between a
+    single object and a small (max 4×4) array; we never instantiate the
+    raw count (a 4896-cell rack would blow up the scene)."""
+    cw, cd, ch = cell_size
+    fill = 0.75
+    rgb = _COMP_COLOURS.get(shape, _COMP_COLOURS["cube"])
+    mat = make_flat_material(f"comp_{name}", rgb, alpha=1.0)
+
+    # Decide whether to render a single primitive or a packed array.
+    arr_n = 1
+    if quantity >= 8:
+        # Pack into a 2D grid that visibly hints at "many of these"
+        # without literally placing them all. Cap at 4×4.
+        side = min(4, max(2, int(round(math.sqrt(min(quantity, 16))))))
+        arr_n = side  # arr_n × arr_n footprint on (x, y)
+
+    if shape == "cell":
+        # Tall thin rectangular box; in arrays, pack on the floor.
+        if arr_n > 1:
+            cell_pad = 0.10
+            sub_w = (cw * fill) / arr_n * (1.0 - cell_pad)
+            sub_d = (cd * fill) / arr_n * (1.0 - cell_pad)
+            sub_h = ch * fill
+            for ix in range(arr_n):
+                for iy in range(arr_n):
+                    px = centre[0] + (ix - (arr_n - 1) / 2) * (cw * fill) / arr_n
+                    py = centre[1] + (iy - (arr_n - 1) / 2) * (cd * fill) / arr_n
+                    add_box(
+                        f"{name}_c{ix}_{iy}",
+                        (px, py, centre[2]),
+                        (sub_w, sub_d, sub_h),
+                        mat,
+                    )
+        else:
+            add_box(name, centre, (cw * fill * 0.5, cd * fill * 0.5, ch * fill), mat)
+        return
+
+    if shape == "frame":
+        # Larger semi-transparent outline box — looks like a rack/frame.
+        frame_mat = make_flat_material(
+            f"frame_{name}", rgb, alpha=0.55,
+        )
+        add_box(name, centre, (cw * fill, cd * fill, ch * fill), frame_mat)
+        return
+
+    if shape == "cylinder_short":
+        # Short cylinder lying horizontally → looks like compressor/pump.
+        r = min(cw, cd) * fill * 0.4
+        h = ch * fill * 0.55
+        obj = add_cylinder(name, centre, r, h, mat)
+        obj.rotation_euler = (math.radians(90.0), 0.0, 0.0)
+        return
+
+    if shape == "cylinder_tall":
+        r = min(cw, cd) * fill * 0.42
+        h = ch * fill
+        add_cylinder(name, centre, r, h, mat)
+        return
+
+    if shape == "pcb":
+        # Flat thin green rectangle.
+        add_box(
+            name,
+            (centre[0], centre[1], centre[2] - ch * fill * 0.3),
+            (cw * fill, cd * fill, max(0.02, ch * 0.06)),
+            mat,
+        )
+        return
+
+    if shape == "led_panel":
+        # Thin emissive-feel plane.
+        emi_mat = bpy.data.materials.new(name=f"emi_{name}")
+        emi_mat.use_nodes = True
+        nt = emi_mat.node_tree
+        bsdf = nt.nodes.get("Principled BSDF")
+        if bsdf:
+            bsdf.inputs["Base Color"].default_value = (*rgb, 1.0)
+            if "Emission Color" in bsdf.inputs:
+                bsdf.inputs["Emission Color"].default_value = (*rgb, 1.0)
+            if "Emission Strength" in bsdf.inputs:
+                bsdf.inputs["Emission Strength"].default_value = 1.5
+            if "Specular IOR Level" in bsdf.inputs:
+                bsdf.inputs["Specular IOR Level"].default_value = 0.0
+            if "Roughness" in bsdf.inputs:
+                bsdf.inputs["Roughness"].default_value = 1.0
+        add_box(
+            name,
+            (centre[0], centre[1], centre[2] + ch * fill * 0.35),
+            (cw * fill, cd * fill, max(0.02, ch * 0.08)),
+            emi_mat,
+        )
+        return
+
+    if shape == "fan":
+        r = min(cw, cd) * fill * 0.45
+        h = ch * fill * 0.18
+        add_cylinder(name, centre, r, h, mat, vertices=24)
+        return
+
+    if shape == "tube":
+        # Thin horizontal tube spanning the cell.
+        r = min(cw, cd) * 0.05
+        length = max(cw, cd) * fill
+        obj = add_cylinder(name, centre, r, length, mat, vertices=12)
+        obj.rotation_euler = (math.radians(90.0), 0.0, 0.0)
+        return
+
+    if shape == "panel_box":
+        # Box with a darker "door line" — render as the cube; door
+        # line is implied by Freestyle silhouette + scale.
+        add_box(name, centre, (cw * fill, cd * fill, ch * fill), mat)
+        return
+
+    if shape == "thin_panel":
+        # Thin vertical filter / vent panel.
+        add_box(
+            name,
+            centre,
+            (cw * fill, max(0.03, cd * 0.08), ch * fill),
+            mat,
+        )
+        return
+
+    if shape == "coil":
+        # Tall slim cylinder oriented horizontally → coil tube bank.
+        r = min(cw, cd) * fill * 0.3
+        h = cw * fill
+        obj = add_cylinder(name, centre, r, h, mat, vertices=18)
+        obj.rotation_euler = (0.0, math.radians(90.0), 0.0)
+        return
+
+    if shape == "small_cyl":
+        r = min(cw, cd) * fill * 0.20
+        h = ch * fill * 0.40
+        add_cylinder(name, centre, r, h, mat, vertices=12)
+        return
+
+    # Default cube.
+    add_box(name, centre, (cw * fill, cd * fill, ch * fill), mat)
+
+
+def pack_subgrid(
+    parent_centre: tuple[float, float, float],
+    parent_size: tuple[float, float, float],
+    n_items: int,
+) -> list[tuple[tuple[float, float, float], tuple[float, float, float]]]:
+    """Return a list of (centre, cell_size) tuples that pack `n_items`
+    cells inside the parent box. Margin keeps cells from touching the
+    parent walls so the focal box's silhouette is still visible."""
+    if n_items <= 0:
+        return []
+    pw, pd, ph = parent_size
+    # Grid columns chosen so cells stay roughly square in plan view.
+    cols = max(1, int(round(math.sqrt(n_items * pw / max(pd, 0.1)))))
+    cols = min(cols, n_items)
+    rows = int(math.ceil(n_items / cols))
+    margin = 0.05 * min(pw, pd)
+    cell_w = max(0.05, (pw - margin * (cols + 1)) / cols)
+    cell_d = max(0.05, (pd - margin * (rows + 1)) / rows)
+    cell_h = ph * 0.85
+    cx0 = parent_centre[0] - pw / 2.0 + margin + cell_w / 2.0
+    cy0 = parent_centre[1] - pd / 2.0 + margin + cell_d / 2.0
+    cz = parent_centre[2]
+    cells: list[tuple[tuple[float, float, float], tuple[float, float, float]]] = []
+    for i in range(n_items):
+        col = i % cols
+        row = i // cols
+        cx = cx0 + col * (cell_w + margin)
+        cy = cy0 + row * (cell_d + margin)
+        cells.append(((cx, cy, cz), (cell_w, cell_d, cell_h)))
+    return cells
 
 
 def layout_modules(
@@ -357,9 +649,92 @@ def layout_modules(
     return items
 
 
-def build_scene(state: dict, focal: str | None) -> tuple[float, float, float]:
-    """Build the entire scene. Returns the envelope dimensions in
-    metres so the camera placement can use them."""
+def populate_focal_module(item: dict, mods: list[dict]) -> None:
+    """Render the focal module as a faint outline shell + the actual
+    sub-modules + components inside, packed in a sub-grid. Called only
+    for the focal module on per-module renders (2026-05-21 enhancement
+    per Tristan: per-module images must show RECOGNISABLE COMPONENTS
+    inside the focal box, not just a coloured cube). """
+    focal_id = item["id"]
+    centre = item["centre"]
+    size = item["size"]
+    # Find the focal module's data so we can read sub_modules / words.
+    focal_mod: dict | None = None
+    for m in mods:
+        if m.get("module") == focal_id:
+            focal_mod = m
+            break
+    if focal_mod is None:
+        # Fall back to a saturated solid box if we can't find the data.
+        mat = make_flat_material(f"Mod_{focal_id}", item["rgb"], alpha=1.0)
+        add_box(f"box_{focal_id}", centre, size, mat)
+        return
+
+    # Faint translucent enclosing shell so the focal box silhouette is
+    # still readable. Freestyle outlines do the actual line work.
+    shell_mat = make_flat_material(
+        f"FocalShell_{focal_id}", item["rgb"], alpha=FOCAL_BOX_ALPHA,
+    )
+    add_box(f"focal_shell_{focal_id}", centre, size, shell_mat)
+
+    sub_mods = focal_mod.get("sub_modules") or []
+    if not isinstance(sub_mods, list) or not sub_mods:
+        # No sub-modules in the brief — leave the focal as its faint
+        # shell. Better than fabricating content.
+        return
+
+    # Pack sub-modules in a sub-grid inside the focal box.
+    sub_cells = pack_subgrid(centre, size, len(sub_mods))
+    for sm, (sm_centre, sm_size) in zip(sub_mods, sub_cells):
+        if not isinstance(sm, dict):
+            continue
+        words = sm.get("words") or []
+        if not isinstance(words, list) or not words:
+            # Empty sub-module → render a small placeholder grey cube.
+            ph_mat = make_flat_material(
+                f"sm_empty_{focal_id}_{sm.get('id', '')}", GREY, alpha=1.0,
+            )
+            add_box(
+                f"sm_empty_{focal_id}_{sm.get('id', '')}",
+                sm_centre,
+                (sm_size[0] * 0.5, sm_size[1] * 0.5, sm_size[2] * 0.5),
+                ph_mat,
+            )
+            continue
+        # Cap words per sub-module to 6 so the scene stays under the
+        # ≤5s render budget (each component is ~5-25 verts).
+        words = words[:6]
+        word_cells = pack_subgrid(sm_centre, sm_size, len(words))
+        for w_idx, (word, (w_centre, w_size)) in enumerate(zip(words, word_cells)):
+            if not isinstance(word, dict):
+                continue
+            name_human = word.get("name_human") or ""
+            cc = word.get("content_character") or {}
+            cid = cc.get("character_id") if isinstance(cc, dict) else ""
+            shape = shape_for_word(name_human, cid or "")
+            qty = quantity_from_word(word)
+            safe_name = (
+                (cid or name_human or f"w{w_idx}")
+                .lower()
+                .replace(" ", "_")
+                .replace("/", "_")
+            )[:24]
+            add_component_shape(
+                shape,
+                f"comp_{focal_id}_{safe_name}_{w_idx}",
+                w_centre,
+                w_size,
+                qty,
+            )
+
+
+def build_scene(
+    state: dict, focal: str | None,
+) -> tuple[tuple[float, float, float], dict | None]:
+    """Build the entire scene. Returns (envelope_size_m, focal_item)
+    where `focal_item` is the layout dict for the focal module (or
+    None on cover shots) — the camera needs its centre + size to frame
+    correctly."""
     reset_scene()
     env_w, env_d, env_h = envelope_mm(state)
 
@@ -375,16 +750,23 @@ def build_scene(state: dict, focal: str | None) -> tuple[float, float, float]:
     )
 
     # Modules inside. Cover shot = all coloured. Per-module shot = focal
-    # only saturated, others grey.
+    # gets components rendered inside it, others grey.
     mods = modules(state)
     is_cover = focal is None
     items = layout_modules(
         mods, env_w, env_d, env_h, focal,
         show_all_coloured=is_cover,
     )
+    focal_item: dict | None = None
     for it in items:
-        mat = make_flat_material(f"Mod_{it['id']}", it["rgb"], alpha=1.0)
-        add_box(f"box_{it['id']}", it["centre"], it["size"], mat)
+        if (not is_cover) and it["id"] == focal:
+            # Don't render the focal module as a solid box; let
+            # populate_focal_module draw the faint shell + components.
+            populate_focal_module(it, mods)
+            focal_item = it
+        else:
+            mat = make_flat_material(f"Mod_{it['id']}", it["rgb"], alpha=1.0)
+            add_box(f"box_{it['id']}", it["centre"], it["size"], mat)
 
     # Ground plane — flat off-white, gives a subtle scale reference.
     ground_mat = make_flat_material("Ground", GROUND_TINT, alpha=1.0)
@@ -402,48 +784,61 @@ def build_scene(state: dict, focal: str | None) -> tuple[float, float, float]:
     except AttributeError:
         pass
 
-    return env_w, env_d, env_h
+    return (env_w, env_d, env_h), focal_item
 
 
 # ── Camera + lighting + render setup ──────────────────────────────────
 
 
 def place_camera(env_w: float, env_d: float, env_h: float,
-                 azimuth_deg: float, wide: bool = False) -> None:
+                 azimuth_deg: float, wide: bool = False,
+                 look_at: tuple[float, float, float] | None = None,
+                 focal_size: tuple[float, float, float] | None = None,
+                 ) -> None:
     """Place the camera on the orbital sphere.
 
-    radius    = 1.5 × max envelope dim   (per validated decision)
-    elevation = 0.4 × radius             (per validated decision)
-    lens      = 35 mm fixed              (per validated decision)
-    Only AZIMUTH varies per module.
+    Cover / envelope shot: orbital camera centred on origin, framed to
+    fit the whole envelope. radius derived from envelope diagonal.
 
-    Note (Tristan 2026-05-20 review): for long-thin envelopes (the
-    vertical-farm 40-ft container is 12 m × 2.4 m × 2.9 m), max_dim ×
-    1.5 puts the camera 18 m away staring at a 2.4 m sliver. We use a
-    `target_extent` heuristic — half the bounding-box diagonal — so
-    long-thin and cube-like envelopes both frame correctly.
+    Per-module shot (look_at + focal_size supplied): orbital camera
+    centred on the FOCAL MODULE, radius derived from the focal box's
+    diagonal so the module fills 60-80% of the frame and the COMPONENTS
+    inside it become legible (2026-05-21 enhancement per Tristan: per-
+    module renders MUST show recognisable components at proper zoom).
+
+    Lens 35mm and elevation 28° are preserved across both modes — only
+    radius and look-at change, so the per-module images still feel like
+    the same orbital turntable, just zoomed in on the focal module.
     """
-    diag = math.sqrt(env_w * env_w + env_d * env_d + env_h * env_h)
-    target_extent = diag / 2.0
-    # Distance to fit `target_extent` in a 35mm lens with some margin.
-    # 35mm vertical FoV ~38° → tan(19°) ≈ 0.344 → dist ≈ extent / 0.344.
-    # Use 0.30 (slightly more pulled back) for safety, 0.22 for wide.
-    fit = 0.22 if wide else 0.30
+    if look_at is not None and focal_size is not None:
+        # Per-module: orbit the focal module's centre, distance scaled
+        # to the focal module's bounding-box diagonal.
+        fw, fd, fh = focal_size
+        target_extent = math.sqrt(fw * fw + fd * fd + fh * fh) / 2.0
+        # Tighter fit factor so the focal box fills 60-80% of the
+        # frame. 0.42 ≈ 70% of frame at 35mm.
+        fit = 0.42
+        centre = look_at
+    else:
+        diag = math.sqrt(env_w * env_w + env_d * env_d + env_h * env_h)
+        target_extent = diag / 2.0
+        fit = 0.22 if wide else 0.30
+        centre = (0.0, 0.0, 0.0)
     distance = target_extent / fit
     elevation_angle = math.radians(28.0)  # consistent ¾ view
     az = math.radians(azimuth_deg)
     horiz = distance * math.cos(elevation_angle)
-    cx = horiz * math.cos(az)
-    cy = horiz * math.sin(az)
-    cz = distance * math.sin(elevation_angle)
+    cx = centre[0] + horiz * math.cos(az)
+    cy = centre[1] + horiz * math.sin(az)
+    cz = centre[2] + distance * math.sin(elevation_angle)
     cam_data = bpy.data.cameras.new("Cam")
     cam_data.lens = 35.0
     cam_data.clip_end = max(1000.0, distance * 4.0)
     cam_obj = bpy.data.objects.new("Cam", cam_data)
     bpy.context.collection.objects.link(cam_obj)
     cam_obj.location = (cx, cy, cz)
-    # Aim at the scene centre
-    direction = Vector((0.0, 0.0, 0.0)) - Vector((cx, cy, cz))
+    # Aim at the focal centre (or scene origin for cover shots).
+    direction = Vector(centre) - Vector((cx, cy, cz))
     rot_quat = direction.to_track_quat("-Z", "Y")
     cam_obj.rotation_euler = rot_quat.to_euler()
     bpy.context.scene.camera = cam_obj
@@ -460,6 +855,9 @@ def add_lighting(env_w: float, env_d: float, env_h: float) -> None:
         ("KeyLight", (max_dim * 1.5, -max_dim * 1.5, height), 4.0),
         ("FillLight", (-max_dim * 1.5, -max_dim * 1.0, height * 0.6), 3.0),
         ("BackLight", (0.0, max_dim * 1.5, height * 0.8), 2.0),
+        # Subtle rim light from below to lift recessed components out
+        # of shadow on per-module renders — adds <1 ms render cost.
+        ("RimLight", (max_dim * 0.5, -max_dim * 0.5, -max_dim * 0.5), 1.2),
     ]:
         light_data = bpy.data.lights.new(name=name, type="SUN")
         light_data.energy = energy
@@ -549,8 +947,15 @@ def main() -> None:
     is_cover = module_id == "cover"
     focal = None if is_cover else module_id
 
-    env_w, env_d, env_h = build_scene(state, focal)
-    place_camera(env_w, env_d, env_h, azimuth, wide=is_cover)
+    (env_w, env_d, env_h), focal_item = build_scene(state, focal)
+    if focal_item is not None:
+        place_camera(
+            env_w, env_d, env_h, azimuth, wide=False,
+            look_at=focal_item["centre"],
+            focal_size=focal_item["size"],
+        )
+    else:
+        place_camera(env_w, env_d, env_h, azimuth, wide=is_cover)
     add_lighting(env_w, env_d, env_h)
 
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
