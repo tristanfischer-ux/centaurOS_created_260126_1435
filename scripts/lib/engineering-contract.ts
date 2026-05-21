@@ -129,7 +129,7 @@ export type TopologyEdge = {
 export interface MacroAssemblyPrice {
   word_name: string       // e.g. 'carbon_fibre_wing_spar', 'gaas_solar_laminate'
   unit_price_gbp: number  // £ per dimension unit (per metre, per m², per kWh)
-  dimension_basis: 'metre_length' | 'metre_wingspan' | 'square_metre' | 'kwh_capacity' | 'litre_volume' | 'cubic_metre' | 'kg_mass'
+  dimension_basis: 'metre_length' | 'metre_wingspan' | 'square_metre' | 'kwh_capacity' | 'litre_volume' | 'cubic_metre' | 'kg_mass' | 'cell_count' | 'kw_power' | 'each'
   dimension_value: number  // the scale from the brief envelope
   total_gbp: number       // unit_price × dimension_value — what the BoM should ship
   source_detail: string
@@ -207,6 +207,12 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   high_altitude_pseudo_satellite: 'haps',
   pseudo_satellite: 'haps',
   stratospheric_uav: 'haps',
+  heat_pump_residential: 'heat_pump_residential',
+  heat_pump: 'heat_pump_residential',
+  heatpump: 'heat_pump_residential',
+  air_source_heat_pump: 'heat_pump_residential',
+  ashp: 'heat_pump_residential',
+  mini_split_heatpump: 'heat_pump_residential',
 }
 
 export function buildContract(productClass: string, parsedBrief: any): EngineeringContract | null {
@@ -324,9 +330,64 @@ registerArchetype('bess', (brief: any) => {
     reason: `Nameplate ${nameplateKwh.toFixed(0)} kWh = ${cellCount} cells × ${cellVoltageV} V × ${cellAh} Ah / 1000 = ${(cellCount * cellEnergyKwh).toFixed(0)} kWh`,
   })
 
-  // Macro-assembly pricing — placeholder; real prices land when Engine B
-  // wiring happens in plan-mode session.
-  const macro_assembly_prices: MacroAssemblyPrice[] = []
+  // Macro-assembly pricing — sized to the deterministic Contract quantities.
+  // Verified against mempalace drawer (BESS reality 2026-05-18): 280 Ah LFP
+  // prismatic cells £75-100/cell, BMS master £2-5k flat, BMS slaves £400/slave,
+  // PCS IGBT-based £150/kW, container fit-out £8k flat, liquid cooling
+  // £600/kW thermal rejection. Word names chosen for ≥0.66 token overlap
+  // against Stage 1.7 emissions (cell_string sub-module, pcs_inverter_1mw,
+  // container_enclosure, bms_master, bms_slave, liquid_cooling_loop_1mw).
+  const slaveCount = Math.ceil(cellCount / 24)  // 24-channel BMS slave boards
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'lfp_cell_string',
+      unit_price_gbp: 100,
+      dimension_basis: 'cell_count',
+      dimension_value: cellCount,
+      total_gbp: 100 * cellCount,
+      source_detail: `£100/cell × ${cellCount} cells (CATL 280 Ah LFP prismatic, programme-rate)`,
+    },
+    {
+      word_name: 'pcs_inverter_bidirectional',
+      unit_price_gbp: 150,
+      dimension_basis: 'kw_power',
+      dimension_value: continuousKw,
+      total_gbp: 150 * continuousKw,
+      source_detail: `£150/kW × ${continuousKw} kW (1700 V IGBT-based bidirectional PCS, utility-scale BESS)`,
+    },
+    {
+      word_name: 'iso_container_enclosure',
+      unit_price_gbp: 8000,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 8000,
+      source_detail: `£8,000 flat — 40-ft HC ISO container with structural mods, fire-rated penetrations, HVAC mounting`,
+    },
+    {
+      word_name: 'bms_master_controller',
+      unit_price_gbp: 3000,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 3000,
+      source_detail: `£3,000 flat — STM32F427-based BMS master with watchdog, CAN, isolation (IEC 62619)`,
+    },
+    {
+      word_name: 'bms_slave_module',
+      unit_price_gbp: 400,
+      dimension_basis: 'each',
+      dimension_value: slaveCount,
+      total_gbp: 400 * slaveCount,
+      source_detail: `£400/slave × ${slaveCount} slaves (24-channel each; ceil(${cellCount} cells / 24))`,
+    },
+    {
+      word_name: 'liquid_cooling_loop',
+      unit_price_gbp: 600,
+      dimension_basis: 'kw_power',
+      dimension_value: thermalRejectionMinKw,
+      total_gbp: 600 * thermalRejectionMinKw,
+      source_detail: `£600/kW × ${thermalRejectionMinKw.toFixed(1)} kW thermal rejection (chiller + pump + cold-plate manifold)`,
+    },
+  ]
 
   return {
     product_class: 'bess',
