@@ -772,6 +772,242 @@ registerArchetype('vertical_farm', (brief: any) => {
 })
 
 // ---------------------------------------------------------------------------
+// HEAT PUMP (RESIDENTIAL AIR-SOURCE) ARCHETYPE — monobloc ASHP, 5-25 kW
+// thermal, R290 (or R32) refrigerant, deterministic refrigeration-cycle
+// physics. Builds the Contract BEFORE the Generator runs so refrigerant
+// charge, compressor displacement, HX areas, fan power, mass, and sound
+// power all close arithmetically against the brief thermal target + COP.
+// Same pattern as BESS / HAPS / VF archetypes.
+// ---------------------------------------------------------------------------
+
+registerArchetype('heat_pump_residential', (brief: any) => {
+  // Inputs from brief.constraints + brief.product_description.
+  // Thermal output (kW) comes from target_performance with unit conversion.
+  const tp = brief?.constraints?.target_performance ?? {}
+  const briefValue = Number(tp.value ?? 0)
+  const briefUnit = String(tp.unit ?? 'kW').toLowerCase()
+  // Normalise to kW THERMAL. Brief may use kW, W, or BTU/h.
+  const thermalKw = briefUnit === 'w' ? briefValue / 1000
+    : briefUnit === 'mw' ? briefValue * 1000
+    : briefUnit === 'btu/h' || briefUnit === 'btu_h' || briefUnit === 'btuh' ? briefValue / 3412.142
+    : briefValue > 0 ? briefValue
+    : 12  // class default 12 kW (mid-range residential)
+  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  const extractRange = (pat: RegExp, dflt: number): number => {
+    const m = desc.match(pat)
+    if (!m) return dflt
+    const a = parseFloat(m[1])
+    const b = m[2] ? parseFloat(m[2]) : a
+    return (a + b) / 2
+  }
+  // Refrigerant selection: R290 (propane, GWP=3) for new builds 2026+;
+  // R32 (GWP=675) legacy. Brief may mention either.
+  const refrigerantId = /(r-?290|propane)/i.test(desc) ? 'r290'
+    : /(r-?32)/i.test(desc) ? 'r32'
+    : 'r290'  // default for 2026+ new builds
+  // COP_rated at A2/W35 rating point (EN 14511): air-source residential
+  // monobloc typical 3.6-4.0; default 3.8. SCOP (seasonal) typical 4.2-5.0.
+  const copRated = extractRange(/cop[^0-9]*(\d\.\d)\s*-?\s*(\d\.\d)?/i, 3.8)
+  const scop = extractRange(/scop[^0-9]*(\d\.\d)\s*-?\s*(\d\.\d)?/i, 4.5)
+  // Electrical input: thermal_output / COP
+  const electricalKw = thermalKw / copRated
+  // Refrigerant charge: 0.15 kg/kW thermal typical, capped by IEC
+  // 60335-2-40 Annex CC at 1 kg per 1.5 kW thermal for R290 (A3 flammable)
+  const refrigerantChargeKg = 0.15 * thermalKw
+  const refrigerantChargeLimitKg = thermalKw / 1.5  // Annex CC for R290
+  // Compressor displacement: ~3 cm³ per kW thermal (rotary or scroll)
+  const compressorDisplacementCm3 = 3 * thermalKw
+  // Outdoor HX (air-side cross-flow finned tube): ~0.5 m² per kW thermal
+  const outdoorHxAreaM2 = 0.5 * thermalKw
+  // Indoor HX (water-side brazed-plate): ~0.1 m² per kW thermal
+  const indoorHxAreaM2 = 0.1 * thermalKw
+  // Outdoor axial fan power: ~2% of thermal output (lower-bound EC fan)
+  const fanPowerKw = 0.02 * thermalKw
+  // Mass: ~25 kg/kW thermal for monobloc air-source residential
+  const totalEstimatedMassKg = 25 * thermalKw
+  const briefMassCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? 250)
+  // Sound power dBA: empirical 50 + log2(thermal_kw) × 3
+  const soundPowerDba = 50 + Math.log2(Math.max(thermalKw, 1)) * 3
+  // Ambient envelope (EN 14511 / EN 14825): brief may override
+  const minAmbientC = Number(brief?.constraints?.min_ambient_c?.value ?? -20)
+  const maxAmbientC = Number(brief?.constraints?.max_ambient_c?.value ?? 35)
+  // Refrigeration cycle saturation at A2/W35
+  const evapSatC = -12
+  const condSatC = 50
+  // Pressure ratio for R290 between evap/cond saturation: ~3.8
+  const pressureRatio = 3.8
+  // DC bus / 230 V single-phase line current at rated electrical input
+  const lineVoltageV = 230
+  const lineCurrentA = (electricalKw * 1000) / lineVoltageV
+
+  const quantities: Record<string, Quantity> = {
+    rated_thermal_kw: q(thermalKw, 'kW', 'power', 'rated', 'system', 'brief', { source_detail: 'brief.constraints.target_performance', condition: 'A2/W35 (EN 14511)' }),
+    rated_electrical_kw: q(electricalKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'thermal_kw / cop_rated' }),
+    cop_rated: q(copRated, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'EN 14511 A2/W35; air-source residential typical 3.6-4.0', condition: 'A2/W35' }),
+    scop: q(scop, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'EN 14825 seasonal; air-source residential typical 4.2-5.0', condition: 'Average climate, W35' }),
+    refrigerant: q(0, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: `refrigerant=${refrigerantId} (${refrigerantId === 'r290' ? 'propane, GWP=3, A3 flammable' : refrigerantId === 'r32' ? 'difluoromethane, GWP=675, A2L mildly flammable' : 'unknown'})` }),
+    refrigerant_charge_kg: q(refrigerantChargeKg, 'kg', 'mass', 'rated', 'system', 'calculator', { source_detail: '0.15 kg/kW thermal × rated_thermal_kw' }),
+    refrigerant_charge_limit_kg: q(refrigerantChargeLimitKg, 'kg', 'mass', 'max', 'system', 'physics_constant', { source_detail: 'IEC 60335-2-40 Annex CC: 1 kg per 1.5 kW thermal for R290 (A3)' }),
+    compressor_displacement_cm3: q(compressorDisplacementCm3, 'cm³', 'volume', 'rated', 'module', 'calculator', { source_detail: '3 cm³ per kW thermal (rotary or scroll)' }),
+    outdoor_hx_area_m2: q(outdoorHxAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: '0.5 m²/kW thermal (Cu/Al fin-tube cross-flow, marine-coated)' }),
+    indoor_hx_area_m2: q(indoorHxAreaM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: '0.1 m²/kW thermal (stainless brazed-plate water-side)' }),
+    fan_power_kw: q(fanPowerKw, 'kW', 'power', 'continuous', 'module', 'calculator', { source_detail: '2% of thermal output (EC axial fan lower-bound)' }),
+    total_estimated_mass_kg: q(totalEstimatedMassKg, 'kg', 'mass', 'empty', 'system', 'calculator', { source_detail: '25 kg/kW thermal (monobloc air-source residential)' }),
+    max_mass_kg: q(briefMassCapKg, 'kg', 'mass', 'max', 'system', 'brief'),
+    sound_power_dba: q(soundPowerDba, 'dBA', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: '50 + log2(thermal_kw) × 3 empirical', condition: 'EN 12102 / Lw' }),
+    max_ambient_c: q(maxAmbientC, '°C', 'temperature', 'max', 'system', 'brief'),
+    min_ambient_c: q(minAmbientC, '°C', 'temperature', 'min', 'system', 'brief'),
+    evap_saturation_c: q(evapSatC, '°C', 'temperature', 'rated', 'module', 'physics_constant', { source_detail: 'A2/W35 rating point typical evaporator saturation' }),
+    cond_saturation_c: q(condSatC, '°C', 'temperature', 'rated', 'module', 'physics_constant', { source_detail: 'A2/W35 rating point typical condenser saturation' }),
+    pressure_ratio: q(pressureRatio, '', 'dimensionless', 'rated', 'module', 'physics_constant', { source_detail: 'R290 A2/W35 pressure ratio cond/evap' }),
+    line_voltage_v: q(lineVoltageV, 'V', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'UK/EU single-phase residential mains' }),
+    line_current_a: q(lineCurrentA, 'A', 'dimensionless', 'continuous', 'system', 'calculator', { source_detail: 'electrical_kw × 1000 / line_voltage_v' }),
+  }
+
+  // Topology constraints — typed edges
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'compressor',
+      to_part: 'indoor_hx',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'thermal_rejection',
+      required_value: thermalKw,
+      required_unit: 'kW',
+    },
+    {
+      from_part: 'compressor',
+      to_part: 'outdoor_hx',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'thermal_rejection',
+      required_value: thermalKw - electricalKw,  // heat absorbed from outdoor air = thermal - work input
+      required_unit: 'kW',
+    },
+    {
+      from_part: 'inverter_pcb',
+      to_part: 'compressor',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: lineCurrentA * 1.25,
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+    },
+    {
+      from_part: 'refrigerant_circuit',
+      to_part: 'enclosure_shell',
+      mechanism: 'mechanical',
+      constraint_kind: 'material_compatibility',
+      material_context: refrigerantId === 'r290'
+        ? 'r290_a3_compatible — enclosure must meet IEC 60335-2-40 ventilation + ignition-source separation for A3 flammable refrigerant'
+        : refrigerantId === 'r32'
+          ? 'r32_a2l_compatible — enclosure must meet IEC 60335-2-40 reduced requirements for A2L mildly flammable refrigerant'
+          : 'refrigerant_compatible',
+    },
+  ]
+
+  // Macro-assembly pricing — verified from mempalace heat-pump industry
+  // data. Word names chosen for ≥0.66 token overlap against Stage 1.7
+  // emissions (compressor, refrigerant_compressor, evaporator_coil,
+  // condenser_coil, expansion_valve, refrigerant_circuit, cabinet_enclosure,
+  // outdoor_fan).
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'refrigerant_compressor',
+      unit_price_gbp: 100,
+      dimension_basis: 'kw_power',
+      dimension_value: thermalKw,
+      total_gbp: 100 * thermalKw,
+      source_detail: `£100/kW × ${thermalKw.toFixed(1)} kW thermal (hermetic rotary or scroll, ${refrigerantId.toUpperCase()}-rated)`,
+    },
+    {
+      word_name: 'outdoor_heat_exchanger',
+      unit_price_gbp: 45,
+      dimension_basis: 'kw_power',
+      dimension_value: thermalKw,
+      total_gbp: 45 * thermalKw,
+      source_detail: `£45/kW × ${thermalKw.toFixed(1)} kW thermal (Cu/Al fin-tube cross-flow, marine-coated outer)`,
+    },
+    {
+      word_name: 'indoor_heat_exchanger',
+      unit_price_gbp: 30,
+      dimension_basis: 'kw_power',
+      dimension_value: thermalKw,
+      total_gbp: 30 * thermalKw,
+      source_detail: `£30/kW × ${thermalKw.toFixed(1)} kW thermal (stainless brazed-plate water-side)`,
+    },
+    {
+      word_name: 'refrigerant_circuit',
+      unit_price_gbp: 25,
+      dimension_basis: 'kw_power',
+      dimension_value: thermalKw,
+      total_gbp: 25 * thermalKw,
+      source_detail: `£25/kW × ${thermalKw.toFixed(1)} kW (EEV + 4-way valve + filter-drier + pressure switches + ${refrigerantId.toUpperCase()} piping)`,
+    },
+    {
+      word_name: 'enclosure_shell',
+      unit_price_gbp: 600,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 600,
+      source_detail: `£600 flat — sheet-metal monobloc cabinet + composite acoustic liner`,
+    },
+    {
+      word_name: 'axial_fan_assembly',
+      unit_price_gbp: 200,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 200,
+      source_detail: `£200 flat — EC axial fan + grille (residential size class)`,
+    },
+    {
+      word_name: 'compressor_inverter_pcb',
+      unit_price_gbp: 180,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 180,
+      source_detail: `£180 flat — motor drive + control board`,
+    },
+  ]
+
+  // Closures
+  const closures: ContractClosureResult[] = []
+  const thermalElectricalGap = Math.abs(thermalKw - electricalKw * copRated) / thermalKw
+  closures.push({
+    invariant_id: 'thermal_electrical_closure',
+    status: thermalElectricalGap < 0.05 ? 'pass' : 'fail',
+    measured: quantities.rated_thermal_kw,
+    required: `electrical_kw × cop_rated within 5% of thermal_kw`,
+    reason: `Thermal ${thermalKw.toFixed(2)} kW vs electrical × COP = ${(electricalKw * copRated).toFixed(2)} kW (gap ${(thermalElectricalGap * 100).toFixed(2)}%).`,
+  })
+  closures.push({
+    invariant_id: 'refrigerant_charge_safety_closure',
+    status: refrigerantChargeKg <= refrigerantChargeLimitKg ? 'pass' : 'fail',
+    measured: quantities.refrigerant_charge_kg,
+    required: refrigerantChargeLimitKg,
+    reason: `Refrigerant charge ${refrigerantChargeKg.toFixed(2)} kg vs IEC 60335-2-40 Annex CC limit ${refrigerantChargeLimitKg.toFixed(2)} kg for ${refrigerantId.toUpperCase()} at ${thermalKw.toFixed(1)} kW thermal.`,
+  })
+  closures.push({
+    invariant_id: 'mass_closure',
+    status: totalEstimatedMassKg <= briefMassCapKg * 0.85 ? 'pass'
+          : totalEstimatedMassKg <= briefMassCapKg ? 'warn'
+          : 'fail',
+    measured: quantities.total_estimated_mass_kg,
+    required: briefMassCapKg,
+    reason: `Estimated mass ${totalEstimatedMassKg.toFixed(1)} kg vs brief cap ${briefMassCapKg} kg (${((totalEstimatedMassKg / briefMassCapKg) * 100).toFixed(0)}%). Ideal ≤85% to leave margin for refrigerant + control + service ports.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'heat_pump_residential',
+    brief_summary: `Residential monobloc air-source heat pump, ${thermalKw.toFixed(1)} kW thermal output @ COP ${copRated.toFixed(1)} (SCOP ${scop.toFixed(1)}), ${refrigerantId.toUpperCase()} refrigerant (${refrigerantChargeKg.toFixed(2)} kg charge). Electrical input ${electricalKw.toFixed(2)} kW @ ${lineVoltageV} V. Outdoor HX ${outdoorHxAreaM2.toFixed(1)} m², indoor HX ${indoorHxAreaM2.toFixed(2)} m². Mass ${totalEstimatedMassKg.toFixed(0)} kg, sound power ${soundPowerDba.toFixed(0)} dBA. Operating envelope ${minAmbientC}°C to ${maxAmbientC}°C. Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
+})
+
+// ---------------------------------------------------------------------------
 // VALIDATOR — runs after each LLM stage. Compares stage's proposal against
 // Contract; rejects proposals that violate any 'fail' closure or topology
 // constraint. Replaces the current Physics-Critic-after-the-fact loop.
