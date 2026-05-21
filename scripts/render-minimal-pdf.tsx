@@ -631,6 +631,13 @@ function computeBomTotals(state: any): BomTotals | null {
   for (const v of verifications) {
     if (v.word_id) verifByWordId.set(v.word_id, v)
   }
+  // Build #4b (Loop 10 regression fix, 2026-05-21): track macro-assembly
+  // price entries that have already been claimed by a BoM word, so each
+  // Contract macro fires ONCE not per-word. Loop 10 VF blew up from
+  // £3,253/m² to £10,496/m² because 8 separate "trolley" words each got
+  // overridden with the SAME £20k total → 8 × £20k = £160k instead of
+  // £20k. Set-based single-fire fixes the regression.
+  const claimedMacroAssemblies = new Set<string>()
   const rawModules = state.moduleDecomposition?.modules ?? []
   const orderedModules = order_modules(rawModules as Array<{ module: string; display_name?: string }>)
   if (orderedModules.length === 0) return null
@@ -701,6 +708,9 @@ function computeBomTotals(state: any): BomTotals | null {
           let bestMatch: typeof macroPrices[number] | null = null
           let bestScore = 0
           for (const mp of macroPrices) {
+            // Build #4b single-fire guard: skip macros already claimed
+            // by a prior word in this BoM pass.
+            if (claimedMacroAssemblies.has(mp.word_name)) continue
             const tokens = mp.word_name.split('_').filter(t => t.length >= 3)
             if (tokens.length === 0) continue
             for (const cand of candidates) {
@@ -720,6 +730,8 @@ function computeBomTotals(state: any): BomTotals | null {
             unit_price_gbp = roundToPence(bestMatch.total_gbp / Math.max(qty, 1))
             line_total_gbp = roundToPence(bestMatch.total_gbp)
             contract_override_reason = `Contract macro-assembly (${bestScore >= 1 ? 'exact' : `${Math.round(bestScore * 100)}% token match`}): ${bestMatch.source_detail}`
+            // Claim this macro so subsequent matching words don't double-count.
+            claimedMacroAssemblies.add(bestMatch.word_name)
           }
         }
         const row: BomPartRow = {
