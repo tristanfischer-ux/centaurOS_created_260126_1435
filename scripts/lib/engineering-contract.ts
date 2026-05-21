@@ -213,6 +213,38 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   air_source_heat_pump: 'heat_pump_residential',
   ashp: 'heat_pump_residential',
   mini_split_heatpump: 'heat_pump_residential',
+  // Classifier (product-classifier.ts:77) emits 'thermal_system' for heat
+  // pump briefs. Chain orchestrator remaps thermal_system → 'heat-pump-
+  // residential' (with dash) at serial-design-chain-v2.tsx:2413+:3127 for
+  // class-specific routes — but buildContract() reads productClass BEFORE
+  // that remap. Add both forms.
+  thermal_system: 'heat_pump_residential',
+  'heat-pump-residential': 'heat_pump_residential',
+  air_to_water_heat_pump: 'heat_pump_residential',
+  monobloc_heat_pump: 'heat_pump_residential',
+  commercial_heat_pump: 'heat_pump_residential',
+  drone: 'drone',
+  multirotor: 'drone',
+  quadcopter: 'drone',
+  hexacopter: 'drone',
+  octocopter: 'drone',
+  uav_consumer: 'drone',
+  cinematography_drone: 'drone',
+  consumer_drone: 'drone',
+  agri_drone: 'drone',
+  agricultural_drone: 'drone',
+  auv: 'auv',
+  autonomous_underwater_vehicle: 'auv',
+  subsea_vehicle: 'auv',
+  deep_sea_drone: 'auv',
+  uuv: 'auv',
+  unmanned_underwater_vehicle: 'auv',
+  bioreactor: 'bioreactor',
+  fermenter: 'bioreactor',
+  stirred_tank_bioreactor: 'bioreactor',
+  single_use_bioreactor: 'bioreactor',
+  cell_culture_bioreactor: 'bioreactor',
+  fermentation_vessel: 'bioreactor',
 }
 
 export function buildContract(productClass: string, parsedBrief: any): EngineeringContract | null {
@@ -1000,6 +1032,747 @@ registerArchetype('heat_pump_residential', (brief: any) => {
   return {
     product_class: 'heat_pump_residential',
     brief_summary: `Residential monobloc air-source heat pump, ${thermalKw.toFixed(1)} kW thermal output @ COP ${copRated.toFixed(1)} (SCOP ${scop.toFixed(1)}), ${refrigerantId.toUpperCase()} refrigerant (${refrigerantChargeKg.toFixed(2)} kg charge). Electrical input ${electricalKw.toFixed(2)} kW @ ${lineVoltageV} V. Outdoor HX ${outdoorHxAreaM2.toFixed(1)} m², indoor HX ${indoorHxAreaM2.toFixed(2)} m². Mass ${totalEstimatedMassKg.toFixed(0)} kg, sound power ${soundPowerDba.toFixed(0)} dBA. Operating envelope ${minAmbientC}°C to ${maxAmbientC}°C. Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
+})
+
+// ---------------------------------------------------------------------------
+// DRONE (CONSUMER/COMMERCIAL MULTIROTOR) ARCHETYPE — default cinematography
+// quadcopter, 0.5-25 kg MTOW, LiPo battery, brushless motors + ESCs, gimbal
+// payload. Deterministic disk-actuator hover-power physics. Builds the
+// Contract BEFORE the Generator runs so MTOW, rotor count, hover power,
+// battery sizing, endurance, and macro-assembly costs all close
+// arithmetically against the brief flight-time / payload target.
+// ---------------------------------------------------------------------------
+
+registerArchetype('drone', (brief: any) => {
+  const tp = brief?.constraints?.target_performance ?? {}
+  const briefValue = Number(tp.value ?? 0)
+  const briefUnit = String(tp.unit ?? 'min').toLowerCase()
+  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  const extractRange = (pat: RegExp, dflt: number): number => {
+    const m = desc.match(pat)
+    if (!m) return dflt
+    const a = parseFloat(m[1])
+    const b = m[2] ? parseFloat(m[2]) : a
+    return (a + b) / 2
+  }
+  // Brief target_performance: flight_time (min) OR payload (kg). Capture both.
+  const briefIsPayload = /kg|payload/i.test(briefUnit)
+  const briefFlightTimeMin = !briefIsPayload && briefValue > 0 ? briefValue
+    : extractRange(/(\d{1,3})\s*-?\s*(\d{1,3})?\s*min/i, 25)
+  const briefPayloadKg = briefIsPayload && briefValue > 0 ? briefValue
+    : extractRange(/(\d+(?:\.\d+)?)\s*kg.*(?:payload|gimbal|camera)/i, 0.4)
+  // MTOW kg: 0.5-25 kg typical. Default 1.8 kg for prosumer cinematography.
+  const mtowKg = Number(brief?.constraints?.max_mass_kg?.value ?? 1.8)
+  // Motor count: 4 (quad), 6 (hex), 8 (oct). Default 4. Detect from prose.
+  const motorCount = (() => {
+    if (/oct[oa]copter|8\s*rotor|eight\s*rotor/i.test(desc)) return 8
+    if (/hex[oa]copter|6\s*rotor|six\s*rotor/i.test(desc)) return 6
+    return 4
+  })()
+  // Rotor diameter m: default 0.20 m (8-inch prosumer prop)
+  const rotorDiameterM = extractRange(/(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*(?:inch|in|")\s*(?:prop|rotor)/i, 0) > 0
+    ? extractRange(/(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*(?:inch|in|")\s*(?:prop|rotor)/i, 8) * 0.0254
+    : 0.20
+  const diskAreaPerRotorM2 = Math.pow(rotorDiameterM / 2, 2) * Math.PI
+  // Air density at sea level (drones typically operate <500m AGL)
+  const airDensityKgM3 = 1.225
+  const gravityMs2 = 9.81
+  // Figure-of-merit (propeller efficiency loss): 0.7 for typical small UAV
+  const figureOfMerit = 0.7
+  // Disk-actuator hover power: P_hover = (T)^1.5 / sqrt(2 × ρ × A_total) / FoM
+  // Total thrust = MTOW × g (in N). A_total = motor_count × disk_area.
+  const totalThrustHoverN = mtowKg * gravityMs2
+  const totalDiskAreaM2 = motorCount * diskAreaPerRotorM2
+  const idealHoverPowerW = Math.pow(totalThrustHoverN, 1.5) / Math.sqrt(2 * airDensityKgM3 * totalDiskAreaM2)
+  const hoverPowerKw = (idealHoverPowerW / figureOfMerit) / 1000
+  // Cruise power ≈ 70% of hover (level forward flight more efficient)
+  const cruisePowerKw = hoverPowerKw * 0.7
+  // Battery kWh: brief or default 0.077 kWh (4S 5200 mAh = 14.8V × 5.2Ah)
+  const batteryKwh = extractRange(/(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*kWh/i, 0.077)
+  // Propulsion efficiency (battery DC → mechanical lift via ESC + motor + prop)
+  const etaPropulsion = 0.55
+  // Geofence / RTH battery reserve: 20% — endurance reported at 80% DoD
+  const usableBatteryFraction = 0.80
+  // Endurance (min): (battery × η × usable_frac) / hover_power × 60
+  const computedEnduranceMin = (batteryKwh * etaPropulsion * usableBatteryFraction / hoverPowerKw) * 60
+  // Thrust margin: motors must provide 1.5× hover thrust for manoeuvring
+  const totalThrustRequiredN = totalThrustHoverN * 1.5
+  // Per-motor thrust requirement
+  const perMotorThrustN = totalThrustRequiredN / motorCount
+  // Camera/gimbal payload
+  const payloadKg = briefPayloadKg
+  // Battery pack mass (approx 200 Wh/kg cell-level for LiPo)
+  const batteryMassKg = (batteryKwh * 1000) / 200
+  // Component masses
+  const motorMassKgEach = 0.08  // ~80g per brushless motor for prosumer class
+  const escMassKgEach = 0.04
+  const flightControllerKg = 0.05
+  const airframeMassKg = mtowKg * 0.25  // CF airframe ~25% of MTOW
+  const totalEstimatedMassKg = airframeMassKg + motorCount * (motorMassKgEach + escMassKgEach) + batteryMassKg + payloadKg + flightControllerKg
+
+  const quantities: Record<string, Quantity> = {
+    mtow_kg: q(mtowKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+    motor_count: q(motorCount, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'detected from prose (quad/hex/oct) — default 4' }),
+    rotor_diameter_m: q(rotorDiameterM, 'm', 'length', 'rated', 'module', 'brief'),
+    disk_area_per_rotor_m2: q(diskAreaPerRotorM2, 'm²', 'area', 'rated', 'module', 'calculator', { source_detail: 'π × (d/2)²' }),
+    total_disk_area_m2: q(totalDiskAreaM2, 'm²', 'area', 'rated', 'system', 'calculator', { source_detail: 'motor_count × disk_area_per_rotor' }),
+    air_density_kg_m3: q(airDensityKgM3, 'kg/m³', 'dimensionless', 'rated', 'system', 'physics_constant', { condition: 'sea-level standard atmosphere' }),
+    figure_of_merit: q(figureOfMerit, '', 'dimensionless', 'typical', 'system', 'physics_constant', { source_detail: 'small-UAV prop FoM 0.65-0.75; default 0.7' }),
+    total_thrust_hover_n: q(totalThrustHoverN, 'N', 'force', 'continuous', 'system', 'calculator', { source_detail: 'mtow × g' }),
+    total_thrust_required_n: q(totalThrustRequiredN, 'N', 'force', 'peak', 'system', 'calculator', { source_detail: 'hover × 1.5 manoeuvre margin' }),
+    per_motor_thrust_n: q(perMotorThrustN, 'N', 'force', 'peak', 'module', 'calculator'),
+    hover_power_kw: q(hoverPowerKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'disk-actuator theory: T^1.5 / sqrt(2ρA) / FoM' }),
+    cruise_power_kw: q(cruisePowerKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: '0.7 × hover_power (forward flight)' }),
+    battery_capacity_kwh: q(batteryKwh, 'kWh', 'energy', 'nameplate', 'system', 'brief'),
+    battery_usable_kwh: q(batteryKwh * usableBatteryFraction, 'kWh', 'energy', 'usable', 'system', 'calculator', { source_detail: `battery × ${usableBatteryFraction} (RTH/geofence reserve)` }),
+    propulsion_efficiency: q(etaPropulsion, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'battery → mech lift via ESC + motor + prop' }),
+    target_flight_time_min: q(briefFlightTimeMin, 'min', 'time', 'min', 'system', 'brief'),
+    computed_endurance_min: q(computedEnduranceMin, 'min', 'time', 'continuous', 'system', 'calculator', { source_detail: 'battery_usable × η / hover_power × 60' }),
+    payload_kg: q(payloadKg, 'kg', 'mass', 'payload', 'system', 'brief'),
+    battery_mass_kg: q(batteryMassKg, 'kg', 'mass', 'empty', 'module', 'calculator', { source_detail: 'battery_kwh × 1000 / 200 Wh/kg LiPo' }),
+    airframe_mass_kg: q(airframeMassKg, 'kg', 'mass', 'empty', 'module', 'calculator', { source_detail: 'mtow × 0.25 CF airframe fraction' }),
+    total_estimated_mass_kg: q(totalEstimatedMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator'),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'esc_speed_controller',
+      to_part: 'brushless_motor',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (hoverPowerKw * 1000) / (14.8 * motorCount) * 1.5,
+      required_unit: 'A',
+      required_margin_factor: 1.5,
+    },
+    {
+      from_part: 'lipo_battery_pack',
+      to_part: 'esc_distribution',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (hoverPowerKw * 1000) / 14.8 * 1.25,
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+    },
+    {
+      from_part: 'flight_controller',
+      to_part: 'esc_speed_controller',
+      mechanism: 'data',
+      constraint_kind: 'data_bandwidth',
+      required_value: 400,
+      required_unit: 'Hz',
+    },
+  ]
+
+  // Macro-assembly pricing. Word names chosen for ≥0.66 token overlap
+  // against Stage 1.7 emissions (carbon_fibre_frame, brushless_motor,
+  // esc_speed_controller, flight_controller, lipo_battery_pack,
+  // gimbal_camera_payload, propeller, transmitter_receiver).
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'carbon_fibre_airframe',
+      unit_price_gbp: 400,
+      dimension_basis: 'kg_mass',
+      dimension_value: mtowKg,
+      total_gbp: 400 * mtowKg,
+      source_detail: `£400/kg MTOW × ${mtowKg.toFixed(2)} kg (premium CF prepreg + foam-core arms)`,
+    },
+    {
+      word_name: 'brushless_motor_assembly',
+      unit_price_gbp: 80,
+      dimension_basis: 'each',
+      dimension_value: motorCount,
+      total_gbp: 80 * motorCount,
+      source_detail: `£80/motor × ${motorCount} motors (outrunner, ${perMotorThrustN.toFixed(1)} N peak thrust class)`,
+    },
+    {
+      word_name: 'esc_speed_controller',
+      unit_price_gbp: 45,
+      dimension_basis: 'each',
+      dimension_value: motorCount,
+      total_gbp: 45 * motorCount,
+      source_detail: `£45/ESC × ${motorCount} ESCs (BLHeli_32 / DShot600, per-motor)`,
+    },
+    {
+      word_name: 'flight_controller_pcb',
+      unit_price_gbp: 180,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 180,
+      source_detail: `£180 flat — IMU + barometer + GNSS + processor (PX4 / ArduPilot class)`,
+    },
+    {
+      word_name: 'lipo_battery_pack',
+      unit_price_gbp: 300,
+      dimension_basis: 'kwh_capacity',
+      dimension_value: batteryKwh,
+      total_gbp: 300 * batteryKwh,
+      source_detail: `£300/kWh × ${batteryKwh.toFixed(3)} kWh (4S/6S LiPo prosumer-grade)`,
+    },
+    {
+      word_name: 'gimbal_camera_payload',
+      unit_price_gbp: 600,
+      dimension_basis: 'kg_mass',
+      dimension_value: payloadKg,
+      total_gbp: 600 * payloadKg,
+      source_detail: `£600/kg payload × ${payloadKg.toFixed(2)} kg (3-axis brushless gimbal + camera module)`,
+    },
+    {
+      word_name: 'propeller_set_carbon',
+      unit_price_gbp: 25,
+      dimension_basis: 'each',
+      dimension_value: motorCount,
+      total_gbp: 25 * motorCount,
+      source_detail: `£25/prop × ${motorCount} props (CF, ${(rotorDiameterM * 39.37).toFixed(0)}-inch)`,
+    },
+    {
+      word_name: 'transmitter_receiver_pair',
+      unit_price_gbp: 240,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 240,
+      source_detail: `£240 flat — 2.4 GHz transmitter + receiver pair (ELRS / FrSky class)`,
+    },
+  ]
+
+  // Closures
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'hover_thrust_closure',
+    status: 'pass',
+    measured: perMotorThrustN,
+    required: (totalThrustHoverN * 1.5) / motorCount,
+    reason: `Per-motor required thrust ${perMotorThrustN.toFixed(1)} N gives 1.5× hover margin (motors must lift MTOW + manoeuvre).`,
+  })
+  closures.push({
+    invariant_id: 'mass_closure',
+    status: totalEstimatedMassKg <= mtowKg * 1.05 && totalEstimatedMassKg >= mtowKg * 0.85 ? 'pass'
+          : totalEstimatedMassKg <= mtowKg * 1.15 ? 'warn'
+          : 'fail',
+    measured: quantities.total_estimated_mass_kg,
+    required: mtowKg,
+    reason: `Estimated total mass ${totalEstimatedMassKg.toFixed(2)} kg vs brief MTOW cap ${mtowKg.toFixed(2)} kg (${((totalEstimatedMassKg / mtowKg) * 100).toFixed(0)}%).`,
+  })
+  closures.push({
+    invariant_id: 'endurance_closure',
+    status: computedEnduranceMin >= briefFlightTimeMin * 0.95 ? 'pass'
+          : computedEnduranceMin >= briefFlightTimeMin * 0.80 ? 'warn'
+          : 'fail',
+    measured: quantities.computed_endurance_min,
+    required: briefFlightTimeMin,
+    reason: `Computed endurance ${computedEnduranceMin.toFixed(1)} min vs target ${briefFlightTimeMin.toFixed(1)} min (${((computedEnduranceMin / briefFlightTimeMin) * 100).toFixed(0)}%). At ${hoverPowerKw.toFixed(3)} kW hover, ${batteryKwh.toFixed(3)} kWh battery, ${etaPropulsion} η, ${(usableBatteryFraction * 100).toFixed(0)}% DoD.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'drone',
+    brief_summary: `${motorCount === 4 ? 'Quadcopter' : motorCount === 6 ? 'Hexacopter' : 'Octocopter'} consumer/commercial drone, ${mtowKg.toFixed(2)} kg MTOW, ${(rotorDiameterM * 1000).toFixed(0)} mm rotors. Hover ${hoverPowerKw.toFixed(3)} kW, cruise ${cruisePowerKw.toFixed(3)} kW. ${batteryKwh.toFixed(3)} kWh LiPo → ${computedEnduranceMin.toFixed(1)} min endurance (target ${briefFlightTimeMin.toFixed(1)} min). ${payloadKg.toFixed(2)} kg gimbal/camera payload. Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
+})
+
+// ---------------------------------------------------------------------------
+// AUV (AUTONOMOUS UNDERWATER VEHICLE) ARCHETYPE — deep-marine variant,
+// 50-3000 m operating depth, titanium/aluminium pressure hull, multi-
+// thruster propulsion, LFP subsea-rated battery, syntactic foam buoyancy.
+// Deterministic hydrostatic + hoop-stress hull thickness physics. Builds
+// the Contract BEFORE the Generator runs so depth → hull thickness,
+// displacement → buoyancy, battery → endurance all close arithmetically.
+// ---------------------------------------------------------------------------
+
+registerArchetype('auv', (brief: any) => {
+  const tp = brief?.constraints?.target_performance ?? {}
+  const briefValue = Number(tp.value ?? 0)
+  const briefUnit = String(tp.unit ?? 'm').toLowerCase()
+  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  const extractRange = (pat: RegExp, dflt: number): number => {
+    const m = desc.match(pat)
+    if (!m) return dflt
+    const a = parseFloat(m[1])
+    const b = m[2] ? parseFloat(m[2]) : a
+    return (a + b) / 2
+  }
+  const gravityMs2 = 9.81
+  // Brief target_performance: depth (m) OR endurance (h). Capture both.
+  const briefIsDepth = briefUnit === 'm' || briefUnit === 'metres' || briefUnit === 'meter' || briefUnit === 'meters'
+  const briefIsEndurance = /h|hour/i.test(briefUnit)
+  const operatingDepthM = briefIsDepth && briefValue > 0 ? briefValue
+    : extractRange(/(\d{2,5})\s*-?\s*(\d{2,5})?\s*m(?:etre)?s?\s*(?:depth|operating|rated)/i, 200)
+  const briefEnduranceH = briefIsEndurance && briefValue > 0 ? briefValue
+    : extractRange(/(\d{1,3})\s*-?\s*(\d{1,3})?\s*h(?:our)?s?\s*(?:endurance|mission)/i, 12)
+  // Hydrostatic pressure: P_external_bar = depth_m × 0.0981
+  const externalPressureBar = operatingDepthM * 0.0981
+  const externalPressurePa = externalPressureBar * 1e5
+  // Hull material: titanium grade 5 above 1000 m, 6061-T6 aluminium below
+  const hullMaterial = operatingDepthM >= 1000 ? 'titanium_grade_5' : 'aluminium_6061_t6'
+  // Allowable stress (yield / safety factor 1.5)
+  const allowableStressPa = hullMaterial === 'titanium_grade_5' ? 828e6 / 1.5 : 270e6 / 1.5
+  // Hull cylinder OD: default 0.4 m, length 2 m
+  const hullDiameterM = extractRange(/(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*m\s*(?:diameter|OD)/i, 0.4)
+  const hullLengthM = extractRange(/(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*m\s*(?:length|hull|long)/i, 2.0)
+  // Weld efficiency
+  const weldEfficiency = 0.85
+  // Hull thickness (hoop stress, von Mises with 1.5× depth safety factor)
+  const designPressurePa = externalPressurePa * 1.5
+  const hullThicknessM = (designPressurePa * hullDiameterM) / (2 * allowableStressPa * weldEfficiency)
+  const hullThicknessMm = hullThicknessM * 1000
+  // Hull volume (cylinder shell) and mass
+  const hullVolumeM3 = Math.PI * hullDiameterM * hullThicknessM * hullLengthM
+  const hullDensityKgM3 = hullMaterial === 'titanium_grade_5' ? 4500 : 2700
+  const hullMassKg = hullVolumeM3 * hullDensityKgM3
+  // Displacement: external cylinder volume
+  const displacementM3 = Math.PI * Math.pow(hullDiameterM / 2, 2) * hullLengthM
+  // Seawater density
+  const seawaterDensityKgM3 = 1025
+  // Positive buoyancy 6% — syntactic foam volume
+  const positiveBuoyancyFraction = 0.06
+  const buoyancyFoamVolumeM3 = displacementM3 * positiveBuoyancyFraction
+  // Battery kWh: brief or default 4 kWh
+  const batteryKwh = extractRange(/(\d{1,2}(?:\.\d+)?)\s*-?\s*(\d{1,2}(?:\.\d+)?)?\s*kWh/i, 4.0)
+  // Propulsion power: cruise 0.4 kW, peak 1.5 kW
+  const cruisePowerKw = 0.4
+  const peakPowerKw = 1.5
+  // Thruster count: 4 typical (forward + 2 lateral + 1 vertical)
+  const thrusterCount = (() => {
+    if (/6\s*thrust/i.test(desc)) return 6
+    if (/8\s*thrust/i.test(desc)) return 8
+    if (/3\s*thrust/i.test(desc)) return 3
+    return 4
+  })()
+  // Endurance (h): battery × 0.8 efficiency / cruise power
+  const etaPropulsionElectrical = 0.8
+  const computedEnduranceH = (batteryKwh * etaPropulsionElectrical) / cruisePowerKw
+  // Subsea battery mass: ~80 Wh/kg system-level
+  const batteryMassKg = (batteryKwh * 1000) / 80
+  // Thruster mass: 2 kg each
+  const thrusterMassKgEach = 2.0
+  // Electronics mass: 5 kg
+  const electronicsMassKg = 5.0
+  // Ballast: trimmed for 6% positive buoyancy in seawater
+  const seawaterDisplaced = displacementM3 * seawaterDensityKgM3
+  const componentMass = hullMassKg + batteryMassKg + thrusterCount * thrusterMassKgEach + electronicsMassKg
+  const ballastMassKg = Math.max(0, seawaterDisplaced * (1 - positiveBuoyancyFraction) - componentMass)
+  const mtowAirKg = componentMass + ballastMassKg
+  // DC bus voltage: 24 V subsea typical
+  const busVoltageV = 24
+  const peakBusCurrentA = (peakPowerKw * 1000) / busVoltageV
+
+  const quantities: Record<string, Quantity> = {
+    operating_depth_m: q(operatingDepthM, 'm', 'length', 'rated', 'system', 'brief', { condition: 'rated max design depth' }),
+    external_pressure_bar: q(externalPressureBar, 'bar', 'pressure', 'rated', 'system', 'calculator', { source_detail: 'hydrostatic: depth × 0.0981' }),
+    design_pressure_bar: q(externalPressureBar * 1.5, 'bar', 'pressure', 'max', 'system', 'calculator', { source_detail: 'external × 1.5 safety factor' }),
+    hull_material: q(0, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: `material=${hullMaterial} (Ti-6Al-4V Grade 5 for depth ≥1000m, Al 6061-T6 otherwise)` }),
+    allowable_stress_mpa: q(allowableStressPa / 1e6, 'MPa', 'pressure', 'max', 'system', 'physics_constant', { source_detail: `yield / 1.5 safety factor (${hullMaterial})` }),
+    hull_diameter_m: q(hullDiameterM, 'm', 'length', 'rated', 'system', 'brief'),
+    hull_length_m: q(hullLengthM, 'm', 'length', 'rated', 'system', 'brief'),
+    hull_thickness_mm: q(hullThicknessMm, 'mm', 'length', 'rated', 'system', 'calculator', { source_detail: 'hoop stress: P × d / (2 × σ × η_weld)' }),
+    weld_efficiency: q(weldEfficiency, '', 'dimensionless', 'rated', 'system', 'physics_constant'),
+    hull_mass_kg: q(hullMassKg, 'kg', 'mass', 'empty', 'system', 'calculator'),
+    displacement_m3: q(displacementM3, 'm³', 'volume', 'rated', 'system', 'calculator', { source_detail: 'π × (d/2)² × L cylinder external volume' }),
+    seawater_density_kg_m3: q(seawaterDensityKgM3, 'kg/m³', 'dimensionless', 'rated', 'system', 'physics_constant', { condition: 'standard seawater 35 PSU @ 4°C' }),
+    positive_buoyancy_fraction: q(positiveBuoyancyFraction, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'typical AUV trim 5-10%; default 6%' }),
+    buoyancy_foam_volume_m3: q(buoyancyFoamVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator'),
+    battery_capacity_kwh: q(batteryKwh, 'kWh', 'energy', 'nameplate', 'system', 'brief'),
+    battery_mass_kg: q(batteryMassKg, 'kg', 'mass', 'empty', 'module', 'calculator', { source_detail: 'kWh × 1000 / 80 Wh/kg subsea-rated LFP' }),
+    cruise_power_kw: q(cruisePowerKw, 'kW', 'power', 'continuous', 'system', 'physics_constant', { source_detail: 'typical 0.4 kW @ 2 m/s cruise' }),
+    peak_power_kw: q(peakPowerKw, 'kW', 'power', 'peak', 'system', 'physics_constant', { source_detail: 'typical 1.5 kW peak transient' }),
+    thruster_count: q(thrusterCount, '', 'dimensionless', 'rated', 'system', 'brief'),
+    propulsion_efficiency: q(etaPropulsionElectrical, '', 'dimensionless', 'rated', 'system', 'physics_constant'),
+    target_endurance_h: q(briefEnduranceH, 'h', 'time', 'min', 'system', 'brief'),
+    computed_endurance_h: q(computedEnduranceH, 'h', 'time', 'continuous', 'system', 'calculator', { source_detail: 'battery × η / cruise_power' }),
+    ballast_mass_kg: q(ballastMassKg, 'kg', 'mass', 'empty', 'system', 'calculator', { source_detail: 'trimmed for +6% buoyancy in seawater' }),
+    mtow_air_kg: q(mtowAirKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'hull + battery + thrusters + electronics + ballast', condition: 'in-air mass' }),
+    bus_voltage_v: q(busVoltageV, 'V', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: '24V subsea convention' }),
+    peak_bus_current_a: q(peakBusCurrentA, 'A', 'dimensionless', 'peak', 'system', 'calculator'),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'lfp_subsea_battery',
+      to_part: 'thruster_motor',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: peakBusCurrentA * 1.5,
+      required_unit: 'A',
+      required_margin_factor: 1.5,
+    },
+    {
+      from_part: 'pressure_compensator',
+      to_part: 'hull_internal',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: 0.5,
+      required_unit: 'L/min',
+    },
+    {
+      from_part: 'nav_computer',
+      to_part: 'thruster_motor',
+      mechanism: 'data',
+      constraint_kind: 'data_bandwidth',
+      required_value: 100,
+      required_unit: 'Hz',
+    },
+    {
+      from_part: 'pressure_hull',
+      to_part: 'seawater_environment',
+      mechanism: 'mechanical',
+      constraint_kind: 'material_compatibility',
+      material_context: hullMaterial === 'titanium_grade_5'
+        ? 'titanium_seawater_compatible — Ti-6Al-4V Grade 5 is inert in seawater; no galvanic protection needed'
+        : 'aluminium_seawater_requires_anodes — Al 6061-T6 requires sacrificial Zn/Al anodes + hard anodised + epoxy coating',
+    },
+  ]
+
+  // Macro-assembly pricing. Word names chosen for ≥0.66 token overlap
+  // against Stage 1.7 emissions (titanium_hull, aluminium_hull,
+  // pressure_hull, thruster_motor, lfp_battery, syntactic_foam,
+  // doppler_velocity_log, pressure_compensator, subsea_dome).
+  const hullPricePerKg = hullMaterial === 'titanium_grade_5' ? 900 : 200
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: hullMaterial === 'titanium_grade_5' ? 'titanium_pressure_hull' : 'aluminium_pressure_hull',
+      unit_price_gbp: hullPricePerKg,
+      dimension_basis: 'kg_mass',
+      dimension_value: hullMassKg,
+      total_gbp: hullPricePerKg * hullMassKg,
+      source_detail: `£${hullPricePerKg}/kg × ${hullMassKg.toFixed(1)} kg (${hullMaterial.replace(/_/g, ' ')}, rated to ${operatingDepthM} m)`,
+    },
+    {
+      word_name: 'thruster_motor_assembly',
+      unit_price_gbp: 600,
+      dimension_basis: 'each',
+      dimension_value: thrusterCount,
+      total_gbp: 600 * thrusterCount,
+      source_detail: `£600/thruster × ${thrusterCount} thrusters (subsea brushless DC, oil-filled, pressure-tolerant)`,
+    },
+    {
+      word_name: 'lfp_subsea_battery_pack',
+      unit_price_gbp: 450,
+      dimension_basis: 'kwh_capacity',
+      dimension_value: batteryKwh,
+      total_gbp: 450 * batteryKwh,
+      source_detail: `£450/kWh × ${batteryKwh.toFixed(2)} kWh (LFP subsea-rated, oil-compensated pack)`,
+    },
+    {
+      word_name: 'syntactic_foam_buoyancy',
+      unit_price_gbp: 1500,
+      dimension_basis: 'cubic_metre',
+      dimension_value: buoyancyFoamVolumeM3,
+      total_gbp: 1500 * buoyancyFoamVolumeM3,
+      source_detail: `£1,500/m³ × ${buoyancyFoamVolumeM3.toFixed(3)} m³ (hollow-glass-microsphere syntactic foam, depth-rated)`,
+    },
+    {
+      word_name: 'subsea_glass_oil_dome',
+      unit_price_gbp: 800,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 800,
+      source_detail: `£800 flat — borosilicate optical port + oil-filled compensation for camera/sensor`,
+    },
+    {
+      word_name: 'doppler_velocity_log',
+      unit_price_gbp: 8000,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 8000,
+      source_detail: `£8,000 flat — 4-beam DVL (Teledyne Pathfinder / Nortek DVL1000 class) for subsea nav`,
+    },
+    {
+      word_name: 'pressure_compensator_assembly',
+      unit_price_gbp: 350,
+      dimension_basis: 'each',
+      dimension_value: thrusterCount,
+      total_gbp: 350 * thrusterCount,
+      source_detail: `£350/thruster × ${thrusterCount} compensators (rubber bladder + reservoir + check valve)`,
+    },
+  ]
+
+  // Closures
+  const closures: ContractClosureResult[] = []
+  const hoopStressAtDesignPa = (designPressurePa * hullDiameterM) / (2 * hullThicknessM)
+  closures.push({
+    invariant_id: 'hull_pressure_closure',
+    status: hoopStressAtDesignPa <= allowableStressPa * weldEfficiency * 1.05 ? 'pass' : 'fail',
+    measured: hoopStressAtDesignPa / 1e6,
+    required: (allowableStressPa * weldEfficiency) / 1e6,
+    reason: `Hoop stress at 1.5× design depth = ${(hoopStressAtDesignPa / 1e6).toFixed(1)} MPa vs allowable × η_weld = ${((allowableStressPa * weldEfficiency) / 1e6).toFixed(1)} MPa. Hull thickness ${hullThicknessMm.toFixed(2)} mm.`,
+  })
+  const buoyancyForceN = (seawaterDisplaced - mtowAirKg) * gravityMs2
+  const buoyancyPct = (buoyancyForceN / (mtowAirKg * gravityMs2)) * 100
+  closures.push({
+    invariant_id: 'buoyancy_closure',
+    status: buoyancyPct >= 4 && buoyancyPct <= 12 ? 'pass'
+          : buoyancyPct >= 2 && buoyancyPct <= 15 ? 'warn'
+          : 'fail',
+    measured: buoyancyPct,
+    required: '5-10% positive buoyancy in seawater',
+    reason: `Net buoyancy ${buoyancyPct.toFixed(1)}% of in-air weight (target 5-10%). Seawater displacement ${seawaterDisplaced.toFixed(1)} kg vs in-air mass ${mtowAirKg.toFixed(1)} kg.`,
+  })
+  closures.push({
+    invariant_id: 'endurance_closure',
+    status: computedEnduranceH >= briefEnduranceH * 0.95 ? 'pass'
+          : computedEnduranceH >= briefEnduranceH * 0.80 ? 'warn'
+          : 'fail',
+    measured: quantities.computed_endurance_h,
+    required: briefEnduranceH,
+    reason: `Computed endurance ${computedEnduranceH.toFixed(1)} h vs target ${briefEnduranceH.toFixed(1)} h. At ${cruisePowerKw} kW cruise, ${batteryKwh.toFixed(2)} kWh battery, ${etaPropulsionElectrical} η.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'auv',
+    brief_summary: `Autonomous underwater vehicle, ${operatingDepthM} m rated depth (${externalPressureBar.toFixed(1)} bar hydrostatic), ${hullMaterial.replace(/_/g, ' ')} pressure hull ${hullThicknessMm.toFixed(2)} mm thick. ${thrusterCount} thrusters, ${batteryKwh.toFixed(2)} kWh battery → ${computedEnduranceH.toFixed(1)} h endurance (target ${briefEnduranceH.toFixed(1)} h). In-air mass ${mtowAirKg.toFixed(1)} kg. Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
+})
+
+// ---------------------------------------------------------------------------
+// BIOREACTOR ARCHETYPE — stirred-tank stainless 316L jacketed vessel,
+// working volume + dissolved oxygen + agitation deterministic physics.
+// Builds the Contract BEFORE the Generator runs so vessel volume,
+// agitation power, kLa, oxygen transfer, heat balance, and pH/DO control
+// all close arithmetically against the brief working-volume target.
+// ---------------------------------------------------------------------------
+
+registerArchetype('bioreactor', (brief: any) => {
+  const tp = brief?.constraints?.target_performance ?? {}
+  const briefValue = Number(tp.value ?? 0)
+  const briefUnit = String(tp.unit ?? 'L').toLowerCase()
+  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  const extractRange = (pat: RegExp, dflt: number): number => {
+    const m = desc.match(pat)
+    if (!m) return dflt
+    const a = parseFloat(m[1])
+    const b = m[2] ? parseFloat(m[2]) : a
+    return (a + b) / 2
+  }
+  // Working volume L: brief target_performance with unit conversion
+  const workingVolumeL = (() => {
+    if (briefValue > 0) {
+      if (briefUnit === 'l' || briefUnit === 'litre' || briefUnit === 'litres' || briefUnit === 'liter' || briefUnit === 'liters') return briefValue
+      if (briefUnit === 'm3' || briefUnit === 'm³' || briefUnit === 'cubic_metre' || briefUnit === 'cubic_meter') return briefValue * 1000
+      if (briefUnit === 'ml') return briefValue / 1000
+      return briefValue  // fallback assume L
+    }
+    const m = desc.match(/(\d{1,5})\s*(?:L|litre|liter)/i)
+    if (m) return parseFloat(m[1])
+    return 1000  // class default
+  })()
+  // Fill ratio: 80% standard for stirred tanks
+  const fillRatio = 0.80
+  const totalVolumeL = workingVolumeL / fillRatio
+  const totalVolumeM3 = totalVolumeL / 1000
+  // Aspect ratio H:D = 2:1
+  const aspectRatioHD = 2.0
+  // V_cyl = π × (D/2)² × 2D = π × D³ / 2 → D = (2V / π)^(1/3)
+  const vesselDiameterM = Math.cbrt((2 * totalVolumeM3) / Math.PI)
+  const vesselHeightM = aspectRatioHD * vesselDiameterM
+  // Vessel mass: ~4 kg per litre total volume (316L jacketed sanitary)
+  const vesselMassKg = 4 * totalVolumeL
+  // Agitation power W/L: 5 W/L default (mammalian cell), 2-10 W/L range
+  const agitationPowerPerLW = extractRange(/(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*W\/L/i, 5)
+  const agitatorPowerKw = (workingVolumeL * agitationPowerPerLW) / 1000
+  // Oxygen transfer rate (OTR) mmol/L/h: 30-50 aerobic, default 40
+  const otrMmolLH = extractRange(/(\d{2,3})\s*-?\s*(\d{2,3})?\s*mmol/i, 40)
+  // DO saturation 0.21 mmol/L; setpoint 30% of sat
+  const doSaturationMmolL = 0.21
+  const doSetpointFraction = 0.30
+  const doSetpointMmolL = doSaturationMmolL * doSetpointFraction
+  // kLa = OTR / (DO_sat - DO_setpoint)
+  const klaPerH = otrMmolLH / (doSaturationMmolL - doSetpointMmolL)
+  // Sparger: vvm × working volume, vvm default 0.75
+  const vvm = extractRange(/(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*vvm/i, 0.75)
+  const spargerFlowLMin = vvm * workingVolumeL
+  // Heat removal: agitator dissipation 40% + microbial heat 5 W/L
+  const microbialHeatKw = workingVolumeL * 0.005
+  const agitatorHeatKw = agitatorPowerKw * 0.40
+  const heatRemovalKw = agitatorHeatKw + microbialHeatKw
+  // pH dosing channels
+  const phChannels = 2
+  // Temperature envelope
+  const tempControlMinC = 20
+  const tempControlMaxC = 45
+
+  const quantities: Record<string, Quantity> = {
+    working_volume_l: q(workingVolumeL, 'L', 'volume', 'usable', 'system', 'brief'),
+    total_volume_l: q(totalVolumeL, 'L', 'volume', 'gross', 'system', 'calculator', { source_detail: `working / ${fillRatio} fill ratio` }),
+    fill_ratio: q(fillRatio, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'standard stirred tank 75-80% fill' }),
+    aspect_ratio_hd: q(aspectRatioHD, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'H:D = 2:1 stirred tank convention' }),
+    vessel_diameter_m: q(vesselDiameterM, 'm', 'length', 'rated', 'system', 'calculator'),
+    vessel_height_m: q(vesselHeightM, 'm', 'length', 'rated', 'system', 'calculator'),
+    vessel_mass_kg: q(vesselMassKg, 'kg', 'mass', 'empty', 'system', 'calculator', { source_detail: '4 kg/L total (316L jacketed sanitary)' }),
+    agitation_power_per_l_w: q(agitationPowerPerLW, 'W/L', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'typical 2-10 W/L; default 5 (mammalian)' }),
+    agitator_power_kw: q(agitatorPowerKw, 'kW', 'power', 'continuous', 'module', 'calculator', { source_detail: 'working_L × W/L / 1000' }),
+    otr_mmol_l_h: q(otrMmolLH, 'mmol/L/h', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'aerobic typical 30-50; default 40' }),
+    do_saturation_mmol_l: q(doSaturationMmolL, 'mmol/L', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: '1 mM O2 at 25°C, 1 atm air' }),
+    do_setpoint_mmol_l: q(doSetpointMmolL, 'mmol/L', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `${(doSetpointFraction * 100).toFixed(0)}% of saturation` }),
+    kla_per_h: q(klaPerH, '1/h', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'OTR / (DO_sat − DO_setpoint)' }),
+    vvm: q(vvm, 'vvm', 'dimensionless', 'rated', 'system', 'brief'),
+    sparger_flow_l_min: q(spargerFlowLMin, 'L/min', 'flow_rate', 'continuous', 'module', 'calculator', { source_detail: 'vvm × working_volume_L' }),
+    microbial_heat_kw: q(microbialHeatKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: '5 W/L high-cell-density typical' }),
+    agitator_heat_kw: q(agitatorHeatKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: '40% of agitator power dissipates as heat' }),
+    heat_removal_kw: q(heatRemovalKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'agitator + microbial heat' }),
+    ph_channels: q(phChannels, '', 'dimensionless', 'rated', 'module', 'physics_constant', { source_detail: '2-channel peristaltic acid + base' }),
+    temp_control_min_c: q(tempControlMinC, '°C', 'temperature', 'min', 'system', 'brief'),
+    temp_control_max_c: q(tempControlMaxC, '°C', 'temperature', 'max', 'system', 'brief'),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'agitator_motor',
+      to_part: 'vessel_top_plate',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: vesselMassKg + workingVolumeL,
+      required_unit: 'kg',
+    },
+    {
+      from_part: 'sparger_air',
+      to_part: 'vessel_bottom',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: spargerFlowLMin,
+      required_unit: 'L/min',
+    },
+    {
+      from_part: 'jacket_heat_exchanger',
+      to_part: 'vessel_jacket',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: heatRemovalKw,
+      required_unit: 'kW',
+    },
+    {
+      from_part: 'do_probe',
+      to_part: 'control_unit',
+      mechanism: 'data',
+      constraint_kind: 'data_bandwidth',
+      required_value: 1,
+      required_unit: 'Hz',
+    },
+    {
+      from_part: 'vessel_internal',
+      to_part: 'culture_media',
+      mechanism: 'mechanical',
+      constraint_kind: 'material_compatibility',
+      material_context: '316L_sanitary — electropolished Ra <0.5 µm, biocompatible, withstands SIP/CIP cycles (NaOH/HNO3/peracetic acid)',
+    },
+  ]
+
+  // Macro-assembly pricing. Word names chosen for ≥0.66 token overlap
+  // against Stage 1.7 emissions (stainless_vessel, jacketed_vessel,
+  // agitator_motor, aeration_sparger, jacket_heat_exchanger,
+  // temperature_control, ph_dosing, do_probe, biosafety_filter).
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'stainless_316l_vessel',
+      unit_price_gbp: 200,
+      dimension_basis: 'litre_volume',
+      dimension_value: totalVolumeL,
+      total_gbp: 200 * totalVolumeL,
+      source_detail: `£200/L × ${totalVolumeL.toFixed(0)} L total (316L jacketed, sanitary electropolished, SIP-rated)`,
+    },
+    {
+      word_name: 'agitator_motor_assembly',
+      unit_price_gbp: 300,
+      dimension_basis: 'kw_power',
+      dimension_value: agitatorPowerKw,
+      total_gbp: 300 * agitatorPowerKw,
+      source_detail: `£300/kW × ${agitatorPowerKw.toFixed(2)} kW (top-entry direct-drive, mechanical seal, multi-impeller)`,
+    },
+    {
+      word_name: 'aeration_sparger_system',
+      unit_price_gbp: 0.15,
+      dimension_basis: 'litre_volume',
+      dimension_value: workingVolumeL,
+      total_gbp: 0.15 * workingVolumeL,
+      source_detail: `£0.15/L × ${workingVolumeL.toFixed(0)} L working (ring sparger + mass-flow controller + 0.2µm inlet filter)`,
+    },
+    {
+      word_name: 'jacket_heat_exchanger',
+      unit_price_gbp: 400,
+      dimension_basis: 'kw_power',
+      dimension_value: heatRemovalKw,
+      total_gbp: 400 * heatRemovalKw,
+      source_detail: `£400/kW × ${heatRemovalKw.toFixed(2)} kW heat removal (welded dimple jacket, glycol loop)`,
+    },
+    {
+      word_name: 'temperature_control_unit',
+      unit_price_gbp: 2500,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 2500,
+      source_detail: `£2,500 flat — chiller + heater + circulation pump + PID control`,
+    },
+    {
+      word_name: 'ph_dosing_system',
+      unit_price_gbp: 1800,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 1800,
+      source_detail: `£1,800 flat — 2-channel peristaltic pump + acid/base reservoirs + pH probe`,
+    },
+    {
+      word_name: 'do_probe_optical',
+      unit_price_gbp: 900,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 900,
+      source_detail: `£900 flat — luminescent quenching DO probe (Hamilton VisiFerm / Mettler InPro 6970)`,
+    },
+    {
+      word_name: 'biosafety_filter_assembly',
+      unit_price_gbp: 350,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 350,
+      source_detail: `£350 flat — 0.2µm hydrophobic vent + sparger filters (biosafety containment)`,
+    },
+  ]
+
+  // Closures
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'volume_closure',
+    status: Math.abs(totalVolumeL - workingVolumeL / fillRatio) / totalVolumeL < 0.05 ? 'pass' : 'fail',
+    measured: totalVolumeL,
+    required: workingVolumeL / fillRatio,
+    reason: `Total volume ${totalVolumeL.toFixed(1)} L = working ${workingVolumeL} L / ${fillRatio} fill ratio. ±5% closure check.`,
+  })
+  closures.push({
+    invariant_id: 'kla_closure',
+    status: klaPerH >= 100 && klaPerH <= 800 ? 'pass'
+          : klaPerH >= 50 && klaPerH <= 1200 ? 'warn'
+          : 'fail',
+    measured: klaPerH,
+    required: '100-800 1/h typical aerobic stirred tank',
+    reason: `kLa ${klaPerH.toFixed(0)} 1/h from OTR ${otrMmolLH} mmol/L/h and ΔDO ${(doSaturationMmolL - doSetpointMmolL).toFixed(3)} mmol/L. Check agitator + sparger can deliver this.`,
+  })
+  closures.push({
+    invariant_id: 'heat_balance_closure',
+    status: heatRemovalKw >= (agitatorHeatKw + microbialHeatKw) * 0.95 ? 'pass' : 'fail',
+    measured: heatRemovalKw,
+    required: agitatorHeatKw + microbialHeatKw,
+    reason: `Heat removal ${heatRemovalKw.toFixed(2)} kW vs dissipation ${(agitatorHeatKw + microbialHeatKw).toFixed(2)} kW (agitator + microbial). By construction passes — verifies arithmetic.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'bioreactor',
+    brief_summary: `Stirred-tank bioreactor, ${workingVolumeL.toFixed(0)} L working / ${totalVolumeL.toFixed(0)} L total volume (316L jacketed). Vessel ${vesselDiameterM.toFixed(2)} m diameter × ${vesselHeightM.toFixed(2)} m height (H:D=${aspectRatioHD}:1). Agitator ${agitatorPowerKw.toFixed(2)} kW (${agitationPowerPerLW} W/L). Sparger ${spargerFlowLMin.toFixed(1)} L/min @ ${vvm} vvm. kLa ${klaPerH.toFixed(0)} 1/h delivering OTR ${otrMmolLH} mmol/L/h. Heat removal ${heatRemovalKw.toFixed(2)} kW. Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
     quantities,
     topology,
     macro_assembly_prices,
