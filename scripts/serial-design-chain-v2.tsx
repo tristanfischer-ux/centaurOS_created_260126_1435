@@ -3014,6 +3014,32 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     // Renderer reads state.cost_reality_status + state.cost_reality_rejection.
     const tCostReality = Date.now()
     try {
+      // 2026-05-21 (Tristan VF iter-2b deep dive): G2 must MIRROR the
+      // renderer's cost aggregation, not use qty=1. Previously the gate
+      // saw £35,911 (sum of unit prices) and reported 'pass', but the
+      // renderer with actual qty from modifier_characters saw £112,008
+      // (3.1× higher because trolleys × 8, sensors × 4, drivers × 12,
+      // etc.) → cover flagged "81% ABOVE typical". G2's whole purpose
+      // is to catch THAT — a gate that uses different aggregation than
+      // the cover is worse than no gate. Per mempalace drawer
+      // forgeos_decisions_63765b2b3c36398c (gates must mirror visible
+      // verdict). Build word→qty map from modifier_characters, same
+      // logic as render-minimal-pdf.tsx:643.
+      const qtyByWordId = new Map<string, number>()
+      for (const m of (liveState.moduleDecomposition?.modules ?? [])) {
+        for (const sm of (m.sub_modules ?? [])) {
+          for (const w of (sm.words ?? [])) {
+            let qty = 1
+            const qmod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'quantity')
+            if (qmod) {
+              const numStr = String(qmod.value).replace(/[×x,\s]/g, '')
+              const n = parseInt(numStr, 10)
+              if (Number.isFinite(n) && n > 0) qty = n
+            }
+            if (w.id) qtyByWordId.set(String(w.id), qty)
+          }
+        }
+      }
       let bomTotalGbp = 0
       let bomPricedLines = 0
       let bomUnpricedLines = 0
@@ -3022,8 +3048,14 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
           ? Number(v.distributor_price_gbp)
           : (Number(v.price_estimate_gbp) > 0 ? Number(v.price_estimate_gbp) : 0)
         if (unit > 0) {
-          // Try to recover quantity from the matching word; default 1.
-          const qty = 1  // Conservative; engine_b_* already attributes per-unit
+          // Skip lines the cost-repair UP-cap excluded from the subtotal
+          // (manual_sourcing_required) so the gate doesn't double-count
+          // hallucination placeholders.
+          if (v.cost_repair_excluded_from_subtotal === true) {
+            bomPricedLines += 1
+            continue
+          }
+          const qty = qtyByWordId.get(String(v.word_id ?? '')) ?? 1
           bomTotalGbp += unit * qty
           bomPricedLines += 1
         } else {
