@@ -430,12 +430,63 @@ export function buildPerformanceCard(state: any): PerformanceCard {
   const sections: PerformanceCard['sections'] = []
   const warnings: PerformanceCard['warnings'] = []
 
+  // Build #7 (Tristan 2026-05-21 6/6 council unanimous): Performance Card
+  // reads from state.engineeringContract.quantities FIRST. The Contract
+  // holds deterministic physics-derived numbers (capacity_kwh, mass_kg,
+  // cruise_power_kw, canopy_area_m2, etc.). Per the council, downstream
+  // stages should READ from the canonical Contract not regenerate from
+  // LLM-emitted derived_parameters. This puts Performance Card into the
+  // "frozen Contract read" pattern. Universal across product classes.
+  const contractQuantities: Record<string, any> = (state?.engineeringContract?.quantities ?? {}) as Record<string, any>
+  // Map Performance Card metric ids to Contract quantity keys. When the
+  // metric.id matches a Contract quantity key, use the Contract value
+  // (over the LLM-emitted derived_parameters). Universal — works for any
+  // class whose archetype emits quantities matching the metric schema ids.
+  const CONTRACT_KEY_ALIASES: Record<string, string[]> = {
+    // BESS
+    nameplate_kwh: ['nameplate_capacity_kwh', 'usable_capacity_kwh'],
+    usable_kwh: ['usable_capacity_kwh', 'battery_usable_kwh'],
+    cell_count: ['cell_count'],
+    cell_capacity_ah: ['cell_capacity_ah'],
+    cell_voltage_v: ['cell_voltage_v'],
+    dod_fraction: ['dod_fraction'],
+    rated_power_kw: ['continuous_power_kw'],
+    peak_power_kw: ['peak_power_kw'],
+    dc_bus_voltage_v: ['dc_bus_voltage_v'],
+    cooling_capacity_kw: ['thermal_rejection_min_kw'],
+    // HAPS
+    wingspan_m: ['wingspan_m'],
+    wing_area_m2: ['wing_area_m2'],
+    cruise_power_kw: ['cruise_power_kw'],
+    battery_capacity_kwh: ['battery_capacity_kwh'],
+    solar_peak_kw: ['solar_peak_kw'],
+    endurance_days: ['endurance_days'],
+    // VF
+    canopy_area_m2: ['canopy_area_m2'],
+    led_installed_power_kw: ['led_installed_power_kw'],
+    hvac_cooling_kw: ['hvac_cooling_kw'],
+    ppfd_target_umol_m2_s: ['ppfd_target_umol_m2_s'],
+    annual_yield_tonnes: ['annual_yield_tonnes'],
+  }
+
   for (const section of schema.sections) {
     const rows: ResolvedMetric[] = []
     for (const m of section.metrics) {
       let raw: any = null
       let source: string | null = null
-      for (const path of m.sources) {
+      // Try Engineering Contract FIRST per Build #7 council verdict.
+      const contractKeys = CONTRACT_KEY_ALIASES[m.id] ?? []
+      for (const ckey of contractKeys) {
+        const ck = contractQuantities[ckey]
+        if (ck && typeof ck === 'object' && typeof ck.value === 'number') {
+          raw = ck.value
+          source = `engineeringContract.quantities.${ckey} (${ck.source ?? 'calculator'})`
+          break
+        }
+      }
+      if (raw !== null) {
+        // Got it from Contract; skip the legacy LLM-derived lookups.
+      } else for (const path of m.sources) {
         const v = getByPath(state, path)
         if (v !== null && v !== undefined) {
           raw = v
