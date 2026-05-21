@@ -2817,30 +2817,30 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     console.error('[chain] CHAIN_SKIP_SUPPLIER_VALIDATION=1 — skipping supplier-contact-validation step')
   }
 
-  // ── Product Illustration Generation (Tristan 2026-05-21, mempalace
-  // forgeos/decisions illustration-architecture-VALIDATED):
+  // ── Product Illustration Generation (Tristan 2026-05-21 reset, council
+  // a66e6ee7cdd05270f verdict, mempalace illustration-architecture-
+  // VALIDATED 2026-05-16 BESS bake-off):
   //
-  // Validated architecture per the 2026-05-16 BESS bake-off + Tristan's
-  // 2026-05-21 reset: the hero MUST be an AI-generated image (gpt-image-1
-  // text-to-image) — NOT the raw Blender render. The raw Blender output
-  // is too schematic / faint at the cover-page size; reader needs a
-  // polished engineering illustration. Blender provides per-module
-  // schematics where the small inset size makes schematic quality
-  // acceptable (in fact desirable — module pages benefit from clear
-  // outlines + saturated focal module + greyscaled siblings).
+  // Validated architecture (8.2/10 vs 5.6/10 text-only gpt-image-1):
+  //   1. Hero: Blender wireframe (structural reference) → Gemini 3.1
+  //      Flash Image preview i2i → photorealistic industrial photograph.
+  //      Blender provides correct envelope geometry + module positions;
+  //      Gemini paints over with photoreal finish anchored by the
+  //      reference. Single output: <out-dir>/cover.png. Smoke-test:
+  //      13.7 s, ~$0.07, photorealistic BESS interior with battery
+  //      racks + liquid cooling + control panel + HVAC.
+  //   2. Modules: for each module, Gemini i2i with TWO references —
+  //      the hero PNG + a programmatic palette card. Both references
+  //      lock visual continuity (same lighting / finish / palette as
+  //      the hero), so module zooms read as close-ups of the same
+  //      product. Outputs: <out-dir>/module-<id>.png per module.
   //
-  // Order:
-  //   1. gpt-image-1 hero (scripts/generate-hero-images.tsx) — PRIMARY
-  //      cover image; ~$0.04, ~38 s. Writes state.brief_hero_image_path.
-  //   2. Blender module renders (scripts/render-product-illustrations.tsx)
-  //      — fills state.module_image_paths AND would overwrite the hero
-  //      path. We CLEAR module_image_paths first then re-run Blender,
-  //      and the Blender wrapper is configured to NOT overwrite an
-  //      already-set hero (or we overwrite back to gpt-image-1 after).
+  // OpenRouter proxies google/gemini-3.1-flash-image-preview with
+  // image-input + image-output. No new API key required.
   //
-  // Both fail-soft. Skip via CHAIN_SKIP_IMAGE_GEN=1.
+  // Both steps fail-soft. Skip entirely via CHAIN_SKIP_IMAGE_GEN=1.
   if (process.env.CHAIN_SKIP_IMAGE_GEN !== '1') {
-    // STEP 1: gpt-image-1 PRIMARY hero
+    // STEP 1: hero (Blender ref → Gemini i2i)
     const tHero = Date.now()
     let heroSucceeded = false
     try {
@@ -2852,45 +2852,28 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
         const post = JSON.parse(require('fs').readFileSync(statePath, 'utf-8'))
         heroSucceeded = typeof post?.brief_hero_image_path === 'string' && post.brief_hero_image_path.length > 0
       } catch { heroSucceeded = false }
-      logAction({ step: 'hero_image_gpt_image_1', latency_ms: Date.now() - tHero, ok: heroSucceeded })
+      logAction({ step: 'hero_image_gemini_i2i', latency_ms: Date.now() - tHero, ok: heroSucceeded })
     } catch (err) {
-      console.error(`[chain] gpt-image-1 hero failed: ${(err as Error).message}; will fall back to Blender`)
-      logAction({ step: 'hero_image_gpt_image_1', latency_ms: Date.now() - tHero, ok: false, error: String(err).slice(0, 200) })
+      console.error(`[chain] Gemini i2i hero failed: ${(err as Error).message}; continuing without hero`)
+      logAction({ step: 'hero_image_gemini_i2i', latency_ms: Date.now() - tHero, ok: false, error: String(err).slice(0, 200) })
     }
-    // Capture gpt-image-1 hero path so the Blender step can't clobber it
-    let preservedHeroPath: string | null = null
+
+    // STEP 2: per-module Gemini i2i (only if hero succeeded — module
+    // calls need hero as reference for visual continuity)
     if (heroSucceeded) {
+      const tModules = Date.now()
       try {
-        const post = JSON.parse(require('fs').readFileSync(statePath, 'utf-8'))
-        preservedHeroPath = typeof post?.brief_hero_image_path === 'string' ? post.brief_hero_image_path : null
-      } catch {}
-    }
-
-    // STEP 2: Blender module images (always runs — provides module_image_paths)
-    const tBlender = Date.now()
-    try {
-      execFileSync('npx', ['tsx', resolve(__dirname, 'render-product-illustrations.tsx'), statePath, '--write'], {
-        stdio: 'inherit',
-        cwd: resolve(__dirname, '..'),
-      })
-      logAction({ step: 'blender_module_illustrations', latency_ms: Date.now() - tBlender, ok: true })
-    } catch (err) {
-      console.error(`[chain] Blender illustrations failed: ${(err as Error).message}; continuing without per-module images`)
-      logAction({ step: 'blender_module_illustrations', latency_ms: Date.now() - tBlender, ok: false, error: String(err).slice(0, 200) })
-    }
-
-    // Restore the gpt-image-1 hero path if Blender overwrote it
-    if (preservedHeroPath) {
-      try {
-        const post = JSON.parse(require('fs').readFileSync(statePath, 'utf-8'))
-        if (post.brief_hero_image_path !== preservedHeroPath) {
-          post.brief_hero_image_path = preservedHeroPath
-          require('fs').writeFileSync(statePath, JSON.stringify(post, null, 2))
-          console.error('[chain] restored gpt-image-1 hero path after Blender step')
-        }
+        execFileSync('npx', ['tsx', resolve(__dirname, 'generate-module-images.tsx'), statePath, '--write'], {
+          stdio: 'inherit',
+          cwd: resolve(__dirname, '..'),
+        })
+        logAction({ step: 'module_images_gemini_i2i', latency_ms: Date.now() - tModules, ok: true })
       } catch (err) {
-        console.error(`[chain] could not restore gpt-image-1 hero path: ${(err as Error).message}`)
+        console.error(`[chain] Gemini module i2i failed: ${(err as Error).message}; continuing without per-module images`)
+        logAction({ step: 'module_images_gemini_i2i', latency_ms: Date.now() - tModules, ok: false, error: String(err).slice(0, 200) })
       }
+    } else {
+      console.error('[chain] hero gen failed; skipping module i2i (modules need hero as reference)')
     }
   } else {
     console.error('[chain] CHAIN_SKIP_IMAGE_GEN=1 — skipping illustration generation')

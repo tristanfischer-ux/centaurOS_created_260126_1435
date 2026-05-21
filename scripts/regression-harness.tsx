@@ -283,6 +283,29 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     () => `none of the fresh-chain markers present — state predates Sprints 1B/3A/0v2: ${JSON.stringify(freshMarkers)}`,
   ))
 
+  // I9c. Hero image is the Gemini i2i output, NOT the Blender wireframe
+  // (2026-05-21 regression added after Tristan caught hero overwrite bug
+  // where Blender was clobbering the gpt-image-1 cover.png — and then
+  // after the council switch to Gemini i2i which produces photorealistic
+  // output via Blender-as-reference, NOT Blender as the cover itself).
+  // Invariant: if a hero exists, its file should be >= 200 KB (typical
+  // Gemini i2i output is 500-1000 KB; raw Blender renders are also
+  // ~1000 KB so size alone doesn't disambiguate — also check that the
+  // blender_cover_image_path is a DIFFERENT file from brief_hero_image
+  // _path so we know the two writers stopped colliding).
+  if (state?.brief_hero_image_path) {
+    const heroPath = String(state.brief_hero_image_path)
+    const blenderPath = String(state?.blender_cover_image_path ?? '')
+    const samePath = blenderPath && blenderPath === heroPath
+    assertions.push(assertEq(
+      'I9c.hero_and_blender_separate',
+      'brief_hero_image_path and blender_cover_image_path point to DIFFERENT files (no filename collision)',
+      samePath,
+      (collision) => !collision,
+      () => `brief_hero_image_path === blender_cover_image_path === ${heroPath} — Blender output is overwriting the Gemini hero. Check render-product-illustrations.tsx / generate-hero-images.tsx output paths.`,
+    ))
+  }
+
   // VF-specific additional invariants
   if (productClass === 'vertical_farm' || productClass === 'verticalfarm') {
     const eo = modules.find((m: any) => m.module === 'energy_conversion_transduction')
