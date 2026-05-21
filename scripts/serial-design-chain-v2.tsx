@@ -2817,50 +2817,79 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     console.error('[chain] CHAIN_SKIP_SUPPLIER_VALIDATION=1 — skipping supplier-contact-validation step')
   }
 
-  // ── Product Illustration Generation (Tristan 2026-05-20): validated
-  // Blender pipeline replaces both the gpt-image-1 cover + per-module
-  // gpt-image-1 calls. Single render-product-blender.py scene built from
-  // envelope + module decomposition; render-product-illustrations.tsx
-  // wrapper orbits the camera (turntable, AZIMUTH-only variation per
-  // module — same radius / elevation / lens) and saves cover + per-module
-  // PNGs. Persists state.brief_hero_image_path + state.module_image_paths.
-  // Universal — class-agnostic. ~1.25 s per render, 12 renders in ~15 s
-  // for an 11-module brief. Fail-soft: if Blender is absent, falls through
-  // to the gpt-image-1 cover so we still have a hero. Skip entirely via
-  // CHAIN_SKIP_IMAGE_GEN=1.
+  // ── Product Illustration Generation (Tristan 2026-05-21, mempalace
+  // forgeos/decisions illustration-architecture-VALIDATED):
+  //
+  // Validated architecture per the 2026-05-16 BESS bake-off + Tristan's
+  // 2026-05-21 reset: the hero MUST be an AI-generated image (gpt-image-1
+  // text-to-image) — NOT the raw Blender render. The raw Blender output
+  // is too schematic / faint at the cover-page size; reader needs a
+  // polished engineering illustration. Blender provides per-module
+  // schematics where the small inset size makes schematic quality
+  // acceptable (in fact desirable — module pages benefit from clear
+  // outlines + saturated focal module + greyscaled siblings).
+  //
+  // Order:
+  //   1. gpt-image-1 hero (scripts/generate-hero-images.tsx) — PRIMARY
+  //      cover image; ~$0.04, ~38 s. Writes state.brief_hero_image_path.
+  //   2. Blender module renders (scripts/render-product-illustrations.tsx)
+  //      — fills state.module_image_paths AND would overwrite the hero
+  //      path. We CLEAR module_image_paths first then re-run Blender,
+  //      and the Blender wrapper is configured to NOT overwrite an
+  //      already-set hero (or we overwrite back to gpt-image-1 after).
+  //
+  // Both fail-soft. Skip via CHAIN_SKIP_IMAGE_GEN=1.
   if (process.env.CHAIN_SKIP_IMAGE_GEN !== '1') {
-    const tImg = Date.now()
-    let blenderSucceeded = false
+    // STEP 1: gpt-image-1 PRIMARY hero
+    const tHero = Date.now()
+    let heroSucceeded = false
+    try {
+      execFileSync('npx', ['tsx', resolve(__dirname, 'generate-hero-images.tsx'), statePath, '--write'], {
+        stdio: 'inherit',
+        cwd: resolve(__dirname, '..'),
+      })
+      try {
+        const post = JSON.parse(require('fs').readFileSync(statePath, 'utf-8'))
+        heroSucceeded = typeof post?.brief_hero_image_path === 'string' && post.brief_hero_image_path.length > 0
+      } catch { heroSucceeded = false }
+      logAction({ step: 'hero_image_gpt_image_1', latency_ms: Date.now() - tHero, ok: heroSucceeded })
+    } catch (err) {
+      console.error(`[chain] gpt-image-1 hero failed: ${(err as Error).message}; will fall back to Blender`)
+      logAction({ step: 'hero_image_gpt_image_1', latency_ms: Date.now() - tHero, ok: false, error: String(err).slice(0, 200) })
+    }
+    // Capture gpt-image-1 hero path so the Blender step can't clobber it
+    let preservedHeroPath: string | null = null
+    if (heroSucceeded) {
+      try {
+        const post = JSON.parse(require('fs').readFileSync(statePath, 'utf-8'))
+        preservedHeroPath = typeof post?.brief_hero_image_path === 'string' ? post.brief_hero_image_path : null
+      } catch {}
+    }
+
+    // STEP 2: Blender module images (always runs — provides module_image_paths)
+    const tBlender = Date.now()
     try {
       execFileSync('npx', ['tsx', resolve(__dirname, 'render-product-illustrations.tsx'), statePath, '--write'], {
         stdio: 'inherit',
         cwd: resolve(__dirname, '..'),
       })
-      // Did the wrapper actually persist a hero? It exits 0 even when
-      // Blender is absent (fail-soft), so confirm by re-reading state.
+      logAction({ step: 'blender_module_illustrations', latency_ms: Date.now() - tBlender, ok: true })
+    } catch (err) {
+      console.error(`[chain] Blender illustrations failed: ${(err as Error).message}; continuing without per-module images`)
+      logAction({ step: 'blender_module_illustrations', latency_ms: Date.now() - tBlender, ok: false, error: String(err).slice(0, 200) })
+    }
+
+    // Restore the gpt-image-1 hero path if Blender overwrote it
+    if (preservedHeroPath) {
       try {
         const post = JSON.parse(require('fs').readFileSync(statePath, 'utf-8'))
-        blenderSucceeded = typeof post?.brief_hero_image_path === 'string' && post.brief_hero_image_path.length > 0
-      } catch { blenderSucceeded = false }
-      logAction({ step: 'blender_illustrations', latency_ms: Date.now() - tImg, ok: blenderSucceeded })
-    } catch (err) {
-      console.error(`[chain] blender illustrations failed: ${(err as Error).message}; falling back to gpt-image-1`)
-      logAction({ step: 'blender_illustrations', latency_ms: Date.now() - tImg, ok: false, error: String(err).slice(0, 200) })
-    }
-    if (!blenderSucceeded) {
-      // Blender missing or failed — fall back to gpt-image-1 cover so
-      // the PDF at least has a brief-aware hero. No per-module images;
-      // renderer drops back to the EnvelopeOutline placeholder per module.
-      const tFallback = Date.now()
-      try {
-        execFileSync('npx', ['tsx', resolve(__dirname, 'generate-hero-images.tsx'), statePath, '--write'], {
-          stdio: 'inherit',
-          cwd: resolve(__dirname, '..'),
-        })
-        logAction({ step: 'hero_image_fallback_gpt_image_1', latency_ms: Date.now() - tFallback, ok: true })
+        if (post.brief_hero_image_path !== preservedHeroPath) {
+          post.brief_hero_image_path = preservedHeroPath
+          require('fs').writeFileSync(statePath, JSON.stringify(post, null, 2))
+          console.error('[chain] restored gpt-image-1 hero path after Blender step')
+        }
       } catch (err) {
-        console.error(`[chain] hero-image-generation fallback failed: ${(err as Error).message}; continuing without`)
-        logAction({ step: 'hero_image_fallback_gpt_image_1', latency_ms: Date.now() - tFallback, ok: false, error: String(err).slice(0, 200) })
+        console.error(`[chain] could not restore gpt-image-1 hero path: ${(err as Error).message}`)
       }
     }
   } else {

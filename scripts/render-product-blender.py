@@ -152,8 +152,10 @@ def palette_for(module_id: str) -> tuple[float, float, float]:
 GREY = (0.62, 0.62, 0.62)  # greyscale colour for non-focal modules
 SHELL_TINT = (0.78, 0.82, 0.88)  # envelope shell tint (visible enough
 # to read as the container outline without obscuring the boxes inside)
-SHELL_ALPHA = 0.22  # transparent enough to see modules inside,
+SHELL_ALPHA = 0.40  # transparent enough to see modules inside,
 # solid enough that the envelope reads unambiguously as "the box"
+# (2026-05-21 Tristan feedback: 0.22 was too faint at the small inset
+# sizes used for per-module images; 0.40 keeps the box legible)
 GROUND_TINT = (0.96, 0.96, 0.97)
 
 

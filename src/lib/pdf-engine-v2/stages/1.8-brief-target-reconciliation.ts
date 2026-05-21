@@ -84,6 +84,16 @@ interface TargetSpec {
   brief_key: string
   /** Default unit string (used in note text when brief doesn't provide one). */
   unit: string
+  /**
+   * Unit family the spec applies to. When set, the gate ONLY runs the
+   * comparison if the brief's declared unit belongs to this family. This
+   * is what stops e.g. HAPS endurance ("90 days") being compared against
+   * an engine's rated_power_kw ("0.1 kW") — third hit of the unit-family
+   * bug pattern (BESS Physics Repair + briefConstraintPropagationGate
+   * were the prior two). Omit for class-agnostic specs whose brief_key
+   * uniquely encodes the family (max_mass_kg, unit_cost_ceiling_gbp).
+   */
+  brief_unit_family?: 'power' | 'energy' | 'mass' | 'time' | 'photon_flux_density' | 'area' | 'currency' | 'length'
   /** Candidate field names in design.modules[].derived_parameters (any match counts). */
   design_keys: string[]
   /** Whether to apply unit conversion. Default: identity. */
@@ -94,34 +104,100 @@ interface TargetSpec {
 // Note: each entry MUST have unambiguous units. The chain's brief parser
 // usually emits `{value: number, unit: string}` shape under
 // parsedBrief.constraints.target_performance / max_mass_kg / etc.
+//
+// 2026-05-21 (HAPS unit-family forensic): target_performance is polymorphic
+// across product classes — heat pump = kW thermal, BESS = kWh energy,
+// HAPS = days endurance, VF = μmol/m²/s PPFD, drone = minutes flight time.
+// The pre-existing single-row spec hardcoded `unit: 'kW'` and false-matched
+// HAPS endurance "90 days" against rated_power_kw "0.1 kW" → ratio 0.001
+// → HALT, exiting the chain with exit code 3 before any PDF could render.
+// Per-family rows + brief_unit_family gating fixes this; new classes add
+// a row without touching the comparison loop.
 const TARGET_RECONCILIATIONS: TargetSpec[] = [
-  // Thermal capacity (heat pump, BESS thermal, chillers, bioreactor)
+  // Thermal/electrical power (heat pump, chiller, BESS PCS, bioreactor)
   {
     brief_key: 'target_performance',
     unit: 'kW',
+    brief_unit_family: 'power',
     design_keys: ['rated_thermal_kw', 'thermal_capacity_kw', 'heat_output_kw', 'rated_power_kw', 'capacity_kw'],
   },
-  // Capacity in kWh (BESS, EV battery, HAPS)
+  // Energy capacity (BESS, EV battery, HAPS battery pack)
+  {
+    brief_key: 'target_performance',
+    unit: 'kWh',
+    brief_unit_family: 'energy',
+    design_keys: ['capacity_kwh', 'usable_capacity_kwh', 'total_capacity_kwh', 'nameplate_capacity_kwh', 'capacity_kwh_total', 'capacity_kwh_gross'],
+  },
+  // Endurance / mission duration (HAPS, long-endurance UAV, autonomous underwater vehicle)
+  {
+    brief_key: 'target_performance',
+    unit: 'days',
+    brief_unit_family: 'time',
+    design_keys: ['endurance_days', 'mission_duration_days', 'flight_endurance_days', 'station_keeping_days'],
+  },
+  // Photon-flux density (vertical farm, greenhouse, controlled-environment agriculture)
+  {
+    brief_key: 'target_performance',
+    unit: 'umol/m2/s',
+    brief_unit_family: 'photon_flux_density',
+    design_keys: ['ppfd_umol_m2_s', 'target_ppfd_umol_m2_s', 'photon_flux_umol_per_m2_s'],
+  },
+  // Growing area (vertical farm canopy area)
+  {
+    brief_key: 'target_performance',
+    unit: 'm2',
+    brief_unit_family: 'area',
+    design_keys: ['canopy_area_m2', 'growing_area_m2', 'target_canopy_area_m2'],
+  },
+  // Yield / throughput (vertical farm tonnes/year, bioreactor litres/day)
+  // Skipped for now — yield is class-specific and rarely lands in derived_parameters
+  // under a stable key. Revisit when bioreactor/VF physics ledgers stabilise.
+  //
+  // Capacity in kWh (legacy brief shape — explicit field, not via target_performance)
   {
     brief_key: 'capacity_kwh',
     unit: 'kWh',
+    brief_unit_family: 'energy',
     design_keys: ['capacity_kwh_total', 'capacity_kwh_gross', 'capacity_kwh_nameplate', 'nameplate_capacity_kwh'],
   },
   // Mass budget — universal
   {
     brief_key: 'max_mass_kg',
     unit: 'kg',
+    brief_unit_family: 'mass',
     design_keys: ['max_mass_kg', 'gross_mass_kg', 'mass_limit_kg', 'mass_kg', 'system_mass_kg'],
   },
   // Unit cost — universal
   {
     brief_key: 'unit_cost_ceiling_gbp',
     unit: 'GBP',
+    brief_unit_family: 'currency',
     design_keys: ['unit_cost_ceiling_gbp', 'target_unit_cost_gbp', 'cost_ceiling_gbp', 'oem_cost_target_gbp'],
   },
   // Production volume — informational, no design counterpart but worth logging
   // Skipped from comparison since design doesn't carry production volume.
 ]
+
+/**
+ * Map a brief's declared unit string to a unit family. Used to gate
+ * target_performance comparisons so e.g. HAPS endurance "days" doesn't
+ * false-match against an engine kW spec. Returns null for unknown units —
+ * caller should fall back to legacy non-family-aware behaviour (so legacy
+ * briefs that omit the unit field still get compared).
+ */
+function classifyBriefUnitFamily(rawUnit: string | null | undefined): TargetSpec['brief_unit_family'] | null {
+  if (!rawUnit) return null
+  const u = String(rawUnit).toLowerCase().trim()
+  if (['wh', 'kwh', 'mwh', 'gwh'].includes(u)) return 'energy'
+  if (['w', 'kw', 'mw', 'gw'].includes(u)) return 'power'
+  if (['g', 'kg', 't', 'tonne', 'tonnes'].includes(u)) return 'mass'
+  if (['s', 'sec', 'second', 'seconds', 'min', 'minute', 'minutes', 'h', 'hr', 'hour', 'hours', 'day', 'days', 'wk', 'week', 'weeks', 'month', 'months', 'yr', 'year', 'years'].includes(u)) return 'time'
+  if (['umol/m2/s', 'μmol/m²/s', 'umol/m^2/s'].includes(u) || u.includes('ppfd')) return 'photon_flux_density'
+  if (['cm2', 'm2', 'ha', 'sqm', 'sqft'].includes(u) || u.includes('m²')) return 'area'
+  if (['gbp', 'eur', 'usd', '£', '$', '€'].includes(u)) return 'currency'
+  if (['mm', 'cm', 'm', 'km'].includes(u)) return 'length'
+  return null
+}
 
 function readBriefValue(parsedBrief: any, key: string): { value: number; unit: string | null } | null {
   if (!parsedBrief || typeof parsedBrief !== 'object') return null
@@ -198,6 +274,20 @@ export function runBriefTargetReconciliation(
     if (!briefVal) {
       // Brief didn't specify this target — not a comparison opportunity.
       continue
+    }
+    // Unit-family gate (2026-05-21 HAPS forensic): if the spec declares a
+    // brief_unit_family and the brief's declared unit belongs to a
+    // different family, skip this spec — it's a polymorphic brief_key
+    // (e.g. target_performance) and this spec row doesn't apply to this
+    // brief's class. Without this check, a "90 days" endurance brief was
+    // false-matched against a kW power spec and the chain halted.
+    if (spec.brief_unit_family && briefVal.unit) {
+      const briefFamily = classifyBriefUnitFamily(briefVal.unit)
+      if (briefFamily && briefFamily !== spec.brief_unit_family) {
+        // Brief unit is in a known family that doesn't match this spec.
+        // Silently skip — another spec row will pick it up.
+        continue
+      }
     }
     const designVal = findDesignValue(modules, spec.design_keys)
     if (!designVal) {

@@ -739,7 +739,18 @@ function computeBomTotals(state: any): BomTotals | null {
             ? v.engine_c_priced_count : undefined,
         }
         sub.parts.push(row)
-        sub.subtotal_gbp = roundToPence(sub.subtotal_gbp + line_total_gbp)
+        // 2026-05-21 (Tristan VF cost-overrun deep dive): the renderer
+        // was reading cost_repair_excluded_from_subtotal onto the row but
+        // not actually skipping it from the aggregate. Result: lines the
+        // UP-cap rejected as hallucination (£1,500 placeholder pinned by
+        // class floor with no corpus evidence) still inflated module +
+        // grand totals. Skip-from-aggregate now honours the flag while
+        // keeping the row in the BoM table for visibility — the row
+        // renders with MANUAL SOURCING tagged + £0 contribution.
+        // Universal across product classes.
+        if (row.cost_repair_excluded_from_subtotal !== true) {
+          sub.subtotal_gbp = roundToPence(sub.subtotal_gbp + line_total_gbp)
+        }
         totalRows += 1
         if (tier === 'actual') actualPriced += 1
         else if (tier === 'estimate') estimatePriced += 1
@@ -884,7 +895,12 @@ function applyBatchEconomics(state: any, bomTotals: BomTotals | null, slugHint?:
           price_estimate_gbp: p.price_estimate_gbp !== null ? scaledUnit : null,
         }
         newSub.parts.push(newRow)
-        newSub.subtotal_gbp = roundToPence(newSub.subtotal_gbp + scaledLine)
+        // Mirror the cost-overrun forensic skip on the scaled-aggregate
+        // path too — lines flagged manual_sourcing_required do not
+        // contribute to the scaled subtotal.
+        if (newRow.cost_repair_excluded_from_subtotal !== true) {
+          newSub.subtotal_gbp = roundToPence(newSub.subtotal_gbp + scaledLine)
+        }
       }
       if (newSub.parts.length > 0) {
         newMod.subs.push(newSub)
@@ -1808,7 +1824,7 @@ function CoverPage({
             ? { marginTop: 14, flexDirection: 'row', alignItems: 'flex-start' }
             : { marginTop: 14 }}>
           <View style={(heroImagePath || briefEnvelope)
-            ? { flex: 55, marginRight: 12, padding: 11, backgroundColor: '#0c4a6e', borderRadius: 5 }
+            ? { flex: 50, marginRight: 12, padding: 11, backgroundColor: '#0c4a6e', borderRadius: 5 }
             : { padding: 11, backgroundColor: '#0c4a6e', borderRadius: 5 }}>
             <Text style={{ fontSize: 8, color: '#bae6fd', letterSpacing: 1.4, marginBottom: 6 }}>
               COST STACK — RAW MATERIALS TO INSTALLED PRICE
@@ -1918,8 +1934,8 @@ function CoverPage({
             // Right column of the two-column cover layout. Sized 207×170 to
             // fit alongside the cost-stack panel (45% column on a 475pt
             // content width). Caption stays visible underneath.
-            <View style={{ flex: 45, alignItems: 'center' }}>
-              <Image src={heroImagePath} style={{ width: 207, height: 170, objectFit: 'contain' }} />
+            <View style={{ flex: 50, alignItems: 'center' }}>
+              <Image src={heroImagePath} style={{ width: 240, height: 200, objectFit: 'contain' }} />
               <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 6, fontStyle: 'italic', textAlign: 'center' }}>
                 Illustration only — generic class render, not a photograph of the actual unit. Used for visual reference; final geometry follows the engineering specification.
               </Text>

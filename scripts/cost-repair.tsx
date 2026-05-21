@@ -71,13 +71,33 @@ interface RepairResponse {
 function buildPrompt(rows: FlaggedRow[]): string {
   return `You are an industrial-parts pricing reviewer. The design chain has produced a unit price for each part below, but the corpus-comparison check (Engine C) has flagged each as out of typical range. For each row, decide ONE of three actions:
 
-A) "corrected" — you have high confidence the current price is wrong. Provide a corrected unit price + cite a real distributor or manufacturer URL. Use realistic UK GBP prices.
-B) "manual_sourcing_required" — both the current price AND the corpus median look implausible; flag for human procurement.
-C) "leave_as_is" — the current price is actually correct; the corpus comparison is misleading (corpus median came from incompatible items, e.g. small consumer parts compared against industrial commodity).
+A) "corrected" — provide a corrected unit price + cite a real distributor or manufacturer URL. Use realistic UK GBP prices. PREFERRED whenever the part's typical UK trade price is identifiable from common engineering knowledge.
+B) "manual_sourcing_required" — pricing is genuinely uncertain (truly bespoke, low-volume, application-specific). Use this for items where any specific price would be a guess.
+C) "leave_as_is" — the current price is actually correct; the corpus comparison is misleading.
 
-For commodities sold at retail catalogue (ISO containers, off-the-shelf compressors, finished pumps, structural beams, OEM-branded modules): prefer "corrected" with a realistic UK price citing CIMC / Copeland / Bosch Rexroth / Grundfos / etc.
+IMPORTANT — SMALL-COMMODITY DOWNWARD CORRECTIONS (2026-05-21 Tristan VF cost-overrun forensic):
+The chain's Engine B applies broad class-floor estimates (e.g. structural_metal class median £1,500) that are CORRECT for big items (containers, frames, racks) but WILDLY WRONG for small parts that happen to share the class. Always CORRECT DOWN small commodities — DO NOT leave £1,500 on a sensor bracket.
 
-For custom-fabricated items (brackets, sheet-metal enclosures, machined parts): if the current price is below £20/unit at 1000-unit production volume, "manual_sourcing_required". If plausible, "leave_as_is".
+Small-commodity keywords (apply downward correction without hesitation):
+  • bracket, plate, panel, pan, tray, clip, mount, mounting, support, gusset, washer, gasket, seal, bushing, sleeve, ferrule, lug, terminal, cable_gland, grommet — typical £5-£60 each
+  • fastener, bolt, nut, screw, rivet, anchor — typical £0.20-£5 each
+  • earth_bar, bus_bar (small <300 mm), cable_tray (per metre) — typical £15-£80
+  • drain_pan, condensate_pan, drip_tray (sheet metal, <1m²) — typical £20-£100
+  • label, sticker, decal, nameplate — typical £1-£10
+  • drain_hose, p_trap, small_fitting — typical £5-£50
+
+Mid-commodity keywords:
+  • enclosure, cabinet, housing (depending on size, IP rating) — typical £80-£800
+  • fan, blower, pump (depending on capacity) — typical £40-£600
+  • LED_fixture, light_panel — typical £80-£300 for horticultural, £30-£200 generic
+  • coil, heat_exchanger (small) — typical £100-£600
+
+Large/finished-commodity keywords (anchor at retail catalogue):
+  • ISO_container, shipping_container (20-ft £2,000-£3,500; 40-ft £3,500-£5,500; 40-ft high cube £4,000-£6,500)
+  • compressor (1-30 kW scroll/screw), inverter, transformer — typical £1,500-£15,000
+  • OEM_subsystem branded (chillers, AHUs, packaged equipment) — anchor at manufacturer list
+
+For genuinely bespoke fabrication (custom enclosure, machined frame, prototype tooling): only use "manual_sourcing_required" if you can't reasonably estimate within ±50%.
 
 Reply with a JSON array — one object per row, in the same order. Schema:
 { "word_id": str, "action": "corrected"|"manual_sourcing_required"|"leave_as_is", "corrected_unit_price_gbp"?: number, "source"?: str, "confidence": "high"|"medium"|"low", "reasoning": str }
@@ -147,14 +167,31 @@ async function main() {
   const pv: any[] = Array.isArray(state.partVerifications) ? state.partVerifications : []
 
   const flagged: FlaggedRow[] = []
+  // 2026-05-21 (Tristan VF cost-overrun forensic): also route no_reference
+  // rows with current price > £500 to Cost Repair. These are the highest-
+  // risk lines: Engine B applied a class-floor with NO corpus anchor, so
+  // a £1,500 estimate on a "sensor mounting bracket" passes through
+  // unchallenged unless reviewed. Threshold £500 covers small-commodity
+  // hallucinations without overwhelming the LLM with low-stakes lines.
+  const NO_REFERENCE_REVIEW_THRESHOLD = 500
   for (const v of pv) {
-    if (v.engine_c_flag !== 'over' && v.engine_c_flag !== 'under') continue
     const unitPrice = (typeof v.price_estimate_gbp === 'number' && v.price_estimate_gbp > 0)
       ? v.price_estimate_gbp
       : (typeof v.engine_c_our_unit_gbp === 'number' && v.engine_c_our_unit_gbp > 0)
         ? v.engine_c_our_unit_gbp
         : 0
     if (!unitPrice) continue
+    const flag = v.engine_c_flag
+    let routedFlag: 'over' | 'under' | null = null
+    if (flag === 'over' || flag === 'under') {
+      routedFlag = flag
+    } else if (flag === 'no_reference' && unitPrice > NO_REFERENCE_REVIEW_THRESHOLD) {
+      // Treat no_reference + high price as "over" for review purposes —
+      // the LLM should either correct down (small commodity), confirm
+      // (genuinely £1,500+ item), or flag for manual sourcing.
+      routedFlag = 'over'
+    }
+    if (!routedFlag) continue
     flagged.push({
       word_id: String(v.word_id ?? ''),
       word_name: String(v.word_name ?? v.part_name ?? ''),
@@ -163,7 +200,7 @@ async function main() {
       quantity: Number(v.quantity ?? 1),
       current_unit_price_gbp: unitPrice,
       engine_b_component_class: String(v.engine_b_component_class ?? 'unknown'),
-      engine_c_flag: v.engine_c_flag,
+      engine_c_flag: routedFlag,
       engine_c_ref_median_gbp: typeof v.engine_c_ref_median_gbp === 'number' ? v.engine_c_ref_median_gbp : null,
       engine_c_ratio: typeof v.engine_c_ratio === 'number' ? v.engine_c_ratio : null,
     })
