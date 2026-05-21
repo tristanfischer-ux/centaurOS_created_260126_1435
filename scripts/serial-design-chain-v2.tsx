@@ -1380,6 +1380,17 @@ async function runReviewerStep(opts: {
   const kmBlock = formatKeyMetricsBlock(opts.keyMetrics ?? null)
   // Compact JSON (no indent) to fit Haiku's 200 K context window after R2/R3
   // grow the design ~30 % each pass. Pretty-printed bloats by ~30 % whitespace.
+  // Build #6b: surface Contract macro-assembly misses as structured
+  // constraints. The validator (Build #6) detected which Contract macro-
+  // assemblies were NOT emitted by the Generator + stored them on
+  // (design.modules as any).__contractMisses. Each reviewer pass now
+  // receives this list and is asked to ADD a word matching each miss
+  // (so the renderer's macro-assembly override can land the Contract's
+  // size-aware price on a BoM line). Universal across product classes.
+  const contractMissesAny = (opts.currentDesign?.modules as any)?.__contractMisses
+  const contractMisses: Array<{ word_name: string; expected_total_gbp: number; reason: string }> = Array.isArray(contractMissesAny) ? contractMissesAny : []
+  const contractMissesBlock = contractMisses.length > 0 ? `\n\nENGINEERING CONTRACT MACRO-ASSEMBLY MISSES (Contract has size-aware pricing for these large items but Generator did not emit a matching word — please ADD a word matching each name so the renderer can price the line correctly):\n${contractMisses.map(m => `  - "${m.word_name}" (Contract price £${m.expected_total_gbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}): ${m.reason}`).join('\n')}\nFor each miss, use add_word_to_sub_module with a word.name_human / id that contains the macro-assembly's tokens (e.g. for "carbon_fibre_wing_spar" emit a word with name_human="Carbon-fibre wing spar" and id="carbon_fibre_wing_spar_word"). The Contract's price will flow into the BoM via the renderer's macro-assembly override.\n` : ''
+
   const user = `PRODUCT BRIEF (raw):
 ${opts.brief}
 
@@ -1392,7 +1403,7 @@ ${opts.research ? JSON.stringify(opts.research) : '(not available)'}
 CURRENT DESIGN (apply your 3-concern review to this whole block):
 ${JSON.stringify(opts.currentDesign)}
 ${kmBlock}
-${densityTargets}
+${densityTargets}${contractMissesBlock}
 Return the corrected JSON.`
 
   const before = summarise(opts.currentDesign.modules ?? [])
