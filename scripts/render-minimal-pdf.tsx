@@ -447,6 +447,10 @@ type BomPartRow = {
   status: 'verified' | 'uncertain' | 'stripped' | 'unverified'
   unit_price_gbp: number     // rounded to pence; 0 if TBD
   line_total_gbp: number     // unit_price_gbp * quantity; 0 if TBD
+  // Build #4 (2026-05-21): when set, this row's line_total_gbp was
+  // overridden by the Engineering Contract's macro_assembly_prices
+  // (size-aware pricing for items the per-unit class anchor under-prices).
+  contract_override_reason?: string
   price_tier: 'actual' | 'estimate' | 'tbd'
   // Engine B (2026-05-18) — per-component-class attribution. Optional so
   // legacy state.json files without the engine_b_* fields still render.
@@ -667,8 +671,37 @@ function computeBomTotals(state: any): BomTotals | null {
         // Round unit price to pence BEFORE multiplying so the printed line
         // equals printed_unit × qty exactly.
         const rawUnit = hasActual ? Number(v.distributor_price_gbp) : hasEstimate ? Number(v.price_estimate_gbp) : 0
-        const unit_price_gbp = roundToPence(rawUnit)
-        const line_total_gbp = roundToPence(unit_price_gbp * qty)
+        let unit_price_gbp = roundToPence(rawUnit)
+        let line_total_gbp = roundToPence(unit_price_gbp * qty)
+        let contract_override_reason: string | null = null
+
+        // Build #4 (Tristan 2026-05-21, council unanimous): Engineering
+        // Contract macro-assembly pricing override. Class-anchors (£800
+        // for a structural_polymer) apply per-unit, but a 50m wing spar
+        // is one item costing £400k not £800. The Contract emits
+        // macro_assembly_prices keyed by canonical word_name; we match
+        // the current word's name_human / id against those entries and
+        // override line_total_gbp with the size-aware Contract value
+        // when a match exists. Universal across product classes.
+        const macroPrices: Array<{ word_name: string; total_gbp: number; source_detail: string; unit_price_gbp: number; dimension_value: number }> = (state?.engineeringContract?.macro_assembly_prices ?? []) as any[]
+        if (macroPrices.length > 0) {
+          const normalisedWordName = String(w.name_human || w.id || '')
+            .toLowerCase()
+            .replace(/\s+/g, '_')
+          // Try canonical-name match first, then substring match.
+          const exact = macroPrices.find(mp => mp.word_name && normalisedWordName === mp.word_name)
+          const substring = exact ? null : macroPrices.find(mp => {
+            const tokens = mp.word_name.split('_').filter(Boolean)
+            // Require ALL non-trivial tokens to appear in the word name.
+            return tokens.every(t => t.length >= 3 && normalisedWordName.includes(t))
+          })
+          const match = exact || substring
+          if (match && match.total_gbp > 0) {
+            unit_price_gbp = roundToPence(match.total_gbp / Math.max(qty, 1))
+            line_total_gbp = roundToPence(match.total_gbp)
+            contract_override_reason = `Contract macro-assembly: ${match.source_detail}`
+          }
+        }
         const row: BomPartRow = {
           word_name: w.name_human || humanise(w.id),
           word_id: w.id,
@@ -725,6 +758,9 @@ function computeBomTotals(state: any): BomTotals | null {
           cost_repair_corrected_price_gbp: typeof v?.cost_repair_corrected_price_gbp === 'number' ? v.cost_repair_corrected_price_gbp : undefined,
           cost_repair_previous_price_gbp: typeof v?.cost_repair_previous_price_gbp === 'number' ? v.cost_repair_previous_price_gbp : undefined,
           cost_repair_excluded_from_subtotal: v?.cost_repair_excluded_from_subtotal === true ? true : undefined,
+          // Build #4: Engineering Contract macro-assembly price override
+          // (when the Contract has a size-aware price for this word).
+          contract_override_reason: contract_override_reason ?? undefined,
           // Engine C reference-anchor — written by enrich-state-with-
           // reference-anchor.tsx onto the verification row. Stays undefined
           // for legacy state files that never ran enrichment.
