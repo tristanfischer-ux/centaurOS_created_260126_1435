@@ -93,7 +93,7 @@ interface TargetSpec {
    * were the prior two). Omit for class-agnostic specs whose brief_key
    * uniquely encodes the family (max_mass_kg, unit_cost_ceiling_gbp).
    */
-  brief_unit_family?: 'power' | 'energy' | 'mass' | 'time' | 'photon_flux_density' | 'area' | 'currency' | 'length'
+  brief_unit_family?: 'power' | 'energy' | 'mass' | 'time' | 'photon_flux_density' | 'area' | 'currency' | 'length' | 'yield'
   /** Candidate field names in design.modules[].derived_parameters (any match counts). */
   design_keys: string[]
   /** Whether to apply unit conversion. Default: identity. */
@@ -149,10 +149,19 @@ const TARGET_RECONCILIATIONS: TargetSpec[] = [
     brief_unit_family: 'area',
     design_keys: ['canopy_area_m2', 'growing_area_m2', 'target_canopy_area_m2'],
   },
-  // Yield / throughput (vertical farm tonnes/year, bioreactor litres/day)
-  // Skipped for now — yield is class-specific and rarely lands in derived_parameters
-  // under a stable key. Revisit when bioreactor/VF physics ledgers stabilise.
-  //
+  // Yield / throughput (vertical farm tonnes/year, bioreactor litres/day,
+  // food production lines, brewing). The brief's unit is a compound rate
+  // (e.g. "tonnes/year") so classifyBriefUnitFamily returns 'yield'.
+  // Design_keys list common yield/throughput field names; if none of them
+  // appear on the design yet (class without yield physics ledger), the
+  // gate skips silently via the unable_to_compare path — that's fine.
+  // 2026-05-21 4th-hit-of-unit-family-bug fix.
+  {
+    brief_key: 'target_performance',
+    unit: 'tonnes/year',
+    brief_unit_family: 'yield',
+    design_keys: ['target_yield_tonnes_per_year', 'yield_tonnes_per_year', 'annual_yield_tonnes', 'production_volume_per_year', 'throughput_units_per_year'],
+  },
   // Capacity in kWh (legacy brief shape — explicit field, not via target_performance)
   {
     brief_key: 'capacity_kwh',
@@ -188,6 +197,13 @@ const TARGET_RECONCILIATIONS: TargetSpec[] = [
 function classifyBriefUnitFamily(rawUnit: string | null | undefined): TargetSpec['brief_unit_family'] | null {
   if (!rawUnit) return null
   const u = String(rawUnit).toLowerCase().trim()
+  // 2026-05-21 (4th hit of unit-family bug, VF yield brief): yield/throughput
+  // is a compound rate. Detect by '/year' '/yr' '/day' '/hr' suffix
+  // BEFORE simpler classifications so 'tonnes/year' doesn't degenerate to
+  // 'tonnes' (mass) or fall through to null.
+  if (/\/(yr|year|years|month|months|wk|week|day|days|h|hr|hour|hours|min|s|sec)$/.test(u)) {
+    return 'yield'
+  }
   if (['wh', 'kwh', 'mwh', 'gwh'].includes(u)) return 'energy'
   if (['w', 'kw', 'mw', 'gw'].includes(u)) return 'power'
   if (['g', 'kg', 't', 'tonne', 'tonnes'].includes(u)) return 'mass'
@@ -275,19 +291,30 @@ export function runBriefTargetReconciliation(
       // Brief didn't specify this target — not a comparison opportunity.
       continue
     }
-    // Unit-family gate (2026-05-21 HAPS forensic): if the spec declares a
-    // brief_unit_family and the brief's declared unit belongs to a
-    // different family, skip this spec — it's a polymorphic brief_key
-    // (e.g. target_performance) and this spec row doesn't apply to this
-    // brief's class. Without this check, a "90 days" endurance brief was
-    // false-matched against a kW power spec and the chain halted.
-    if (spec.brief_unit_family && briefVal.unit) {
+    // Unit-family gate (2026-05-21 — 3rd then 4th hit of unit-family bug):
+    // if the spec declares a brief_unit_family, the brief's declared unit
+    // MUST classify to that exact family. Three rejection cases:
+    //   (a) brief unit classified to a DIFFERENT known family → SKIP
+    //       (e.g. 'tonnes' brief vs power spec — handled by HAPS fix)
+    //   (b) brief unit UNKNOWN to classifier → SKIP STRICT (e.g. compound
+    //       'tonnes/year' before yield family was added, or any future
+    //       compound unit). Previously fell through and false-matched;
+    //       the VF iter-2 G0.5 HALT was caused by this. Be strict: if
+    //       the spec demands a family and we can't confirm the brief
+    //       is in that family, don't compare.
+    //   (c) brief unit absent (briefVal.unit === null) AND spec demands
+    //       a family → permissive (allow comparison) only for backward
+    //       compatibility with legacy briefs that omit the unit field.
+    if (spec.brief_unit_family) {
       const briefFamily = classifyBriefUnitFamily(briefVal.unit)
-      if (briefFamily && briefFamily !== spec.brief_unit_family) {
-        // Brief unit is in a known family that doesn't match this spec.
-        // Silently skip — another spec row will pick it up.
+      if (briefVal.unit && briefFamily !== spec.brief_unit_family) {
+        // Cases (a) + (b): brief HAS a unit but it doesn't match the
+        // spec's family (or is unrecognised). Skip strictly.
         continue
       }
+      // Case (c): briefVal.unit is null/empty AND spec demands a family.
+      // Fall through — this is a legacy brief without a unit; the
+      // comparison MAY false-match but the magnitude guard backstops.
     }
     const designVal = findDesignValue(modules, spec.design_keys)
     if (!designVal) {

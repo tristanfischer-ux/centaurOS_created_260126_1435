@@ -246,6 +246,26 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // I9b. Unit-family bug detector (2026-05-21 — added after 4 hits of the
+  // unit-family bug pattern: cover-side, Physics Repair, G0.5 HAPS endurance,
+  // G0.5 VF yield). The chain MUST NOT exit FATAL on G0.5 due to a
+  // brief/design unit-family mismatch. We check: when state has cost_stack
+  // (means chain progressed past G0.5) OR an explicit G0.5 PASS verdict,
+  // assert no scale_mismatch entry in any reconciliation report. If
+  // state.g0_5_brief_target_reconciliation exists with verdict='HALT', this
+  // is the bug pattern recurring — fail loudly so we add another unit family
+  // to classifyBriefUnitFamily.
+  const g05 = state?.briefTargetReconciliation
+  if (g05) {
+    assertions.push(assertEq(
+      'I9b.no_g05_halt',
+      'G0.5 brief-target reconciliation did not HALT (unit-family bug regression check)',
+      g05.verdict,
+      (v) => v !== 'HALT',
+      (v) => `G0.5 verdict=${v}; mismatches=${JSON.stringify((g05.mismatches ?? []).map((m: any) => ({ target: m.target_field, briefUnit: m.target_unit, design: m.design_field, ratio: m.ratio })).slice(0, 3))} — likely missing unit family in classifyBriefUnitFamily or missing TARGET_RECONCILIATIONS spec`,
+    ))
+  }
+
   // I9. Fresh-chain markers — these fields prove the NEW chain stages ran.
   // Soft check (informational); only fails if all three are missing (suggests
   // a chain run pre-dating Sprints 1B/3A/0v2).
