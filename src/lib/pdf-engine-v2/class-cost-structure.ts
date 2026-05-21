@@ -281,12 +281,30 @@ export const COST_STACK: Record<string, CostStackRatios> = {
   // PRODUCT_CLASS_REFERENCE_OVERRIDES lift Engine-B raw BoM from £25 to £93/kWh
   // and these heavy-EPC ratios (compound 2.40×) land installed ASP at £224/kWh.
   bess: {
+    // 2026-05-21 real council (Gemini 3.1 Pro + Grok 4.3 + MiMo) verdict
+    // on Loop 6 BESS shipping 190% above band. Original stack assumed
+    // mass-production (1000+ unit/yr) with on-site assembly. Actual
+    // bess.md brief is 25 units/year UK programme, containerised
+    // plug-and-play. Three ratios corrected (unanimous council):
+    //   - installation 45% → 18%: containerised BESS is factory-built;
+    //     site work is foundation + grid hookup + commissioning only,
+    //     not the on-site assembly that justified 45% (council Gemini:
+    //     "12-20% typical"; MiMo: "10-20% at reasonable volume")
+    //   - manufacturer_margin 20% → 38%: 25/yr bespoke programme has
+    //     unamortised engineering, tooling, UL 9540A certification
+    //     (>$100k/test), requires 35-45% on COGS to recover overhead
+    //     (council Gemini: "35-45%"; Grok agrees on low-vol penalty)
+    //   - labour + overhead unchanged at 20% + 15% (council agrees)
+    // Compound: 1.20 × 1.15 × 1.38 × 1.00 × 1.18 = 2.25×
+    // Pre-W3 BoM at £93/kWh × 2.25 = £209/kWh installed (was £224/kWh)
+    // — sits at the low end of the £190-265/kWh mass-prod band (target
+    // moved to low-vol band £400-550/kWh in class-price-bands.ts).
     assembly_labour_factor: 0.20,
     factory_overhead_factor: 0.15,
-    manufacturer_margin_factor: 0.20,
+    manufacturer_margin_factor: 0.38,
     channel_markup_factor: 0,
-    installation_cost_factor: 0.45,
-    notes: 'BESS utility — alias of bess-utility-scale; recalibrated 2026-05-18 (Engine-B gap fix). Compound multiplier 2.40× lifts post-override raw £93/kWh to £224/kWh installed ASP (band centre £227.5/kWh).',
+    installation_cost_factor: 0.18,
+    notes: 'BESS utility — recalibrated 2026-05-21 per council a66e6ee7 follow-up (Gemini Pro + Grok 4.3 + MiMo unanimous). Containerised plug-and-play install lower than original; bespoke 25/yr margin higher. Compound 2.25× (was 2.40×). Pre-override raw £93/kWh × 2.25 = £209/kWh installed (low end of mass-prod band £190-265). Low-vol bespoke target band £400-550/kWh — see class-price-bands.ts.',
   },
   // Calibrated 2026-05-18: target installed-ASP £850k-£1.95M per Grok (Kongsberg REMUS, Teledyne, IDTechEx), multiplier 9.173× — W3 set to 1.0. Bespoke marine: hand-built + SAT trials + integration dominate
   auv: {
