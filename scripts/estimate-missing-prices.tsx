@@ -379,29 +379,94 @@ No prose, no markdown.`
 
 interface SmallCommodityTier {
   pattern: RegExp
-  unit_gbp: number
+  // Tiered unit prices at different annual production volumes.
+  // Council 2026-05-21 verdict (Q1+Q3): original flat prices were 2-3×
+  // too high at 100k volume — Tier 2 at £10 systematically overshoots
+  // for consumer / mid-vol classes. Now volume-aware.
+  unit_gbp_low_vol: number    // ~1-1000 units/yr (bespoke, distributor 1-off)
+  unit_gbp_mid_vol: number    // 1k-10k/yr (distributor-discounted, light tooling)
+  unit_gbp_high_vol: number   // >50k/yr (commodity, full-tooling OEM contract)
   reason: string
 }
 
 const SMALL_COMMODITY_TIERS: SmallCommodityTier[] = [
-  // Tier 1: micro commodity (£0.50-3) — fasteners, micro-electronics, single wires
-  { pattern: /\b(fastener|bolt|nut|screw|rivet|washer|grommet|cable_tie|tie_wrap|spacer_screw|micro_fuse|jumper|ferrite_bead)\b/i, unit_gbp: 1.5, reason: 'micro commodity (fastener/wire)' },
-  { pattern: /\b(voltage_tap_wire|tap_wire|sense_wire|sensing_wire|pilot_wire|signal_wire|trigger_wire|sample_lead)\b/i, unit_gbp: 2.0, reason: 'small signal/tap wire' },
-  // Tier 2: small fabrication (£5-30) — small brackets/plates/clips/connectors
-  { pattern: /\b(clip|mount(ing)?_clip|tab|spring_clip|ferrule|lug|terminal|cable_gland|cable_clamp|p_clip|spacer)\b/i, unit_gbp: 10, reason: 'small fabricated clip/terminal' },
-  { pattern: /\b(gasket|o_ring|seal|grommet_seal|sleeve|bushing)\b/i, unit_gbp: 8, reason: 'small seal/bushing' },
-  { pattern: /\b(label|sticker|decal|nameplate|warning_plate)\b/i, unit_gbp: 3, reason: 'label/sticker' },
-  // Tier 3: small structural (£15-80) — small plates, brackets, panels under 1 m
-  { pattern: /\b(small_bracket|sub_bracket|mounting_bracket|sensor_bracket|micro_bracket)\b/i, unit_gbp: 25, reason: 'small mounting bracket' },
-  { pattern: /\b(cable_entry|gland_plate|tray_clip|cover_plate|access_plate|blanking_plate)\b/i, unit_gbp: 30, reason: 'small access/cover plate' },
-  // Tier 4: short busbars / connector strips (£10-50)
-  { pattern: /\b(cell_to_cell|inter_cell|cell_busbar|busbar_short|sense_busbar|module_busbar)\b/i, unit_gbp: 25, reason: 'small cell-interconnect busbar' },
+  // Tier 1: micro commodity — fasteners, micro-electronics, single wires
+  // Plus council Q2 additions: standoffs, heat-shrink, crimps, strain relief,
+  // cable markers, thermal pads.
+  { pattern: /\b(fastener|bolt|nut|screw|rivet|washer|grommet|cable_tie|tie_wrap|spacer_screw|micro_fuse|jumper|ferrite_bead|standoff|pillar|pcb_spacer|heat_shrink|sleeving|spiral_wrap|crimp|spade|pin_terminal|strain_relief|cable_marker|thermal_pad|thermal_paste|tim_pad|cable_saddle|din_end_stop|cable_tray_clip)\b/i,
+    unit_gbp_low_vol: 2.0, unit_gbp_mid_vol: 0.8, unit_gbp_high_vol: 0.20,
+    reason: 'micro commodity (fastener / small electronic)' },
+  { pattern: /\b(voltage_tap_wire|tap_wire|sense_wire|sensing_wire|pilot_wire|signal_wire|trigger_wire|sample_lead)\b/i,
+    unit_gbp_low_vol: 3.0, unit_gbp_mid_vol: 1.0, unit_gbp_high_vol: 0.30,
+    reason: 'small signal/tap wire' },
+  // Tier 2: small fabrication — small clips/lugs/seals/labels.
+  // Council Q3 vetoes applied: cable_gland (£0.50-200 spread) +
+  // bushing (£0.20-120) + terminal (£0.50-150) DROPPED from this tier
+  // — too ambiguous, would false-floor expensive industrial variants.
+  // Only the qualified small-variant keywords remain.
+  { pattern: /\b(clip|mount(ing)?_clip|tab|spring_clip|ferrule|lug|cable_clamp|p_clip|spacer|pcb_terminal|pcb_terminal_block)\b/i,
+    unit_gbp_low_vol: 8, unit_gbp_mid_vol: 2.5, unit_gbp_high_vol: 0.60,
+    reason: 'small fabricated clip/terminal' },
+  { pattern: /\b(gasket|o_ring|seal|grommet_seal|sleeve|nylon_bushing|polymer_bushing|pg_gland|pg7_gland|pg9_gland|pg11_gland|pg13_gland|pg16_gland|pg21_gland)\b/i,
+    unit_gbp_low_vol: 6, unit_gbp_mid_vol: 1.5, unit_gbp_high_vol: 0.50,
+    reason: 'small seal/bushing/nylon gland' },
+  { pattern: /\b(label|sticker|decal|nameplate|warning_plate)\b/i,
+    unit_gbp_low_vol: 3, unit_gbp_mid_vol: 1.0, unit_gbp_high_vol: 0.20,
+    reason: 'label/sticker' },
+  // Tier 3: small structural — small plates, brackets, panels under 1 m.
+  // Council Q1: at 1k/yr £25; at 100k/yr should be £3-8.
+  { pattern: /\b(small_bracket|sub_bracket|mounting_bracket|sensor_bracket|micro_bracket)\b/i,
+    unit_gbp_low_vol: 25, unit_gbp_mid_vol: 8, unit_gbp_high_vol: 2.5,
+    reason: 'small mounting bracket' },
+  { pattern: /\b(cable_entry|gland_plate|tray_clip|cover_plate|access_plate|blanking_plate)\b/i,
+    unit_gbp_low_vol: 25, unit_gbp_mid_vol: 7, unit_gbp_high_vol: 2.0,
+    reason: 'small access/cover plate' },
+  // Tier 4: short busbars / cell interconnects.
+  // Council Q1: BESS gotcha drawer says cell-to-cell busbar at 100k volume
+  // is £0.20-0.50 — the original £25 was 50× too high.
+  { pattern: /\b(cell_to_cell|inter_cell|cell_busbar|busbar_short|sense_busbar)\b/i,
+    unit_gbp_low_vol: 8, unit_gbp_mid_vol: 1.5, unit_gbp_high_vol: 0.40,
+    reason: 'small cell-interconnect busbar' },
+  // module_busbar removed from Tier 4 (council Q3: £25-800 spread depending
+  // on whether it's a HAPS payload connector or a utility BESS main bus).
 ]
 
-function trySmallCommodityFloor(partName: string): { unit_gbp: number; reason: string } | null {
-  const name = String(partName ?? '').replace(/\s+/g, '_').toLowerCase()
+/**
+ * Pick the volume-tier price for a small-commodity match. Council 2026-05-21
+ * verdict Q1: flat prices systematically over-shoot for high-volume classes.
+ */
+function smallCommodityPriceAtVolume(tier: SmallCommodityTier, annualVolume: number): number {
+  if (annualVolume >= 50_000) return tier.unit_gbp_high_vol
+  if (annualVolume >= 1_000) return tier.unit_gbp_mid_vol
+  return tier.unit_gbp_low_vol
+}
+
+/**
+ * Manufacturer-set veto (council Q3). If the part has a real distributor-
+ * sourced manufacturer + part number, the small-commodity floor is the
+ * WRONG anchor — the part is a finished catalogue item with its own
+ * price. Returning null lets the normal Flash-Lite fallback or downstream
+ * cost-repair cite the manufacturer's catalogue price instead.
+ */
+function isFinishedCommodityVeto(ctx: PartContext): boolean {
+  const mfg = String(ctx.manufacturer ?? '').trim()
+  const pn = String(ctx.part_number ?? '').trim()
+  if (!mfg || !pn) return false
+  if (mfg.toLowerCase() === 'unspecified' || mfg.toLowerCase() === 'custom') return false
+  // Heuristic: a real catalogue MPN has at least 4 alphanumeric chars
+  // and isn't all-letters (which would suggest a category name like "BOLT").
+  if (pn.length < 4) return false
+  if (!/[0-9]/.test(pn)) return false
+  return true
+}
+
+function trySmallCommodityFloor(ctx: PartContext, annualVolume: number): { unit_gbp: number; reason: string } | null {
+  if (isFinishedCommodityVeto(ctx)) return null
+  const name = String(ctx.word_name ?? '').replace(/\s+/g, '_').toLowerCase()
   for (const t of SMALL_COMMODITY_TIERS) {
-    if (t.pattern.test(name)) return { unit_gbp: t.unit_gbp, reason: t.reason }
+    if (t.pattern.test(name)) {
+      return { unit_gbp: smallCommodityPriceAtVolume(t, annualVolume), reason: t.reason }
+    }
   }
   return null
 }
@@ -746,7 +811,7 @@ async function main() {
           // returning £128 for what should be a £2 wire. Cost Repair
           // can still correct upward later if a real high-priced item
           // matched the pattern.
-          const smallFloor = trySmallCommodityFloor(ctx.word_name)
+          const smallFloor = trySmallCommodityFloor(ctx, annualVolume)
           if (smallFloor) {
             results.push({
               ctx,

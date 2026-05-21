@@ -306,7 +306,7 @@ export async function buildPaletteCardPng(modules: string[]): Promise<Buffer> {
   <text x="40" y="148" font-family="Helvetica" font-size="16" fill="#3a4754">Match the reference image's perspective, scale, and module positions exactly.</text>
   <text x="40" y="220" font-family="Helvetica" font-size="18" font-weight="bold" fill="#1a1f26">Module palette</text>
   ${swatches}
-  <text x="40" y="${H - 60}" font-family="Helvetica" font-size="14" fill="#3a4754">Use these hex values when a part / surface corresponds to a module above. Otherwise use natural material colours (brushed aluminium, painted steel, copper, polymer, etc.).</text>
+  <text x="40" y="${H - 60}" font-family="Helvetica" font-size="14" fill="#3a4754">These colours suggest each module's family — respect them LOOSELY when a focal surface clearly belongs to a module. For most surfaces prefer natural material colours (brushed aluminium, painted steel, copper, polymer, anodised, powder-coated, etc.).</text>
 </svg>`
   // Lazy-import sharp so this lib stays import-safe even when sharp isn't installed
   const sharp = (await import('sharp')).default
@@ -342,16 +342,48 @@ function summariseBrief(state: any): BriefSummary {
   return { product_class: productClass, product_display: productDisplay, envelope_text, module_list_text }
 }
 
+// Council 2026-05-21 verdict Q5: "Photorealistic industrial-installation"
+// is wrong for at least 3 of 10 product classes. CGM is a hospital-reject
+// in a factory shoot; HAPS wing reads as a wind-turbine blade; consumer
+// drone needs retail style. Class-aware style strings.
+const STYLE_BY_CLASS: Record<string, string> = {
+  // Medical / wearable
+  cgm: 'clinical product photography. Soft daylight, clean white or pale-grey backdrop, medical-device catalogue aesthetic. Sharp focus on the device; supporting elements minimal.',
+  wearable_medical_device: 'clinical product photography. Soft daylight, clean white or pale-grey backdrop, medical-device catalogue aesthetic. Sharp focus on the device; supporting elements minimal.',
+  insulin_pump: 'clinical product photography. Soft daylight, clean white or pale-grey backdrop, medical-device catalogue aesthetic.',
+  // Aerospace / unmanned aviation
+  haps: 'aerospace prototype photography. Composite-shop or hangar lighting, polished concrete floor, the aircraft posed three-quarter front with one wing visible. Carbon-fibre, painted-aluminium, kapton-tape finishes. Like an Airbus / BAE programme photograph.',
+  // Subsea / autonomous marine
+  auv: 'autonomous marine vehicle photography. Workshop or dry-dock lighting, the hull resting on cradles. Polished anodised aluminium, anti-fouling paint, syntactic foam. Like a Kongsberg or Teledyne product page.',
+  // Consumer
+  consumer_cinematography_drone: 'retail product photography. Soft studio gradient backdrop, key light + fill, slight reflection on a glossy white surface, drone hovering or angled three-quarter. Premium consumer-electronics aesthetic.',
+  drone: 'retail product photography. Soft studio gradient backdrop, key light + fill, premium consumer-electronics aesthetic.',
+  // Industrial / installed default — covers BESS, EV charger, heat pump,
+  // bioreactor, edge-AI rack, vertical farm, PV inverter
+  __default: 'photorealistic industrial-installation photography. Sharp focus, neutral studio or factory lighting, real materials (brushed aluminium / painted steel / copper / polymer / cables), proper shadows and reflections, no people.',
+}
+
+function styleForClass(productClass: string): string {
+  const key = String(productClass ?? '').toLowerCase().trim()
+  return STYLE_BY_CLASS[key] ?? STYLE_BY_CLASS.__default
+}
+
+// Stronger text-suppression imperative (council Q8). The 5-word negative
+// list "no text, no labels, no watermarks" was insufficient per the
+// gpt-image-1 garbled-text drawer. Imperative form lands more reliably.
+const NO_TEXT_NEGATIVE = `Do NOT include any text, words, letters, numbers, typography, written labels, dimension callouts, or watermarks in the image whatsoever. Surfaces must be unmarked.`
+
 export function composeHeroPrompt(state: any): string {
   const b = summariseBrief(state)
   const envBlock = b.envelope_text
     ? `Envelope: ${b.envelope_text}.`
     : ''
-  return `Photorealistic professional product photograph of ${b.product_display ? `a ${b.product_display}` : 'an industrial engineering system'}. ${envBlock} The visible engineering modules are: ${b.module_list_text}.
+  const style = styleForClass(b.product_class)
+  return `${style.charAt(0).toUpperCase() + style.slice(1)} of ${b.product_display ? `a ${b.product_display}` : 'an industrial engineering system'}. ${envBlock} The visible engineering modules are: ${b.module_list_text}.
 
-Use the provided reference image (a Blender wireframe of the structural layout) ONLY for the OVERALL POSITIONS and PROPORTIONS — where modules sit, how big the container/envelope is, how doors and access panels are arranged. Do NOT replicate the schematic style. The OUTPUT must be photorealistic industrial-installation photography: sharp focus, neutral studio or factory lighting, real materials (brushed aluminium / painted steel / copper / polymer / cables), proper shadows and reflections, no people.
+Use the provided reference image (a Blender wireframe of the structural layout) ONLY for the OVERALL POSITIONS and PROPORTIONS — where modules sit, how big the envelope is, how doors and access panels are arranged. Do NOT replicate the schematic style. The OUTPUT must match the style description above.
 
-Composition: open or cutaway view that lets the reader see the modules inside the envelope. Slight three-quarter or front-on angle, like a manufacturer's product photo. No text, no labels, no watermarks, no logos, no callouts. Clean factory or studio backdrop. Generate at high resolution.`
+Composition: open or cutaway view that lets the reader see the modules inside the envelope (for installed products), or a clean three-quarter hero (for consumer / wearable / aerospace). No people. ${NO_TEXT_NEGATIVE} Generate at high resolution.`
 }
 
 export function composeModulePrompt(state: any, moduleId: string): string {
@@ -369,7 +401,7 @@ You have THREE reference images (the order matters):
 2. The style contract / palette card — use these hex values when surfaces correspond to the modules listed there; otherwise natural material colours.
 3. A Blender schematic wireframe showing the focal module SATURATED in colour with sibling modules in GREYSCALE. This is the SPATIAL ANCHOR — the focal module's geometry, bounding box, and position relative to the envelope are CORRECT in this wireframe. Respect them. The parts you draw MUST FIT inside the focal module's bounds. Use the wireframe to size and position the focal sub-systems; then paint over with photorealistic finish (matching reference 1's style).
 
-Composition: sharp focus on the focal sub-systems, neutral industrial lighting, real materials, no people. NO text, NO labels, NO callouts, NO watermarks. Square aspect ratio. Generate at high resolution.`
+Composition: sharp focus on the focal sub-systems, neutral lighting matching the hero, real materials, no people. ${NO_TEXT_NEGATIVE} Square aspect ratio. Generate at high resolution.`
 }
 
 // ---------------------------------------------------------------------------
