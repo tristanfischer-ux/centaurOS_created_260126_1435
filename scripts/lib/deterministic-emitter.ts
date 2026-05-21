@@ -1194,7 +1194,7 @@ function emitOperatorInterface(_p: BessParams): DesignModule {
   )
 
   return {
-    module: 'operator_interface',
+    module: 'hmi_ergonomics',
     module_brief: 'Provides local supervisory display + redundant emergency stop for the container operator.',
     overview_paragraph_en: '',
     derived_parameters: {
@@ -1246,8 +1246,8 @@ function emitInterconnect(_p: BessParams): DesignModule {
   )
 
   return {
-    module: 'interconnect',
-    module_brief: 'Terminates the AC export at the grid point of common coupling via MV glands and 0.5S accuracy CTs for revenue metering.',
+    module: 'maintenance_serviceability',
+    module_brief: 'Terminates the AC export at the grid point of common coupling via MV glands and 0.5S accuracy CTs for revenue metering. Provides service-side electrical access to PCC for inspection + isolation.',
     overview_paragraph_en: '',
     derived_parameters: {
       phase_count: 3,
@@ -1354,14 +1354,14 @@ function emitCrossModuleGrammarLinks(p: BessParams): CrossModuleGrammarLink[] {
       detail: 'chiller bolts to skid + roof penetration',
     },
     {
-      from_module: 'operator_interface',
+      from_module: 'hmi_ergonomics',
       to_module: 'control_compute_communication',
       mechanism: 'hmi_data',
       type: 'mutual',
       detail: 'HMI ↔ EMS over Modbus TCP',
     },
     {
-      from_module: 'interconnect',
+      from_module: 'maintenance_serviceability',
       to_module: 'energy_conversion_transduction',
       mechanism: 'ac_busbar',
       type: 'mutual',
