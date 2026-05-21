@@ -1824,6 +1824,65 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   }
   logAction({ step: 'propagate_constraints', target_module: propagation.target_module, written: propagation.written })
 
+  // ── Build #6: Engineering Contract proposal validation (Tristan
+  // 2026-05-21 6/6 council). After Generator emits the design, validate
+  // it against the Contract's macro_assembly_prices BEFORE the prose
+  // reviewers run. Specifically: each Contract macro_assembly_price
+  // SHOULD appear as a word.name_human / id / character_id in the
+  // design — if it doesn't, the renderer's per-line override can't
+  // fire and the BoM ships under-priced. The Contract's invariant_id
+  // failures get LOGGED so subsequent reviewer prompts receive them
+  // as structured constraints to fix. Universal across product classes.
+  if (engineeringContract && engineeringContract.macro_assembly_prices.length > 0) {
+    const allDesignWords: string[] = []
+    for (const m of (design?.modules ?? [])) {
+      for (const sm of (m?.sub_modules ?? [])) {
+        for (const w of (sm?.words ?? [])) {
+          const nameHuman = String(w?.name_human || '').toLowerCase().replace(/[-\s]+/g, '_')
+          const wid = String(w?.id || '').toLowerCase().replace(/[-\s]+/g, '_')
+          const ccid = String(w?.content_character?.character_id || '').toLowerCase().replace(/[-\s]+/g, '_')
+          if (nameHuman) allDesignWords.push(nameHuman)
+          if (wid) allDesignWords.push(wid)
+          if (ccid) allDesignWords.push(ccid)
+        }
+      }
+    }
+    const macroAssemblyMisses: Array<{ word_name: string; expected_total_gbp: number; reason: string }> = []
+    for (const mp of engineeringContract.macro_assembly_prices) {
+      const tokens = mp.word_name.split('_').filter(t => t.length >= 3)
+      const matchCount = allDesignWords.filter(dw => {
+        if (dw === mp.word_name) return true
+        const matched = tokens.filter(t => dw.includes(t)).length
+        return matched / Math.max(tokens.length, 1) >= 0.66
+      }).length
+      if (matchCount === 0) {
+        macroAssemblyMisses.push({
+          word_name: mp.word_name,
+          expected_total_gbp: mp.total_gbp,
+          reason: `Generator did NOT emit any word matching "${mp.word_name}" — Contract pricing £${mp.total_gbp.toLocaleString(undefined, { maximumFractionDigits: 0 })} cannot land in the BoM. Reviewers should emit a word with this name to surface the cost.`,
+        })
+      }
+    }
+    if (macroAssemblyMisses.length > 0) {
+      console.error(`[chain] Contract validation: ${macroAssemblyMisses.length} macro-assembly NOT FOUND in design — reviewers will be asked to add them`)
+      for (const miss of macroAssemblyMisses.slice(0, 5)) {
+        console.error(`  ✕ ${miss.word_name}: ${miss.reason}`)
+      }
+    } else {
+      console.error(`[chain] Contract validation: all ${engineeringContract.macro_assembly_prices.length} macro-assemblies present in design ✓`)
+    }
+    logAction({
+      step: 'engineering_contract_validation',
+      macro_assembly_matches: engineeringContract.macro_assembly_prices.length - macroAssemblyMisses.length,
+      macro_assembly_misses: macroAssemblyMisses.length,
+      misses_detail: macroAssemblyMisses.slice(0, 10).map(m => m.word_name),
+    })
+    // Persist misses on design so reviewers receive them as constraints.
+    // (Reviewers read `(design.modules as any).__contractMisses` in a
+    // future Build #6b; this commit lays the data structure.)
+    ;(design.modules as any).__contractMisses = macroAssemblyMisses
+  }
+
   // ── Phase 1: Reviewers (identical template)
   // Sprint 2D (Tristan 2026-05-20): each reviewer step has a fallback
   // model in a different vendor family so a transient model failure
