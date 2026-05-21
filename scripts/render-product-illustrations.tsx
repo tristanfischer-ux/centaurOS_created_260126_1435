@@ -137,10 +137,17 @@ function buildJobs(mods: string[], outDir: string): RenderJob[] {
   // distribute evenly around the sphere so every module gets its own
   // viewpoint. Reads as a turntable spin across the deck.
   const jobs: RenderJob[] = []
+  // 2026-05-21 (Tristan HAPS forensic, 6th iteration): Blender cover must
+  // NOT collide with gpt-image-1's cover.png. The chain orchestrator runs
+  // generate-hero-images.tsx first (writes <out-dir>/cover.png) and
+  // expects this Blender step to leave the gpt-image-1 hero alone. Use a
+  // distinct filename so both can coexist. The renderer (resolveHeroImages)
+  // reads state.brief_hero_image_path which the chain restores to the
+  // gpt-image-1 path after this script runs.
   jobs.push({
     module: 'cover',
     azimuth: -35,
-    outPath: resolve(outDir, 'cover.png'),
+    outPath: resolve(outDir, 'blender-cover.png'),
   })
   const n = mods.length
   if (n === 0) return jobs
@@ -278,8 +285,16 @@ function main(): void {
   // produces every module, but the merge keeps the behaviour safe if
   // someone runs both pipelines.)
   state.module_image_paths = { ...(state.module_image_paths ?? {}), ...successes }
-  if (coverPath) {
+  // 2026-05-21 (HAPS forensic): only set brief_hero_image_path if the
+  // chain hasn't already set one (gpt-image-1 has PRIMARY claim). The
+  // chain orchestrator also has a belt-and-braces restore step.
+  if (coverPath && !state.brief_hero_image_path) {
     state.brief_hero_image_path = coverPath
+  }
+  // Always expose the Blender cover path separately so the renderer
+  // could surface it on an exploded-view / appendix page later.
+  if (coverPath) {
+    state.blender_cover_image_path = coverPath
   }
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   console.log(

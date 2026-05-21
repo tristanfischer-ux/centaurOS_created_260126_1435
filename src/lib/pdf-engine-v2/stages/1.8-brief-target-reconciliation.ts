@@ -194,6 +194,43 @@ const TARGET_RECONCILIATIONS: TargetSpec[] = [
  * caller should fall back to legacy non-family-aware behaviour (so legacy
  * briefs that omit the unit field still get compared).
  */
+/**
+ * Convert a value from one unit to another within the same family.
+ * Returns null if the conversion isn't supported (different families,
+ * or compound unit like yield where conversion isn't generally
+ * possible). Added 2026-05-21 after the 5th hit of the unit-family bug
+ * (BESS iter-2b: brief 3.5 MWh compared to design 4587.5 kWh as
+ * 3.5 raw → ratio 1310, FATAL HALT). The gate was checking family
+ * match but NOT converting magnitude; this helper closes that gap.
+ */
+function convertWithinFamily(
+  value: number,
+  fromUnit: string,
+  toUnit: string,
+  family: TargetSpec['brief_unit_family'],
+): number | null {
+  if (fromUnit === toUnit) return value
+  // Per-family scale tables, each unit's factor to the family's canonical unit
+  const families: Record<string, Record<string, number>> = {
+    energy: { wh: 0.001, kwh: 1, mwh: 1000, gwh: 1_000_000 },
+    power: { w: 0.001, kw: 1, mw: 1000, gw: 1_000_000 },
+    mass: { g: 0.001, kg: 1, t: 1000, tonne: 1000, tonnes: 1000 },
+    area: { cm2: 0.0001, m2: 1, ha: 10000, sqm: 1, sqft: 0.0929 },
+    length: { mm: 0.001, cm: 0.01, m: 1, km: 1000 },
+    time: { s: 1, sec: 1, second: 1, seconds: 1, min: 60, minute: 60, minutes: 60, h: 3600, hr: 3600, hour: 3600, hours: 3600, day: 86400, days: 86400, wk: 604800, week: 604800, weeks: 604800 },
+    // yield, photon_flux_density, currency: no general within-family
+    // conversion — caller falls through, magnitude guard backstops.
+  }
+  if (!family) return null
+  const table = families[family]
+  if (!table) return null
+  const fromScale = table[fromUnit]
+  const toScale = table[toUnit]
+  if (fromScale === undefined || toScale === undefined) return null
+  // value × (fromScale → canonical) ÷ (toScale → canonical) = converted
+  return (value * fromScale) / toScale
+}
+
 function classifyBriefUnitFamily(rawUnit: string | null | undefined): TargetSpec['brief_unit_family'] | null {
   if (!rawUnit) return null
   const u = String(rawUnit).toLowerCase().trim()
@@ -291,9 +328,9 @@ export function runBriefTargetReconciliation(
       // Brief didn't specify this target — not a comparison opportunity.
       continue
     }
-    // Unit-family gate (2026-05-21 — 3rd then 4th hit of unit-family bug):
+    // Unit-family gate (2026-05-21 — 3rd, 4th, 5th hits of unit-family bug):
     // if the spec declares a brief_unit_family, the brief's declared unit
-    // MUST classify to that exact family. Three rejection cases:
+    // MUST classify to that exact family. Four rejection cases:
     //   (a) brief unit classified to a DIFFERENT known family → SKIP
     //       (e.g. 'tonnes' brief vs power spec — handled by HAPS fix)
     //   (b) brief unit UNKNOWN to classifier → SKIP STRICT (e.g. compound
@@ -305,12 +342,29 @@ export function runBriefTargetReconciliation(
     //   (c) brief unit absent (briefVal.unit === null) AND spec demands
     //       a family → permissive (allow comparison) only for backward
     //       compatibility with legacy briefs that omit the unit field.
+    //   (d) brief unit IN the family but DIFFERENT magnitude than the
+    //       spec (e.g. brief MWh vs spec kWh) → CONVERT briefVal.value to
+    //       spec.unit before comparing. BESS iter-2b HALT was here:
+    //       3.5 MWh was compared as 3.5 against 4587.5 kWh (1310× off)
+    //       because the family matched but the magnitude wasn't normalised.
     if (spec.brief_unit_family) {
       const briefFamily = classifyBriefUnitFamily(briefVal.unit)
       if (briefVal.unit && briefFamily !== spec.brief_unit_family) {
         // Cases (a) + (b): brief HAS a unit but it doesn't match the
         // spec's family (or is unrecognised). Skip strictly.
         continue
+      }
+      // Case (d): convert briefVal.value to spec.unit when both are in
+      // the same family but differ in magnitude.
+      if (briefVal.unit && briefFamily === spec.brief_unit_family) {
+        const briefUnitLower = briefVal.unit.toLowerCase().trim()
+        const specUnitLower = spec.unit.toLowerCase().trim()
+        if (briefUnitLower !== specUnitLower) {
+          const converted = convertWithinFamily(briefVal.value, briefUnitLower, specUnitLower, briefFamily)
+          if (converted !== null) {
+            briefVal = { value: converted, unit: spec.unit }
+          }
+        }
       }
       // Case (c): briefVal.unit is null/empty AND spec demands a family.
       // Fall through — this is a legacy brief without a unit; the
