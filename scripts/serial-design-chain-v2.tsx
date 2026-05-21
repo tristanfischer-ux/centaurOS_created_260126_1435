@@ -44,6 +44,12 @@ import { runResearchSynthesis } from '../src/lib/pdf-engine-v2/stages/1-research
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { buildContractForChain, type EngineeringContract } from './lib/engineering-contract'
 import { canEmitBess, emitBessDesign } from './lib/deterministic-emitter'
+// Universal Engineering Orchestrator (Build #18 — Phase 1+2). Importing
+// register-all triggers auto-registration of every shipped tool wrapper
+// + every class plan into the orchestrator's global registry + planner.
+import './lib/orchestrator/register-all'
+import { orchestrateDesign } from './lib/orchestrator/orchestrate'
+import type { ContractInProgress as OrchestratorContract } from './lib/orchestrator/types'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { translate } from '../src/lib/pdf-engine-v2/radical/universal-translator'
@@ -1875,8 +1881,71 @@ async function main() {
   // Round-2 council 2026-05-21 (drawer drawer_forgeos_decisions_a4cec57d79eeea89)
   // accepted Path A as interim scaffolding pending the proper parametric
   // constraint solver (Build #17 v2, next session).
-  const useDeterministic = process.env.DETERMINISTIC_EMITTER === '1' && engineeringContract && canEmitBess(engineeringContract)
+  // Universal Engineering Orchestrator path (Build #18 — Phase 1+2).
+  // When env ORCHESTRATOR=1, run the orchestrator FIRST. If it
+  // succeeds, use its design (skipping both LLM Generator and the
+  // hand-coded deterministic emitter). If it returns fallback_to_llm,
+  // proceed through the existing Build #17b deterministic path or
+  // Build #6c LLM-with-Contract-prompt path.
   let design: any
+  let orchestratorRan = false
+  if (process.env.ORCHESTRATOR === '1' && engineeringContract) {
+    console.error(`\n[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — attempting universal engineering orchestrator`)
+    const tOrch = Date.now()
+    const initialOrchContract: OrchestratorContract = {
+      product_class: engineeringContract.product_class,
+      brief_summary: engineeringContract.brief_summary,
+      envelope: {} as any,
+      quantities: engineeringContract.quantities as any,
+      topology: engineeringContract.topology as any,
+      closures: engineeringContract.closures as any,
+      macro_assembly_prices: engineeringContract.macro_assembly_prices as any,
+      _tools_run: [],
+    }
+    const orchResult = await orchestrateDesign(parsedResult.data, initialOrchContract, { fallback_on_failure: true })
+    const orchLatencyMs = Date.now() - tOrch
+    if (orchResult.ok && orchResult.design) {
+      design = orchResult.design
+      orchestratorRan = true
+      const sumOrch = summarise(design.modules)
+      const orchReasons = [
+        `orchestrator=ok`,
+        `tools_run=${orchResult.contract._tools_run.length}`,
+        `iterations=${orchResult.iterations}`,
+        `consistency_passed=${orchResult.consistency_results.filter(r => r.passed).length}/${orchResult.consistency_results.length}`,
+        `modules=${sumOrch.modules}`,
+        `sub_modules=${sumOrch.sub_modules}`,
+        `words=${sumOrch.words}`,
+      ]
+      console.error(`[chain] Orchestrator: ${sumOrch.modules} modules, ${sumOrch.sub_modules} sub-modules, ${sumOrch.words} words, ${orchResult.contract._tools_run.length} tools ran (${orchLatencyMs}ms)`)
+      writeFileSync(resolve(outDir, '4-generator.json'), JSON.stringify(design, null, 2))
+      writeFileSync(resolve(outDir, '4-generator-candidates.json'), JSON.stringify([{ score: 1.0, reasons: orchReasons, summary: sumOrch }], null, 2))
+      writeFileSync(resolve(outDir, '4-orchestrator-tool-results.json'), JSON.stringify(
+        Array.from(orchResult.tool_results.entries()).map(([id, r]) => ({ tool_id: id, ok: r.ok, warnings: r.warnings, error: r.error })),
+        null, 2,
+      ))
+      writeFileSync(resolve(outDir, '4-orchestrator-tools-used.json'), JSON.stringify(orchResult.tools_used_page, null, 2))
+      logAction({
+        step: 'generator',
+        model: 'universal_orchestrator',
+        latency_ms: orchLatencyMs,
+        tokens_in: 0,
+        tokens_out: 0,
+        summary: sumOrch,
+        best_of_n: 1,
+        best_score: 1.0,
+        best_reasons: orchReasons,
+        all_scores: [1.0],
+        cost_usd: 0,
+        orchestrator_tools_run: orchResult.contract._tools_run,
+        orchestrator_iterations: orchResult.iterations,
+        orchestrator_consistency_passed: orchResult.consistency_results.every(r => r.passed),
+      })
+    } else {
+      console.error(`[chain] Orchestrator failed (${orchResult.failures.length} failures); falling back to legacy path: ${orchResult.failures.slice(0, 3).join('; ')}`)
+    }
+  }
+  const useDeterministic = !orchestratorRan && process.env.DETERMINISTIC_EMITTER === '1' && engineeringContract && canEmitBess(engineeringContract)
   if (useDeterministic) {
     console.error(`\n[chain] STEP 4: Deterministic emitter (Build #17b — council d, BESS utility envelope ${(engineeringContract!.quantities.nameplate_capacity_kwh?.value / 1000).toFixed(1)} MWh nameplate) — bypassing LLM Generator`)
     const tDet = Date.now()
@@ -1900,7 +1969,7 @@ async function main() {
       all_scores: [1.0],
       cost_usd: 0,
     })
-  } else {
+  } else if (!orchestratorRan) {
   console.error(`\n[chain] STEP 4: Generator (Gemini 3.1 Pro) — best-of-N ...`)
   const keyMetricsBlock = formatKeyMetricsBlock(keyMetrics)
   const N_CANDIDATES = Number(process.env.GENERATOR_BEST_OF_N ?? 3)
