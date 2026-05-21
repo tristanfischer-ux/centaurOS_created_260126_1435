@@ -92,48 +92,59 @@ async function main() {
   const outDir = dirname(statePath)
   writeImage(resolve(outDir, 'palette-card.png'), paletteCardData)
 
-  // 2026-05-21 (Tristan critique on photoreal-only being spatially
-  // inaccurate): for each module, render a Blender structural reference
-  // FIRST (focal module saturated, siblings greyscale) — this anchors
-  // the part bounding boxes to the actual envelope. Then pass the
-  // Blender wireframe as a THIRD reference to Gemini i2i alongside the
-  // hero + palette card. Result: photoreal close-up that respects
-  // spatial layout (every part fits inside the envelope).
-  console.log(`[modules] step A: Blender structural reference per module (sequential, ~1.5 s each)`)
+  // 2026-05-21 (Tristan second critique): "the images you are using for
+  // the modules still look like photorealistic AI renders that look great
+  // but are inaccurate from an engineering perspective. you are supposed
+  // to be using blender to do a 3d CAD model that has all the components
+  // that are in the right size and place spatially."
+  //
+  // Per-module images now use the Blender output DIRECTLY (no Gemini
+  // i2i paint-over). The Blender pipeline renders the engineering-truth
+  // geometry — focal module saturated + sibling modules greyscale —
+  // which IS the spatial accuracy the reader needs on the module pages.
+  // Gemini photoreal stays at the COVER hero only (where polish matters
+  // more than spatial precision).
+  //
+  // FOLLOW-UP NEEDED (separate task): the current render-product-
+  // blender.py renders modules as solid coloured boxes inside the
+  // envelope. To match Tristan's "all the components that are in the
+  // right size and place spatially" requirement, render-product-blender
+  // .py needs to read sub_modules + words from state.json and emit
+  // recognisable component shapes (battery rack, compressor, control
+  // panel, etc.) inside each module's bounding box. That's a Python
+  // change — deferred to a separate commit.
+  console.log(`[modules] Blender per-module CAD render (engineering-truth, no Gemini paint-over)`)
   const tBlender = Date.now()
-  const blenderRefByModule = new Map<string, ImageRef>()
+  const modulePaths: Record<string, string> = {}
   for (let i = 0; i < moduleIds.length; i++) {
     const id = moduleIds[i]
     const az = moduleAzimuth(i, moduleIds.length)
-    const blenderOut = resolve(outDir, `module-${id}-blender.png`)
+    const blenderOut = resolve(outDir, `module-${id}.png`)  // direct: Blender → module-<id>.png (no -blender suffix)
     const path = runBlenderModulePass({ statePath, moduleId: id, azimuth: az, outPath: blenderOut })
     if (path) {
-      const ref = readImageRef(path)
-      if (ref) blenderRefByModule.set(id, ref)
+      modulePaths[id] = path
+      console.log(`[modules]   ${Object.keys(modulePaths).length}/${moduleIds.length} ${id} → ${path}`)
+    } else {
+      console.log(`[modules]   ${id} — Blender failed (binary absent or render error)`)
     }
   }
-  console.log(`[modules]   Blender refs ready: ${blenderRefByModule.size}/${moduleIds.length} in ${((Date.now() - tBlender) / 1000).toFixed(1)}s`)
+  console.log(`[modules] Blender complete: ${Object.keys(modulePaths).length}/${moduleIds.length} in ${((Date.now() - tBlender) / 1000).toFixed(1)}s`)
 
-  console.log(`[modules] step B: Gemini i2i per module (concurrency ${CONCURRENCY})`)
-  const t0 = Date.now()
-  const modulePaths: Record<string, string> = {}
+  // Mark the hero + palette as not used per module (they're for the
+  // cover only now) but keep refs computed so we don't waste them —
+  // future Gemini-on-cover-only path may still want them.
+  void heroRef; void paletteRef
+  const t0 = Date.now(); void t0
 
-  // Concurrency-limited processor — each module passes [hero, palette,
-  // module-specific Blender wireframe] as three references to Gemini.
-  const tasks = moduleIds.map((id) => ({ id, outPath: resolve(outDir, `module-${id}.png`) }))
+  // No Gemini per-module pass — the Blender CAD render IS the module
+  // image now. Loop below kept as a fallback skeleton (zero iters
+  // unless re-enabled in a follow-up).
+  const tasks: Array<{ id: string; outPath: string }> = []
   for (let i = 0; i < tasks.length; i += CONCURRENCY) {
     const batch = tasks.slice(i, i + CONCURRENCY)
     const results = await Promise.all(batch.map(async (t) => {
       const prompt = composeModulePrompt(state, t.id)
-      const blenderModuleRef = blenderRefByModule.get(t.id)
-      const refs: ImageRef[] = blenderModuleRef
-        ? [heroRef, paletteRef, blenderModuleRef]
-        : [heroRef, paletteRef]
-      const png = await callGeminiI2I({ prompt, references: refs })
-      if (png) {
-        if (write) writeImage(t.outPath, png)
-        return { id: t.id, path: t.outPath, ok: true }
-      }
+      void prompt
       return { id: t.id, path: null, ok: false }
     }))
     for (const r of results) {
