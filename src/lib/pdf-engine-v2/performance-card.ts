@@ -443,7 +443,7 @@ export function buildPerformanceCard(state: any): PerformanceCard {
   // (over the LLM-emitted derived_parameters). Universal — works for any
   // class whose archetype emits quantities matching the metric schema ids.
   const CONTRACT_KEY_ALIASES: Record<string, string[]> = {
-    // BESS
+    // BESS (schema metric IDs verified via grep against performance-card.ts)
     nameplate_kwh: ['nameplate_capacity_kwh', 'usable_capacity_kwh'],
     usable_kwh: ['usable_capacity_kwh', 'battery_usable_kwh'],
     cell_count: ['cell_count'],
@@ -453,20 +453,29 @@ export function buildPerformanceCard(state: any): PerformanceCard {
     rated_power_kw: ['continuous_power_kw'],
     peak_power_kw: ['peak_power_kw'],
     dc_bus_voltage_v: ['dc_bus_voltage_v'],
-    cooling_capacity_kw: ['thermal_rejection_min_kw'],
-    // HAPS
+    cooling_capacity_kw: ['thermal_rejection_min_kw', 'hvac_cooling_kw'],
+    // VF (schema metric IDs verified)
+    canopy_area_m2: ['canopy_area_m2'],
+    led_power_kw: ['led_installed_power_kw'],
+    led_power_per_m2: ['led_power_per_m2'],  // derived from led_installed_power_kw / canopy_area_m2 (calculator hint)
+    ppfd_umol_m2_s: ['ppfd_target_umol_m2_s'],
+    annual_yield_kg: ['annual_yield_tonnes'],  // tonnes → kg conversion in calculator hint
+    heat_load_kw: ['hvac_cooling_kw'],
+    refrigerant_charge_kg: ['refrigerant_charge_kg'],
+    // HAPS (schema not yet defined in PERFORMANCE_CARDS but ready for future)
     wingspan_m: ['wingspan_m'],
     wing_area_m2: ['wing_area_m2'],
     cruise_power_kw: ['cruise_power_kw'],
     battery_capacity_kwh: ['battery_capacity_kwh'],
     solar_peak_kw: ['solar_peak_kw'],
     endurance_days: ['endurance_days'],
-    // VF
-    canopy_area_m2: ['canopy_area_m2'],
-    led_installed_power_kw: ['led_installed_power_kw'],
-    hvac_cooling_kw: ['hvac_cooling_kw'],
-    ppfd_target_umol_m2_s: ['ppfd_target_umol_m2_s'],
-    annual_yield_tonnes: ['annual_yield_tonnes'],
+    // Heat pump (schema metric IDs verified)
+    rated_thermal_kw: ['thermal_rejection_min_kw'],
+    rated_electrical_kw: ['continuous_power_kw'],
+    cop: ['cop_rated'],
+    refrigerant: ['refrigerant'],
+    // Generic / cross-class
+    max_mass_kg: ['max_mass_kg', 'brief_mass_cap_kg'],
   }
 
   for (const section of schema.sections) {
