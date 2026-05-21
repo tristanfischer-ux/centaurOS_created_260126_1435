@@ -368,6 +368,45 @@ No prose, no markdown.`
 }
 
 // ---------------------------------------------------------------------------
+// Small-commodity keyword pre-filter for unknown-class parts (2026-05-21,
+// Tristan BESS forensic). Flash-Lite was returning £128 for "cell voltage
+// tap wire" (×5000 = £640k!) because it didn't know to bias toward small-
+// commodity prices. Universal: short list of keywords that map to a tier
+// of typical UK unit prices. When the part name matches, skip the Flash-
+// Lite call entirely and use the deterministic floor. Cost Repair can
+// still correct upward if a genuinely high-priced item slipped through.
+// ---------------------------------------------------------------------------
+
+interface SmallCommodityTier {
+  pattern: RegExp
+  unit_gbp: number
+  reason: string
+}
+
+const SMALL_COMMODITY_TIERS: SmallCommodityTier[] = [
+  // Tier 1: micro commodity (£0.50-3) — fasteners, micro-electronics, single wires
+  { pattern: /\b(fastener|bolt|nut|screw|rivet|washer|grommet|cable_tie|tie_wrap|spacer_screw|micro_fuse|jumper|ferrite_bead)\b/i, unit_gbp: 1.5, reason: 'micro commodity (fastener/wire)' },
+  { pattern: /\b(voltage_tap_wire|tap_wire|sense_wire|sensing_wire|pilot_wire|signal_wire|trigger_wire|sample_lead)\b/i, unit_gbp: 2.0, reason: 'small signal/tap wire' },
+  // Tier 2: small fabrication (£5-30) — small brackets/plates/clips/connectors
+  { pattern: /\b(clip|mount(ing)?_clip|tab|spring_clip|ferrule|lug|terminal|cable_gland|cable_clamp|p_clip|spacer)\b/i, unit_gbp: 10, reason: 'small fabricated clip/terminal' },
+  { pattern: /\b(gasket|o_ring|seal|grommet_seal|sleeve|bushing)\b/i, unit_gbp: 8, reason: 'small seal/bushing' },
+  { pattern: /\b(label|sticker|decal|nameplate|warning_plate)\b/i, unit_gbp: 3, reason: 'label/sticker' },
+  // Tier 3: small structural (£15-80) — small plates, brackets, panels under 1 m
+  { pattern: /\b(small_bracket|sub_bracket|mounting_bracket|sensor_bracket|micro_bracket)\b/i, unit_gbp: 25, reason: 'small mounting bracket' },
+  { pattern: /\b(cable_entry|gland_plate|tray_clip|cover_plate|access_plate|blanking_plate)\b/i, unit_gbp: 30, reason: 'small access/cover plate' },
+  // Tier 4: short busbars / connector strips (£10-50)
+  { pattern: /\b(cell_to_cell|inter_cell|cell_busbar|busbar_short|sense_busbar|module_busbar)\b/i, unit_gbp: 25, reason: 'small cell-interconnect busbar' },
+]
+
+function trySmallCommodityFloor(partName: string): { unit_gbp: number; reason: string } | null {
+  const name = String(partName ?? '').replace(/\s+/g, '_').toLowerCase()
+  for (const t of SMALL_COMMODITY_TIERS) {
+    if (t.pattern.test(name)) return { unit_gbp: t.unit_gbp, reason: t.reason }
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
 // Flash-Lite fallback price estimator — used ONLY when the classifier
 // returned 'unknown'. New prompt is volume-aware (NOT scale-of-one).
 // ---------------------------------------------------------------------------
@@ -699,6 +738,37 @@ async function main() {
         while (inFlight < CONCURRENCY && nextIdx < unknowns.length) {
           const ctx = unknowns[nextIdx++]
           inFlight += 1
+          // 2026-05-21 (Tristan BESS forensic): small-commodity keyword
+          // pre-filter. If the part name matches a known small-commodity
+          // tier (fastener, tap wire, small bracket, cable clip, etc.),
+          // skip the Flash-Lite call entirely and use the deterministic
+          // floor. Saves an LLM call and prevents Flash-Lite from
+          // returning £128 for what should be a £2 wire. Cost Repair
+          // can still correct upward later if a real high-priced item
+          // matched the pattern.
+          const smallFloor = trySmallCommodityFloor(ctx.word_name)
+          if (smallFloor) {
+            results.push({
+              ctx,
+              estimate: {
+                price_estimate_gbp: round2(smallFloor.unit_gbp),
+                estimate_low_gbp: round2(smallFloor.unit_gbp * 0.5),
+                estimate_high_gbp: round2(smallFloor.unit_gbp * 2),
+                reasoning: `Engine B small-commodity pre-filter: ${smallFloor.reason}`,
+                component_class: 'unknown',
+                curve_multiplier: 0,
+                reference_unit_cost_gbp: 0,
+                annual_volume: annualVolume,
+                classification_source: classSource.get(ctx.word_id)!,
+                estimate_source: 'flash_lite_unknown_class',
+              },
+            })
+            done += 1
+            inFlight -= 1
+            if (done === unknowns.length) resolveAll()
+            else tick()
+            continue
+          }
           estimatePriceForUnknown(ctx, productClass, annualVolume).then((e) => {
             if (e) {
               results.push({
