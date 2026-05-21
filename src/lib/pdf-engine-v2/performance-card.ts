@@ -119,6 +119,51 @@ function getByPath(state: any, path: string): any {
   return cursor ?? null
 }
 
+// 2026-05-21 (6th hit of the unit-family bug, pre-emptive fix per Rule 12
+// in project CLAUDE.md). The Performance Card metric schema declares
+// `brief_path` paths ending in '.target_performance.value' for BESS
+// nameplate_kwh (kWh) and heat-pump rated_thermal_kw (kW). The brief
+// emits {value, unit}; reading .value alone treats 3.5 MWh as 3.5 kWh
+// (1000× off). This wrapper reads the sibling .unit and converts to the
+// metric's declared canonical unit. Returns null if the families don't
+// match (different unit family = comparison doesn't apply to this row).
+// Universal across product classes.
+function getUnitAwareBriefValue(state: any, briefPath: string, metricUnit: string): number | string | null {
+  const raw = getByPath(state, briefPath)
+  if (raw === null) return null
+  // Only convert when path is the target_performance.value form. Other
+  // brief_paths (unit_cost_ceiling.value, max_mass_kg.value, etc.)
+  // carry their unit IN their field name, no ambiguity.
+  if (!briefPath.endsWith('target_performance.value')) return raw
+  const tpPath = briefPath.replace(/\.value$/, '')
+  const tp = getByPath(state, tpPath)
+  const briefUnit = String((tp as any)?.unit ?? '').toLowerCase().trim()
+  const metricUnitLower = String(metricUnit ?? '').toLowerCase().trim()
+  if (!briefUnit || !metricUnitLower || briefUnit === metricUnitLower) return raw
+  // Same-family conversion tables — kept local to avoid cross-file dep
+  // (the G0.5 stage 1.8 has a similar helper; if we end up with three
+  // of these, refactor into a shared unit-conversion module).
+  const FAMILIES: Record<string, Record<string, number>> = {
+    energy: { wh: 0.001, kwh: 1, mwh: 1000, gwh: 1_000_000 },
+    power: { w: 0.001, kw: 1, mw: 1000, gw: 1_000_000 },
+    mass: { g: 0.001, kg: 1, t: 1000, tonne: 1000, tonnes: 1000 },
+    area: { cm2: 0.0001, m2: 1, ha: 10000 },
+    length: { mm: 0.001, cm: 0.01, m: 1, km: 1000 },
+  }
+  const v = num(raw)
+  if (v === null) return raw
+  for (const table of Object.values(FAMILIES)) {
+    if (briefUnit in table && metricUnitLower in table) {
+      return (v * table[briefUnit]) / table[metricUnitLower]
+    }
+  }
+  // Brief unit not in same family as metric unit → comparison doesn't
+  // apply (e.g. heat-pump rated_thermal_kw metric vs HAPS endurance days
+  // brief). Return null so compareToBrief sees no target and the row
+  // doesn't false-flag a delta.
+  return null
+}
+
 function getModules(state: any): any[] {
   const a = state?.moduleDecomposition?.design?.modules
   if (Array.isArray(a)) return a
@@ -405,8 +450,12 @@ export function buildPerformanceCard(state: any): PerformanceCard {
           if (v !== null && v !== undefined) { raw = v; source = 'computed' }
         } catch {}
       }
-      // Brief target
-      const brief = m.brief_path ? getByPath(state, m.brief_path) : null
+      // Brief target — unit-aware read (6th-hit-of-unit-family-bug
+      // pre-emptive fix). Polymorphic brief paths like
+      // parsedBrief.constraints.target_performance.value carry a
+      // separate .unit field that must match the metric's declared
+      // unit (or be convertible within the same family).
+      const brief = m.brief_path ? getUnitAwareBriefValue(state, m.brief_path, m.unit) : null
       // Status
       let status: PerformanceStatus = raw === null ? 'missing' : (source === 'computed' ? 'computed' : 'ok')
       if (raw !== null && m.reasonable_range) {
