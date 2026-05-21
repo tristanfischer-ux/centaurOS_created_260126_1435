@@ -183,6 +183,60 @@ export function runBlenderCoverPass(statePath: string): string | null {
   }
 }
 
+/**
+ * Render the Blender structural reference for a single module (focal
+ * module SATURATED, sibling modules GREYSCALE). Same orbital sphere
+ * as runBlenderCoverPass — only azimuth varies. The output is the
+ * canonical SPATIAL ANCHOR: every part's bounding box is derived from
+ * state.moduleDecomposition + max_dimensions_mm, so parts actually
+ * fit inside the envelope.
+ *
+ * 2026-05-21 (Tristan critique): "the blender sub module system meant
+ * that all the parts actually fit in the system accurately from a
+ * space and layout perspective". Pure photoreal i2i without this
+ * reference produces beautiful but spatially fictional zooms. The
+ * fix is to pass this PNG as a Gemini i2i reference so the photoreal
+ * output respects the same geometry.
+ *
+ * Returns the absolute output path, or null on failure / Blender
+ * absent. Universal across product classes.
+ */
+export function runBlenderModulePass(opts: {
+  statePath: string
+  moduleId: string
+  azimuth: number
+  outPath: string
+}): string | null {
+  if (!existsSync(BLENDER_BIN)) return null
+  const projectRoot = resolve(__dirname, '..', '..')
+  const blenderScript = resolve(projectRoot, 'scripts', 'render-product-blender.py')
+  try {
+    execFileSync(BLENDER_BIN, [
+      '--background',
+      '--python', blenderScript,
+      '--',
+      '--state', opts.statePath,
+      '--module', opts.moduleId,
+      '--azimuth', String(opts.azimuth),
+      '--out', opts.outPath,
+    ], { stdio: 'pipe', timeout: 60_000 })
+    return existsSync(opts.outPath) ? opts.outPath : null
+  } catch (err) {
+    console.error(`[i2i] Blender module render failed (${opts.moduleId}): ${(err as Error).message}`)
+    return null
+  }
+}
+
+/**
+ * Pick a per-module orbital azimuth. Same convention as the validated
+ * Blender turntable pipeline: cover at -35°, modules start at +20°
+ * and stride evenly around the orbital sphere.
+ */
+export function moduleAzimuth(moduleIndex: number, totalModules: number): number {
+  if (totalModules <= 0) return 0
+  return (20 + (360 / totalModules) * moduleIndex) % 360
+}
+
 // ---------------------------------------------------------------------------
 // Palette card — programmatic SVG → PNG via sharp
 // ---------------------------------------------------------------------------
@@ -310,9 +364,10 @@ export function composeModulePrompt(state: any, moduleId: string): string {
   const subList = subModules.slice(0, 5).map((s: any) => String(s?.name_human ?? s?.id ?? '').replace(/_/g, ' ')).join(', ')
   return `Photorealistic close-up photograph of the "${display}" module within a ${b.product_display}. Module description: ${briefText}. Key sub-systems visible: ${subList}.
 
-You have TWO reference images:
+You have THREE reference images (the order matters):
 1. The system hero (full assembly) — produce an image that reads as a ZOOM-IN of the corresponding region of that hero. Same lighting, same finish, same perspective style, same palette. The viewer should believe this close-up came from the same shoot as the hero.
 2. The style contract / palette card — use these hex values when surfaces correspond to the modules listed there; otherwise natural material colours.
+3. A Blender schematic wireframe showing the focal module SATURATED in colour with sibling modules in GREYSCALE. This is the SPATIAL ANCHOR — the focal module's geometry, bounding box, and position relative to the envelope are CORRECT in this wireframe. Respect them. The parts you draw MUST FIT inside the focal module's bounds. Use the wireframe to size and position the focal sub-systems; then paint over with photorealistic finish (matching reference 1's style).
 
 Composition: sharp focus on the focal sub-systems, neutral industrial lighting, real materials, no people. NO text, NO labels, NO callouts, NO watermarks. Square aspect ratio. Generate at high resolution.`
 }

@@ -48,6 +48,8 @@ import {
   buildPaletteCardPng,
   readImageRef,
   writeImage,
+  runBlenderModulePass,
+  moduleAzimuth,
   type ImageRef,
 } from './lib/illustration-i2i'
 
@@ -90,17 +92,44 @@ async function main() {
   const outDir = dirname(statePath)
   writeImage(resolve(outDir, 'palette-card.png'), paletteCardData)
 
-  console.log(`[modules] generating ${moduleIds.length} module images (concurrency ${CONCURRENCY})`)
+  // 2026-05-21 (Tristan critique on photoreal-only being spatially
+  // inaccurate): for each module, render a Blender structural reference
+  // FIRST (focal module saturated, siblings greyscale) — this anchors
+  // the part bounding boxes to the actual envelope. Then pass the
+  // Blender wireframe as a THIRD reference to Gemini i2i alongside the
+  // hero + palette card. Result: photoreal close-up that respects
+  // spatial layout (every part fits inside the envelope).
+  console.log(`[modules] step A: Blender structural reference per module (sequential, ~1.5 s each)`)
+  const tBlender = Date.now()
+  const blenderRefByModule = new Map<string, ImageRef>()
+  for (let i = 0; i < moduleIds.length; i++) {
+    const id = moduleIds[i]
+    const az = moduleAzimuth(i, moduleIds.length)
+    const blenderOut = resolve(outDir, `module-${id}-blender.png`)
+    const path = runBlenderModulePass({ statePath, moduleId: id, azimuth: az, outPath: blenderOut })
+    if (path) {
+      const ref = readImageRef(path)
+      if (ref) blenderRefByModule.set(id, ref)
+    }
+  }
+  console.log(`[modules]   Blender refs ready: ${blenderRefByModule.size}/${moduleIds.length} in ${((Date.now() - tBlender) / 1000).toFixed(1)}s`)
+
+  console.log(`[modules] step B: Gemini i2i per module (concurrency ${CONCURRENCY})`)
   const t0 = Date.now()
   const modulePaths: Record<string, string> = {}
 
-  // Concurrency-limited processor
+  // Concurrency-limited processor — each module passes [hero, palette,
+  // module-specific Blender wireframe] as three references to Gemini.
   const tasks = moduleIds.map((id) => ({ id, outPath: resolve(outDir, `module-${id}.png`) }))
   for (let i = 0; i < tasks.length; i += CONCURRENCY) {
     const batch = tasks.slice(i, i + CONCURRENCY)
     const results = await Promise.all(batch.map(async (t) => {
       const prompt = composeModulePrompt(state, t.id)
-      const png = await callGeminiI2I({ prompt, references: [heroRef, paletteRef] })
+      const blenderModuleRef = blenderRefByModule.get(t.id)
+      const refs: ImageRef[] = blenderModuleRef
+        ? [heroRef, paletteRef, blenderModuleRef]
+        : [heroRef, paletteRef]
+      const png = await callGeminiI2I({ prompt, references: refs })
       if (png) {
         if (write) writeImage(t.outPath, png)
         return { id: t.id, path: t.outPath, ok: true }
