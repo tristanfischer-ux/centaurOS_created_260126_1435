@@ -57,6 +57,16 @@ interface FlaggedRow {
   engine_c_flag: 'over' | 'under'
   engine_c_ref_median_gbp: number | null
   engine_c_ratio: number | null
+  // 2026-05-21 (audit af2a318fd78e757f8 Pattern 5): pass Engine B's
+  // estimate source so the Cost Repair LLM can RESPECT Engine B's
+  // deterministic small-commodity pre-filter instead of re-inflating
+  // a correctly-low price. When estimate_source='flash_lite_unknown_class'
+  // and the price is already in £0.20-£60 range, the LLM should
+  // leave_as_is.
+  engine_b_estimate_source: string
+  // Annual production volume — tells the LLM whether to use scale-of-one
+  // or commodity volume pricing for the correction.
+  annual_volume: number
 }
 
 interface RepairResponse {
@@ -78,13 +88,24 @@ C) "leave_as_is" — the current price is actually correct; the corpus compariso
 IMPORTANT — SMALL-COMMODITY DOWNWARD CORRECTIONS (2026-05-21 Tristan VF cost-overrun forensic):
 The chain's Engine B applies broad class-floor estimates (e.g. structural_metal class median £1,500) that are CORRECT for big items (containers, frames, racks) but WILDLY WRONG for small parts that happen to share the class. Always CORRECT DOWN small commodities — DO NOT leave £1,500 on a sensor bracket.
 
-Small-commodity keywords (apply downward correction without hesitation):
-  • bracket, plate, panel, pan, tray, clip, mount, mounting, support, gusset, washer, gasket, seal, bushing, sleeve, ferrule, lug, terminal, cable_gland, grommet — typical £5-£60 each
-  • fastener, bolt, nut, screw, rivet, anchor — typical £0.20-£5 each
-  • earth_bar, bus_bar (small <300 mm), cable_tray (per metre) — typical £15-£80
-  • drain_pan, condensate_pan, drip_tray (sheet metal, <1m²) — typical £20-£100
-  • label, sticker, decal, nameplate — typical £1-£10
-  • drain_hose, p_trap, small_fitting — typical £5-£50
+RESPECT ENGINE B'S PRE-FILTER (added 2026-05-21 audit af2a318fd78e757f8 Pattern 5):
+If a row has \`engine_b_estimate_source = 'flash_lite_unknown_class'\` AND the current price is ALREADY between £0.20 and £60 AND the part name matches one of the small-commodity keywords below, Engine B's deterministic pre-filter has ALREADY correctly anchored this part — return action='leave_as_is' with reasoning 'engine_b pre-filter anchored'. Do NOT re-inflate by suggesting £5-£60 when Engine B already set £2.50. This avoids the two engines fighting each other.
+
+Volume-aware small-commodity tiers (use the brief's annual_volume from the part row):
+- LOW volume ≤1k/yr (bespoke / 1-off): use the high end of each range
+- MID volume 1k-50k/yr (distributor-discounted, light tooling): use the centre
+- HIGH volume ≥50k/yr (commodity, full-tooling OEM contract): use the low end
+
+Small-commodity keywords:
+  • bracket, plate, panel, pan, tray, clip, mount, mounting, support, gusset, washer, gasket, seal, bushing, sleeve, ferrule, lug, terminal, cable_gland, grommet — £0.50 (high-vol) to £60 (low-vol) each
+  • fastener, bolt, nut, screw, rivet, anchor — £0.05 (high-vol) to £5 (low-vol) each
+  • earth_bar, bus_bar (small <300 mm), cable_tray (per metre) — £2 (high-vol) to £80 (low-vol)
+  • drain_pan, condensate_pan, drip_tray (sheet metal, <1m²) — £5 (high-vol) to £100 (low-vol)
+  • label, sticker, decal, nameplate — £0.20 (high-vol) to £10 (low-vol)
+  • drain_hose, p_trap, small_fitting — £2 (high-vol) to £50 (low-vol)
+  • cable_tie, ferrite_bead, heat_shrink, sleeving, crimp, spade, standoff, pcb_spacer, thermal_pad — £0.05 (high-vol) to £3 (low-vol)
+  • voltage_tap_wire, tap_wire, sense_wire, signal_wire — £0.20 (high-vol) to £3 (low-vol)
+  • cell_to_cell_busbar, inter_cell_busbar, cell_busbar — £0.40 (high-vol) to £8 (low-vol)
 
 Mid-commodity keywords:
   • enclosure, cabinet, housing (depending on size, IP rating) — typical £80-£800
@@ -203,6 +224,8 @@ async function main() {
       engine_c_flag: routedFlag,
       engine_c_ref_median_gbp: typeof v.engine_c_ref_median_gbp === 'number' ? v.engine_c_ref_median_gbp : null,
       engine_c_ratio: typeof v.engine_c_ratio === 'number' ? v.engine_c_ratio : null,
+      engine_b_estimate_source: String(v.engine_b_estimate_source ?? 'unknown'),
+      annual_volume: Number(state?.parsedBrief?.constraints?.batch_size?.value ?? state?.parsedBrief?.constraints?.production_volume?.value ?? 1000),
     })
   }
 

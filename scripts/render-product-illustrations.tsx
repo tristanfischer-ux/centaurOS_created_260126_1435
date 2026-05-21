@@ -2,6 +2,23 @@
 /**
  * scripts/render-product-illustrations.tsx
  *
+ * DEPRECATED 2026-05-21 — superseded by scripts/generate-{hero,module}-
+ * images.tsx (Gemini i2i pipeline) per council a66e6ee7cdd05270f
+ * verdict. Kept on disk as a dev tool but NO LONGER CALLED from the
+ * chain orchestrator. Per-module Blender wireframes are now produced
+ * inline by runBlenderModulePass() in scripts/lib/illustration-i2i.ts
+ * and consumed as i2i references by generate-module-images.tsx.
+ *
+ * AUDIT FINDING (af2a318fd78e757f8 Pattern 3, 2026-05-21): this script
+ * writes module-<id>.png to the same path generate-module-images.tsx
+ * uses for its final photoreal output. If both run in the same chain,
+ * whichever runs last wins. Mitigated TODAY by the chain orchestrator
+ * no longer invoking this script — but the filename collision remains
+ * a latent risk. If you re-enable this script for any reason, change
+ * outputs to `module-<id>-legacy-blender.png` first.
+ *
+ * --- ORIGINAL ARCHITECTURE NOTES BELOW (for reference) ---
+ *
  * Sprint 0 v5 (Tristan 2026-05-20): generic, brief-aware Blender
  * illustration pipeline for the ForgeOS PDF engine. Replaces the
  * gpt-image-1 stylistic drift problem (different prompt = different
@@ -56,6 +73,10 @@
  * superset — emits cover + every module image in one Blender process
  * batch.
  */
+
+// DEPRECATED guard — script body retained for dev/debug, but anyone
+// invoking it should know it's no longer the canonical Blender path.
+console.error('[render-product-illustrations] DEPRECATED — this script is no longer called from the chain (council a66e6ee7cdd05270f, 2026-05-21). Use scripts/generate-{hero,module}-images.tsx instead. Continuing anyway since you invoked it explicitly.')
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from 'fs'
 import { spawnSync } from 'child_process'
