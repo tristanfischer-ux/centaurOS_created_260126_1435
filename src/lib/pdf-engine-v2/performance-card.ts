@@ -384,6 +384,62 @@ const HEAT_PUMP_SCHEMA: PerformanceCardSchema = {
   ],
 }
 
+const HAPS_SCHEMA: PerformanceCardSchema = {
+  product_class: 'haps',
+  sections: [
+    {
+      name: 'Airframe',
+      metrics: [
+        { id: 'wingspan_m', label: 'Wingspan', unit: 'm', sources: ['any_module.derived.wingspan_m', 'any_module.derived.wingspan_metres'], reasonable_range: [20, 80] },
+        { id: 'wing_area_m2', label: 'Wing area', unit: 'm²', sources: ['any_module.derived.wing_area_m2', 'any_module.derived.wing_area_metres_squared'] },
+        { id: 'aspect_ratio', label: 'Aspect ratio', unit: '', sources: ['any_module.derived.aspect_ratio'], reasonable_range: [15, 30] },
+        { id: 'total_estimated_mass_kg', label: 'Estimated empty mass', unit: 'kg', sources: ['any_module.derived.total_estimated_mass_kg', 'any_module.derived.empty_mass_kg'] },
+        { id: 'max_mass_kg', label: 'Brief mass ceiling', unit: 'kg', sources: ['parsedBrief.constraints.max_mass_kg.value'] },
+        { id: 'composite_spar_mass_kg', label: 'Composite wing spar mass', unit: 'kg', sources: ['any_module.derived.composite_spar_mass_kg', 'any_module.derived.wing_spar_mass_kg'] },
+      ],
+    },
+    {
+      name: 'Power & propulsion',
+      metrics: [
+        { id: 'cruise_power_kw', label: 'Cruise power', unit: 'kW', sources: ['any_module.derived.cruise_power_kw', 'any_module.derived.continuous_power_kw'], reasonable_range: [0.5, 30] },
+        { id: 'cruise_speed_ms', label: 'Cruise airspeed', unit: 'm/s', sources: ['any_module.derived.cruise_speed_ms', 'any_module.derived.cruise_v_ms'], reasonable_range: [15, 40] },
+        { id: 'propeller_efficiency', label: 'Propeller efficiency', unit: '', sources: ['any_module.derived.propeller_efficiency', 'any_module.derived.propeller_eta'], reasonable_range: [0.6, 0.85] },
+      ],
+    },
+    {
+      name: 'Energy storage',
+      metrics: [
+        { id: 'battery_capacity_kwh', label: 'Battery capacity', unit: 'kWh', sources: ['any_module.derived.battery_capacity_kwh', 'any_module.derived.usable_capacity_kwh'] },
+        { id: 'battery_chemistry', label: 'Battery chemistry', unit: '', sources: ['any_module.derived.battery_chemistry', 'any_module.derived.cell_chemistry'], format: 'string' },
+        { id: 'battery_energy_density_wh_kg', label: 'Battery energy density', unit: 'Wh/kg', sources: ['any_module.derived.battery_energy_density_wh_kg'], reasonable_range: [350, 500] },
+      ],
+    },
+    {
+      name: 'Solar array',
+      metrics: [
+        { id: 'solar_peak_kw', label: 'Solar peak power', unit: 'kW', sources: ['any_module.derived.solar_peak_kw', 'any_module.derived.solar_array_peak_kw'] },
+        { id: 'solar_array_area_m2', label: 'Solar array area', unit: 'm²', sources: ['any_module.derived.solar_array_area_m2', 'any_module.derived.solar_area_m2'] },
+        { id: 'solar_cell_efficiency_pct', label: 'GaAs cell efficiency', unit: '%', sources: ['any_module.derived.solar_cell_efficiency_pct', 'any_module.derived.gaas_efficiency_pct'], reasonable_range: [28, 36] },
+      ],
+    },
+    {
+      name: 'Mission performance',
+      metrics: [
+        { id: 'endurance_days', label: 'Endurance target', unit: 'days', sources: ['any_module.derived.endurance_days', 'any_module.derived.target_endurance_days'], brief_path: 'parsedBrief.constraints.target_performance.value', reasonable_range: [30, 365] },
+        { id: 'operating_altitude_m', label: 'Operating altitude', unit: 'm', sources: ['any_module.derived.altitude_m', 'any_module.derived.operating_altitude_m', 'any_module.derived.cruise_altitude_m'], reasonable_range: [15000, 25000] },
+        { id: 'station_keep_radius_km', label: 'Station-keeping radius', unit: 'km', sources: ['any_module.derived.station_keep_radius_km'] },
+      ],
+    },
+    {
+      name: 'Operating envelope',
+      metrics: [
+        { id: 'operating_temp_min_c', label: 'Min operating temp', unit: '°C', sources: ['any_module.derived.operating_temp_min_c'], reasonable_range: [-90, -40] },
+        { id: 'operating_temp_max_c', label: 'Max operating temp', unit: '°C', sources: ['any_module.derived.operating_temp_max_c'], reasonable_range: [10, 60] },
+      ],
+    },
+  ],
+}
+
 const GENERIC_SCHEMA: PerformanceCardSchema = {
   product_class: 'generic',
   sections: [
@@ -404,6 +460,10 @@ export const PERFORMANCE_CARDS: Record<string, PerformanceCardSchema> = {
   bess: BESS_SCHEMA,
   heatpump: HEAT_PUMP_SCHEMA,
   heat_pump: HEAT_PUMP_SCHEMA,
+  haps: HAPS_SCHEMA,
+  'high-altitude-pseudo-satellite': HAPS_SCHEMA,
+  pseudo_satellite: HAPS_SCHEMA,
+  stratospheric_uav: HAPS_SCHEMA,
   generic: GENERIC_SCHEMA,
 }
 
@@ -415,6 +475,7 @@ function normaliseClassSlug(raw: string): string {
   if (lower.includes('bess') || lower.includes('battery energy storage')) return 'bess'
   if (lower.includes('vertical farm') || lower.includes('vertical_farm')) return 'vertical-farm'
   if (lower.includes('heat pump') || lower.includes('heat_pump') || lower.includes('heatpump') || lower.includes('thermal system')) return 'heatpump'
+  if (lower.includes('haps') || lower.includes('high-altitude') || lower.includes('high_altitude') || lower.includes('pseudo-satellite') || lower.includes('pseudo_satellite') || lower.includes('stratospheric')) return 'haps'
   return lower.replace(/[_ ]/g, '-')
 }
 
