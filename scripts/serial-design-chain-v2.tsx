@@ -1902,7 +1902,14 @@ async function main() {
       macro_assembly_prices: engineeringContract.macro_assembly_prices as any,
       _tools_run: [],
     }
-    const orchResult = await orchestrateDesign(parsedResult.data, initialOrchContract, { fallback_on_failure: true })
+    // Inject product_class into parsedResult.data because the orchestrator's
+    // envelope detector reads it from there — the parsed brief doesn't
+    // carry the classifier output by default.
+    const orchParsedConstraints = {
+      ...parsedResult.data,
+      product_class: engineeringContract.product_class,
+    } as any
+    const orchResult = await orchestrateDesign(orchParsedConstraints, initialOrchContract, { fallback_on_failure: true })
     const orchLatencyMs = Date.now() - tOrch
     if (orchResult.ok && orchResult.design) {
       design = orchResult.design
