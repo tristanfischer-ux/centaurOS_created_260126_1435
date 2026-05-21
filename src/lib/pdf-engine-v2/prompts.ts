@@ -2049,7 +2049,28 @@ When the block is present and the records pass the priority checks above:
 
 - "high" — the brief unambiguously describes this module's role (e.g. brief explicitly mentions a battery → energy_storage_source = high).
 - "medium" — the module is implied by the product class but not explicitly described.
-- "low" — the module MAY apply but the brief is silent and the class doesn't strongly imply it. Use sparingly — 2+ "low" entries triggers council scrutiny.`
+- "low" — the module MAY apply but the brief is silent and the class doesn't strongly imply it. Use sparingly — 2+ "low" entries triggers council scrutiny.
+
+=== MACRO-ASSEMBLY ENFORCEMENT RULE (Tristan 2026-05-21, council Gemini 3.1 Pro + Grok 4.3 + MiMo verdict on HAPS under-pricing) ===
+
+CRITICAL EXTRACTION RULE for large-envelope or specialised-domain products (any product where the brief calls out a primary physical structure > 2 metres, OR specifies a non-commodity material chemistry, OR sits in aerospace / marine / utility-installed categories):
+
+You MUST emit the dominant macro-assemblies as DISCRETE, NAMED SUB-MODULES — NOT collapse them into generic component nodes. The downstream BoM uses sub_module + word names to find class-specific cost anchors; if you emit "carbon-fibre part" the engine prices it as a £100 commodity, while if you emit "50m primary composite wing spar" the engine prices it as the £200-500k assembly it actually is.
+
+Mandatory macro-assembly emissions when applicable (NOT exhaustive — same principle to anything large/specialised):
+
+- HAPS / long-endurance UAV / glider: PRIMARY COMPOSITE WING SPAR (full wingspan, single line item with material radical CF prepreg / S-glass and dimensions in metres), CARBON-FIBRE WING SKIN ASSEMBLY (areal weight g/m², total area m²), SOLAR LAMINATE ARRAY (cell chemistry GaAs / Si / CIGS, total area m², peak watts), HIGH-SPECIFIC-ENERGY BATTERY PACK (chemistry Li-S / Li-ion / solid-state, kWh, mass kg, cell count).
+- BESS / utility energy storage: BATTERY RACK ASSEMBLY (count, mass per rack, voltage), POWER CONVERSION SYSTEM (rated MW, topology), CONTAINER FIT-OUT INTEGRATION (ISO container build to TS standards) — as discrete sub-modules, not just "PCS inverter" alone.
+- Vertical farm / bioreactor / process: PRIMARY VESSEL OR CONTAINER (40-ft HC ISO with structural mods, food-grade or GMP build), CONDITIONED GROWING / REACTION ZONE (canopy m² or working volume L) — discrete macro lines.
+- AUV / submersible: PRESSURE HULL ASSEMBLY (depth rating bar, material), SYNTACTIC FOAM BUOYANCY MODULE (kg / m³).
+- Heat pump / chiller: REFRIGERANT CHARGE & PRIMARY HEAT EXCHANGER (refrigerant kg, exchanger area m², material).
+- EV charger: PRIMARY POWER STACK (rated kW, topology), USER-FACING CABINET (IP rating, material).
+
+For each macro-assembly: emit ONE sub_module with that purpose, name it descriptively, populate words[] with the primary physical part(s) carrying real material + mass + dimension modifiers, AND set the appropriate component_class on those words via the manufacturer/part_number modifiers. DO NOT decompose a 50m composite wing into 200 micro-components; the spar is one item priced as one item.
+
+Rationale: Engine B has class-specific reference unit cost overrides per product class (component-classes.ts:800+). Those overrides only fire if the WORDS in the BoM are named in a way that matches the class anchors. A generic "wing skin" word matches the cheapest class median; a "carbon-fibre wing skin assembly" word matches the aerospace-grade override. The naming is the lever — be specific.
+
+If the brief is ambiguous about a macro-assembly's existence, emit it anyway with applicability="medium" — a missing £200k spar is a worse error than an emitted spar the design might not need.`
 
 export const MODULE_DECOMPOSITION_COUNCIL_PROMPT = `You are one seat on a 4-seat code-and-engineering council reviewing a freshly-emitted module catalog for a hardware product. The catalog claims which of 12 universal engineering modules apply to this specific product, what each module does on it, and what radicals/materials it uses.
 

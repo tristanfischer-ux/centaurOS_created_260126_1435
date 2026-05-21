@@ -798,17 +798,28 @@ export const PRODUCT_CLASS_REFERENCE_OVERRIDES: Record<string, Partial<Record<Co
   // £5k-£100k. Post-override raw £2.55M × cost-stack compound 4.143× × W3
   // 1.0 = £10.58M (band £7M-£15M, 4% under centre — in band).
   haps: {
-    mechanical_assembly: 350.0,     // aerospace-grade cured composite assemblies, hinges, fittings (£100-£2k)
-    structural_polymer: 100.0,      // certified aerospace prepreg + composite parts (£20-£500 each ply / part)
-    electronic_cable: 30.0,         // MIL-spec aerospace harnesses (£5-£200)
-    electronic_ic: 30.0,            // rad-hardened MCU/FPGA at aerospace qty (£10-£500)
-    oem_subsystem: 40000.0,         // autopilot + sat-link + payload computer (£5k-£100k mixed)
-    electronic_power_module: 1500.0,// MPPT modules, BLDC controllers (£500-£5k)
-    sensor: 300.0,                  // cert-grade IMU, air-data probes (£50-£2000)
-    motor_actuator: 1500.0,         // aerospace BLDC propulsion motors (£200-£3000)
-    magnetic: 200.0,                // aerospace step-up transformers, BLDC stators
-    electronic_pcb: 250.0,          // space-qualified PCBs (£50-£800)
-    structural_metal: 300.0,        // CNC'd aluminium fittings, Ti pins (£80-£1000)
+    // 2026-05-21 (real council Gemini 3.1 Pro + Grok 4.3 + GLM-5.1 + MiMo
+    // verdict on HAPS under-pricing). Loop 4 emitted £37k raw BoM vs £7-15M
+    // validated installed-ASP band — 50-100× low. Per GLM-5.1: original
+    // anchors are commercial-drone calibrated, not aerospace. Raised to
+    // MiMo's confidence-bounded ranges for low-rate (4/yr) aerospace
+    // production. Cause C (Stage 1.7 macro-assembly emission) also fixed
+    // in prompts.ts MODULE_DECOMPOSITION_TAXONOMY_PROMPT — these higher
+    // anchors only land when the BoM contains aerospace-named parts.
+    mechanical_assembly: 800.0,     // raised from 350 — aerospace-grade cured composite hinges, fittings, control horns (£200-£2k typical at 4/yr)
+    structural_polymer: 800.0,      // raised from 100 — cured aerospace prepreg + CF wing skin parts; £400-1000/kg cured at low rate (council GLM-5.1)
+    electronic_cable: 80.0,         // raised from 30 — MIL-spec aerospace harnesses (£20-£300 each at low rate, council ranges)
+    electronic_ic: 300.0,           // raised from 30 — rad-hardened MCU/FPGA at low aerospace qty (council MiMo: £100-£500)
+    oem_subsystem: 80000.0,         // raised from 40000 — autopilot + sat-link + payload computer (£20k-£200k mixed at programme rate)
+    electronic_power_module: 3500.0,// raised from 1500 — aerospace MPPT, BLDC controllers (£1k-£10k at low rate)
+    sensor: 800.0,                  // raised from 300 — cert-grade IMU, air-data probes, GNSS (£200-£3k at aerospace qty)
+    motor_actuator: 3500.0,         // raised from 1500 — aerospace BLDC propulsion motors (£1.5k-£8k council GLM-5.1)
+    magnetic: 400.0,                // raised from 200 — aerospace step-up transformers, BLDC stators
+    electronic_pcb: 800.0,          // raised from 250 — space-qualified PCBs (£200-£2k council GLM-5.1)
+    structural_metal: 1200.0,       // raised from 300 — CNC'd Ti / 7075 aluminium fittings (£500-£2k council GLM-5.1)
+    // NEW classes likely to appear after Stage 1.7 macro-assembly rule lands
+    optical: 5000.0,                // GaAs solar laminate per panel — £4k/m² typical, panels ~1 m²
+    battery_cell: 1500.0,           // lithium-sulphur premium cell — £4k/kWh × ~0.4 kWh module = ~£1.6k
   },
 
   // 1U rack-mount edge-AI inference appliance (1-2× L4/T4 + 64-128 GB).
