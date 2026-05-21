@@ -502,8 +502,60 @@ function setByPath(obj: any, path: string, value: any): void {
 
 // ─── Prompts ────────────────────────────────────────────────────────────────
 
-function generatorSystem(): string {
-  return `${MODULE_DECOMPOSITION_TAXONOMY_PROMPT}
+function generatorSystem(engineeringContract?: EngineeringContract | null): string {
+  // Build #6c (Tristan 2026-05-21, council verdict — GLM-5.1 (a) pick;
+  // reinforced by (d) plurality verdict that the lossy channel between
+  // Contract and Generator is the primary reliability bottleneck).
+  // When the Contract is present, inject its deterministic quantities +
+  // required macro-assemblies + closure status into the system prompt.
+  // The Generator is now told the Contract's numbers VERBATIM and
+  // forbidden from inventing alternatives. This addresses Loop 12 BESS
+  // bug where Generator emitted cell_count=432 instead of Contract's
+  // 4014 — arithmetic gate caught it, but the chain wasted Phase 2
+  // iters re-emitting. With Build #6c, the Generator sees cell_count=4014
+  // in its system prompt before it generates anything.
+  let contractBlock = ''
+  if (engineeringContract && Object.keys(engineeringContract.quantities).length > 0) {
+    const c = engineeringContract
+    const qList = Object.entries(c.quantities).map(([k, q]: [string, any]) =>
+      `  - ${k}: ${q.value}${q.unit ? ' ' + q.unit : ''}${q.basis ? ' [' + q.basis : ''}${q.source ? ', source=' + q.source + ']' : (q.basis ? ']' : '')}${q.source_detail ? ' — ' + q.source_detail : ''}`
+    ).join('\n')
+    const macroList = c.macro_assembly_prices.length > 0 ? c.macro_assembly_prices.map((m: any) =>
+      `  - "${m.word_name}" (Contract price: £${Math.round(m.total_gbp).toLocaleString()} = £${m.unit_price_gbp}/${m.dimension_basis} × ${m.dimension_value} units) — ${m.source_detail}`
+    ).join('\n') : '  (no macro-assembly prices declared for this class)'
+    const closureList = c.closures.length > 0 ? c.closures.map((cl: any) =>
+      `  - ${cl.invariant_id}: ${cl.status.toUpperCase()} — ${cl.reason}`
+    ).join('\n') : '  (no closures declared)'
+    contractBlock = `
+
+=== ENGINEERING CONTRACT — DETERMINISTIC VALUES (USE VERBATIM — DO NOT INVENT) ===
+
+A deterministic Contract has been built from the brief BEFORE you (per the 6-seat full council architectural verdict 2026-05-21). Its values are physics-derived and validated. You MUST emit modules + sub-modules + words that respect these EXACT values. DO NOT invent alternative numbers. DO NOT round or estimate when the Contract has a value. DO NOT skip a required macro-assembly.
+
+PRODUCT CLASS: ${c.product_class}
+SUMMARY: ${c.brief_summary}
+
+REQUIRED DETERMINISTIC QUANTITIES (use these EXACT values in derived_parameters across modules; the Phase 2 arithmetic gate WILL block downstream if you contradict them):
+${qList}
+
+REQUIRED MACRO-ASSEMBLY EMISSIONS (you MUST emit a word for each name below; the Contract has size-aware pricing already computed):
+${macroList}
+
+For each macro-assembly above, emit a word inside the most relevant sub-module with name_human and id whose tokens overlap the macro_assembly word_name by ≥66% (e.g. for "lfp_cell_string" emit a word with id "lfp_cell_string_word" or name_human containing "LFP cell string"; for "pcs_inverter_bidirectional" use "pcs_inverter_module_word" or similar). The renderer's macro-assembly override (Build #4) reads this match and overrides the BoM line_total_gbp with the Contract price. Skipping a macro-assembly leaves a price gap in the BoM that downstream Cost Repair must close imprecisely.
+
+CONTRACT CLOSURE STATUS:
+${closureList}
+
+If ANY closure is "fail", you must surface this prominently in the relevant module's design_decisions and (where applicable) overview_paragraph_en. A failed closure means the brief target is infeasible at the design's other parameters — be honest about it in the module prose; do not hide it. The Performance Card (Build #7) reads from this Contract and will flag the failure on the cover.
+
+CONSEQUENCES OF CONTRADICTING THE CONTRACT:
+  - Wrong quantity value (e.g. cell_count=432 when Contract says 4014) → Phase 2 arithmetic gate FAILS → chain blocks until you re-emit
+  - Missing macro-assembly word → contract validator records miss → reviewer iterations forced to retry to add it (slower, less reliable)
+  - Contradicting closure status → cost-reality band + Performance Card surface infeasibility to the customer
+
+`
+  }
+  return `${MODULE_DECOMPOSITION_TAXONOMY_PROMPT}${contractBlock}
 
 === FIRST-DRAFT BUDGET (Tristan 2026-05-14, retuned 2026-05-15 after iter-55 BESS truncation) ===
 
@@ -1820,7 +1872,7 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   const candidateResults = await Promise.all(
     Array.from({ length: N_CANDIDATES }, (_, i) => callLlm({
       model: GEMINI_3_1_PRO,
-      system: generatorSystem(),
+      system: generatorSystem(engineeringContract),
       user: genUser,
       maxTokens: 150_000,
       timeoutMs: 1_500_000,
