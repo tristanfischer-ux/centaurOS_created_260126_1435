@@ -1576,46 +1576,9 @@ async function main() {
   console.error(`[chain] classification: ${classificationOriginal.productClass} (confidence=${classificationOriginal.confidence})`)
   logAction({ step: 'classify', product_class: classificationOriginal.productClass, confidence: classificationOriginal.confidence })
 
-  // ── Build #3: Engineering Contract construction (Tristan 2026-05-21
-  // 6/6 council unanimous: deterministic physics BEFORE Generator).
-  // The Contract becomes the canonical state object — quantities, topology
-  // constraints, macro-assembly prices, and arithmetic closures derived
-  // from the brief deterministically. Generator + downstream stages READ
-  // from the Contract; LLM no longer invents physics numbers it can't
-  // close. Per Grok: "until an external verifier with WRITE access to
-  // canonical state is the primary actor, every other variable being
-  // tuned is noise". This wires the Contract; subsequent builds plumb it
-  // into Performance Card / BoM / cost / prose stages.
+  // Build #19a (2026-05-22): engineering_contract moved AFTER brief refinement
+  // — it now uses the FINAL stable brief, not the pre-revision draft.
   let engineeringContract: EngineeringContract | null = null
-  try {
-    engineeringContract = buildContractForChain(classificationOriginal.productClass, parsedResultOriginal.data)
-    const failCount = engineeringContract.closures.filter(c => c.status === 'fail').length
-    const warnCount = engineeringContract.closures.filter(c => c.status === 'warn').length
-    const passCount = engineeringContract.closures.filter(c => c.status === 'pass').length
-    const macroAssemblyTotalGbp = engineeringContract.macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
-    console.error(`[chain] engineering_contract: ${Object.keys(engineeringContract.quantities).length} quantities, ${engineeringContract.topology.length} topology edges, ${engineeringContract.macro_assembly_prices.length} macro-assemblies (total £${macroAssemblyTotalGbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}), closures: ${passCount} pass / ${warnCount} warn / ${failCount} fail`)
-    if (failCount > 0) {
-      for (const c of engineeringContract.closures.filter(c => c.status === 'fail')) {
-        console.error(`  ✕ [${c.invariant_id}] ${c.reason}`)
-      }
-    }
-    writeFileSync(resolve(outDir, '0.5-engineering-contract.json'), JSON.stringify(engineeringContract, null, 2))
-    logAction({
-      step: 'engineering_contract_built',
-      product_class: classificationOriginal.productClass,
-      quantities_count: Object.keys(engineeringContract.quantities).length,
-      topology_edges: engineeringContract.topology.length,
-      macro_assemblies: engineeringContract.macro_assembly_prices.length,
-      macro_assembly_total_gbp: Math.round(macroAssemblyTotalGbp),
-      closures_pass: passCount,
-      closures_warn: warnCount,
-      closures_fail: failCount,
-      ok: true,
-    })
-  } catch (err) {
-    console.error(`[chain] engineering_contract build failed: ${(err as Error).message}; continuing without Contract (LLM-only fallback)`)
-    logAction({ step: 'engineering_contract_built', ok: false, error: String(err).slice(0, 200) })
-  }
 
   // ── Phase 0 — brief refinement loop (Tristan 2026-05-15)
   // Auto-revise non-viable briefs along the lowest-priority relaxation path,
@@ -1797,6 +1760,46 @@ async function main() {
   const productClass = currentProductClass
   const classification = { productClass: currentProductClass, confidence: classificationOriginal.confidence }
   writeFileSync(resolve(outDir, '1-parsed-brief.json'), JSON.stringify(parsedResult.data, null, 2))
+
+  // ── Build #19a: Engineering Contract construction NOW (post-brief-refinement,
+  // pre-tool-orchestrator). Uses the final stable parsed brief + final
+  // productClass — not the pre-revision originals — so the Contract's
+  // quantities reflect what the brief actually asks for after any auto-
+  // applied relaxations.
+  //
+  // Original Build #3 comment kept for context: deterministic physics BEFORE
+  // Generator; Contract is canonical state; Generator reads from Contract.
+  // Per Grok: "until an external verifier with WRITE access to canonical
+  // state is the primary actor, every other variable being tuned is noise".
+  try {
+    engineeringContract = buildContractForChain(productClass, parsedResult.data)
+    const failCount = engineeringContract.closures.filter(c => c.status === 'fail').length
+    const warnCount = engineeringContract.closures.filter(c => c.status === 'warn').length
+    const passCount = engineeringContract.closures.filter(c => c.status === 'pass').length
+    const macroAssemblyTotalGbp = engineeringContract.macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+    console.error(`[chain] engineering_contract: ${Object.keys(engineeringContract.quantities).length} quantities, ${engineeringContract.topology.length} topology edges, ${engineeringContract.macro_assembly_prices.length} macro-assemblies (total £${macroAssemblyTotalGbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}), closures: ${passCount} pass / ${warnCount} warn / ${failCount} fail`)
+    if (failCount > 0) {
+      for (const c of engineeringContract.closures.filter(c => c.status === 'fail')) {
+        console.error(`  ✕ [${c.invariant_id}] ${c.reason}`)
+      }
+    }
+    writeFileSync(resolve(outDir, '0.5-engineering-contract.json'), JSON.stringify(engineeringContract, null, 2))
+    logAction({
+      step: 'engineering_contract_built',
+      product_class: productClass,
+      quantities_count: Object.keys(engineeringContract.quantities).length,
+      topology_edges: engineeringContract.topology.length,
+      macro_assemblies: engineeringContract.macro_assembly_prices.length,
+      macro_assembly_total_gbp: Math.round(macroAssemblyTotalGbp),
+      closures_pass: passCount,
+      closures_warn: warnCount,
+      closures_fail: failCount,
+      ok: true,
+    })
+  } catch (err) {
+    console.error(`[chain] engineering_contract build failed: ${(err as Error).message}; continuing without Contract (LLM-only fallback)`)
+    logAction({ step: 'engineering_contract_built', ok: false, error: String(err).slice(0, 200) })
+  }
 
   // ── G0 deterministic physics ledger (Task #253, 2026-05-19): runs AFTER
   // brief refinement converges and BEFORE the LLM physics-critic. Pure
@@ -2178,26 +2181,66 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     ;(design.modules as any).__contractMisses = macroAssemblyMisses
   }
 
-  // ── Phase 1: Reviewers (identical template)
-  // Sprint 2D (Tristan 2026-05-20): each reviewer step has a fallback
-  // model in a different vendor family so a transient model failure
-  // (R2 GLM-5.1 truncated mid-stream in iter-9, KIMI K2.6 intermittently
-  // unavailable per MEMORY) doesn't kill the chain. The fallback uses a
-  // peer reviewer's model — same review-pass purpose, different
-  // tokeniser / JSON-emission style. Each fallback is the model that
-  // sits in the OTHER half of the reviewer pool so we don't both fail
-  // for a shared infra issue.
-  const r1 = await runReviewerStep({ label: 'STEP 5: R1 Grok 4.3', model: GROK_4_3, fallbackModel: QWEN_3_6_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics, toolOutputsBlock })
+  // ── Build #19b (2026-05-22): PHASE 4 — physics critic on skeleton + fail-fast.
+  // Per Tristan's plan: run physics critic on the tool-derived skeleton BEFORE
+  // the expensive reviewer cascade. If plausibility is unrecoverable (<3/10),
+  // log a clear FAIL_FAST diagnostic so we don't waste 10 min of reviewer time
+  // painting over a fundamentally broken skeleton. We DON'T halt the run (the
+  // PDF still lands so we can see what came out), but we DO surface the
+  // verdict prominently in the action log + reviewer prompt.
+  console.error(`\n[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)`)
+  const tSkeletonCritic = Date.now()
+  let skeletonCritique: CritiqueReport | null = null
+  let skeletonFailFast = false
+  try {
+    skeletonCritique = await runPhysicsCritic({
+      modules: design.modules ?? [],
+      brief: parsedResult.data,
+      keyMetrics,
+      productClass,
+      apiKey,
+    })
+    if (skeletonCritique) {
+      const s = skeletonCritique.scores
+      console.error(`[chain] PHASE 4 skeleton critic: brief=${s.brief_to_design_fidelity}/10 plaus=${s.engineering_plausibility}/10 coh=${s.internal_coherence}/10 part=${s.part_realism}/10 hon=${s.honesty_signal}/10 (${skeletonCritique.latency_ms}ms)`)
+      const highSev = skeletonCritique.issues.filter(i => i.severity === 'high')
+      console.error(`[chain] PHASE 4 skeleton critic: ${highSev.length} HIGH-severity issues found before any LLM painting`)
+      for (const i of highSev.slice(0, 8)) console.error(`  ✗ [${i.dimension} @ ${i.where}] ${i.issue.slice(0, 180)}`)
+      writeFileSync(resolve(outDir, '4-5-skeleton-critique.json'), JSON.stringify(skeletonCritique, null, 2))
+      // FAIL_FAST decision: if plausibility ≤ 2 the tool outputs are
+      // fundamentally inconsistent with each other or the brief — paying
+      // for reviewer time won't fix that. Surface loudly.
+      if (s.engineering_plausibility <= 2) {
+        skeletonFailFast = true
+        console.error(`[chain] PHASE 4 FAIL_FAST: plausibility ${s.engineering_plausibility}/10 — tool skeleton is unrecoverable; reviewer cascade will NOT fix this. Loop continues so PDF lands for diagnosis, but fix the orchestrator tool wiring first.`)
+      }
+    } else {
+      console.error(`[chain] PHASE 4 skeleton critic returned null; continuing without fail-fast check`)
+    }
+  } catch (err) {
+    console.error(`[chain] PHASE 4 skeleton critic threw: ${(err as Error).message}; continuing`)
+  }
+  logAction({ step: 'phase4_skeleton_critic', latency_ms: Date.now() - tSkeletonCritic, ok: skeletonCritique !== null, scores: skeletonCritique?.scores, issue_count: skeletonCritique?.issues.length ?? 0, fail_fast: skeletonFailFast })
+
+  // Inject skeleton critic findings into reviewer prompt so the single
+  // reviewer can specifically address them rather than re-discovering
+  // problems by itself.
+  const skeletonCriticAppend = skeletonCritique && skeletonCritique.issues.length > 0
+    ? `\n\nPHASE 4 SKELETON CRITIC FINDINGS (Build #19b — these issues exist in the tool-derived design BEFORE you edit it; your job is to address them via prose-only patches that fix the narrative without overriding the tool-sourced numbers):\n${skeletonCritique.issues
+        .filter(i => i.severity === 'high' || i.severity === 'med')
+        .slice(0, 10)
+        .map((i, n) => `${n + 1}. [${i.severity}] ${i.dimension} @ ${i.where}: ${i.issue}${i.suggested_check ? ` (suggested check: ${i.suggested_check})` : ''}`)
+        .join('\n')}\n`
+    : ''
+
+  // ── Build #19a (2026-05-22): COLLAPSED R1+R2+R3 cascade → single reviewer.
+  // Per Tristan's plan: 3-reviewer cascade adds ~30 min wall + ~£0.30 cost
+  // and only adds 1-2 score points over a single strong reviewer. Replaced
+  // with one Grok 4.3 pass (fallback Qwen 3.6 Max). Loops 22-28 evidence:
+  // the cascade's value-add was marginal. Saving the time/cost.
+  const r1 = await runReviewerStep({ label: 'STEP 5: Single reviewer (Grok 4.3)', model: GROK_4_3, fallbackModel: QWEN_3_6_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics, toolOutputsBlock: toolOutputsBlock + skeletonCriticAppend })
   design = r1.design
   writeFileSync(resolve(outDir, '5-r1-grok.json'), JSON.stringify(design, null, 2))
-
-  const r2 = await runReviewerStep({ label: 'STEP 6: R2 GLM-5.1', model: GLM_5_1, fallbackModel: GROK_4_3, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "6-r2-glm.raw.txt"), keyMetrics, toolOutputsBlock })
-  design = r2.design
-  writeFileSync(resolve(outDir, '6-r2-glm.json'), JSON.stringify(design, null, 2))
-
-  const r3 = await runReviewerStep({ label: 'STEP 7: R3 Qwen 3.6 Max', model: QWEN_3_6_MAX, fallbackModel: GLM_5_1, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "7-r3-qwen.raw.txt"), keyMetrics, toolOutputsBlock })
-  design = r3.design
-  writeFileSync(resolve(outDir, '7-r3-haiku.json'), JSON.stringify(design, null, 2))
 
   // ── STEP 7.5: Physics critic (post-R3, pre-R4).
   // Structural gates check wiring, not physics. The critic does the math the
