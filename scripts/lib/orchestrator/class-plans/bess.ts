@@ -80,25 +80,41 @@ const stepCoolProp: ToolStep = {
   tool_id: 'coolprop:refrigerant-properties',
   required: false,
   feeds_into: [] as string[],
-  input_from_contract: () => ({ fluid: 'r513a', temperature_c: 35 }),
+  // Build #18n-fix2: R290 (propane), not R513A. R513A is a refrigerant
+  // BLEND and this CoolProp install can't compute mixture properties,
+  // so every CoolProp output was silently null. R290 is industry-
+  // standard for modern BESS thermal-management CDUs (high COP, A3
+  // flammability handled by container ventilation per IEC 60079-10).
+  input_from_contract: () => ({ fluid: 'r290', temperature_c: 35 }),
   contract_update: (c: ContractInProgress, output: any) => {
-    const out = output as { latent_heat_kj_kg: number; cp_liquid_kj_kgk: number }
+    const out = output as { latent_heat_kj_kg: number | null; cp_liquid_kj_kgk: number | null }
     const prov = (f: string) => ({ source: 'tool:coolprop:refrigerant-properties' as const, tool_id: 'coolprop:refrigerant-properties', tool_version: '7.2.0', tool_license: 'MIT' as const, tool_source_url: 'coolprop.org', invocation_output_field: f, duration_ms: 0 })
     // Build #18n: feed CoolProp coolant cp into cooling-loop sizing.
     // Required cooling capacity ≈ PCS dissipation × 1.5 safety factor.
     // Pulls inverter_dissipated_kw from prior ngspice step if present;
-    // falls back to 20 kW (typical 2% loss at 1 MW). £180/kW installed for
-    // an R513A pumped-loop CDU sized to remove 30-40 kW continuous.
+    // falls back to 20 kW (typical 2% loss at 1 MW). £180/kW installed
+    // for an R290 pumped-loop CDU sized to remove 30-40 kW continuous.
     const inverterDissKw = (c.quantities?.inverter_dissipated_kw?.value as number) ?? 20
     const requiredCoolingKw = inverterDissKw * 1.5
     const coolingPricePerKw = 180
+    // Defensive: cp_liquid may be null if the fluid is unsupported.
+    // Skip the source_detail cp reference rather than crash.
+    const cpDisplay = (out.cp_liquid_kj_kgk !== null && out.cp_liquid_kj_kgk !== undefined)
+      ? `cp=${out.cp_liquid_kj_kgk.toFixed(2)} kJ/kg·K`
+      : '(cp unavailable; coolprop mixture)'
     const coolingMacro = {
       word_name: 'liquid_cooling_loop',
       unit_price_gbp: coolingPricePerKw,
       dimension_basis: 'kw_power' as const,
       dimension_value: requiredCoolingKw,
       total_gbp: coolingPricePerKw * requiredCoolingKw,
-      source_detail: `coolprop-derived: £${coolingPricePerKw}/kW × ${requiredCoolingKw.toFixed(1)} kW = £${(coolingPricePerKw * requiredCoolingKw).toLocaleString()} (R513A loop sized for ${inverterDissKw.toFixed(1)} kW dissipation × 1.5 safety; cp=${out.cp_liquid_kj_kgk.toFixed(2)} kJ/kg·K)`,
+      source_detail: `coolprop-derived: £${coolingPricePerKw}/kW × ${requiredCoolingKw.toFixed(1)} kW = £${(coolingPricePerKw * requiredCoolingKw).toLocaleString()} (R290 loop sized for ${inverterDissKw.toFixed(1)} kW dissipation × 1.5 safety; ${cpDisplay})`,
+    }
+    const quantityUpdates: any = {
+      thermal_rejection_min_kw: { value: requiredCoolingKw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'sized from inverter dissipation × 1.5', provenance: prov('inverter_dissipated_kw_x_1_5') },
+    }
+    if (out.cp_liquid_kj_kgk !== null && out.cp_liquid_kj_kgk !== undefined) {
+      quantityUpdates.coolant_cp_kj_kgk = { value: out.cp_liquid_kj_kgk, unit: 'kJ/(kg·K)', family: 'specific_heat', basis: 'rated', scope: 'system', uncertainty_pct: 2, temporal_resolution_s: null, condition: '35°C, R290', provenance: prov('cp_liquid_kj_kgk') }
     }
     return {
       ...c,
@@ -108,8 +124,7 @@ const stepCoolProp: ToolStep = {
       ],
       quantities: {
         ...c.quantities,
-        coolant_cp_kj_kgk: { value: out.cp_liquid_kj_kgk, unit: 'kJ/(kg·K)', family: 'specific_heat', basis: 'rated', scope: 'system', uncertainty_pct: 2, temporal_resolution_s: null, condition: '35°C, R513A', provenance: prov('cp_liquid_kj_kgk') },
-        thermal_rejection_min_kw: { value: requiredCoolingKw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'sized from inverter dissipation × 1.5', provenance: prov('cp_liquid_kj_kgk') },
+        ...quantityUpdates,
       },
     }
   },
