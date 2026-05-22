@@ -56,7 +56,13 @@ function allSubModuleRefs(modules: ModuleSpec[]): NodeRef[] {
 
 function intraLinkPeers(m: ModuleSpec, sub_module_id: string): string[] {
   const peers = new Set<string>()
-  for (const link of (m.grammar_links ?? [])) {
+  // (2026-05-22 Tristan HAPS chain crash): some LLM repair patches emit
+  // grammar_links as an OBJECT instead of an ARRAY (e.g. when "append" patch
+  // creates a new field with a single object value). The `??` operator only
+  // catches null/undefined — a non-array object passes through and the
+  // for-of throws "object is not iterable". Defensive Array.isArray gate.
+  const links = Array.isArray(m.grammar_links) ? m.grammar_links : []
+  for (const link of links) {
     if (link.from_sub_module === sub_module_id) peers.add(link.to_sub_module)
     if (link.to_sub_module === sub_module_id) peers.add(link.from_sub_module)
   }
@@ -65,7 +71,8 @@ function intraLinkPeers(m: ModuleSpec, sub_module_id: string): string[] {
 
 function crossLinkPeers(modules: ModuleSpec[], crossLinks: CrossModuleGrammarLink[], mod: string): string[] {
   const peers = new Set<string>()
-  for (const cl of crossLinks) {
+  const links = Array.isArray(crossLinks) ? crossLinks : []
+  for (const cl of links) {
     if (cl.from_module === mod) peers.add(cl.to_module)
     if (cl.to_module === mod) peers.add(cl.from_module)
   }
@@ -109,7 +116,7 @@ const noDanglingReferencesGate: GrammarGate = {
     const dangling: string[] = []
     for (const m of modules) {
       const ids = new Set((m.sub_modules ?? []).map(sm => sm.id))
-      for (const link of (m.grammar_links ?? [])) {
+      for (const link of (Array.isArray(m.grammar_links) ? m.grammar_links : [])) {
         if (!ids.has(link.from_sub_module)) dangling.push(`${m.module}: grammar_link.from_sub_module="${link.from_sub_module}" not declared`)
         if (!ids.has(link.to_sub_module)) dangling.push(`${m.module}: grammar_link.to_sub_module="${link.to_sub_module}" not declared`)
       }
@@ -413,7 +420,7 @@ const declaredLinksUniqueGate: GrammarGate = {
     const dupes: string[] = []
     for (const m of modules) {
       const seen = new Set<string>()
-      for (const link of (m.grammar_links ?? [])) {
+      for (const link of (Array.isArray(m.grammar_links) ? m.grammar_links : [])) {
         const key = `${link.from_sub_module}::${link.to_sub_module}::${link.mechanism}`
         const rev = `${link.to_sub_module}::${link.from_sub_module}::${link.mechanism}`
         if (seen.has(key) || seen.has(rev)) {
@@ -735,7 +742,7 @@ const spatialPositionCompleteGate: GrammarGate = {
   evaluate(modules) {
     const missing: string[] = []
     for (const m of modules) {
-      for (const gl of (m.grammar_links ?? [])) {
+      for (const gl of (Array.isArray(m.grammar_links) ? m.grammar_links : [])) {
         const mech = String((gl as any).mechanism ?? '').toLowerCase()
         if (!SPATIAL_MECHANISMS.has(mech)) continue
         const pos = String((gl as any).position ?? '').trim()
@@ -806,7 +813,7 @@ const crossModuleRequiredLinksGate: GrammarGate = {
     // (cross_module_grammar_links is the right place but reviewers sometimes put
     // module-to-module links inside a module's grammar_links by mistake — accept).
     for (const m of modules ?? []) {
-      for (const gl of (m.grammar_links ?? [])) {
+      for (const gl of (Array.isArray(m.grammar_links) ? m.grammar_links : [])) {
         const fm = String((gl as any).from_module ?? m.module)
         const tm = String((gl as any).to_module ?? m.module)
         const mech = String((gl as any).mechanism ?? '')
