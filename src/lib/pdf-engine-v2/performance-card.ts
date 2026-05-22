@@ -498,7 +498,18 @@ export function buildPerformanceCard(state: any): PerformanceCard {
   // stages should READ from the canonical Contract not regenerate from
   // LLM-emitted derived_parameters. This puts Performance Card into the
   // "frozen Contract read" pattern. Universal across product classes.
-  const contractQuantities: Record<string, any> = (state?.engineeringContract?.quantities ?? {}) as Record<string, any>
+  // Bug fix #1 (2026-05-22 v2): merge orchestratorContract.quantities ON TOP
+  // of engineeringContract.quantities. The orchestrator's contract is the
+  // tool-enriched one — it carries `annual_yield_kg`, `crop_annual_yield_kg_m2`,
+  // `led_par_ppfd_umol_m2_s`, etc. that the legacy `engineeringContract` built
+  // from `buildContractForChain()` does NOT have. The Performance card was
+  // missing these, falling back to `annual_yield_tonnes` (brief target, 25 t)
+  // → ×1000 = 25,000 kg/year — even when plant-growth:yield computed an
+  // achievable 56 kg/m²/yr × 100 m² = 5,600 kg/year. Spread the orchestrator's
+  // quantities last so they win for any tool-computed field that overlaps.
+  const orchestratorQuantities: Record<string, any> = (state?.orchestratorContract?.quantities ?? {}) as Record<string, any>
+  const legacyQuantities: Record<string, any> = (state?.engineeringContract?.quantities ?? {}) as Record<string, any>
+  const contractQuantities: Record<string, any> = { ...legacyQuantities, ...orchestratorQuantities }
   // Map Performance Card metric ids to Contract quantity keys. When the
   // metric.id matches a Contract quantity key, use the Contract value
   // (over the LLM-emitted derived_parameters). Universal — works for any
@@ -520,7 +531,16 @@ export function buildPerformanceCard(state: any): PerformanceCard {
     led_power_kw: ['led_installed_power_kw'],
     led_power_per_m2: ['led_power_per_m2'],  // derived from led_installed_power_kw / canopy_area_m2 (calculator hint)
     ppfd_umol_m2_s: ['ppfd_target_umol_m2_s'],
-    annual_yield_kg: ['annual_yield_tonnes'],  // tonnes → kg conversion in calculator hint
+    // Bug fix #1 (2026-05-22): prefer the tool-computed `annual_yield_kg`
+    // (from plant-growth:yield, the AUTHORITATIVE DLI-driven achievable yield)
+    // over the brief-target `annual_yield_tonnes` (which carries the
+    // unconverted 25 t target and is unit-mismatched). When the tool quantity
+    // is missing, fall back to tonnes (with unit conversion). This stops the
+    // performance card showing "25 kg/year" (the 1000× error documented in
+    // the iter-VF audit). The mission/cover/table now all agree on the
+    // achievable number from plant-growth:yield (typically ~2.85 t for a
+    // brief 25 t target — flagged in the brief-target comparison column).
+    annual_yield_kg: ['annual_yield_kg', 'annual_yield_tonnes'],
     heat_load_kw: ['hvac_cooling_kw'],
     refrigerant_charge_kg: ['refrigerant_charge_kg'],
     // HAPS (schema not yet defined in PERFORMANCE_CARDS but ready for future)
@@ -550,6 +570,33 @@ export function buildPerformanceCard(state: any): PerformanceCard {
         const ck = contractQuantities[ckey]
         if (ck && typeof ck === 'object' && typeof ck.value === 'number') {
           raw = ck.value
+          // Bug fix #1 (2026-05-22): unit conversion at alias-hop. When the
+          // alias maps a kg-unit metric to a tonnes-unit Contract key (or
+          // vice-versa), the raw value passes through unchanged — leading to
+          // the "25 kg/year" 1000× error on the VF performance card where
+          // the metric is `kg/year` but the Contract field
+          // `annual_yield_tonnes` carries 25 tonnes. Detect known
+          // unit-family hops and rescale.
+          const contractUnit = String(ck.unit ?? '').toLowerCase()
+          const metricUnit = String(m.unit ?? '').toLowerCase()
+          if (typeof raw === 'number') {
+            // tonnes → kg (×1000)
+            if ((contractUnit === 't' || contractUnit === 't/yr' || contractUnit === 'tonne' || contractUnit === 'tonnes') && metricUnit.startsWith('kg')) {
+              raw = raw * 1000
+            }
+            // kg → tonnes (÷1000)
+            else if (contractUnit.startsWith('kg') && (metricUnit === 't' || metricUnit === 't/yr' || metricUnit === 'tonne' || metricUnit === 'tonnes')) {
+              raw = raw / 1000
+            }
+            // W → kW (÷1000)
+            else if (contractUnit === 'w' && metricUnit === 'kw') {
+              raw = raw / 1000
+            }
+            // kW → W (×1000)
+            else if (contractUnit === 'kw' && metricUnit === 'w') {
+              raw = raw * 1000
+            }
+          }
           source = `engineeringContract.quantities.${ckey} (${ck.source ?? 'calculator'})`
           break
         }
