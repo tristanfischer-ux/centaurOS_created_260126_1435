@@ -137,28 +137,19 @@ def t_cantera():
 # 6. ngspice — SPICE circuit simulation (via PySpice)
 # ──────────────────────────────────────────────────────────────────────────
 
-@case("ngspice/PySpice", "RC low-pass filter transient: V_out(τ) ≈ 0.63 × V_in")
+@case("ngspice (direct CLI)", "RC low-pass filter transient: V_out(τ) ≈ 0.63 × V_in")
 def t_ngspice():
-    from PySpice.Spice.Netlist import Circuit
-    from PySpice.Unit import u_V, u_Ohm, u_uF, u_ms, u_us
-    circuit = Circuit("RC LPF")
-    circuit.V("input", "in", circuit.gnd, u_V(5))
-    circuit.R(1, "in", "out", u_Ohm(1_000))
-    circuit.C(1, "out", circuit.gnd, u_uF(1.0))
-    sim = circuit.simulator(temperature=25, nominal_temperature=25)
-    # Tau = R*C = 1k * 1uF = 1ms; V_out should be ~63% of V_in at t=tau
-    analysis = sim.transient(step_time=u_us(10), end_time=u_ms(5))
-    times = list(analysis.time)
-    v_out = list(analysis["out"])
-    # find sample closest to t = 1 ms
-    target_idx = 0
-    for i, t in enumerate(times):
-        if float(t) >= 1.0e-3:
-            target_idx = i
-            break
-    v_at_tau = float(v_out[target_idx])
-    pct = (v_at_tau / 5.0) * 100
-    return f"V_out at t=1ms = {v_at_tau:.3f}V ({pct:.1f}% of V_in)"
+    # Direct ngspice subprocess (bypasses PySpice — version incompat with
+    # ngspice 46). Reuses our orchestrator wrapper's smoke_test_rc_lpf.
+    import importlib.util
+    here = __import__('os').path.dirname(__file__)
+    spec = importlib.util.spec_from_file_location("ngspice_run", here + "/ngspice_run.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    result = mod.smoke_test_rc_lpf()
+    if not result["ok"]:
+        raise RuntimeError(f"ngspice smoke failed: {result}")
+    return f"V_out at t=1ms = {result['v_out_at_tau_v']}V ({result['percent']}% of V_in, expected 63.2%)"
 
 
 # ──────────────────────────────────────────────────────────────────────────
