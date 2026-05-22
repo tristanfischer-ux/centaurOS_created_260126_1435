@@ -403,10 +403,10 @@ const stepMassAggregator: ToolStep = {
       quantities: {
         ...c.quantities,
         total_system_mass_kg: { value: out.total_system_mass_kg, unit: 'kg', family: 'mass', basis: 'dry', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'all-up including container tare', provenance: prov('total_system_mass_kg') },
-        mass_budget_breach_kg: { value: out.mass_budget_breach_kg, unit: 'kg', family: 'mass', basis: 'derived', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'positive=breach', provenance: prov('mass_budget_breach_kg') },
-        mass_budget_utilisation_pct: { value: out.mass_budget_utilisation_pct, unit: '%', family: 'dimensionless', basis: 'derived', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: null, provenance: prov('mass_budget_utilisation_pct') },
-        recommended_container_count: { value: out.recommended_container_count, unit: '', family: 'dimensionless', basis: 'derived', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: '1 = no split needed; ≥2 = MUST split for road transport', provenance: prov('recommended_container_count') },
-        per_container_mass_kg: { value: out.per_container_mass_kg, unit: 'kg', family: 'mass', basis: 'derived', scope: 'container', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'after split', provenance: prov('per_container_mass_kg') },
+        mass_budget_breach_kg: { value: out.mass_budget_breach_kg, unit: 'kg', family: 'mass', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'positive=breach', provenance: prov('mass_budget_breach_kg') },
+        mass_budget_utilisation_pct: { value: out.mass_budget_utilisation_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: null, provenance: prov('mass_budget_utilisation_pct') },
+        recommended_container_count: { value: out.recommended_container_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: '1 = no split needed; ≥2 = MUST split for road transport', provenance: prov('recommended_container_count') },
+        per_container_mass_kg: { value: out.per_container_mass_kg, unit: 'kg', family: 'mass', basis: 'rated', scope: 'subassembly', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'after split', provenance: prov('per_container_mass_kg') },
       },
     }
   },

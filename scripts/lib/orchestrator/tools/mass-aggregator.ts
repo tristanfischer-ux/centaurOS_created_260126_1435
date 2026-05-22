@@ -57,7 +57,7 @@ export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
   version: '1.0.0',
   license: 'free-proprietary',  // ForgeOS internal tool, no external dependency
   source_url: 'internal://forgeos/orchestrator',
-  domain: 'mass_budget',
+  domain: 'mechanical',  // mass + envelope check is a mechanical-domain concern
   pinned_environment: { algorithm: 'iso-668-container-tare-2024' },
   applicable_to() {
     return true  // every class benefits from a mass-budget check
