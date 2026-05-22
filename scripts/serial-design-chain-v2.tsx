@@ -1433,6 +1433,9 @@ async function runReviewerStep(opts: {
   currentDesign: any
   rawDumpPath?: string
   keyMetrics?: KeyMetrics | null
+  // Build #18k: precomputed verified-tool outputs block to inject into
+  // the reviewer prompt. Empty string when the orchestrator did not run.
+  toolOutputsBlock?: string
 }): Promise<any> {
   const system = REVIEWER_TEMPLATE + (opts.systemAppend ?? '')
   const densityTargets = computeDensityTargets(opts.currentDesign)
@@ -1450,6 +1453,14 @@ async function runReviewerStep(opts: {
   const contractMisses: Array<{ word_name: string; expected_total_gbp: number; reason: string }> = Array.isArray(contractMissesAny) ? contractMissesAny : []
   const contractMissesBlock = contractMisses.length > 0 ? `\n\nENGINEERING CONTRACT MACRO-ASSEMBLY MISSES (Contract has size-aware pricing for these large items but Generator did not emit a matching word — please ADD a word matching each name so the renderer can price the line correctly):\n${contractMisses.map(m => `  - "${m.word_name}" (Contract price £${m.expected_total_gbp.toLocaleString(undefined, { maximumFractionDigits: 0 })}): ${m.reason}`).join('\n')}\nFor each miss, use add_word_to_sub_module with a word.name_human / id that contains the macro-assembly's tokens (e.g. for "carbon_fibre_wing_spar" emit a word with name_human="Carbon-fibre wing spar" and id="carbon_fibre_wing_spar_word"). The Contract's price will flow into the BoM via the renderer's macro-assembly override.\n` : ''
 
+  // Build #18k (2026-05-22): inject the verified-tool outputs into the
+  // reviewer prompt. When the universal orchestrator ran (ORCHESTRATOR=1)
+  // and produced verified-tool computed quantities, this block makes the
+  // reviewers AWARE of those values + REQUIRES them to reference each one
+  // in the relevant module overview_paragraph_en. Per Tristan 2026-05-22:
+  // "use them usefully in the report."
+  const toolOutputsBlock = opts.toolOutputsBlock ?? ''
+
   const user = `PRODUCT BRIEF (raw):
 ${opts.brief}
 
@@ -1462,7 +1473,7 @@ ${opts.research ? JSON.stringify(opts.research) : '(not available)'}
 CURRENT DESIGN (apply your 3-concern review to this whole block):
 ${JSON.stringify(opts.currentDesign)}
 ${kmBlock}
-${densityTargets}${contractMissesBlock}
+${densityTargets}${contractMissesBlock}${toolOutputsBlock}
 Return the corrected JSON.`
 
   const before = summarise(opts.currentDesign.modules ?? [])
@@ -1889,6 +1900,9 @@ async function main() {
   // Build #6c LLM-with-Contract-prompt path.
   let design: any
   let orchestratorRan = false
+  // Build #18k: precomputed verified-tool outputs block to feed reviewers.
+  // Populated when ORCHESTRATOR=1 ran successfully.
+  let toolOutputsBlock = ''
   if (process.env.ORCHESTRATOR === '1' && engineeringContract) {
     console.error(`\n[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — attempting universal engineering orchestrator`)
     const tOrch = Date.now()
@@ -1935,6 +1949,19 @@ async function main() {
         null, 2,
       ))
       writeFileSync(resolve(outDir, '4-orchestrator-tools-used.json'), JSON.stringify(orchResult.tools_used_page, null, 2))
+      // Build #18k: construct the verified-tool outputs block. Reviewers will
+      // be told these values are AUTHORITATIVE and must be referenced in the
+      // module overview_paragraph_en where applicable.
+      const toolsUsedPage = orchResult.tools_used_page as any
+      if (toolsUsedPage?.tools && Array.isArray(toolsUsedPage.tools) && toolsUsedPage.tools.length > 0) {
+        const blocks: string[] = []
+        for (const tool of toolsUsedPage.tools) {
+          const claimsList = (tool.claims ?? []).map((c: any) => `      - ${c.field} = ${c.value}${c.unit ? ' ' + c.unit : ''} (from ${tool.tool_name} ${c.output_field})`).join('\n')
+          blocks.push(`  ${tool.tool_name} v${tool.tool_version} (${tool.tool_license}, ${tool.tool_source_url}):\n${claimsList}`)
+        }
+        toolOutputsBlock = `\n\nVERIFIED-TOOL OUTPUTS (Build #18 orchestrator — these values were computed by reputable open-source engineering tools and are AUTHORITATIVE. You MUST reference each one explicitly in the relevant module's overview_paragraph_en when discussing that quantity. DO NOT silently override these values with your own estimates):\n${blocks.join('\n\n')}\n\nFor each tool-sourced quantity above, ensure the module overview text says e.g. "PyBaMM Prada2013 LFP DFN simulation confirms 5006 cells × 3.2 V × 280 Ah ≈ 4.48 MWh nameplate" rather than just stating the number. The reader needs to know which tool produced which claim so they can independently reproduce it.\n`
+        console.error(`[chain] Build #18k: toolOutputsBlock built (${blocks.length} tools, ${toolOutputsBlock.length} chars) — will be injected into reviewer prompts`)
+      }
       logAction({
         step: 'generator',
         model: 'universal_orchestrator',
@@ -2160,15 +2187,15 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   // tokeniser / JSON-emission style. Each fallback is the model that
   // sits in the OTHER half of the reviewer pool so we don't both fail
   // for a shared infra issue.
-  const r1 = await runReviewerStep({ label: 'STEP 5: R1 Grok 4.3', model: GROK_4_3, fallbackModel: QWEN_3_6_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, '5-r1-grok.raw.txt'), keyMetrics })
+  const r1 = await runReviewerStep({ label: 'STEP 5: R1 Grok 4.3', model: GROK_4_3, fallbackModel: QWEN_3_6_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics, toolOutputsBlock })
   design = r1.design
   writeFileSync(resolve(outDir, '5-r1-grok.json'), JSON.stringify(design, null, 2))
 
-  const r2 = await runReviewerStep({ label: 'STEP 6: R2 GLM-5.1', model: GLM_5_1, fallbackModel: GROK_4_3, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, '6-r2-glm.raw.txt'), keyMetrics })
+  const r2 = await runReviewerStep({ label: 'STEP 6: R2 GLM-5.1', model: GLM_5_1, fallbackModel: GROK_4_3, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "6-r2-glm.raw.txt"), keyMetrics, toolOutputsBlock })
   design = r2.design
   writeFileSync(resolve(outDir, '6-r2-glm.json'), JSON.stringify(design, null, 2))
 
-  const r3 = await runReviewerStep({ label: 'STEP 7: R3 Qwen 3.6 Max', model: QWEN_3_6_MAX, fallbackModel: GLM_5_1, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, '7-r3-qwen.raw.txt'), keyMetrics })
+  const r3 = await runReviewerStep({ label: 'STEP 7: R3 Qwen 3.6 Max', model: QWEN_3_6_MAX, fallbackModel: GLM_5_1, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "7-r3-qwen.raw.txt"), keyMetrics, toolOutputsBlock })
   design = r3.design
   writeFileSync(resolve(outDir, '7-r3-haiku.json'), JSON.stringify(design, null, 2))
 
@@ -2234,6 +2261,7 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design,
     rawDumpPath: resolve(outDir, '8-r4-flashlite.raw.txt'),
     keyMetrics,
+    toolOutputsBlock,
   })
   design = r4.design
   writeFileSync(resolve(outDir, '8-r4-flashlite.json'), JSON.stringify(design, null, 2))
@@ -2300,6 +2328,7 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
           currentDesign: design,
           rawDumpPath: resolve(outDir, '8-5-specialist.raw.txt'),
           keyMetrics,
+          toolOutputsBlock,
         })
         design = r45.design
         writeFileSync(resolve(outDir, '8-5-specialist.json'), JSON.stringify(design, null, 2))
