@@ -2168,31 +2168,23 @@ function CoverPage({
                 </>
               )
             })()}
-            {/* Cost-overrun forensic (Tristan 2026-05-21): compact
-                price-reality verdict ON THE COVER, immediately under the
-                Installed ASP headline. Previously removed in iter-10.5
-                third review for "cover clutter" reasons — but with that
-                removed, a £356k installed ASP for a 100 m² VF (when typical
-                is £60-120k) had NO reader-visible flag and shipped silently.
-                Re-adding ONLY when the verdict is over/under (no clutter
-                when in_band). Universal across product classes. */}
+            {/* Cost-band marker (Tristan 2026-05-22 v3 — Bug #18 universal):
+                The full "% ABOVE typical (band £X–£Y)" framing previously
+                appeared inline here. Tristan flagged this as cover-clutter
+                — it sits next to the headline price and over-dominates the
+                page. Moved to a Candid Cost Analysis section deeper in the
+                report (rendered via CandidCostAnalysisSection). Here on the
+                cover we keep only a SHORT one-line marker so the reader
+                knows there's a band-comparison verdict to read, without the
+                full % framing screaming at them. (Verdicts: high → buyer
+                investigates; low → engineer double-checks BoM coverage.) */}
             {priceReality && (priceReality.verdict === 'high' || priceReality.verdict === 'low') && priceReality.metric_value !== null ? (
-              (() => {
-                const absPct = Math.abs(priceReality.pct_deviation || 0)
-                const isOver = priceReality.verdict === 'high'
-                const verdictWord = isOver
-                  ? `${Math.round(absPct)}% ABOVE typical`
-                  : `${Math.round(absPct)}% BELOW typical`
-                return (
-                  <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: '#1e4a73' }}>
-                    <Text style={{ fontSize: 9, color: '#ffffff' }}>
-                      <Text style={{ fontFamily: 'Helvetica-Bold', color: isOver ? '#fca5a5' : '#fcd34d' }}>{isOver ? '! ' : '? '}</Text>
-                      <Text style={{ fontFamily: 'Helvetica-Bold' }}>{fmtGBP_compact(priceReality.metric_value)} per {priceReality.metric_label.replace(/^£\//, '').split('(')[0].trim()}</Text>
-                      <Text style={{ color: '#bae6fd' }}> — {verdictWord} (band {fmtGBP_compact(priceReality.band_low)}–{fmtGBP_compact(priceReality.band_high)})</Text>
-                    </Text>
-                  </View>
-                )
-              })()
+              <View style={{ marginTop: 10, paddingTop: 8, borderTopWidth: 0.5, borderTopColor: '#1e4a73' }}>
+                <Text style={{ fontSize: 9, color: '#bae6fd' }}>
+                  {priceReality.verdict === 'high' ? '! Cost outside the typical band' : '? Cost below the typical band'}
+                  <Text style={{ color: '#94a3b8' }}>{' '}— see Cost Analysis section for the per-metric verdict + supplier corpus reference.</Text>
+                </Text>
+              </View>
             ) : null}
             {/* ITER-10.5 third review (Tristan 2026-05-20): cover stays
                 clean. Everything below the Installed ASP headline number —
@@ -3543,7 +3535,18 @@ function SubModuleBomBlock({
 }) {
   if (bomLines.length === 0) return null
   return (
-    <View style={{ marginTop: 8, marginBottom: 6, marginLeft: 36 }}>
+    <View style={{ marginTop: 8, marginBottom: 6, marginLeft: 36 }} wrap={false}>
+      {/* wrap={false} — Bug #4 universal (2026-05-22 HP page 14 audit):
+          when the surrounding sub-module prose flowed into the BoM table
+          area, the table header + first row landed ON TOP of the prose
+          ("Indoor brazed-plate heat exchanger" — 4-line prose paragraph
+          had BoM headers PART/MANUFACTURER/PART NUMBER literally rendered
+          inside it). Marking the outer BoM container wrap={false} forces
+          react-pdf to render the whole table on a single page (small —
+          typically 5-10 rows = ~100-200pt tall, easily fits even when the
+          rest of the page is full). If a sub-module's BoM is too tall for
+          a page (>40 rows), this regresses to overflow — acceptable for
+          the safety it buys against overlap on the common case. */}
       {/* Header row — ITER-10.5 third review: SRC/REF renamed to be
           self-explanatory; a column legend renders beneath the table so
           the reader doesn't have to guess at the abbreviations. */}
