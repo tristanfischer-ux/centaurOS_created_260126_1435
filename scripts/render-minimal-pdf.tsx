@@ -4161,14 +4161,14 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
             <View style={{ marginTop: 4, paddingLeft: 50 }}>
               <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 4 }}>{clean_prose(h.mechanism)}</Text>
               <Text style={{ fontSize: 9, color: MUTED, marginBottom: 2 }}>
-                <Text style={{ fontFamily: 'Helvetica-Bold' }}>Typical mitigations:</Text> {h.common_mitigations.slice(0, 3).join('; ')}.
+                <Text style={{ fontFamily: 'Helvetica-Bold' }}>Typical mitigations:</Text> {clean_prose(h.common_mitigations.slice(0, 3).join('; '))}.
               </Text>
               <Text style={{ fontSize: 9, color: MUTED, marginBottom: 2 }}>
-                <Text style={{ fontFamily: 'Helvetica-Bold' }}>Detection:</Text> {h.detection_methods.slice(0, 2).join('; ')}.
+                <Text style={{ fontFamily: 'Helvetica-Bold' }}>Detection:</Text> {clean_prose(h.detection_methods.slice(0, 2).join('; '))}.
               </Text>
               {h.regulatory_drivers.length > 0 ? (
                 <Text style={{ fontSize: 9, color: MUTED }}>
-                  <Text style={{ fontFamily: 'Helvetica-Bold' }}>Governed by:</Text> {h.regulatory_drivers.join(', ')}.
+                  <Text style={{ fontFamily: 'Helvetica-Bold' }}>Governed by:</Text> {clean_prose(h.regulatory_drivers.join(', '))}.
                 </Text>
               ) : null}
             </View>
