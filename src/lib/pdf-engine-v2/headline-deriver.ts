@@ -390,8 +390,31 @@ function deriveVerticalFarmHeadline(modules: ModuleSpec[], parsedBrief: any, bri
     canopyArea = briefAreaM2
     canopySource = `${briefAreaM2} m² from brief target_performance`
   }
-  // Yield rate per m² — high-end LED vertical farms 40-60 kg/m²/yr leafy. Use 50.
-  const yieldPerM2 = 50  // industry typical, surfaced
+  // Bug fix #1 (2026-05-22): yield rate sourced from the tool-computed
+  // achievable yield (plant-growth:yield output) first, then brief target,
+  // then class-typical fallback. Previously hard-coded to 50 kg/m²/yr —
+  // which mis-labelled real designs at 28.5 kg/m²/yr (achievable per the
+  // Kozai 2019 + Bugbee 2017 DLI-driven empirical model) as failures. The
+  // 50 number was the BRIEF TARGET (top-of-market Plenty/80 Acres
+  // benchmark), not what the engineered LED+HVAC+plant model can deliver.
+  // For Phase 1 we report the achievable on the headline; the Performance
+  // Card 'brief target' column shows the 50 kg/m²/yr ambition and flags
+  // the shortfall.
+  const orchYieldPerM2 = (() => {
+    // The orchestrator writes `crop_annual_yield_kg_m2` to module.derived_parameters
+    // (growing_canopy in VF) from the plant-growth:yield tool. Search every
+    // module's derived block for a tool-computed yield-per-m².
+    if (!Array.isArray(modules)) return null
+    for (const m of modules) {
+      const dp = (m as any)?.derived_parameters ?? {}
+      const cand = (typeof dp.yield_per_m2_per_year === 'number' ? dp.yield_per_m2_per_year : null)
+        ?? (typeof dp.crop_annual_yield_kg_m2 === 'number' ? dp.crop_annual_yield_kg_m2 : null)
+        ?? (typeof dp.annual_yield_kg_per_m2 === 'number' ? dp.annual_yield_kg_per_m2 : null)
+      if (typeof cand === 'number' && Number.isFinite(cand) && cand > 0) return cand
+    }
+    return null
+  })()
+  const yieldPerM2 = orchYieldPerM2 ?? 50  // tool-derived achievable OR class-typical brief target
   const annualYieldKg = canopyArea != null ? canopyArea * yieldPerM2 : null
 
   // Brief constraint: convert kg/week → kg/year when needed so the headline
@@ -409,14 +432,21 @@ function deriveVerticalFarmHeadline(modules: ModuleSpec[], parsedBrief: any, bri
 
   const out: Record<string, any> = {}
   if (annualYieldKg != null) {
-    out.headline_output = metric('annual_yield_kg', 'Annual yield', Math.round(annualYieldKg), 'kg/year', `${canopySource} × ${yieldPerM2} kg/m²/yr (industry-typical leafy-green yield at high-end LED). Tighten once design specifies actual yield rate.`, 'derived_from_brief')
+    const yieldSourceNote = orchYieldPerM2 != null
+      ? `${canopySource} × ${yieldPerM2.toFixed(1)} kg/m²/yr (tool-computed achievable from plant-growth:yield).`
+      : `${canopySource} × ${yieldPerM2} kg/m²/yr (industry-typical brief-target leafy-green yield at high-end LED — design has no tool-computed yield rate yet).`
+    out.headline_output = metric('annual_yield_kg', 'Annual yield', Math.round(annualYieldKg), 'kg/year', yieldSourceNote, 'derived_from_brief')
   }
   if (briefAnnualConstraint != null) {
     out.headline_constraint = metric('target_yield_kg_year', 'Brief target yield', briefAnnualConstraint.value, briefAnnualConstraint.unit, `Brief target_performance normalised: ${briefAnnualConstraint.raw}.`, 'derived_from_brief')
   } else if (canopyArea != null) {
     out.headline_constraint = metric('canopy_area_m2', 'Canopy area', canopyArea, 'm²', canopySource ? `Growing area: ${canopySource}.` : 'Growing area available.', 'derived_from_brief')
   }
-  out.utilisation = metric('yield_per_m2_per_year', 'Yield per m² per year', yieldPerM2, 'kg/m²/yr', 'Industry-typical high-end LED leafy-green rate.', 'derived_from_brief')
+  out.utilisation = metric('yield_per_m2_per_year', 'Yield per m² per year', Number(yieldPerM2.toFixed(1)), 'kg/m²/yr',
+    orchYieldPerM2 != null
+      ? 'Tool-computed achievable yield (plant-growth:yield DLI-driven model).'
+      : 'Industry-typical high-end LED leafy-green rate (brief target — no tool-derived rate available).',
+    'derived_from_brief')
   out.supporting_metrics = []
   out.deployment_context = buildDeploymentContextDefault(
     parsedBrief,

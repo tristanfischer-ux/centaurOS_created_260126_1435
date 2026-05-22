@@ -168,6 +168,12 @@ const MODIFIER_KIND_SHORTNAMES: Record<string, string> = {
   dimension: 'dim',
   lifecycle: 'life',
   regulatory: '',  // regulatory values are self-describing (eg "IEC 62619") — no prefix
+  // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): communication protocols
+  // (Modbus TCP, CAN, EtherCAT, IEC 61850) are NOT regulatory standards even
+  // though they share an IEC number. Use a separate `protocol` kind so the
+  // protocol distinction is preserved in BoM metadata. Value is self-describing
+  // ("Modbus TCP") so no prefix when rendered inline.
+  protocol: '',
   performance: 'perf',
   tolerance: 'tol',
   envelope: 'env',
@@ -194,6 +200,9 @@ function renderSingleModifier(modifier: ModifyingCharacter): string {
   // or the metric (≥95%); rendering "perf ≥95%" reads cleaner than just "≥95%"
   // when several sit side-by-side, but regulatory should stay bare.
   if (kindKey === 'regulatory') return valueWithUnit
+  // Build #18r-fix2 (2026-05-22): communication protocol values ("Modbus TCP",
+  // "CAN 500kbps", "EtherCAT") are self-describing — render bare like regulatory.
+  if (kindKey === 'protocol') return valueWithUnit
   // Unknown extensible kinds: render `<kind> <value>` — better than dropping the kind.
   if (shortname === undefined) return `${kindKey} ${valueWithUnit}`
   if (shortname === '') return valueWithUnit
@@ -252,6 +261,76 @@ export function modifierStripInline(modifiers: ReadonlyArray<ModifyingCharacter>
   const renderable = filterRenderableModifiers(modifiers ?? [])
   if (renderable.length === 0) return ''
   return renderable.map(renderSingleModifier).join(', ')
+}
+
+// ---------------------------------------------------------------------------
+// Universal fix #E (2026-05-22 batch): subject-verb agreement
+// ---------------------------------------------------------------------------
+
+const KNOWN_PLURAL_TOKENS = new Set([
+  'sensors', 'trolleys', 'cables', 'circuits', 'fixtures', 'lamps', 'valves',
+  'modules', 'rails', 'panels', 'racks', 'strings', 'fans', 'boards', 'wheels',
+  'thrusters', 'antennas', 'antennae', 'pipes', 'lines', 'units', 'motors',
+  'pumps', 'batteries', 'cells', 'wires', 'connectors', 'busbars', 'mounts',
+])
+const SINGULAR_S_TOKENS = new Set([
+  'chassis', 'analysis', 'bus', 'gas', 'lens', 'iris', 'class', 'glass',
+  'mass', 'press', 'access', 'process', 'address', 'series', 'species',
+  'apparatus', 'crisis',
+])
+
+/**
+ * Decide whether a subject noun phrase is plural. Heuristics:
+ *  - Ends with " s" or with consonant-s (cells, sensors, trolleys, fixtures, circuits, cables, fans, motors)
+ *  - Contains a known plural noun token
+ *  - Numeric prefix "×N " (where N > 1) signals plurality
+ * Excludes mass nouns and singular nouns ending in 's' (e.g. "chassis", "analysis", "bus").
+ */
+export function isSubjectPlural(subject: string): boolean {
+  if (!subject) return false
+  const trimmed = subject.trim().toLowerCase()
+  const xnMatch = trimmed.match(/^×\s*(\d+)\s+/)
+  if (xnMatch) {
+    const n = parseInt(xnMatch[1], 10)
+    if (Number.isFinite(n) && n > 1) return true
+  }
+  const tokens = trimmed.replace(/[(),]/g, ' ').split(/\s+/).filter(Boolean)
+  if (tokens.length === 0) return false
+  const last = tokens[tokens.length - 1]
+  if (KNOWN_PLURAL_TOKENS.has(last)) return true
+  if (SINGULAR_S_TOKENS.has(last)) return false
+  if (last.endsWith('s') && !last.endsWith('ss') && !last.endsWith('us') && !last.endsWith('is')) {
+    return true
+  }
+  return false
+}
+
+/**
+ * Convert a 3rd-person-singular present verb to its plural form when the
+ * subject is plural. Conservative: only strips standard -s/-es/-ies suffixes.
+ */
+export function pluraliseVerb(verb: string, subject: string): string {
+  if (!verb) return verb
+  const v = verb.trim()
+  if (!v) return v
+  if (!isSubjectPlural(subject)) return v
+  if (/[a-z]ies$/.test(v) && v.length > 3) return v.replace(/ies$/, 'y')
+  if (/(?:ches|shes|xes|zes|sses|oes)$/.test(v)) return v.replace(/es$/, '')
+  if (/[a-z]s$/.test(v) && !v.endsWith('ss') && !v.endsWith('us') && !v.endsWith('is')) {
+    return v.replace(/s$/, '')
+  }
+  return v
+}
+
+/**
+ * Capitalise the first character of a string. Used to fix Bug F (lowercase
+ * sentence starts after period-joins).
+ */
+export function capitaliseFirst(s: string): string {
+  if (!s) return s
+  const trimmed = s.trimStart()
+  if (!trimmed) return s
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1)
 }
 
 // ---------------------------------------------------------------------------
@@ -320,7 +399,9 @@ export function generateSubmoduleSentence(
   }
   const style = options?.style ?? 'verbose'
   const subject = subModule.name_human || humaniseId(subModule.id)
-  const verb = (subModule.role_verb && subModule.role_verb.trim()) || 'comprises'
+  const rawVerb = (subModule.role_verb && subModule.role_verb.trim()) || 'comprises'
+  // Universal fix #E (2026-05-22): make the verb agree with subject number.
+  const verb = pluraliseVerb(rawVerb, subject)
   const words = subModule.words ?? []
   const topology = (style === 'verbose' && subModule.topology_clause)
     ? ` ${subModule.topology_clause.trim()}`
@@ -357,6 +438,9 @@ const MODIFIER_KIND_GROUPS = {
   physical: ['material', 'dimensions', 'dimension', 'mass', 'mass_kg', 'form', 'colour', 'color', 'volume', 'capacity'],
   performance: ['rating_primary', 'rating_secondary', 'rating', 'voltage', 'current', 'power', 'flow_rate', 'efficiency', 'operating_temp_range', 'temp_range', 'pressure', 'frequency'],
   compliance: ['regulatory', 'ip_rating', 'certification', 'standard'],
+  // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4): communication protocols are
+  // distinct from regulatory standards (Modbus TCP, CAN, EtherCAT, IEC 61850).
+  communication: ['protocol'],
   procurement: ['lead_time', 'unit_cost_estimate_gbp', 'unit_cost_estimate_eur', 'unit_cost'],
 } as const
 
@@ -426,9 +510,25 @@ function renderWordProse(word: WordSpec): string {
 
   // Build the opening NP — "A Fluidmaster ½-inch WRAS-approved float valve"
   const openParts: string[] = ['A']
-  if (manufacturer) openParts.push(modValue(manufacturer))
+  const mfgValue = manufacturer ? modValue(manufacturer) : ''
+  if (mfgValue) openParts.push(mfgValue)
   if (dimensions && !manufacturer) openParts.push(modValue(dimensions))
-  if (form) openParts.push(modValue(form))
+  if (form) {
+    // Bug fix #7 (2026-05-22): when both `manufacturer` and `form` modifiers
+    // are present and the form value LEADS with the manufacturer name
+    // ("Sensirion SHT41 ±0.2 °C / ±1.8% RH" + manufacturer "Sensirion"), the
+    // opener renders "A Sensirion Sensirion SHT41 ...". Strip the leading
+    // manufacturer token from the form value so the opener reads "A Sensirion
+    // SHT41 ±0.2 °C / ±1.8% RH" (one mention, not two). Match
+    // case-insensitively and allow optional trailing comma/space.
+    let formValue = modValue(form)
+    if (mfgValue) {
+      const escapedMfg = mfgValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      const leadingMfgRx = new RegExp(`^${escapedMfg}\\s*,?\\s*`, 'i')
+      formValue = formValue.replace(leadingMfgRx, '').trim()
+    }
+    if (formValue) openParts.push(formValue)
+  }
   openParts.push(charName.toLowerCase())
   let opener = openParts.join(' ')
   // Parenthetical: part number + material + dimensions (when not opener)
@@ -581,7 +681,9 @@ export function generateSubmoduleParagraph(subModule: SubModuleSpec): string {
   }
 
   const subject = subModule.name_human || humaniseId(subModule.id)
-  const verb = (subModule.role_verb && subModule.role_verb.trim()) || 'comprises'
+  const rawVerb = (subModule.role_verb && subModule.role_verb.trim()) || 'comprises'
+  // Universal fix #E (2026-05-22): subject-verb agreement.
+  const verb = pluraliseVerb(rawVerb, subject)
   const topology = (subModule.topology_clause ?? '').trim()
 
   if (words.length === 0) {
@@ -594,8 +696,11 @@ export function generateSubmoduleParagraph(subModule: SubModuleSpec): string {
   // Per-word prose
   const wordSentences = words.map(renderWordProse)
 
-  // Topology closer
-  const closer = topology ? ` ${ensureTerminalPunctuation(topology)}` : ''
+  // Topology closer — Universal fix #F (2026-05-22): capitalise the first
+  // character since topology_clause values are often lowercase fragments
+  // ("concentric Al chambers, OVC at 50K..."). Sentence-joining a lowercase
+  // fragment after a period produces ungrammatical prose.
+  const closer = topology ? ` ${capitaliseFirst(ensureTerminalPunctuation(topology))}` : ''
 
   return [opener, ...wordSentences, closer].filter(Boolean).join(' ').trim()
 }

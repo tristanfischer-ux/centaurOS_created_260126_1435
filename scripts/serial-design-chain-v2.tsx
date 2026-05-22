@@ -431,6 +431,72 @@ function isProseOnlyPath(path: string): boolean {
   return PROSE_ONLY_PATH_PREFIXES.some(prefix => p === prefix || p.startsWith(prefix + '.') || p.startsWith(prefix + '['))
 }
 
+// Build #19c content validator (2026-05-22, Loop 28 Bugs 2 + 3):
+// Prose-content (not just prose-path) validator that scans for LLM-hallucinated
+// phrases that contradict tool outputs. Path validation is necessary but not
+// sufficient — reviewers can write prose INTO an allowed prose path that
+// contains forbidden content. This catches:
+//
+//   Bug 2 (voltage reconfiguration): if the LLM tries to "fix" the apparent
+//   mismatch between a brief's "800 V nominal" and pybamm's 534 V nominal by
+//   inserting "the battery string was reconfigured to 250 series cells", that
+//   contradicts pybamm's authoritative 167-series choice (which it picked for
+//   end-of-charge voltage headroom).
+//
+//   Bug 3 (invented derating): "12-15% derating applied" — no tool emits a
+//   12-15% derating field. PyBaMM emits capacity_fade_at_6000_cycles_pct.
+//   The phrase "round-trip efficiency of 87.5%" without ngspice citation is
+//   similarly fabricated.
+//
+// The regex set is conservative — it only catches phrases that ARE clearly
+// LLM emissions contradicting the tool. False positives MUST be rare;
+// stripping a legitimate description of voltage headroom is worse than
+// allowing one orphan claim through. If a reviewer wants to discuss voltage
+// reconfiguration legitimately (e.g. "we considered 250-series but pybamm
+// rejected it"), they can phrase it as "we considered" rather than
+// "the pack was reconfigured to".
+interface ContentValidationResult {
+  ok: boolean
+  matched_phrase?: string
+  pattern_name?: string
+}
+
+const FORBIDDEN_PROSE_PATTERNS: Array<{ name: string; pattern: RegExp }> = [
+  // Bug 2: voltage reconfiguration contradicting pybamm.
+  // Matches "reconfigured to 250 series cells", "reconfigured to 244 cells",
+  // "reconfigured to 250-series", etc. Allows the present tense or past, with
+  // or without "the battery string" preamble.
+  { name: 'voltage_reconfiguration_contradiction', pattern: /reconfigured to \d+\s*(?:-?series\s+)?cells?\b/i },
+  { name: 'string_reconfiguration_contradiction', pattern: /(?:string|pack|battery)\s+(?:was|is|been)\s+reconfigured\s+(?:to|with)/i },
+
+  // Bug 3: invented derating ranges paired with efficiency/round-trip.
+  // Matches "12-15% derating applied", "10-15% derating", "12-15 % derating".
+  // Does NOT match plain "derating" without a numeric range (some legitimate
+  // discussions of derating cite specific numbers from tools).
+  { name: 'invented_derating_range', pattern: /\d+\s*[-–—]\s*\d+\s*%\s+derating/i },
+  // Matches "12% derating for round-trip efficiency", "15% derating applied for"
+  { name: 'invented_derating_with_efficiency', pattern: /\d+\s*[-–—]?\s*\d*\s*%\s+derating\s+(?:applied\s+)?for\s+(?:round[-\s]trip|efficiency|loss)/i },
+  // Matches "round-trip efficiency of 87-90%" — ranges of efficiency are
+  // invented because no tool emits a range; ngspice emits a single value.
+  { name: 'efficiency_range_invented', pattern: /round[-\s]?trip\s+efficiency\s+of\s+\d+\s*[-–—]\s*\d+\s*%/i },
+]
+
+/**
+ * Scan prose text for forbidden patterns. Returns ok=false with the matched
+ * phrase + pattern name on first hit. Conservative: only patterns that match
+ * clear LLM hallucinations contradicting tool outputs.
+ */
+function validateProseContent(text: string | undefined | null): ContentValidationResult {
+  if (typeof text !== 'string' || text.trim().length === 0) return { ok: true }
+  for (const { name, pattern } of FORBIDDEN_PROSE_PATTERNS) {
+    const m = text.match(pattern)
+    if (m) {
+      return { ok: false, matched_phrase: m[0], pattern_name: name }
+    }
+  }
+  return { ok: true }
+}
+
 function applyReviewerPatches(design: any, patches: any[]): { applied: number; skipped: number; reasons: string[] } {
   let applied = 0
   let skipped = 0
@@ -447,6 +513,19 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
         if (!Array.isArray(m.sub_modules)) m.sub_modules = []
         if (m.sub_modules.some((s: any) => s.id === p.sub_module?.id)) {
           skipped++; reasons.push(`skip add_sub_module: ${p.module}.${p.sub_module?.id} already exists`); continue
+        }
+        // Build #19c content validator (2026-05-22, Loop 28 Bugs 2 + 3) — scan
+        // the new sub-module's prose fields (english_sentence, topology_clause,
+        // description, narrative, rationale) for the forbidden phrases.
+        const proseFields = ['english_sentence', 'topology_clause', 'description', 'narrative', 'rationale', 'name_human']
+        let cvFail: ContentValidationResult | null = null
+        for (const f of proseFields) {
+          const cv = validateProseContent(p.sub_module?.[f])
+          if (!cv.ok) { cvFail = cv; break }
+        }
+        if (cvFail) {
+          skipped++; reasons.push(`REJECT add_sub_module ${p.module}.${p.sub_module?.id}: forbidden phrase (${cvFail.pattern_name}) "${cvFail.matched_phrase}" in sub-module prose`)
+          continue
         }
         m.sub_modules.push(p.sub_module)
         applied++; reasons.push(`+sub_module ${p.module}.${p.sub_module?.id} (${p.reason ?? ''})`)
@@ -482,6 +561,14 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
           skipped++; reasons.push(`REJECT edit_field non-prose path "${p.path}" — tool-sourced quantities are read-only to reviewers`)
           continue
         }
+        // Build #19c content validator (2026-05-22, Loop 28 Bugs 2 + 3)
+        if (typeof p.new_value === 'string') {
+          const cv = validateProseContent(p.new_value)
+          if (!cv.ok) {
+            skipped++; reasons.push(`REJECT edit_field ${p.module}.${p.path}: forbidden phrase (${cv.pattern_name}) "${cv.matched_phrase}" — contradicts tool output`)
+            continue
+          }
+        }
         setByPath(m, p.path, p.new_value)
         applied++; reasons.push(`=${p.module}.${p.path} (prose)`)
       } else if (op === 'edit_sub_module_field') {
@@ -493,6 +580,14 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
         if (!isProseOnlyPath(p.path)) {
           skipped++; reasons.push(`REJECT edit_sub_module_field non-prose path "${p.path}" — tool-sourced quantities are read-only to reviewers`)
           continue
+        }
+        // Build #19c content validator (2026-05-22, Loop 28 Bugs 2 + 3)
+        if (typeof p.new_value === 'string') {
+          const cv = validateProseContent(p.new_value)
+          if (!cv.ok) {
+            skipped++; reasons.push(`REJECT edit_sub_module_field ${p.module}.${p.sub_module_id}.${p.path}: forbidden phrase (${cv.pattern_name}) "${cv.matched_phrase}" — contradicts tool output`)
+            continue
+          }
         }
         setByPath(sm, p.path, p.new_value)
         applied++; reasons.push(`=${p.module}.${p.sub_module_id}.${p.path} (prose)`)
@@ -535,8 +630,17 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
       } else if (op === 'append_to_overview') {
         const m = design.modules.find((x: any) => x.module === p.module)
         if (!m) { skipped++; reasons.push(`skip append_to_overview: module "${p.module}" not found`); continue }
-        m.overview_paragraph_en = ((m.overview_paragraph_en ?? '').trim() + ' ' + (p.text ?? '').trim()).trim()
-        applied++; reasons.push(`+overview ${p.module}: +${(p.text ?? '').length} chars`)
+        // Build #19c content validator (2026-05-22, Loop 28 Bugs 2 + 3)
+        const appendText = typeof p.text === 'string' ? p.text : ''
+        if (appendText) {
+          const cv = validateProseContent(appendText)
+          if (!cv.ok) {
+            skipped++; reasons.push(`REJECT append_to_overview ${p.module}: forbidden phrase (${cv.pattern_name}) "${cv.matched_phrase}" — contradicts tool output`)
+            continue
+          }
+        }
+        m.overview_paragraph_en = ((m.overview_paragraph_en ?? '').trim() + ' ' + appendText.trim()).trim()
+        applied++; reasons.push(`+overview ${p.module}: +${appendText.length} chars`)
       } else {
         skipped++; reasons.push(`skip unknown op="${op}"`)
       }
@@ -1977,6 +2081,12 @@ async function main() {
   // Build #18k: precomputed verified-tool outputs block to feed reviewers.
   // Populated when ORCHESTRATOR=1 ran successfully.
   let toolOutputsBlock = ''
+  // Build #19e/f (2026-05-22): capture orchestrator outputs so they can be
+  // attached to chain state below the chain's state-init block (line ~3136).
+  // The PDF renderer reads state.toolsUsedPage (end-page) and
+  // state.engineeringContract (per-module callout).
+  let orchToolsUsedPage: unknown = null
+  let orchEngineeringContract: unknown = null
   if (process.env.ORCHESTRATOR === '1' && engineeringContract) {
     console.error(`\n[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — attempting universal engineering orchestrator`)
     const tOrch = Date.now()
@@ -2005,6 +2115,43 @@ async function main() {
     if (orchResult.ok && orchResult.design) {
       design = orchResult.design
       orchestratorRan = true
+
+      // Bug fix #15 (2026-05-22): per-emitter `brief_overview_prose` often
+      // leaves `target_customers` and `why_now` as empty strings (every
+      // emitter generated from the BESS template inherits this). Fill in
+      // chain-level defaults from the parsed brief BEFORE rendering, so
+      // the PDF never shows blank narrator sections. Universal fix —
+      // applies to every product class. Per-emitter overrides (when
+      // present and non-empty) win; this only fills voids.
+      if (design.brief_overview_prose) {
+        const bop = design.brief_overview_prose as Record<string, string>
+        const parsedBriefAny = parsedResult.data as any
+        const constraints = parsedBriefAny?.constraints ?? {}
+        const targetMarket = constraints.target_market
+          ?? constraints.customer_segment
+          ?? constraints.use_case
+          ?? parsedBriefAny?.summary?.target_market
+        const macroDriver = constraints.macro_driver
+          ?? constraints.market_driver
+          ?? constraints.policy_driver
+          ?? parsedBriefAny?.summary?.why_now
+        const productClassReadable = String(productClass ?? 'product')
+          .replace(/_/g, ' ')
+        if (!bop.target_customers || bop.target_customers.trim().length === 0) {
+          bop.target_customers = typeof targetMarket === 'string' && targetMarket.length > 0
+            ? targetMarket
+            : `Operators procuring ${productClassReadable} systems for the use case described in the brief — typically mid-market industrial buyers with defined performance and compliance requirements rather than research-pilot or hobbyist users.`
+        }
+        if (!bop.why_now || bop.why_now.trim().length === 0) {
+          bop.why_now = typeof macroDriver === 'string' && macroDriver.length > 0
+            ? macroDriver
+            : `Demand for ${productClassReadable} solutions is driven by the technical and commercial constraints stated in the brief (cost ceiling, deployment window, throughput target). The macro context — supply-chain, regulatory, or market timing rationale — is to be added by the brief author for the next narrator pass.`
+        }
+        if (!bop.overview_and_context || bop.overview_and_context.trim().length === 0) {
+          bop.overview_and_context = bop.mission_statement ?? ''
+        }
+      }
+
       const sumOrch = summarise(design.modules)
       const orchReasons = [
         `orchestrator=ok`,
@@ -2023,6 +2170,13 @@ async function main() {
         null, 2,
       ))
       writeFileSync(resolve(outDir, '4-orchestrator-tools-used.json'), JSON.stringify(orchResult.tools_used_page, null, 2))
+      // Build #19e (2026-05-22): capture the tools-used page + the finalised
+      // engineering contract so they can be attached to chain state below.
+      // The renderer reads state.toolsUsedPage (Build #19e end-page) and
+      // state.engineeringContract (Build #19f per-module callout) to surface
+      // tool provenance throughout the PDF.
+      orchToolsUsedPage = orchResult.tools_used_page
+      orchEngineeringContract = orchResult.contract
       // Build #18k: construct the verified-tool outputs block. Reviewers will
       // be told these values are AUTHORITATIVE and must be referenced in the
       // module overview_paragraph_en where applicable.
@@ -2030,10 +2184,21 @@ async function main() {
       if (toolsUsedPage?.tools && Array.isArray(toolsUsedPage.tools) && toolsUsedPage.tools.length > 0) {
         const blocks: string[] = []
         for (const tool of toolsUsedPage.tools) {
-          const claimsList = (tool.claims ?? []).map((c: any) => `      - ${c.field} = ${c.value}${c.unit ? ' ' + c.unit : ''} (from ${tool.tool_name} ${c.output_field})`).join('\n')
-          blocks.push(`  ${tool.tool_name} v${tool.tool_version} (${tool.tool_license}, ${tool.tool_source_url}):\n${claimsList}`)
+          // Bug fix #2 (2026-05-22): when tool_name resolves to empty string
+          // (legacy attribution.humaniseToolId() bug, or registry returned a
+          // tool with no name field), the LLM downstream silently substitutes
+          // the empty string into prose templates — producing "0 confirms..."
+          // or "0 requires..." lines in the module overview. Guard at source:
+          // fall back to a robust display name derived from tool_id.
+          const safeName = (typeof tool.tool_name === 'string' && tool.tool_name.trim().length > 0)
+            ? tool.tool_name.trim()
+            : (typeof tool.tool_id === 'string' && tool.tool_id.length > 0
+                ? tool.tool_id.split(':').map((p: string) => p.replace(/-/g, ' ').replace(/\b(\w)/g, (m: string) => m.toUpperCase())).join(' ')
+                : 'Orchestrator tool')
+          const claimsList = (tool.claims ?? []).map((c: any) => `      - ${c.field} = ${c.value}${c.unit ? ' ' + c.unit : ''} (from ${safeName} ${c.output_field})`).join('\n')
+          blocks.push(`  ${safeName} v${tool.tool_version} (${tool.tool_license}, ${tool.tool_source_url}):\n${claimsList}`)
         }
-        toolOutputsBlock = `\n\nVERIFIED-TOOL OUTPUTS (Build #18 orchestrator — these values were computed by reputable open-source engineering tools and are AUTHORITATIVE. You MUST reference each one explicitly in the relevant module's overview_paragraph_en when discussing that quantity. DO NOT silently override these values with your own estimates):\n${blocks.join('\n\n')}\n\nCRITICAL CONSISTENCY RULES (Build #18r — physics critic catches violations):\n  1. The pack topology values (cell_count, rack_count, cells_per_rack, series_cells_per_string, parallel_strings_per_rack) MUST satisfy series_cells_per_string × parallel_strings_per_rack × rack_count = cell_count EXACTLY. The design TEXT, the BoM ROW QUANTITIES, and the rack/string discussion must all use these same values — if pybamm output says 15 racks, the BoM line item for "rack frame" must list ×15, not ×16 or ×18.\n  2. The BMS slave count MUST cover every cell: bms_total_channels ≥ cell_count. If the tool says 418 slaves × 12 channels = 5016 channels for 5010 cells, the BoM must list ×418 slave boards. Do NOT downgrade to fewer slaves or a higher channel count.\n  3. The cold-plate aggregate capacity MUST equal or exceed the system thermal dissipation × 1.25. Use cold_plate_total_capacity_min_kw and cold_plate_per_rack_min_capacity_kw from the tool output. Round UP — never substitute a smaller plate.\n  4. The series-string voltage MUST stay within DC bus rating: series_cells_per_string × cell_max_charge_voltage ≤ dc_bus_voltage × 0.92. The tool has already enforced this — do NOT reconfigure the pack to more cells in series.\n  5. Current-carrying components MUST be rated for the tool-derived currents: LCL filter ≥ lcl_filter_rating_a, DC contactor ≥ dc_contactor_rating_a, DC breaker ≥ dc_breaker_rating_a, AC contactor ≥ ac_contactor_rating_a. The ratings primary AND capacity modifier on each component must BOTH meet this minimum — Loop 22 specced a 100A LCL filter against 1443A continuous (14× under-rated).\n  6. **CONTAINER SPLIT IS MANDATORY WHEN recommended_container_count ≥ 2.** If the mass-aggregator tool output shows recommended_container_count = 2 (i.e. total system mass exceeds the 28 t road-transport envelope), you MUST emit the design as TWO interconnected containers — typically one battery container (cells + BMS + cooling) and one power container (PCS + transformer + switchgear). DO NOT stuff everything into one container and ignore the mass breach. Loop 27 ignored a recommended_container_count = 2 and emitted a single 39 t container, which fails the brief's mass constraint.\n\nFor each tool-sourced quantity above, ensure the module overview text says e.g. "PyBaMM Prada2013 LFP DFN simulation confirms 5010 cells = 15 racks × 2 strings × 167 series cells, 4.49 MWh nameplate" rather than just stating the number. The reader needs to know which tool produced which claim so they can independently reproduce it.\n`
+        toolOutputsBlock = `\n\nVERIFIED-TOOL OUTPUTS (Build #18 orchestrator — these values were computed by reputable open-source engineering tools and are AUTHORITATIVE. You MUST reference each one explicitly in the relevant module's overview_paragraph_en when discussing that quantity. DO NOT silently override these values with your own estimates):\n${blocks.join('\n\n')}\n\nCRITICAL CONSISTENCY RULES (Build #18r — physics critic catches violations):\n  1. The pack topology values (cell_count, rack_count, cells_per_rack, series_cells_per_string, parallel_strings_per_rack) MUST satisfy series_cells_per_string × parallel_strings_per_rack × rack_count = cell_count EXACTLY. The design TEXT, the BoM ROW QUANTITIES, and the rack/string discussion must all use these same values — if pybamm output says 15 racks, the BoM line item for "rack frame" must list ×15, not ×16 or ×18.\n  2. The BMS slave count MUST cover every cell: bms_total_channels ≥ cell_count. If the tool says 418 slaves × 12 channels = 5016 channels for 5010 cells, the BoM must list ×418 slave boards. Do NOT downgrade to fewer slaves or a higher channel count.\n  3. The cold-plate aggregate capacity MUST equal or exceed the system thermal dissipation × 1.25. Use cold_plate_total_capacity_min_kw and cold_plate_per_rack_min_capacity_kw from the tool output. Round UP — never substitute a smaller plate.\n  4. **VOLTAGE HEADROOM EXPLANATION RULE (Build #18r-fix2 2026-05-22, Loop 28 Bug 2)**: The pybamm output's series_cells_per_string and string_voltage_nominal_v are AUTHORITATIVE. pybamm intentionally picks a series count BELOW the brief's "nominal" voltage to leave headroom for end-of-charge voltage rise (typically 15-20%). For example, if the brief says "800 V nominal DC bus" and pybamm picks 167 series cells × 3.2 V = 534 V nominal, that is CORRECT — 167 × 3.65 V max charge = 610 V, which fits a 670 V DC bus rating without exceeding 92% of the bus. The series count was constrained DOWN by the bus voltage rating, not UP by the nominal label. DO NOT write prose that contradicts this:\n     a. NEVER say "the battery string was reconfigured to N series cells to match the X V bus" — pybamm picked the series count FIRST, then derived the nominal voltage. There is no reconfiguration.\n     b. NEVER claim a different series count later in the same paragraph than the one in the tool output. If pybamm says 167 series, the entire overview MUST say 167 (or its arithmetic equivalent), never 250 or 244 or any "rebalanced" figure.\n     c. If the brief's "800 V nominal" disagrees with pybamm's computed nominal voltage, EXPLAIN the headroom: e.g. "PyBaMM picked 167 series cells (534 V nominal, 610 V end-of-charge) to fit within the 670 V DC bus rating implied by the brief's 800 V class designation, leaving 9% headroom for cell aging and balance variance." — DO NOT silently "fix" the inconsistency by re-balancing the topology.\n     The prose phrase "reconfigured to ... series cells" is FORBIDDEN — the chain's Build #19c content validator will reject patches containing this phrase.\n  5. Current-carrying components MUST be rated for the tool-derived currents: LCL filter ≥ lcl_filter_rating_a, DC contactor ≥ dc_contactor_rating_a, DC breaker ≥ dc_breaker_rating_a, AC contactor ≥ ac_contactor_rating_a. The ratings primary AND capacity modifier on each component must BOTH meet this minimum — Loop 22 specced a 100A LCL filter against 1443A continuous (14× under-rated).\n  6. **CONTAINER SPLIT IS MANDATORY WHEN recommended_container_count ≥ 2.** If the mass-aggregator tool output shows recommended_container_count = 2 (i.e. total system mass exceeds the 28 t road-transport envelope), you MUST emit the design as TWO interconnected containers — typically one battery container (cells + BMS + cooling) and one power container (PCS + transformer + switchgear). DO NOT stuff everything into one container and ignore the mass breach. Loop 27 ignored a recommended_container_count = 2 and emitted a single 39 t container, which fails the brief's mass constraint.\n  7. **NO INVENTED DERATING / EFFICIENCY CLAIMS (Build #18r-fix2 2026-05-22, Loop 28 Bug 3)**: prose MUST NOT introduce numeric claims about derating, round-trip efficiency, capacity-fade margin, or loss factors UNLESS the figure traces to a specific tool output. pybamm emits capacity_fade_at_6000_cycles_pct (this IS sourced); it does NOT emit a "12-15% derating" range. If you want to discuss round-trip efficiency, cite ngspice's inverter_efficiency_pct (single number, not a range). If you want to discuss SoC margins, cite pybamm's dod_fraction × nameplate. The phrases "12-15% derating", "round-trip efficiency of X%" (without ngspice citation), "loss factor", or any percentage paired with "derating" / "round-trip" / "efficiency" / "loss" MUST be either backed by a tool number or stripped. The chain's Build #19c content validator will reject patches containing un-sourced derating ranges.\n\nFor each tool-sourced quantity above, ensure the module overview text says e.g. "PyBaMM Prada2013 LFP DFN simulation confirms 5010 cells = 15 racks × 2 strings × 167 series cells, 4.49 MWh nameplate" rather than just stating the number. The reader needs to know which tool produced which claim so they can independently reproduce it.\n`
         console.error(`[chain] Build #18k: toolOutputsBlock built (${blocks.length} tools, ${toolOutputsBlock.length} chars) — will be injected into reviewer prompts`)
       }
       logAction({
@@ -3133,6 +3298,13 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     parsedBrief: parsedResult.data,
     moduleDecomposition: design,
     naturalLanguageLayer: nl,
+    // Build #19e (2026-05-22): orchestrator's tools-used page surfaces as
+    // the PDF's end-page (Tools Used in This Report). state.engineeringContract
+    // is set further down at line ~3227 (legacy chain field) — the renderer
+    // for Build #19f reads it AND any orchestrator-supplied richer contract
+    // via the dedicated state.orchestratorContract slot below.
+    toolsUsedPage: orchToolsUsedPage,
+    orchestratorContract: orchEngineeringContract,
     briefOverviewProse: design.brief_overview_prose ?? null,
     keyMetrics: keyMetrics ?? null,
     brief: briefBlock,

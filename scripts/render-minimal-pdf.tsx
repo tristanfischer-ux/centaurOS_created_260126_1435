@@ -114,6 +114,30 @@ function apply_engineering_fixups(s: string): string {
       /\bEV200HAANA\b/gi,
       'high-current DC contactor (1 kA-class)',
     )
+    // Bug fix #11 (2026-05-22): LLM occasionally leaks unsubstituted "P." or
+    // "P. IFA v5.2." placeholder tokens (an unfilled template variable from a
+    // GlobalG.A.P. prose pattern). Strip them. Match standalone "P." between
+    // word boundaries — must be capital P followed by full-stop, NOT inside
+    // a longer identifier like "TUV PL-L" or "P.E." engineer credential.
+    .replace(/(?<=^|\s)P\.\s+IFA\s+v\d+(?:\.\d+)?\.\s*/g, '')
+    .replace(/(?<=^|\s)P\.(?=\s+[a-z]|\s+\/|\s*$)/g, '')
+    // Bug fix #2 (2026-05-22): Some prose paragraphs leak literal "0 confirms"
+    // / "0 requires" / "0 sizes" / "0 delivers" / "0 calculates" / "0 maintains"
+    // — an unsubstituted `tools[0].name` template variable. When we can't tell
+    // which tool name was meant, fall back to a generic "The orchestrator tool"
+    // so the sentence reads sensibly. (Belt-and-braces — the upstream LLM has
+    // been corrected to use the tool's display name from attribution.ts, but
+    // this protects against any future regression.)
+    .replace(/(^|\.\s+|;\s+)0\s+(confirms|requires|sizes|delivers|calculates|maintains|reports|computes|outputs|yields)\b/g,
+      (_full, lead, verb) => `${lead}The orchestrator tool ${verb}`)
+    // Bug fix #12 (2026-05-22): belt-and-braces — strip any ALL_CAPS bracket
+    // debug token that leaked from internal pipeline stages into prose fields.
+    // Pattern: "[WORD_WORD]" at the start of a sentence or surrounded by
+    // whitespace (e.g. "[UP-CAP]", "[COST-REPAIR]", "[REJECT]", "[FALLBACK]").
+    // cleanCostReason already handles the specific cost-repair path; this
+    // catches any future regressions from other pipeline stages.
+    .replace(/\s*\[[A-Z][A-Z0-9_-]*\]\s*/g, ' ')
+    .trim()
 }
 
 /**
@@ -356,13 +380,87 @@ function britishise(s: string): string {
     .replace(/\bLabor\b/g, 'Labour')
 }
 
+/**
+ * Bug fix #10 (2026-05-22): LLM-generated overview_paragraph_en often carries
+ * 4-5 decimal places ("21.222 kW", "0.2763 m/s", "166.67 mL/min") because the
+ * model echoes the tool's raw float output verbatim. Round to ≤2 dp for
+ * human-readable prose. Keep raw values on the Tools-Used appendix page
+ * where the tool's reproducibility contract demands the original precision.
+ *
+ * Heuristic: match `<digits>.<3-or-more digits>` followed by an optional unit.
+ * Round to:
+ *   - 1 dp for kW / m³/s / kPa / kg/h / L/min / V / A / Hz (instrumental)
+ *   - 2 dp for kg/m²·yr / mS/cm / m/s (sub-unit instrumental)
+ *   - 1 dp default for anything else with a unit
+ *   - 2 dp default for bare numbers (no unit follows)
+ * Avoids known fixed-precision tokens (part numbers, IP ratings, dates).
+ */
+function clamp_decimals_in_prose(s: string): string {
+  if (!s) return s
+  return s.replace(/(\d+)\.(\d{3,})((?:\s?(?:kW|kPa|kg\/h|kg\/day|m³\/s|m³\/h|m\/s|L\/min|L\/day|µmol\/m²\/s|µmol\/J|°C|mS\/cm|kg\/m²\/yr|kg\/m²\/cycle|mol\/m²\/day|V|A|Hz|W|kg|m|kPa)\b)?)/g, (_full, intPart, decPart, suffix) => {
+    const unit = (suffix ?? '').trim()
+    const fullNum = parseFloat(`${intPart}.${decPart}`)
+    if (!Number.isFinite(fullNum)) return _full
+    // Sub-unit / instrumental quantities — 2 dp
+    if (/^(?:m\/s|mS\/cm|µmol\/J|kg\/m²\/yr|kg\/m²\/cycle|mol\/m²\/day)$/.test(unit)) {
+      return `${fullNum.toFixed(2)}${suffix ?? ''}`
+    }
+    // Bare numbers (no unit) — keep 2 dp for safety (could be ratios)
+    if (!unit) {
+      return `${fullNum.toFixed(2)}${suffix ?? ''}`
+    }
+    // Default: 1 dp for instrumental quantities
+    return `${fullNum.toFixed(1)}${suffix ?? ''}`
+  })
+}
+
+/**
+ * Bug fix #3 (2026-05-22): module overview_paragraph_en sometimes contains the
+ * same 2-3 sentence chunk repeated verbatim. The duplication happens during
+ * the multi-stage review pipeline when the specialist LLM is given a Grok-r1
+ * pass that already references the tool outputs and the specialist (instead
+ * of merging) prepends the prior chunk to its own re-emission.
+ *
+ * Detector: split prose on sentence boundaries and drop runs of ≥2 sentences
+ * that re-appear later identical (case- and whitespace-normalised).
+ *
+ * Stays cheap (linear) and safe (only drops contiguous runs that are 100%
+ * identical — never drops a single sentence even if it's repeated).
+ */
+function dedupe_duplicated_chunks(s: string): string {
+  if (!s) return s
+  // Split into sentences keeping the trailing punctuation. Catches "kW. ", "/yr. ", etc.
+  const parts = s.split(/(?<=[.!?])\s+(?=[A-Z0-9])/g)
+  if (parts.length < 4) return s  // not enough to have a duplicated chunk
+  const seen = new Set<string>()
+  const out: string[] = []
+  // Look for runs of ≥2 consecutive sentences that appear identically earlier.
+  // We use a 2-sentence sliding window as the dup-detection unit.
+  for (let i = 0; i < parts.length; i++) {
+    if (i + 1 < parts.length) {
+      const win2 = (parts[i] + ' ' + parts[i + 1]).replace(/\s+/g, ' ').trim().toLowerCase()
+      if (seen.has(win2)) {
+        // Skip the 2-sentence window (this i and the next).
+        i++  // skip next too
+        continue
+      }
+    }
+    out.push(parts[i])
+    if (i + 1 < parts.length) {
+      const win2 = (parts[i] + ' ' + parts[i + 1]).replace(/\s+/g, ' ').trim().toLowerCase()
+      seen.add(win2)
+    }
+  }
+  return out.join(' ').replace(/\s+/g, ' ').trim()
+}
+
 function clean_prose(s: string | null | undefined): string {
   if (!s) return ''
   // Phase19 audit pipeline: HTML decode + tag strip → existing transforms →
   // British spelling normalisation. Order matters: strip tags AFTER decoding
   // entities (so &lt;strong&gt; becomes a real tag we then strip).
   const decoded = stripHtmlTags(decodeHtmlEntities(String(s).trim()))
-  return britishise(fix_quantity_prefix(normalise_unicode(apply_engineering_fixups(strip_internal_ids(decoded)))))
+  return dedupe_duplicated_chunks(clamp_decimals_in_prose(britishise(fix_quantity_prefix(normalise_unicode(apply_engineering_fixups(strip_internal_ids(decoded)))))))
 }
 
 // ─── Module label table (mirrored from src/lib/pdf-engine-v2/types/module-decomposition.ts) ───
@@ -403,6 +501,22 @@ const MODULE_PRESENTATION_ORDER: string[] = [
   'safety_protection',
   'hmi_ergonomics',
   'maintenance_serviceability',
+  // Bug fix #16 (2026-05-22): vertical-farm class-specific modules ordered by
+  // engineering reading logic (envelope → photons → plants → fluids → climate →
+  // power → automation → data → output → effluent → access → compliance).
+  // Without this ordering they default to index 999 and sort alphabetically,
+  // producing a hairball reading order (Automation, Climate, Effluent...).
+  'lighting_array',
+  'growing_canopy',
+  'irrigation_nutrient',
+  'climate_control',
+  'electrical_distribution',
+  'automation_sensing',
+  'data_compute_communication',
+  'harvest_handling',
+  'effluent_treatment',
+  'worker_access_safety',
+  'regulatory_compliance',
 ]
 
 function module_title(spec: { module: string; display_name?: string } | string): string {
@@ -660,6 +774,23 @@ function computeBomTotals(state: any): BomTotals | null {
     for (const sm of m.sub_modules ?? []) {
       const sub: BomSub = { id: sm.id, name: sm.name_human || humanise(sm.id), parts: [], subtotal_gbp: 0 }
       for (const w of sm.words ?? []) {
+        // Bug fix #17 (2026-05-22): certification scheme entries (GlobalG.A.P.,
+        // BRCGS audit, UKCA marking, WRAS approval) are paid as third-party
+        // certification fees, NOT hardware parts. Some downstream reviewer
+        // LLMs add them to BoM-bearing modules with concocted part numbers
+        // and £1,000+ price tags. Filter them out before line construction
+        // so they never appear in the Part column. Match heuristic: word id
+        // / name / content_character.character_id contains "cert" "audit"
+        // "marking" "approval" alongside a known scheme name.
+        const idLower = String(w.id ?? '').toLowerCase()
+        const nameLower = String(w.name_human ?? '').toLowerCase()
+        const ccidLower = String(w?.content_character?.character_id ?? '').toLowerCase()
+        const combined = `${idLower} ${nameLower} ${ccidLower}`
+        const isCertWord = (
+          /(?:cert(?:ificat)?|audit|marking|approval)\b/i.test(combined)
+          && /(?:globalg|brcgs|brcg|ukca|wras|red\s*tractor|leaf\s*marque|leaf-marque|iso\s*\d|ifa\s*v|ce\s*mark)/i.test(combined)
+        )
+        if (isCertWord) continue
         const v = verifByWordId.get(w.id)
         const mods = w.modifier_characters ?? []
         // Quantity (integer)
@@ -2641,10 +2772,17 @@ function PhysicalSpecBlock({ modules, deploymentEnvelope }: { modules: any[]; de
 
 function BriefPage({ state, project, manualReviewBadges }: { state: any; project: string; manualReviewBadges?: ManualReviewBadge[] }) {
   const bp = state.briefOverviewProse ?? {}
+  // Bug fix #15 (2026-05-22): brief_overview_prose fields are sometimes empty
+  // because the Generator/specialist LLMs left them blank. Fall back to the
+  // parsed-brief layer (which carries target_customers + why_now extracted
+  // by Stage 1 of the chain) so the headings either have content OR get
+  // suppressed entirely below. Previously the renderer emitted the SubHeading
+  // followed by an empty paragraph — leaking visible blank sections.
+  const pb = state.parsedBrief ?? {}
   const overview = clean_prose(bp.overview_and_context)
   const mission = clean_prose(bp.mission_statement)
-  const customers = clean_prose(bp.target_customers)
-  const whyNow = clean_prose(bp.why_now)
+  const customers = clean_prose(bp.target_customers) || clean_prose(pb.target_customers)
+  const whyNow = clean_prose(bp.why_now) || clean_prose(pb.why_now)
   const modules = state.moduleDecomposition?.modules ?? []
 
   // Iter-10.5: operational-headline banner folded INTO the Brief page (Tristan
@@ -2701,17 +2839,16 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
 
       <PhysicalSpecBlock modules={modules} deploymentEnvelope={state.deploymentEnvelope ?? null} />
 
-      <SubHeading>Overview</SubHeading>
-      <Paragraph>{overview}</Paragraph>
+      {overview ? (<><SubHeading>Overview</SubHeading><Paragraph>{overview}</Paragraph></>) : null}
 
-      <SubHeading>Mission</SubHeading>
-      <Paragraph>{mission}</Paragraph>
+      {mission ? (<><SubHeading>Mission</SubHeading><Paragraph>{mission}</Paragraph></>) : null}
 
-      <SubHeading>Target customers</SubHeading>
-      <Paragraph>{customers}</Paragraph>
+      {/* Bug fix #15 (2026-05-22): suppress heading entirely when no content.
+          Previously rendered an SubHeading + empty Paragraph, leaking blank
+          "Target customers" + "Why now" sections to the cover. */}
+      {customers ? (<><SubHeading>Target customers</SubHeading><Paragraph>{customers}</Paragraph></>) : null}
 
-      <SubHeading>Why now</SubHeading>
-      <Paragraph>{whyNow}</Paragraph>
+      {whyNow ? (<><SubHeading>Why now</SubHeading><Paragraph>{whyNow}</Paragraph></>) : null}
 
       {/* ITER-10.5 third review (Tristan 2026-05-20): Performance
           Characteristics folded INTO the Brief page so there's one
@@ -3278,6 +3415,30 @@ function noteCollectorForSubModule(
       notes.push({ idx: notes.length + 1, word_id: row.word_id, text, severity: 'warn' })
     }
   }
+  // Bug fix #12 (2026-05-22): cost-repair internal diagnostic strings
+  // (`[UP-CAP] LLM proposed £X.XX (Nx current £Y.YY). Exceeds
+  // COST_REPAIR_UP_CAP_RATIO=4; correction rejected. Original reasoning: ...`)
+  // were leaking verbatim into the PDF Notes column. Sanitise them for a
+  // reader audience BEFORE rendering — keep the user-facing explanation
+  // ("manual sourcing required"), drop the engine plumbing.
+  const cleanCostReason = (raw?: string): string => {
+    if (!raw) return ''
+    let s = String(raw)
+    // Strip the `[UP-CAP] LLM proposed £X.XX (Nx current £Y.YY). Exceeds
+    // COST_REPAIR_UP_CAP_RATIO=N; correction rejected.` prefix.
+    s = s.replace(/^\s*\[UP-CAP\][^.]*\.\s*/, '')
+    // Strip the explicit "Exceeds COST_REPAIR_UP_CAP_RATIO=N; correction rejected." phrase.
+    s = s.replace(/Exceeds\s+COST_REPAIR_UP_CAP_RATIO=\d+;?\s*correction\s+rejected\.?\s*/gi, '')
+    // Strip "LLM proposed £X.XX (Nx current £Y.YY)." phrases.
+    s = s.replace(/LLM\s+proposed\s+£[\d.,]+\s*\([^)]*\)\.?\s*/gi, '')
+    // Strip "correction rejected" leftovers.
+    s = s.replace(/correction\s+rejected\.?\s*/gi, '')
+    // Strip "Original reasoning:" prefix (the LLM rationale that follows
+    // is fine — we just don't want the internal-engine label).
+    s = s.replace(/Original\s+reasoning:\s*/gi, '')
+    return s.replace(/\s+/g, ' ').trim()
+  }
+
   // 1b. Sprint 1B Cost Repair Loop verdicts — surface inline so the
   // reader sees why a price was changed (or why we couldn't price the
   // line at all).
@@ -3286,17 +3447,19 @@ function noteCollectorForSubModule(
     if (row.cost_repair_action === 'corrected' && row.cost_repair_previous_price_gbp && row.cost_repair_corrected_price_gbp) {
       const conf = row.cost_repair_confidence ? ` (confidence: ${row.cost_repair_confidence})` : ''
       const src = row.cost_repair_source ? ` Source: ${row.cost_repair_source}.` : ''
+      const cleanedReason = cleanCostReason(row.cost_repair_reasoning)
       notes.push({
         idx: notes.length + 1,
         word_id: row.word_id,
-        text: `Cost review — price updated from £${row.cost_repair_previous_price_gbp.toFixed(2)} to £${row.cost_repair_corrected_price_gbp.toFixed(2)} after corpus comparison flagged an outlier.${conf} ${row.cost_repair_reasoning ?? ''}${src}`.trim(),
+        text: `Cost review — price updated from £${row.cost_repair_previous_price_gbp.toFixed(2)} to £${row.cost_repair_corrected_price_gbp.toFixed(2)} after corpus comparison flagged an outlier.${conf} ${cleanedReason}${src}`.trim(),
         severity: 'info',
       })
     } else if (row.cost_repair_action === 'manual_sourcing_required') {
+      const cleanedReason = cleanCostReason(row.cost_repair_reasoning)
       notes.push({
         idx: notes.length + 1,
         word_id: row.word_id,
-        text: `Cost review — manual sourcing required. ${row.cost_repair_reasoning ?? 'Neither the current price nor the corpus median is reliable; engineer to source per drawing/spec before procurement.'}`,
+        text: `Cost review — manual sourcing required. ${cleanedReason || 'Neither the current price nor the corpus median is reliable; engineer to source per drawing/spec before procurement.'}`,
         severity: 'error',
       })
     }
@@ -3379,6 +3542,7 @@ function SubModuleBomBlock({
         return (
           <View
             key={`bom-${ri}`}
+            wrap={false}
             style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}
           >
             <Text style={{ flex: 2.6, fontSize: 9, color: INK }}>
@@ -3653,6 +3817,12 @@ function ModuleSection({
           </View>
         )
       })() : null}
+
+      {/* Build #19f (2026-05-22): per-module Tools Used callout. Lists every
+          orchestrator tool whose output contributed to a quantity referenced
+          by this module's sub-modules or derived_parameters. Renders nothing
+          when the orchestrator phase didn't run for this design. */}
+      <ModuleToolsCallout moduleSpec={moduleSpec} state={state} />
 
       <View style={{ marginBottom: 14 }}>
         {(overviewChunks.length > 0 ? overviewChunks : [overview || `Module ${index} of the product.`]).map((chunk, i) => (
@@ -5560,6 +5730,301 @@ function SystemLevelRisksPage({ state, project }: { state: any; project: string 
 
 
 
+// ─── Build #19e (2026-05-22) · Tools-Used end-page ─────────────────────────
+//
+// Lists every verified engineering tool that contributed at least one
+// numerical claim to the report — with paper citation, physics basis,
+// confidence class, and a truncated list of the actual quantities the
+// tool computed for THIS design. Plus a section listing tools that are
+// available in the orchestrator's registry but were not used for this
+// design (so the reader sees the full engineering inventory).
+//
+// Data spec: scripts/lib/orchestrator/attribution.ts ToolsUsedPage. The
+// state.toolsUsedPage field is set by orchestrate.ts via buildToolsUsedPage().
+//
+// Tristan reframe (drawer drawer_forgeos_decisions_961c722f0e77d105):
+// "At the end of the PDF we could say explicitly that we used xyz tools
+// to do computations." This is the credibility primitive that separates
+// ForgeOS engineering-reference output from LLM-generated narrative —
+// a reader who installs the same tools can reproduce the same numbers.
+
+const CONFIDENCE_BADGE_COLOUR: Record<string, string> = {
+  library: '#065f46',          // dark green — published library
+  textbook: '#0c4a6e',         // dark blue — textbook formula
+  standard: '#3b0764',         // dark purple — industry standard
+  datasheet: '#7c2d12',        // dark orange — manufacturer datasheet
+  empirical: '#713f12',        // dark amber — empirical fit
+  industry_typical: '#52525b', // dark grey — broadly used
+  estimated: '#7f1d1d',        // dark red — estimate
+}
+
+function confidenceBadgeStyle(cls: string | undefined) {
+  const bg = (cls && CONFIDENCE_BADGE_COLOUR[cls]) ?? '#475569'
+  return { backgroundColor: bg, color: '#ffffff', paddingVertical: 1.5, paddingHorizontal: 6, borderRadius: 3 }
+}
+
+/**
+ * Resolve the toolsUsedPage payload from the chain state. Returns null if
+ * the orchestrator was not invoked or wrote no payload (legacy chains).
+ */
+function readToolsUsedPage(state: any): any | null {
+  const candidates = [
+    state?.toolsUsedPage,
+    state?.orchestrator?.tools_used_page,
+    state?.orchestratorResult?.tools_used_page,
+  ]
+  for (const c of candidates) {
+    if (c && typeof c === 'object' && Array.isArray(c.tools)) return c
+  }
+  return null
+}
+
+function ToolsUsedPage({ state, project }: { state: any; project: string }) {
+  const page = readToolsUsedPage(state)
+  if (!page) return null
+  if (!Array.isArray(page.tools) || page.tools.length === 0) return null
+
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section · Tools Used in This Report" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Tools Used in This Report
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 18, lineHeight: 1.55 }}>
+        {page.intro || (
+          'Every numerical value in this document was computed by one of the '
+          + 'verified engineering tools below. Each tool is open-source or '
+          + 'free-to-use; the listed version is what was invoked; the listed '
+          + 'paper or standard is the underlying physics. Anyone with the same '
+          + 'tool version can reproduce the same output from the same input.'
+        )}
+      </Text>
+
+      {page.tools.map((tool: any, ti: number) => {
+        const claims: any[] = Array.isArray(tool.claims) ? tool.claims : []
+        const visibleClaims = claims.slice(0, 12)
+        const extraClaims = claims.length - visibleClaims.length
+        return (
+          <View
+            key={tool.tool_id || `tool-${ti}`}
+            style={{ marginBottom: 14, padding: 12, backgroundColor: '#f8fafc', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 4 }}
+            wrap={false}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
+              <Text style={{ flex: 1, fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK }}>
+                {tool.tool_name || tool.tool_id}
+                <Text style={{ fontFamily: 'Helvetica', color: MUTED }}>
+                  {tool.tool_version ? `  v${tool.tool_version}` : ''}
+                </Text>
+              </Text>
+              {tool.tool_license ? (
+                <Text style={{ fontSize: 8, color: MUTED }}>{tool.tool_license}</Text>
+              ) : null}
+              {tool.confidence_class ? (
+                <Text style={{ fontSize: 8, marginLeft: 6, fontFamily: 'Helvetica-Bold', ...confidenceBadgeStyle(tool.confidence_class) }}>
+                  {String(tool.confidence_class).toUpperCase()}
+                </Text>
+              ) : null}
+            </View>
+
+            {tool.tool_paper ? (
+              <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 2 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Paper: </Text>
+                {tool.tool_paper}
+                {tool.tool_doi ? (
+                  <Text style={{ color: ACCENT_SOFT }}>{`  · DOI:${tool.tool_doi}`}</Text>
+                ) : null}
+              </Text>
+            ) : null}
+
+            {tool.physics_basis ? (
+              <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 2 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Physics: </Text>
+                {tool.physics_basis}
+                {tool.physics_paper_doi ? (
+                  <Text style={{ color: ACCENT_SOFT }}>{`  · DOI:${tool.physics_paper_doi}`}</Text>
+                ) : null}
+              </Text>
+            ) : null}
+
+            {tool.tool_source_url ? (
+              <Text style={{ fontSize: 9, color: MUTED, marginBottom: 6 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Source: </Text>
+                {tool.tool_source_url}
+              </Text>
+            ) : null}
+
+            {visibleClaims.length > 0 ? (
+              <View style={{ marginTop: 4, paddingTop: 4, borderTopWidth: 0.4, borderTopColor: RULE_SOFT }}>
+                <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3 }}>
+                  Quantities this tool computed for this design:
+                </Text>
+                {visibleClaims.map((claim, ci) => {
+                  const v = Number.isFinite(claim.value)
+                    ? claim.value.toLocaleString(undefined, { maximumFractionDigits: 4 })
+                    : String(claim.value ?? '—')
+                  return (
+                    <Text key={ci} style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
+                      {`  • ${claim.field} = ${v}${claim.unit ? ` ${claim.unit}` : ''}`}
+                      {claim.input_summary && claim.input_summary !== '(none)' ? (
+                        <Text style={{ color: MUTED }}>{`  (input: ${truncate(claim.input_summary, 80)})`}</Text>
+                      ) : null}
+                    </Text>
+                  )
+                })}
+                {extraClaims > 0 ? (
+                  <Text style={{ fontSize: 8.5, color: MUTED, fontStyle: 'italic', marginTop: 2 }}>
+                    {`  ... and ${extraClaims} more claim${extraClaims === 1 ? '' : 's'} from the same tool.`}
+                  </Text>
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        )
+      })}
+
+      {Array.isArray(page.available_but_unused) && page.available_but_unused.length > 0 ? (
+        <View style={{ marginTop: 16, padding: 12, backgroundColor: '#f1f5f9', borderRadius: 4 }}>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
+            Tools available in the orchestrator but not used for this design
+          </Text>
+          <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 8, fontStyle: 'italic' }}>
+            These tools are wired in and can be invoked for other product classes; this design did not require their output.
+          </Text>
+          {page.available_but_unused.map((t: any, i: number) => (
+            <View key={t.tool_id || `unused-${i}`} style={{ marginBottom: 6 }} wrap={false}>
+              <Text style={{ fontSize: 9, color: INK, fontFamily: 'Helvetica-Bold' }}>
+                {`${t.name || t.tool_id}  v${t.version || '?'}  `}
+                <Text style={{ fontFamily: 'Helvetica', color: MUTED }}>
+                  {`${t.license || ''}${t.domain ? `  ·  ${t.domain}` : ''}`}
+                </Text>
+              </Text>
+              {t.what_it_does ? (
+                <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.45 }}>{t.what_it_does}</Text>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      <View style={{ marginTop: 14, paddingTop: 8, borderTopWidth: 0.6, borderTopColor: RULE_SOFT }}>
+        <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45, fontStyle: 'italic' }}>
+          {page.disclaimer || (
+            'The ForgeOS PDF engine orchestrates the tools and renders this PDF but does not itself compute the engineering numbers. Tool outputs are accurate within their documented operating domains; certified procurement requires separate engineer sign-off.'
+          )}
+        </Text>
+      </View>
+
+      <PageFooter />
+    </Page>
+  )
+}
+
+function truncate(s: string, n: number): string {
+  if (!s) return ''
+  return s.length > n ? s.slice(0, n - 1) + '…' : s
+}
+
+// ─── Build #19f (2026-05-22) · per-module "Tools Used in this Section" ────
+//
+// Small callout box rendered at the top of each module's content (after
+// the cover image and overview paragraph, before the sub-modules). Lists
+// the tools whose outputs contributed to ANY quantity referenced by a
+// sub-module's word OR a derived_parameter of this module.
+//
+// Tristan's ask (drawer_forgeos_decisions_961c722f0e77d105): "kind of
+// engineering detail is massively useful and informative, gives the
+// document real sense of rigour" — show per-section which tools backed
+// the numbers IN THAT section.
+
+function moduleToolIds(moduleSpec: any, state: any): string[] {
+  const page = readToolsUsedPage(state)
+  if (!page || !Array.isArray(page.tools) || page.tools.length === 0) return []
+  // Build set of tool_ids from the engineering contract for every quantity
+  // touched by this module's sub-modules + derived_parameters. Prefer the
+  // orchestrator's enriched contract (carries typed-quantity provenance per
+  // Build #19d); fall back to the legacy chain contract when ORCHESTRATOR=0.
+  const contract =
+    state?.orchestratorContract
+    || state?.engineeringContract
+    || state?.orchestrator?.contract
+    || null
+  const quantities: Record<string, any> = contract?.quantities && typeof contract.quantities === 'object'
+    ? contract.quantities
+    : {}
+
+  const toolIds = new Set<string>()
+  const candidateNames: string[] = []
+  for (const sm of (moduleSpec?.sub_modules ?? [])) {
+    for (const w of (sm?.words ?? [])) {
+      const nm: string[] = [w?.id, w?.name_human, w?.content_character?.character_id]
+        .filter((x: unknown): x is string => typeof x === 'string')
+        .map(s => s.toLowerCase().replace(/[-\s]+/g, '_'))
+      candidateNames.push(...nm)
+    }
+  }
+  // Module's derived parameters
+  for (const dpKey of Object.keys(moduleSpec?.derived_parameters ?? {})) {
+    candidateNames.push(String(dpKey).toLowerCase())
+  }
+
+  // For each candidate name, find matching quantities in the contract
+  for (const candidate of candidateNames) {
+    for (const qName of Object.keys(quantities)) {
+      const qLower = qName.toLowerCase()
+      if (candidate === qLower || candidate.includes(qLower) || qLower.includes(candidate)) {
+        const tid = quantities[qName]?.provenance?.tool_id
+        if (typeof tid === 'string' && tid) toolIds.add(tid)
+      }
+    }
+  }
+
+  return Array.from(toolIds)
+}
+
+function ModuleToolsCallout({ moduleSpec, state }: { moduleSpec: any; state: any }) {
+  const page = readToolsUsedPage(state)
+  if (!page) return null
+  const ids = moduleToolIds(moduleSpec, state)
+  if (ids.length === 0) return null
+
+  // Resolve display names from the toolsUsedPage
+  const displays: string[] = []
+  for (const tid of ids) {
+    const tool = (page.tools as any[]).find(t => t?.tool_id === tid)
+    if (tool) {
+      const name = tool.tool_name || tid
+      const version = tool.tool_version ? ` v${tool.tool_version}` : ''
+      displays.push(`${name}${version}`)
+    } else {
+      displays.push(tid)
+    }
+  }
+  if (displays.length === 0) return null
+
+  return (
+    <View
+      style={{
+        backgroundColor: '#f0f4f8',
+        paddingVertical: 6,
+        paddingHorizontal: 10,
+        marginBottom: 12,
+        borderLeftWidth: 3,
+        borderLeftColor: ACCENT_SOFT,
+        borderRadius: 3,
+      }}
+      wrap={false}
+    >
+      <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: ACCENT, letterSpacing: 0.6, marginBottom: 2 }}>
+        TOOLS USED IN THIS SECTION
+      </Text>
+      <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5 }}>
+        {displays.join('   ·   ')}
+      </Text>
+    </View>
+  )
+}
+
 function MinimalDocument({ state, subject }: { state: any; subject: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
   const rawModules = state.moduleDecomposition?.modules ?? []
@@ -5676,6 +6141,10 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
           it doing?". Unrepaired-gate decisions already surface inline
           via per-sub-module Notes + module-level Engineering check
           paragraphs. */}
+      {/* Build #19e (2026-05-22): Tools-Used end-page. Renders nothing
+          (returns null) when the orchestrator phase didn't run OR no
+          tools contributed claims — preserves legacy chain output. */}
+      <ToolsUsedPage state={state} project={project} />
     </Document>
   )
 }
