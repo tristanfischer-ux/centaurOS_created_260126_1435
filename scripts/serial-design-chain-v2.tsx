@@ -391,6 +391,46 @@ async function parseJson(raw: string, opts: { stage: string; model: string; rawD
 }
 
 // ─── Reviewer patch applier (op-type semantics) ────────────────────────────
+// Build #19c (2026-05-22): prose-only patch validator.
+//
+// Per Tristan's plan: reviewer LLMs are STRUCTURALLY PROHIBITED from editing
+// numeric quantities, part numbers, ratings, or any tool-sourced field.
+// They can only edit narrative prose. This is the architectural change that
+// makes "tool outputs are authoritative" actually enforced (vs the prior
+// approach of asking the LLM nicely in the narrator block and watching it
+// override the numbers anyway — see Loops 26-28).
+//
+// PROSE_ONLY_PATHS: any `edit_field` or `edit_sub_module_field` whose `path`
+// starts with one of these prefixes is ALLOWED. Everything else is rejected.
+const PROSE_ONLY_PATH_PREFIXES = [
+  'overview_paragraph_en',
+  'module_brief',
+  'english_sentence',
+  'role_verb',
+  'topology_clause',
+  'design_rationale',
+  'name_human',                  // top-level module/sub-module display label
+  'applicability_confidence',
+  'applicability_rationale',
+  'sub_module_brief',
+  'description',                 // free-text description
+  'narrative',                   // any narrative-tagged field
+  'rationale',                   // any rationale-tagged field
+] as const
+
+function isProseOnlyPath(path: string): boolean {
+  if (!path) return false
+  const p = String(path).trim()
+  // Reject deep paths into structured data — even if the leaf is a name field,
+  // a nested path implies the LLM is reaching into tool-sourced structures
+  // (derived_parameters, words, modifier_characters, content_character).
+  if (p.includes('derived_parameters') || p.includes('modifier_characters') ||
+      p.includes('content_character') || p.includes('words.') || p.includes('words[')) {
+    return false
+  }
+  return PROSE_ONLY_PATH_PREFIXES.some(prefix => p === prefix || p.startsWith(prefix + '.') || p.startsWith(prefix + '['))
+}
+
 function applyReviewerPatches(design: any, patches: any[]): { applied: number; skipped: number; reasons: string[] } {
   let applied = 0
   let skipped = 0
@@ -437,15 +477,25 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
       } else if (op === 'edit_field') {
         const m = design.modules.find((x: any) => x.module === p.module)
         if (!m) { skipped++; reasons.push(`skip edit_field: module "${p.module}" not found`); continue }
+        // Build #19c prose-only validator
+        if (!isProseOnlyPath(p.path)) {
+          skipped++; reasons.push(`REJECT edit_field non-prose path "${p.path}" — tool-sourced quantities are read-only to reviewers`)
+          continue
+        }
         setByPath(m, p.path, p.new_value)
-        applied++; reasons.push(`=${p.module}.${p.path}`)
+        applied++; reasons.push(`=${p.module}.${p.path} (prose)`)
       } else if (op === 'edit_sub_module_field') {
         const m = design.modules.find((x: any) => x.module === p.module)
         if (!m) { skipped++; reasons.push(`skip: module "${p.module}" not found`); continue }
         const sm = (m.sub_modules ?? []).find((s: any) => s.id === p.sub_module_id)
         if (!sm) { skipped++; reasons.push(`skip: sub-module "${p.module}.${p.sub_module_id}" not found`); continue }
+        // Build #19c prose-only validator
+        if (!isProseOnlyPath(p.path)) {
+          skipped++; reasons.push(`REJECT edit_sub_module_field non-prose path "${p.path}" — tool-sourced quantities are read-only to reviewers`)
+          continue
+        }
         setByPath(sm, p.path, p.new_value)
-        applied++; reasons.push(`=${p.module}.${p.sub_module_id}.${p.path}`)
+        applied++; reasons.push(`=${p.module}.${p.sub_module_id}.${p.path} (prose)`)
       } else if (op === 'add_word_to_sub_module') {
         const m = design.modules.find((x: any) => x.module === p.module)
         if (!m) { skipped++; reasons.push(`skip: module "${p.module}" not found`); continue }
@@ -718,10 +768,27 @@ Supported operation types:
   { "op": "add_sub_module", "module": "<module_id>", "sub_module": { full sub-module object with id, name_human, words[], english_sentence, rad_syntax, grammar_links }, "reason": "..." }
   { "op": "add_grammar_link", "module": "<module_id>", "link": { from_sub_module, to_sub_module, mechanism, type, detail }, "reason": "..." }
   { "op": "add_cross_link", "link": { from_module, to_module, mechanism, type, detail }, "reason": "..." }
-  { "op": "edit_field", "module": "<module_id>", "path": "derived_parameters.cell_count", "new_value": 5000, "reason": "..." }
-  { "op": "edit_sub_module_field", "module": "<module_id>", "sub_module_id": "<sub_id>", "path": "name_human", "new_value": "...", "reason": "..." }
+  { "op": "edit_field", "module": "<module_id>", "path": "overview_paragraph_en", "new_value": "<rewritten prose>", "reason": "..." }
+  { "op": "edit_sub_module_field", "module": "<module_id>", "sub_module_id": "<sub_id>", "path": "english_sentence", "new_value": "<rewritten prose>", "reason": "..." }
   { "op": "add_word_to_sub_module", "module": "<module_id>", "sub_module_id": "<sub_id>", "word": { id, name_human, content_character, modifier_characters }, "reason": "..." }
   { "op": "append_to_overview", "module": "<module_id>", "text": "<additional sentence>", "reason": "..." }
+
+**BUILD #19c PROSE-ONLY VALIDATOR (2026-05-22 — strict enforcement):**
+edit_field and edit_sub_module_field are now PROSE-ONLY. The chain will REJECT
+any patch whose path touches a tool-sourced numeric field (derived_parameters,
+modifier_characters values, content_character, words.N.anything). Allowed
+paths:
+  overview_paragraph_en | module_brief | english_sentence | role_verb |
+  topology_clause | design_rationale | name_human | sub_module_brief |
+  description | narrative | rationale | applicability_confidence |
+  applicability_rationale
+
+Why: tool-sourced quantities (pybamm cell_count, ngspice currents, pandapower
+transformer rating, mass-aggregator container split, etc.) are AUTHORITATIVE.
+The orchestrator's tools computed them from physics. Editing them via a
+reviewer LLM patch is what made Loops 22-28 stuck at plausibility 2-4.
+Your job for numeric quantities: USE them in prose to add narrative around
+them, NOT change them.
 
 PRODUCTIVE-OUTPUT HARD CONSTRAINT (DESCRIPTION-WEIGHTED):
 You MUST return at least ONE move from BOTH groups:
@@ -733,7 +800,11 @@ You MUST return at least ONE move from BOTH groups:
   STRUCTURE / SCAFFOLDING (at least one required):
     (c) ≥ 2 add_sub_module operations
     (d) ≥ 5 add_grammar_link or add_cross_link operations
-    (e) ≥ 5 edit_field operations adding derived_parameters
+    (e) ≥ 5 edit_field or edit_sub_module_field operations on PROSE paths
+        (overview_paragraph_en, module_brief, english_sentence, etc. — see
+        Build #19c rules below) — Build #19c removed the prior "fill
+        derived_parameters" constraint because the orchestrator now owns
+        those fields
 
 A design where existing sub-modules' words still have ≤3 modifier_characters is a FAILED review. The BoM-grade test: pick any word, can a procurement engineer source the part from your modifier set? If "×4896" is all you've got, NO.
 
