@@ -847,6 +847,18 @@ function renderLinkProse(moduleSpec: ModuleSpec, links: ReadonlyArray<GrammarLin
     subById.set(sub.id, sub)
   }
   const sentences: string[] = []
+  // 2026-05-23 (eVTOL chain 2 audit): "drives" is wrong for plural subjects
+  // — "The passenger seats drives the cabin" → "drive" required. Simple
+  // English-plural heuristic (lower ends in 's' but not 'ss', 'us', 'is') —
+  // covers the engineering vocabulary (seats, valves, panels, batteries,
+  // cells, rotors) while keeping singulars (compressor, chassis, bus, gas)
+  // correct.
+  const isLikelyPlural = (name: string): boolean => {
+    const lower = name.trim().toLowerCase()
+    if (!lower.endsWith('s')) return false
+    if (lower.endsWith('ss') || lower.endsWith('us') || lower.endsWith('is')) return false
+    return true
+  }
   for (const link of links) {
     const from = subById.get(link.from_sub_module)
     const to = subById.get(link.to_sub_module)
@@ -857,7 +869,8 @@ function renderLinkProse(moduleSpec: ModuleSpec, links: ReadonlyArray<GrammarLin
     if (link.type === 'mutual') {
       sentences.push(ensureTerminalPunctuation(`The ${fromName} and the ${toName} share a ${mech} link${detail}`))
     } else {
-      sentences.push(ensureTerminalPunctuation(`The ${fromName} drives the ${toName} via ${mech}${detail}`))
+      const verb = isLikelyPlural(fromName) ? 'drive' : 'drives'
+      sentences.push(ensureTerminalPunctuation(`The ${fromName} ${verb} the ${toName} via ${mech}${detail}`))
     }
   }
   return sentences.join(' ')

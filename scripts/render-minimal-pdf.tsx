@@ -5881,23 +5881,28 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
             {(() => {
               const narr = getToolNarrative(tool.tool_id)
               if (!narr) return null
+              // 2026-05-23: pipe narrative fields through normalise_unicode so
+              // CO₂ subscript-2, ¹⁰⁴ superscripts, ≈ ≤ ≥ etc render as ASCII.
+              // Without this, default Helvetica falls back to garbled glyphs
+              // for U+2082 et al — eVTOL chain 2 audit showed "CO₂-equivalent"
+              // rendering as "CO‚-equivalent" in the appendix.
               return (
                 <View style={{ marginTop: 4, marginBottom: 8, padding: 8, backgroundColor: '#ffffff', borderRadius: 3, borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
                   <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
                     <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What it does. </Text>
-                    {narr.description}
+                    {normalise_unicode(narr.description)}
                   </Text>
                   <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
                     <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Origin. </Text>
-                    {narr.origin}
+                    {normalise_unicode(narr.origin)}
                   </Text>
                   <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
                     <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What the results mean. </Text>
-                    {narr.results_interpretation}
+                    {normalise_unicode(narr.results_interpretation)}
                   </Text>
                   <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>
                     <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>How it was used here. </Text>
-                    {narr.usage_pattern}
+                    {normalise_unicode(narr.usage_pattern)}
                   </Text>
                 </View>
               )

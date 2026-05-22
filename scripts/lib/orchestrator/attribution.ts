@@ -48,6 +48,25 @@ export interface ToolAttributionEntry {
   }>
   /** Total invocation duration across all claims. */
   total_duration_ms: number
+  // Build #19d (2026-05-22): extended provenance pulled from each Python
+  // wrapper's `_provenance` block. These propagate from the Python output
+  // through the TS wrapper's invocation_input chain to the PDF Tools-Used
+  // page. Each tool's PDF entry shows the paper + physics basis + confidence
+  // class so an engineer reading the PDF can cite the source of every number.
+  tool_paper?: string
+  tool_doi?: string
+  physics_basis?: string
+  physics_paper_doi?: string
+  confidence_class?:
+    | 'library'
+    | 'datasheet'
+    | 'textbook'
+    | 'standard'
+    | 'empirical'
+    | 'industry_typical'
+    | 'estimated'
+  embedded_constants?: Record<string, { source: string; confidence: string; note?: string }>
+  last_reviewed_date?: string
 }
 
 export interface ToolsUsedPage {
@@ -113,17 +132,40 @@ export function buildToolsUsedPage(contract: ContractInProgress): ToolsUsedPage 
     if (!isToolSourced(q)) continue
     const tid = q.provenance.tool_id ?? ''
     if (!tid) continue
+    // 2026-05-23 (eVTOL chain 2 audit): provenance often omits tool_version
+    // even though the registry has the canonical "1.0.0" for every wrapper.
+    // The render then prints "vunknown" — confusing for a customer-facing
+    // appendix. Look up missing fields from the live registry as a safety
+    // net. Lazy require to avoid module cycles (registry imports types from
+    // here).
+    let registryLookup: any = null
+    try {
+      const { listTools } = require('./registry') as typeof import('./registry')
+      for (const [rtId, rtTool] of listTools()) {
+        if (rtId === tid) { registryLookup = rtTool; break }
+      }
+    } catch { /* registry not ready */ }
     let entry = byTool.get(tid)
     if (!entry) {
       entry = {
         tool_id: tid,
         tool_name: '',
-        tool_version: q.provenance.tool_version ?? 'unknown',
-        tool_license: (q.provenance.tool_license ?? 'free-proprietary') as License,
-        tool_source_url: q.provenance.tool_source_url ?? '',
+        tool_version: q.provenance.tool_version ?? registryLookup?.version ?? 'unknown',
+        tool_license: (q.provenance.tool_license ?? registryLookup?.license ?? 'free-proprietary') as License,
+        tool_source_url: q.provenance.tool_source_url ?? registryLookup?.source_url ?? '',
         pinned_versions: q.provenance.pinned_versions ?? {},
         claims: [],
         total_duration_ms: 0,
+        // Build #19d (2026-05-22): pull extended provenance fields from the
+        // first quantity that carries them — every quantity from the same
+        // tool_id should carry an identical extended block.
+        tool_paper: q.provenance.tool_paper,
+        tool_doi: q.provenance.tool_doi,
+        physics_basis: q.provenance.physics_basis,
+        physics_paper_doi: q.provenance.physics_paper_doi,
+        confidence_class: q.provenance.confidence_class,
+        embedded_constants: q.provenance.embedded_constants,
+        last_reviewed_date: q.provenance.last_reviewed_date,
       }
       byTool.set(tid, entry)
     }
