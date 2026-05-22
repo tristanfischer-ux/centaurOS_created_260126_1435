@@ -21,11 +21,18 @@ const config: Config = {
     transformIgnorePatterns: [
         'node_modules/(?!(react-markdown|remark-.*|unified|bail|is-plain-obj|trough|vfile|unist-.*|mdast-.*|micromark.*|decode-named-character-reference|character-entities|property-information|hast-util-whitespace|space-separated-tokens|comma-separated-tokens|devlop|trim-lines)/)',
     ],
-    // Exclude e2e tests and test utilities - they run with Playwright, not Jest
+    // Exclude e2e tests and test utilities - they run with Playwright, not Jest.
+    // Also exclude .claude/worktrees/ which contains leftover agent worktrees
+    // — those are mirrors of the main tree carrying duplicate test files that
+    // Jest would otherwise try to run, producing 251 spurious suite failures
+    // that block the pre-push hook (2026-05-22 Tristan: "ship them all"
+    // blocked by these spurious failures).
     testPathIgnorePatterns: [
         '<rootDir>/node_modules/',
         '<rootDir>/e2e/',
         '<rootDir>/tests/e2e/',
+        '<rootDir>/.claude/worktrees/',
+        '<rootDir>/_archive/',
     ],
     // Only match test files with .test. or .spec. patterns
     testMatch: [
