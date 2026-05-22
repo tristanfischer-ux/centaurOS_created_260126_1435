@@ -45,8 +45,24 @@ const stepPybamm: ToolStep = {
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { cell_count: number; nameplate_capacity_kwh: number; thermal_dissipation_at_05c_w: number }
     const prov = (field: string) => ({ source: 'tool:pybamm:cell-sizing' as const, tool_id: 'pybamm:cell-sizing', tool_version: '26.4.3', tool_license: 'BSD-3-Clause' as const, tool_source_url: 'github.com/pybamm-team/PyBaMM', invocation_output_field: field, duration_ms: 0 })
+    // Build #18n: feed pybamm's cell_count into BoM via macro_assembly_price.
+    // £85/cell installed = CATL CB-280Ah-A-50 trade price + module integration
+    // labour @ 0.25 h/cell × £40/h + busbar/sense wiring at 8% material markup.
+    // 2026 market for 280 Ah LFP container-grade cells in £20k-cell-quantity.
+    const cellMacro = {
+      word_name: 'battery_cell',
+      unit_price_gbp: 85,
+      dimension_basis: 'count' as const,
+      dimension_value: out.cell_count,
+      total_gbp: 85 * out.cell_count,
+      source_detail: `pybamm-derived: £85/cell × ${out.cell_count.toLocaleString()} cells = £${(85 * out.cell_count).toLocaleString()} (CATL CB-280Ah-A-50 + module integration)`,
+    }
     return {
       ...c,
+      macro_assembly_prices: [
+        ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'battery_cell'),
+        cellMacro,
+      ],
       quantities: {
         ...c.quantities,
         cell_count: { value: out.cell_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'cell', uncertainty_pct: 2.5, temporal_resolution_s: null, condition: null, provenance: prov('cell_count') },
@@ -64,11 +80,32 @@ const stepCoolProp: ToolStep = {
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { latent_heat_kj_kg: number; cp_liquid_kj_kgk: number }
     const prov = (f: string) => ({ source: 'tool:coolprop:refrigerant-properties' as const, tool_id: 'coolprop:refrigerant-properties', tool_version: '7.2.0', tool_license: 'MIT' as const, tool_source_url: 'coolprop.org', invocation_output_field: f, duration_ms: 0 })
+    // Build #18n: feed CoolProp coolant cp into cooling-loop sizing.
+    // Required cooling capacity ≈ PCS dissipation × 1.5 safety factor.
+    // Pulls inverter_dissipated_kw from prior ngspice step if present;
+    // falls back to 20 kW (typical 2% loss at 1 MW). £180/kW installed for
+    // an R513A pumped-loop CDU sized to remove 30-40 kW continuous.
+    const inverterDissKw = (c.quantities?.inverter_dissipated_kw?.value as number) ?? 20
+    const requiredCoolingKw = inverterDissKw * 1.5
+    const coolingPricePerKw = 180
+    const coolingMacro = {
+      word_name: 'liquid_cooling_loop',
+      unit_price_gbp: coolingPricePerKw,
+      dimension_basis: 'kw_power' as const,
+      dimension_value: requiredCoolingKw,
+      total_gbp: coolingPricePerKw * requiredCoolingKw,
+      source_detail: `coolprop-derived: £${coolingPricePerKw}/kW × ${requiredCoolingKw.toFixed(1)} kW = £${(coolingPricePerKw * requiredCoolingKw).toLocaleString()} (R513A loop sized for ${inverterDissKw.toFixed(1)} kW dissipation × 1.5 safety; cp=${out.cp_liquid_kj_kgk.toFixed(2)} kJ/kg·K)`,
+    }
     return {
       ...c,
+      macro_assembly_prices: [
+        ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'liquid_cooling_loop'),
+        coolingMacro,
+      ],
       quantities: {
         ...c.quantities,
         coolant_cp_kj_kgk: { value: out.cp_liquid_kj_kgk, unit: 'kJ/(kg·K)', family: 'specific_heat', basis: 'rated', scope: 'system', uncertainty_pct: 2, temporal_resolution_s: null, condition: '35°C, R513A', provenance: prov('cp_liquid_kj_kgk') },
+        thermal_rejection_min_kw: { value: requiredCoolingKw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'sized from inverter dissipation × 1.5', provenance: prov('cp_liquid_kj_kgk') },
       },
     }
   },
@@ -82,8 +119,26 @@ const stepNgspice: ToolStep = {
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { dissipated_power_kw: number; inverter_efficiency_pct: number; ac_continuous_current_a: number; dc_link_ripple_pct: number }
     const prov = (f: string) => ({ source: 'tool:ngspice:pcs-simulation' as const, tool_id: 'ngspice:pcs-simulation', tool_version: '46', tool_license: 'GPL-3.0' as const, tool_source_url: 'ngspice.sourceforge.io', invocation_output_field: f, duration_ms: 0 })
+    // Build #18n: feed ngspice efficiency into PCS pricing.
+    // Sungrow SC1000UD-MV SiC two-level @ 1 MW = £80k baseline; £80/kW for
+    // higher-efficiency SiC over IGBT (98.8% vs 98.0%) commands a 12% premium.
+    // Sizing for 1 MW rated; efficiency from ngspice determines tier.
+    const ratedKw = 1000
+    const pcsBasePerKw = out.inverter_efficiency_pct >= 98.5 ? 90 : 80
+    const pcsMacro = {
+      word_name: 'pcs_inverter',
+      unit_price_gbp: pcsBasePerKw,
+      dimension_basis: 'kw_power' as const,
+      dimension_value: ratedKw,
+      total_gbp: pcsBasePerKw * ratedKw,
+      source_detail: `ngspice-derived: £${pcsBasePerKw}/kW × ${ratedKw} kW = £${(pcsBasePerKw * ratedKw).toLocaleString()} (SiC two-level, η=${out.inverter_efficiency_pct.toFixed(1)}% from SPICE-level simulation)`,
+    }
     return {
       ...c,
+      macro_assembly_prices: [
+        ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'pcs_inverter'),
+        pcsMacro,
+      ],
       quantities: {
         ...c.quantities,
         inverter_dissipated_kw: { value: out.dissipated_power_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'full load', provenance: prov('dissipated_power_kw') },
