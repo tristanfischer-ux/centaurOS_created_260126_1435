@@ -183,6 +183,14 @@ function normalise_unicode(s: string): string {
     .replace(/[µμ]/g, 'u')
     // Ohm sign Ω (U+03A9, U+2126) → ohm
     .replace(/[Ω]/g, 'ohm')
+    // Greek capital delta Δ (U+0394) → "delta" or "D". Used throughout
+    // engineering text as ΔT (temperature rise), ΔP (pressure drop), Δh
+    // (enthalpy change). Default Helvetica AFM has no Δ glyph; react-pdf
+    // falls back to "" (U+201D right double-quote). Ev-charger L4 audit
+    // showed "Cooling capacity 0.01 kW (6.5 L/min × ”T 30°C)" — should
+    // read "× ΔT 30°C". Spell as "delta " for readability.
+    .replace(/Δ/g, 'delta ')
+    .replace(/δ/g, 'delta ')
     .replace(/[ ]/g, ' ')  // non-breaking space → space (fragile in @react-pdf)
     .replace(/\s+/g, ' ')
     .trim()
@@ -275,6 +283,23 @@ function stripHtmlTags(s: string): string {
  *  storage system (bess)"; this re-uppercases the acronym. Tristan
  *  2026-05-20 third review: also catches "Uk" → "UK" in titles, and
  *  Title-Cases lowercase BoM part names like "grounding lug". */
+// SI units with mixed-case canonical form. Title-casing collapses "kW" → "Kw"
+// because the default `lower.charAt(0).toUpperCase()` rule fires. This map
+// preserves "kW", "mAh" et al by matching case-insensitively and returning
+// the canonical form. Bug fix (2026-05-23 ev-charger L4 audit): cover title
+// rendered "350 Kw Ultra-rapid DC Charger" — should be "350 kW".
+const SI_UNITS_MIXED_CASE = new Map<string, string>([
+  ['kw', 'kW'], ['mw', 'MW'], ['gw', 'GW'], ['tw', 'TW'],
+  ['kva', 'kVA'], ['mva', 'MVA'],
+  ['kpa', 'kPa'], ['mpa', 'MPa'], ['gpa', 'GPa'],
+  ['khz', 'kHz'], ['mhz', 'MHz'], ['ghz', 'GHz'], ['thz', 'THz'],
+  ['mah', 'mAh'], ['kah', 'kAh'],
+  ['kj', 'kJ'], ['mj', 'MJ'], ['gj', 'GJ'],
+  ['kwh', 'kWh'], ['mwh', 'MWh'], ['gwh', 'GWh'],
+  ['kbps', 'kbps'], ['mbps', 'Mbps'], ['gbps', 'Gbps'],
+  ['kgf', 'kgf'], ['nm', 'Nm'],
+])
+
 function toTitleCaseEng(input: string): string {
   if (!input) return ''
   const ACRONYMS = new Set([
@@ -308,6 +333,11 @@ function toTitleCaseEng(input: string): string {
     if (/^[A-Z]{2,}\d*$/.test(tok)) return tok
     const upper = tok.toUpperCase()
     if (ACRONYMS.has(upper)) return upper
+    // Mixed-case SI unit lookup BEFORE the all-lowercase SI unit rule.
+    // "kW", "mAh", "kPa" etc. should preserve their canonical capitalisation
+    // regardless of context (always — these aren't position-sensitive).
+    const lowerTok = tok.toLowerCase()
+    if (SI_UNITS_MIXED_CASE.has(lowerTok)) return SI_UNITS_MIXED_CASE.get(lowerTok)!
     // (2026-05-22 Tristan): the SI-unit rule was too aggressive — it
     // lowercased ANY short token, so part labels like "fan Speed Controller"
     // and "fan Power Cable" had their first word collapsed to lowercase.
