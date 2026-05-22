@@ -647,9 +647,15 @@ function renderWordProse(word: WordSpec): string {
  * Bug fix #8 (2026-05-23, HP chain-12 audit): rendered "A emi input filter
  * (1.9 A capacity)" — both the article and the acronym case were wrong.
  * The acronym-preserving lowercase fix is upstream; this fixes the article.
+ *
+ * Negative lookbehind `(?<![0-9]\s)` excludes the Amps unit case
+ * "2,333 A at 600 V" — here "A" is the Ampere SI unit, not the indefinite
+ * article. The eVTOL chain caught one such false-positive: my first version
+ * would have rendered "(2,333 An at 600 V)". Lookbehind catches the
+ * "digit + space + A" pattern that signals a unit-of-measure context.
  */
 function fixIndefiniteArticle(s: string): string {
-  return s.replace(/\bA\s+([AEIOUaeiou])/g, 'An $1')
+  return s.replace(/(?<![0-9]\s)\bA\s+([AEIOUaeiou])/g, 'An $1')
 }
 
 /**
