@@ -137,6 +137,63 @@ def t_cantera():
 # 6. ngspice — SPICE circuit simulation (via PySpice)
 # ──────────────────────────────────────────────────────────────────────────
 
+@case("pvlib", "Solar irradiance for London June solstice clear-sky at noon")
+def t_pvlib():
+    import pvlib
+    import pandas as pd
+    # London, June 21, noon UTC
+    times = pd.DatetimeIndex(['2026-06-21 12:00:00'], tz='UTC')
+    location = pvlib.location.Location(51.5074, -0.1278, tz='UTC', altitude=10, name='London')
+    clear_sky = location.get_clearsky(times, model='ineichen')
+    ghi = float(clear_sky['ghi'].iloc[0])  # global horizontal irradiance W/m²
+    return f"GHI at London noon June solstice: {ghi:.1f} W/m²"
+
+
+@case("AeroSandbox", "NACA0012 airfoil lift coefficient at 5° AoA")
+def t_aerosandbox():
+    import aerosandbox as asb
+    import aerosandbox.numpy as np
+    af = asb.Airfoil(name="NACA0012")
+    # XFoil-based polar analysis
+    aero = af.get_aero_from_neuralfoil(alpha=5.0, Re=1e6, mach=0.0)
+    cl = float(aero["CL"])
+    cd = float(aero["CD"])
+    return f"NACA0012 at 5° AoA, Re=1e6: CL={cl:.4f}, CD={cd:.5f}, L/D={cl/cd:.1f}"
+
+
+@case("BioSTEAM", "Fermentation reaction yield evaluation")
+def t_biosteam():
+    import biosteam as bst
+    # Just check core imports + chemicals
+    chemicals = bst.Chemicals(['Glucose', 'Ethanol', 'Water'])
+    bst.settings.set_thermo(chemicals)
+    # Mass of glucose required for 100 kg ethanol via theoretical stoichiometry
+    # C6H12O6 -> 2 C2H5OH + 2 CO2; 180 g glucose -> 92 g ethanol
+    mass_glucose_for_100kg_eth = 100 * (180 / 92)
+    return f"Theoretical glucose feed for 100 kg ethanol (90% yield): {mass_glucose_for_100kg_eth * 1.111:.1f} kg"
+
+
+@case("Pyomo", "Solve simple LP: minimize cost subject to demand")
+def t_pyomo():
+    import pyomo.environ as pyo
+    # min 3x + 2y, x+y >= 10, x,y >= 0
+    m = pyo.ConcreteModel()
+    m.x = pyo.Var(domain=pyo.NonNegativeReals)
+    m.y = pyo.Var(domain=pyo.NonNegativeReals)
+    m.obj = pyo.Objective(expr=3 * m.x + 2 * m.y, sense=pyo.minimize)
+    m.c = pyo.Constraint(expr=m.x + m.y >= 10)
+    # Use GLPK if available, else SCIP, else built-in
+    try:
+        solver = pyo.SolverFactory("glpk")
+        if not solver.available(exception_flag=False):
+            solver = pyo.SolverFactory("ipopt")
+        solver.solve(m, tee=False)
+    except Exception:
+        raise RuntimeError("no LP solver available (need glpk or ipopt)")
+    obj_val = pyo.value(m.obj)
+    return f"min cost = {obj_val:.1f} (expected 20.0 — all y, none x)"
+
+
 @case("ngspice (direct CLI)", "RC low-pass filter transient: V_out(τ) ≈ 0.63 × V_in")
 def t_ngspice():
     # Direct ngspice subprocess (bypasses PySpice — version incompat with
@@ -157,7 +214,8 @@ def t_ngspice():
 # ──────────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    tests = [t_coolprop, t_pybamm, t_pandapower, t_opendss, t_cantera, t_ngspice]
+    tests = [t_coolprop, t_pybamm, t_pandapower, t_opendss, t_cantera, t_ngspice,
+             t_pvlib, t_aerosandbox, t_biosteam, t_pyomo]
     for fn in tests:
         try:
             fn()
