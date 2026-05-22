@@ -45,12 +45,16 @@ const stepPybamm: ToolStep = {
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { cell_count: number; nameplate_capacity_kwh: number; thermal_dissipation_at_05c_w: number }
     const prov = (field: string) => ({ source: 'tool:pybamm:cell-sizing' as const, tool_id: 'pybamm:cell-sizing', tool_version: '26.4.3', tool_license: 'BSD-3-Clause' as const, tool_source_url: 'github.com/pybamm-team/PyBaMM', invocation_output_field: field, duration_ms: 0 })
-    // Build #18n: feed pybamm's cell_count into BoM via macro_assembly_price.
-    // £85/cell installed = CATL CB-280Ah-A-50 trade price + module integration
-    // labour @ 0.25 h/cell × £40/h + busbar/sense wiring at 8% material markup.
-    // 2026 market for 280 Ah LFP container-grade cells in £20k-cell-quantity.
+    // Build #18n-fix1 (2026-05-22): feed pybamm's cell_count into BoM
+    // via macro_assembly_price. word_name must match the design's
+    // actual emitted word — Loop 22 emits 'lfp_prismatic_cell' (not
+    // 'battery_cell'). With tokens=['lfp','prismatic','cell'] a
+    // candidate of 'lfp_prismatic_cell' scores 1.0 (exact). £85/cell
+    // installed = CATL CB-280Ah-A-50 trade + module integration
+    // labour @ 0.25 h/cell × £40/h + busbar/sense wiring at 8%
+    // material markup. 2026 market for 280 Ah LFP in £20k-cell qty.
     const cellMacro = {
-      word_name: 'battery_cell',
+      word_name: 'lfp_prismatic_cell',
       unit_price_gbp: 85,
       dimension_basis: 'count' as const,
       dimension_value: out.cell_count,
@@ -60,7 +64,7 @@ const stepPybamm: ToolStep = {
     return {
       ...c,
       macro_assembly_prices: [
-        ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'battery_cell'),
+        ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'lfp_prismatic_cell'),
         cellMacro,
       ],
       quantities: {
