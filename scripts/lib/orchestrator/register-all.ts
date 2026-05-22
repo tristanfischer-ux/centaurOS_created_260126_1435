@@ -19,6 +19,7 @@ import './tools/opendss-real'        // Build #18i  OpenDSS 0.9.4
 import './tools/cantera-real'        // Build #18j  Cantera 3.2.0
 import './tools/octopart-stub'       // stub (needs API key)
 import './tools/iec-standards-stub'  // stub (needs scrape or local DB)
+import './tools/mass-aggregator'     // Build #18q  pure-TS internal aggregator
 // Also register opendss as an additional grid tool — pandapower covers
 // transmission-side, opendss covers distribution-side. Together they
 // give the full grid story.
