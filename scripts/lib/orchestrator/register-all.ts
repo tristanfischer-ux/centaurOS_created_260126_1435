@@ -7,11 +7,11 @@
  * before any orchestrateDesign() call.
  */
 
-// Tools (auto-register on import). Build #18e (overnight push 2026-05-22):
-// CoolProp is now the REAL wrapper (subprocess to Python CoolProp 7.2.0
-// via the repo's .venv). Other tools remain stubs pending real wrappers.
-import './tools/pybamm-stub'
-import './tools/coolprop-real'
+// Tools (auto-register on import). Overnight push 2026-05-22:
+// CoolProp + PyBaMM are now REAL wrappers (subprocess to Python via the
+// repo's .venv). 4 other tools remain stubs pending real wrappers.
+import './tools/pybamm-real'        // Build #18f
+import './tools/coolprop-real'      // Build #18e
 import './tools/ngspice-stub'
 import './tools/pandapower-stub'
 import './tools/octopart-stub'
