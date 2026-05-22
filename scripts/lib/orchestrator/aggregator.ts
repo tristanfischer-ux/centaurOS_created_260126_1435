@@ -63,7 +63,13 @@ export function finaliseContract(
 }
 
 function isValidProvenanceSource(q: TypedQuantity): boolean {
-  const src = q.provenance.source
+  // Defensive: legacy quantities from engineering-contract.ts don't carry
+  // provenance. Treat missing provenance as 'brief' (the most common
+  // legacy source) so the orchestrator can ingest legacy contracts.
+  if (!q || typeof q !== 'object') return false
+  const prov = q.provenance
+  if (!prov) return true  // legacy shape — accept
+  const src = prov.source
   if (src === 'brief') return true
   if (src === 'envelope_detector') return true
   if (src === 'class_anchor') return true

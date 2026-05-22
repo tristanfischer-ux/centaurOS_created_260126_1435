@@ -5,13 +5,15 @@
  * tool wrapper + every class plan. The chain orchestrator imports
  * this file at startup so the registry + planner are populated
  * before any orchestrateDesign() call.
- *
- * Phase 2 will add real tool wrappers here. For now the only
- * registered tool is the PyBaMM stub.
  */
 
-// Tools
+// Tools (auto-register on import)
 import './tools/pybamm-stub'
+import './tools/coolprop-stub'
+import './tools/ngspice-stub'
+import './tools/pandapower-stub'
+import './tools/octopart-stub'
+import './tools/iec-standards-stub'
 
-// Class plans
+// Class plans (auto-register on import)
 import './class-plans/bess'
