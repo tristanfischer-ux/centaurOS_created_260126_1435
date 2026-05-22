@@ -5959,29 +5959,16 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
         )
       })}
 
-      {Array.isArray(page.available_but_unused) && page.available_but_unused.length > 0 ? (
-        <View style={{ marginTop: 16, padding: 12, backgroundColor: '#f1f5f9', borderRadius: 4 }}>
-          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
-            Tools available in the orchestrator but not used for this design
-          </Text>
-          <Text style={{ fontSize: 8.5, color: MUTED, marginBottom: 8, fontStyle: 'italic' }}>
-            These tools are wired in and can be invoked for other product classes; this design did not require their output.
-          </Text>
-          {page.available_but_unused.map((t: any, i: number) => (
-            <View key={t.tool_id || `unused-${i}`} style={{ marginBottom: 6 }} wrap={false}>
-              <Text style={{ fontSize: 9, color: INK, fontFamily: 'Helvetica-Bold' }}>
-                {`${t.name || t.tool_id}  v${t.version || '?'}  `}
-                <Text style={{ fontFamily: 'Helvetica', color: MUTED }}>
-                  {`${t.license || ''}${t.domain ? `  ·  ${t.domain}` : ''}`}
-                </Text>
-              </Text>
-              {t.what_it_does ? (
-                <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.45 }}>{t.what_it_does}</Text>
-              ) : null}
-            </View>
-          ))}
-        </View>
-      ) : null}
+      {/*
+        2026-05-23 universal fix: the "available_but_unused" list is the
+        GLOBAL tool registry minus the tools that ran for this design — so
+        a heat-pump report ends up listing pvlib solar, aeroelastic flutter,
+        airframe FEA, and 145 other tools that have no semantic relevance to
+        a heat pump. The reader interprets this as "these tools were
+        considered for this design" which is misleading and adds 6-10 pages
+        of noise. Hidden from the PDF; the data is still in state.json /
+        4-orchestrator-tools-used.json for debug.
+      */}
 
       <View style={{ marginTop: 14, paddingTop: 8, borderTopWidth: 0.6, borderTopColor: RULE_SOFT }}>
         <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.45, fontStyle: 'italic' }}>

@@ -1810,7 +1810,17 @@ async function main() {
   // Cap at 100× per single revision (halts if a revision would relax beyond).
   // Full revision history saved to state for transparent rendering in §1.
   const MAX_BRIEF_ITERS: number = 3
-  const MAX_RELAX_FACTOR = 100
+  // 2026-05-23: lowered from 100 to 3. HP chain 12 audit found the brief
+  // plausibility critic silently rewrote "30 kW" → "1.67 kW" (18× reduction)
+  // and the design failed physics critic (engineering_plausibility 2/10,
+  // brief_to_design_fidelity 3/10). Cap = 100 was effectively no limit. Cap = 3
+  // allows modest scope tweaks (max-mass +30%, capacity -33%, the eVTOL case)
+  // but BLOCKS dramatic rewrites that defeat the user's stated brief. When the
+  // critic asks for >3× revision the chain halts and the revision is logged in
+  // the PDF "Brief Revision Notice" page for the user to confirm or revise the
+  // brief themselves. Accuracy over approval — never silently substitute the
+  // user's input with a different product.
+  const MAX_RELAX_FACTOR = 3
   const apiKeyEarly = process.env.OPENROUTER_API_KEY ?? ''
 
   function parseRatio(raw: string): number | null {
