@@ -1902,11 +1902,14 @@ async function main() {
       macro_assembly_prices: engineeringContract.macro_assembly_prices as any,
       _tools_run: [],
     }
-    // Inject product_class into parsedResult.data because the orchestrator's
-    // envelope detector reads it from there — the parsed brief doesn't
-    // carry the classifier output by default.
+    // Inject product_class + flatten constraints into top-level fields
+    // because the orchestrator's envelope detector reads target_performance,
+    // max_mass_kg, max_dimensions_mm, voltage_class_v at TOP level — but
+    // the chain's parsedResult.data has them nested under `constraints`.
+    // Build #18c-fix2: flatten constraints + inject product_class.
     const orchParsedConstraints = {
       ...parsedResult.data,
+      ...(parsedResult.data.constraints ?? {}),  // flatten constraints fields up
       product_class: engineeringContract.product_class,
     } as any
     const orchResult = await orchestrateDesign(orchParsedConstraints, initialOrchContract, { fallback_on_failure: true })
