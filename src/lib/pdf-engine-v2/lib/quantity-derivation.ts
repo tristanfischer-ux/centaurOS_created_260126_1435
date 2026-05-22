@@ -161,29 +161,94 @@ function bessCellCount(specs: ProductSpecs): RuleResult | null {
   }
 }
 
-/** BESS rack count — 1 rack per 250 kWh nominal, min 1. */
+/**
+ * BESS rack count — Build #18p-fix3 (2026-05-22): voltage-limit-aware
+ * pack topology to match the orchestrator's pybamm derive_pack_topology.
+ *
+ * Prior implementation (`ceil(nominalKwh / 250)`) returned 18 racks for
+ * a 4.4 MWh BESS, but pybamm with the same inputs returned 15-16 racks
+ * because pybamm searches for integer-clean (series, parallel, racks)
+ * triples that also satisfy series × cell_voltage ≤ DC_bus × derating.
+ *
+ * This mirrors pybamm so BoM line quantities match the design narrative.
+ */
 function bessRackCount(specs: ProductSpecs): RuleResult | null {
   if (!specs.capacityKwh || specs.capacityKwh <= 0) return null
-  const dod = specs.dod ?? 0.8
-  const nominalKwh = specs.capacityKwh / dod
-  const racks = Math.max(1, Math.ceil(nominalKwh / 250))
+  const dcBusV = 800       // standard BESS DC bus
+  const maxCellV = 3.65    // LFP charge cutoff
+  const dcBusDerating = 0.92
+  // Use the same cell_count_after_EoL_margin that pybamm uses so the
+  // two derivations agree. bessCellCount returns the 16-aligned count;
+  // we re-add the 2.5% EoL margin to match pybamm.derive_pack_topology's
+  // input.
+  const cellCountAligned = bessCellCount(specs)?.qty ?? 0
+  const targetCells = Math.ceil(cellCountAligned * 1.025)  // mirror pybamm EoL margin
+  const maxSeriesCells = Math.floor((dcBusV * dcBusDerating) / maxCellV)
+
+  type Score = readonly [number, number, number]  // excess, racks-distance, -series
+  let best: { score: Score; racks: number; stringsPerRack: number; series: number; total: number } | null = null
+
+  for (let series = Math.max(50, maxSeriesCells - 50); series <= maxSeriesCells; series++) {
+    const parallelTotal = Math.ceil(targetCells / series)
+    for (let racks = 4; racks <= 32; racks++) {
+      if (parallelTotal % racks !== 0) continue
+      const stringsPerRack = parallelTotal / racks
+      const total = series * parallelTotal
+      const excess = total - targetCells
+      if (excess < 0) continue
+      const score: Score = [excess, Math.abs(racks - 16), -series]
+      if (best === null
+          || score[0] < best.score[0]
+          || (score[0] === best.score[0] && score[1] < best.score[1])
+          || (score[0] === best.score[0] && score[1] === best.score[1] && score[2] < best.score[2])
+      ) {
+        best = { score, racks, stringsPerRack, series, total }
+      }
+    }
+  }
+
+  if (best === null) {
+    // Fallback to single rack
+    return {
+      qty: 1,
+      rule: 'bess_rack_count_fallback',
+      confidence: 0.5,
+      explanation: `voltage-limit-aware search found no integer-clean topology; default to 1 rack`,
+    }
+  }
+
+  const nominalKwh = (specs.capacityKwh ?? 0) / (specs.dod ?? 0.8)
   return {
-    qty: racks,
-    rule: 'bess_rack_count',
-    confidence: 0.8,
-    explanation: `${nominalKwh.toFixed(0)} kWh nominal / 250 kWh per rack = ${racks}`,
+    qty: best.racks,
+    rule: 'bess_rack_count_voltage_aware',
+    confidence: 0.9,
+    explanation:
+      `${nominalKwh.toFixed(0)} kWh nominal → ${targetCells} cells (after EoL margin); ` +
+      `voltage-limit search finds ${best.racks} racks × ${best.stringsPerRack} parallel strings × ${best.series} cells/series = ${best.total} cells ` +
+      `(string V_max = ${(best.series * maxCellV).toFixed(1)} ≤ ${dcBusV} × ${dcBusDerating} = ${(dcBusV * dcBusDerating).toFixed(0)})`,
   }
 }
 
-/** BESS BMS slave — one per rack. Requires rack count first. */
+/**
+ * BESS BMS slave — Build #18p-fix3 (2026-05-22): one slave per 12 cells,
+ * not one per rack. Prior formula returned 18 slaves for a 5000-cell
+ * design, leaving 4982 cells unmonitored — violated IEC 62619 and was
+ * flagged by Loop 22 physics critic.
+ *
+ * ISL94212-class slaves handle 12 channels each; need ceil(cells/12) boards.
+ */
 function bessBmsSlaveCount(specs: ProductSpecs): RuleResult | null {
-  const racks = bessRackCount(specs)
-  if (!racks) return null
+  const cellCount = bessCellCount(specs)
+  if (!cellCount) return null
+  const channelsPerSlave = 12
+  const slaves = Math.ceil(cellCount.qty / channelsPerSlave)
   return {
-    qty: racks.qty,
-    rule: 'bess_bms_slave_per_rack',
-    confidence: 0.85,
-    explanation: `1 slave per rack × ${racks.qty} racks = ${racks.qty}`,
+    qty: slaves,
+    rule: 'bess_bms_slave_per_12_cells',
+    confidence: 0.9,
+    explanation:
+      `${cellCount.qty} cells / ${channelsPerSlave} channels per ISL94212 slave = ${slaves} slaves ` +
+      `(per IEC 62619 cell-level monitoring requirement)`,
   }
 }
 

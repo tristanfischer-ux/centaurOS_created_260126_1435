@@ -35,12 +35,18 @@ const stepPybamm: ToolStep = {
   required: true,
   feeds_into: [] as string[],
   input_from_contract: (c: any) => ({
+    // Build #18r-fix1 (2026-05-22): READ FROM CONTRACT — engineering_contract.ts
+    // already parses these from the brief; class plan should NOT re-hardcode.
+    // Audit per Tristan 2026-05-22 found 8 values I had hardcoded that
+    // engineering_contract.ts already extracts from brief constraints.
     target_energy_kwh: c.quantities?.usable_capacity_kwh?.value ?? 3500,
-    dod_fraction: 0.80,
-    cell_chemistry: 'lfp' as const,
-    cell_capacity_ah: 280,
-    cell_voltage_v: 3.2,
-    ambient_temp_c: 25,
+    dod_fraction: c.quantities?.dod_fraction?.value ?? 0.80,
+    cell_chemistry: 'lfp' as const,  // TODO #18o: engineering-judgment dispatch from brief.target_material text
+    cell_capacity_ah: c.quantities?.cell_capacity_ah?.value ?? 280,
+    cell_voltage_v: c.quantities?.cell_voltage_v?.value ?? 3.2,
+    ambient_temp_c: c.envelope?.operating_environment?.temp_max_c ?? 25,
+    dc_bus_voltage_v: c.quantities?.dc_bus_voltage_v?.value ?? 800,
+    rated_power_kw: c.quantities?.continuous_power_kw?.value ?? 1000,
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as {
@@ -58,6 +64,17 @@ const stepPybamm: ToolStep = {
       system_thermal_dissipation_at_05c_kw: number
       cold_plate_total_capacity_min_kw: number
       cold_plate_per_rack_min_capacity_kw: number
+      // Build #18p-fix1 (2026-05-22): full series-parallel topology
+      series_cells_per_string: number
+      parallel_strings_per_rack: number
+      parallel_strings_total: number
+      string_voltage_nominal_v: number
+      string_voltage_max_charge_v: number
+      dc_bus_voltage_v: number
+      dc_bus_headroom_pct: number
+      per_cell_current_at_rated_a: number
+      total_bus_current_at_rated_a: number
+      system_thermal_dissipation_kw: number
     }
     const prov = (field: string) => ({ source: 'tool:pybamm:cell-sizing' as const, tool_id: 'pybamm:cell-sizing', tool_version: '26.4.3', tool_license: 'BSD-3-Clause' as const, tool_source_url: 'github.com/pybamm-team/PyBaMM', invocation_output_field: field, duration_ms: 0 })
     // Build #18n-fix1 (2026-05-22): feed pybamm's cell_count into BoM
@@ -101,6 +118,16 @@ const stepPybamm: ToolStep = {
         bms_total_channels: { value: out.bms_total_channels, unit: '', family: 'dimensionless', basis: 'rated', scope: 'pack', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('bms_total_channels') },
         cold_plate_total_capacity_min_kw: { value: out.cold_plate_total_capacity_min_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'sized for cell dissipation × 1.25', provenance: prov('cold_plate_total_capacity_min_kw') },
         cold_plate_per_rack_min_capacity_kw: { value: out.cold_plate_per_rack_min_capacity_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'rack', uncertainty_pct: 10, temporal_resolution_s: null, condition: null, provenance: prov('cold_plate_per_rack_min_capacity_kw') },
+        // Build #18p-fix1 (2026-05-22): voltage + topology + current values
+        series_cells_per_string: { value: out.series_cells_per_string, unit: '', family: 'dimensionless', basis: 'rated', scope: 'string', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('series_cells_per_string') },
+        parallel_strings_per_rack: { value: out.parallel_strings_per_rack, unit: '', family: 'dimensionless', basis: 'rated', scope: 'rack', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('parallel_strings_per_rack') },
+        parallel_strings_total: { value: out.parallel_strings_total, unit: '', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('parallel_strings_total') },
+        string_voltage_nominal_v: { value: out.string_voltage_nominal_v, unit: 'V', family: 'voltage', basis: 'rated', scope: 'string', uncertainty_pct: 1, temporal_resolution_s: null, condition: 'nominal SOC', provenance: prov('string_voltage_nominal_v') },
+        string_voltage_max_charge_v: { value: out.string_voltage_max_charge_v, unit: 'V', family: 'voltage', basis: 'peak', scope: 'string', uncertainty_pct: 1, temporal_resolution_s: null, condition: 'end-of-charge', provenance: prov('string_voltage_max_charge_v') },
+        dc_bus_voltage_v: { value: out.dc_bus_voltage_v, unit: 'V', family: 'voltage', basis: 'rated', scope: 'system', uncertainty_pct: 1, temporal_resolution_s: null, condition: 'design point — pybamm topology constrained to this', provenance: prov('dc_bus_voltage_v') },
+        per_cell_current_at_rated_a: { value: out.per_cell_current_at_rated_a, unit: 'A', family: 'current', basis: 'continuous', scope: 'cell', uncertainty_pct: 2, temporal_resolution_s: null, condition: 'rated power per parallel string', provenance: prov('per_cell_current_at_rated_a') },
+        total_bus_current_at_rated_a: { value: out.total_bus_current_at_rated_a, unit: 'A', family: 'current', basis: 'continuous', scope: 'system', uncertainty_pct: 1, temporal_resolution_s: null, condition: 'DC bus to PCS at rated power', provenance: prov('total_bus_current_at_rated_a') },
+        system_thermal_dissipation_kw: { value: out.system_thermal_dissipation_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'cell I²R × 1.5 system overhead at rated power', provenance: prov('system_thermal_dissipation_kw') },
       },
     }
   },
@@ -115,7 +142,11 @@ const stepCoolProp: ToolStep = {
   // so every CoolProp output was silently null. R290 is industry-
   // standard for modern BESS thermal-management CDUs (high COP, A3
   // flammability handled by container ventilation per IEC 60079-10).
-  input_from_contract: () => ({ fluid: 'r290', temperature_c: 35 }),
+  input_from_contract: (c: any) => ({
+    fluid: 'r290',  // TODO #18o: engineering judgment from brief
+    // Build #18r-fix1: temperature_c = ambient max from brief, not hardcoded 35
+    temperature_c: (c.envelope?.operating_environment?.temp_max_c ?? 35) + 5,  // 5°C safety margin above brief max
+  }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { latent_heat_kj_kg: number | null; cp_liquid_kj_kgk: number | null }
     const prov = (f: string) => ({ source: 'tool:coolprop:refrigerant-properties' as const, tool_id: 'coolprop:refrigerant-properties', tool_version: '7.2.0', tool_license: 'MIT' as const, tool_source_url: 'coolprop.org', invocation_output_field: f, duration_ms: 0 })
@@ -124,8 +155,11 @@ const stepCoolProp: ToolStep = {
     // Pulls inverter_dissipated_kw from prior ngspice step if present;
     // falls back to 20 kW (typical 2% loss at 1 MW). £180/kW installed
     // for an R290 pumped-loop CDU sized to remove 30-40 kW continuous.
+    // Build #18r-fix1: read from contract (engineering_contract emits both)
     const inverterDissKw = (c.quantities?.inverter_dissipated_kw?.value as number) ?? 20
-    const requiredCoolingKw = inverterDissKw * 1.5
+    const cellDissipationKw = (c.quantities?.system_thermal_dissipation_kw?.value as number) ?? 4
+    const totalSystemDissKw = inverterDissKw + cellDissipationKw
+    const requiredCoolingKw = totalSystemDissKw * 1.25  // single safety factor (cells already get × 1.25 in pybamm output)
     const coolingPricePerKw = 180
     // Defensive: cp_liquid may be null if the fluid is unsupported.
     // Skip the source_detail cp reference rather than crash.
@@ -164,7 +198,18 @@ const stepNgspice: ToolStep = {
   tool_id: 'ngspice:pcs-simulation',
   required: true,
   feeds_into: ['coolprop:refrigerant-properties'] as string[],
-  input_from_contract: () => ({ rated_power_kw: 1000, dc_bus_voltage_v: 800, ac_output_voltage_v: 400, topology: 'sic_two_level' as const }),
+  // Build #18r (2026-05-22): read dc_bus_voltage from Contract — pybamm
+  // computes string_voltage_nominal_v based on its derive_pack_topology
+  // (series_cells × cell_voltage). ngspice's prior hardcoded 800V meant
+  // it always assumed 800V even when pybamm picked 534V nominal — a
+  // major cross-tool inconsistency the physics critic flagged.
+  input_from_contract: (c: any) => ({
+    // Build #18r-fix1: all read from Contract (engineering_contract has them)
+    rated_power_kw: c.quantities?.continuous_power_kw?.value ?? 1000,
+    dc_bus_voltage_v: c.quantities?.dc_bus_voltage_v?.value ?? 800,
+    ac_output_voltage_v: c.quantities?.ac_output_voltage_v?.value ?? 400,
+    topology: 'sic_two_level' as const,  // TODO #18o: engineering judgment
+  }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as {
       dissipated_power_kw: number
@@ -183,7 +228,8 @@ const stepNgspice: ToolStep = {
     // Sungrow SC1000UD-MV SiC two-level @ 1 MW = £80k baseline; £80/kW for
     // higher-efficiency SiC over IGBT (98.8% vs 98.0%) commands a 12% premium.
     // Sizing for 1 MW rated; efficiency from ngspice determines tier.
-    const ratedKw = 1000
+    // Build #18r-fix1: read rated power from contract not hardcoded
+    const ratedKw = (c.quantities?.continuous_power_kw?.value as number) ?? 1000
     const pcsBasePerKw = out.inverter_efficiency_pct >= 98.5 ? 90 : 80
     const pcsMacro = {
       word_name: 'pcs_inverter',
@@ -221,10 +267,10 @@ const stepPandaPower: ToolStep = {
   required: false,
   feeds_into: [] as string[],
   input_from_contract: (c: any) => ({
-    rated_power_kw: 1000,
+    rated_power_kw: c.quantities?.continuous_power_kw?.value ?? 1000,
     pcc_voltage_kv: c.envelope?.voltage_class_v ? c.envelope.voltage_class_v / 1000 : 11,
-    region: 'EU' as const,
-    grid_strength: 'medium' as const,
+    region: 'EU' as const,  // TODO: derive from brief (target market)
+    grid_strength: 'medium' as const,  // TODO: derive from brief
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { transformer_rating_kva: number; transformer_mass_kg: number; pcc_short_circuit_ka: number }
@@ -384,15 +430,23 @@ const stepMassAggregator: ToolStep = {
     const total_cell_mass_kg = c.quantities?.total_cell_mass_kg?.value ?? 0
     const transformer_mass_kg = c.quantities?.transformer_mass_kg?.value ?? null
     const rack_count = c.quantities?.rack_count?.value ?? 16
-    const max_mass_kg_envelope = c.envelope?.max_mass_kg?.value ?? 28000
+    // Build #18r-fix1: max mass from Contract (engineering_contract emits
+    // brief_mass_cap_kg) AND from envelope. Prefer brief_mass_cap_kg.
+    const max_mass_kg_envelope = c.quantities?.brief_mass_cap_kg?.value
+      ?? c.envelope?.max_mass_kg?.value
+      ?? 28000
+    // Scale PCS mass by rated_power_kw (rule of thumb: 1.8 kg/kW for
+    // Sungrow-class SiC two-level — 1800 kg for 1000 kW)
+    const ratedKw = c.quantities?.continuous_power_kw?.value ?? 1000
+    const pcs_mass_kg_estimate = ratedKw * 1.8
     return {
       total_cell_mass_kg,
       transformer_mass_kg,
       rack_count,
       max_mass_kg_envelope,
-      pcs_mass_kg_estimate: 1800,         // Sungrow SC1000UD-MV class
-      container_tare_kg_estimate: 4000,    // 40-ft ISO container ISO 668
-      rack_mass_kg_each_estimate: 150,     // steel battery rack
+      pcs_mass_kg_estimate,
+      container_tare_kg_estimate: 4000,    // 40-ft ISO container ISO 668 (this IS hardcoded — physical standard)
+      rack_mass_kg_each_estimate: 150,     // steel battery rack (industry-typical, TODO: derive from cell_count × mass_per_cell × frame_overhead)
     }
   },
   contract_update: (c: ContractInProgress, output: any) => {

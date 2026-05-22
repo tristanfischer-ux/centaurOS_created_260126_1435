@@ -151,44 +151,98 @@ CELL_MASS_KG_BY_CHEMISTRY = {
     "lto": 5.9,   # higher mass per kWh
 }
 
+# Max cell voltage at end-of-charge (per chemistry)
+MAX_CELL_VOLTAGE_V = {
+    "lfp": 3.65,  # LFP charge cutoff
+    "nmc": 4.25,  # NMC charge cutoff
+    "lto": 2.85,  # LTO charge cutoff
+}
+
 # BMS slave board channels (industry standard 12 or 16; we use 12 = lowest-risk)
 BMS_CHANNELS_PER_SLAVE = 12
 
-# Target cells per rack — most container-class BESS designs use 280-300 cells
-# per rack (one or two 24V battery modules per rack × 7-8 modules). Round
-# rack_count to nearest integer that divides cell_count exactly.
-TARGET_CELLS_PER_RACK = 280
+# DC bus voltage derating — leave 8% headroom above max cell voltage for
+# charge over-voltage transients before SCPD trip.
+DC_BUS_DERATING = 0.92
+
+# Preferred range for rack_count in a container-class BESS (used for
+# tiebreaking; the algorithm prefers configurations near 16 racks for
+# 40-ft container layout — 8 wide × 2 deep × 1 tall).
+PREFERRED_RACK_COUNT = 16
 
 
-def derive_pack_topology(cell_count_raw: int) -> tuple[int, int, int]:
+def derive_pack_topology(
+    cell_count_raw: int,
+    cell_voltage_v: float = 3.2,
+    chemistry: str = "lfp",
+    dc_bus_voltage_v: float = 800.0,
+) -> dict:
     """
-    Build #18p: return (rack_count, cells_per_rack, cell_count_rounded) such
-    that cell_count_rounded = rack_count × cells_per_rack EXACTLY (no orphans).
+    Build #18p-fix1 (2026-05-22): voltage-limit-aware pack topology.
 
-    Algorithm:
-      1. Start with rack_count ≈ cell_count_raw / TARGET_CELLS_PER_RACK
-      2. Search rack_count ± 4 for an integer that divides into cell_count_raw
-         with smallest remainder; round cell_count_raw UP to that multiple
-         (so we never under-deliver capacity).
+    Picks (series_cells_per_string, parallel_strings_per_rack, rack_count)
+    such that:
+      • series_cells × cell_voltage ≤ dc_bus_voltage × DC_BUS_DERATING /
+        (max_cell_voltage / nominal_cell_voltage) — keeps charge over-
+        voltage within rating of DC contactor/breaker/fuse.
+      • total_cells = series × parallel × racks ≈ cell_count_raw (minimum
+        excess, never less).
+      • rack_count chosen near PREFERRED_RACK_COUNT for container layout.
 
-    Returns a configuration that the LLM emission layer MUST use literally;
-    cross-tool consistency rules check rack_count × cells_per_rack == cell_count.
+    Returns a dict with all the derived fields the design layer needs.
+
+    Why this matters: Build #18p shipped a 313-cells-in-series design at
+    800V DC bus → 313 × 3.2 = 1001V nominal, exceeds 800V rating, physics
+    critic flagged. The fix is to constrain series count ≤
+    floor(800 × 0.92 / 3.65) = 201 for LFP at 800V.
     """
+    max_cell_v = MAX_CELL_VOLTAGE_V.get(chemistry, 3.65)
+    max_series_cells = int(math.floor((dc_bus_voltage_v * DC_BUS_DERATING) / max_cell_v))
+
     best = None
-    target_racks = max(2, round(cell_count_raw / TARGET_CELLS_PER_RACK))
-    for r in range(max(2, target_racks - 4), target_racks + 5):
-        if r <= 0:
-            continue
-        cells_per_rack = math.ceil(cell_count_raw / r)  # round UP per-rack
-        cell_count_rounded = r * cells_per_rack
-        excess = cell_count_rounded - cell_count_raw
-        cells_per_rack_dist = abs(cells_per_rack - TARGET_CELLS_PER_RACK)
-        # Prefer: lowest excess, then closest to TARGET_CELLS_PER_RACK
-        score = (excess, cells_per_rack_dist)
-        if best is None or score < best[0]:
-            best = (score, r, cells_per_rack, cell_count_rounded)
-    _, r, cells_per_rack, cell_count_rounded = best  # type: ignore[index]
-    return r, cells_per_rack, cell_count_rounded
+    # Iterate over candidate series-string lengths (top-down: max first).
+    # For each candidate, find a (parallel, racks) that fits.
+    for series in range(max(50, max_series_cells - 50), max_series_cells + 1):
+        parallel_total_needed = math.ceil(cell_count_raw / series)
+        # Find rack_counts that divide parallel_total_needed cleanly.
+        for racks in range(4, 33):
+            if parallel_total_needed % racks != 0:
+                continue
+            strings_per_rack = parallel_total_needed // racks
+            total_cells = series * parallel_total_needed
+            excess = total_cells - cell_count_raw
+            if excess < 0:
+                continue
+            # Score: prefer lowest excess, then racks near PREFERRED, then
+            # higher series (better voltage utilisation).
+            score = (excess, abs(racks - PREFERRED_RACK_COUNT), -series)
+            if best is None or score < best[0]:
+                best = (score, racks, strings_per_rack, series, total_cells)
+
+    if best is None:
+        # Fallback: 1 rack, all series, accept whatever cell count works.
+        # Pathological case — only hits if dc_bus_voltage_v is very low.
+        series = max_series_cells
+        racks = 1
+        strings_per_rack = max(1, math.ceil(cell_count_raw / series))
+        total_cells = series * strings_per_rack
+        best = ((total_cells - cell_count_raw, 0, -series), racks, strings_per_rack, series, total_cells)
+
+    _, racks, strings_per_rack, series, total_cells = best
+    cells_per_rack = strings_per_rack * series
+    return {
+        "rack_count": racks,
+        "strings_per_rack": strings_per_rack,
+        "series_cells_per_string": series,
+        "parallel_strings_total": strings_per_rack * racks,
+        "cells_per_rack": cells_per_rack,
+        "cell_count_rounded": total_cells,
+        "string_voltage_nominal_v": round(series * cell_voltage_v, 1),
+        "string_voltage_max_charge_v": round(series * max_cell_v, 1),
+        "max_series_cells_allowed": max_series_cells,
+        "dc_bus_voltage_v": dc_bus_voltage_v,
+        "headroom_pct": round((1 - (series * max_cell_v) / dc_bus_voltage_v) * 100, 1),
+    }
 
 
 def compute(payload: dict) -> dict:
@@ -218,36 +272,71 @@ def compute(payload: dict) -> dict:
     # Thermal dissipation at 0.5C = I^2 * R per cell
     cell_ah = float(payload.get("cell_capacity_ah", 280))
     discharge_current_a = cell_ah * 0.5
-    r_ohm = sim_result["internal_resistance_mohm"] / 1000.0
+    # Build #18p-fix2 (2026-05-22): clamp internal_resistance_mohm. PyBaMM's
+    # DFN startup-transient R estimate returned 0.022 mOhm (Loop 26 — unphysical
+    # for a 280Ah LFP cell where datasheet ranges 0.3-0.5 mOhm). The DFN
+    # sim's first-time-step voltage drop is too small to measure R reliably.
+    # Industry minimum per chemistry × cell capacity:
+    R_MIN_MOHM_BY_CHEMISTRY = {"lfp": 0.30, "nmc": 0.25, "lto": 0.45}
+    r_min_mohm = R_MIN_MOHM_BY_CHEMISTRY.get(chemistry, 0.30)
+    r_mohm_clamped = max(sim_result["internal_resistance_mohm"], r_min_mohm)
+    r_ohm = r_mohm_clamped / 1000.0
     thermal_w = (discharge_current_a ** 2) * r_ohm
 
-    # Build #18p: derive integer-clean pack topology (rack_count × cells_per_rack
-    # must be EXACT to avoid the orphan-cell bug the physics critic flagged in
-    # Loop 22: '5006 / 18 = 278.11 cells per rack — mathematically impossible').
-    rack_count, cells_per_rack, cell_count_rounded = derive_pack_topology(cell_count)
+    # Build #18p-fix1 (2026-05-22): voltage-limit-aware pack topology.
+    dc_bus_voltage_v = float(payload.get("dc_bus_voltage_v", 800))
+    topo = derive_pack_topology(
+        cell_count_raw=cell_count,
+        cell_voltage_v=float(payload.get("cell_voltage_v", 3.2)),
+        chemistry=chemistry,
+        dc_bus_voltage_v=dc_bus_voltage_v,
+    )
+    rack_count = topo["rack_count"]
+    cells_per_rack = topo["cells_per_rack"]
+    cell_count_rounded = topo["cell_count_rounded"]
+    series_cells_per_string = topo["series_cells_per_string"]
+    parallel_strings_per_rack = topo["strings_per_rack"]
+    parallel_strings_total = topo["parallel_strings_total"]
+    string_voltage_nominal_v = topo["string_voltage_nominal_v"]
 
     cell_mass_kg = CELL_MASS_KG_BY_CHEMISTRY.get(chemistry, 5.3)
     total_cell_mass_kg = round(cell_count_rounded * cell_mass_kg, 1)
 
-    # BMS slave board sizing — addresses Loop 22 critic issue 'only 18 ICs
-    # for 5006 cells'. Each slave handles BMS_CHANNELS_PER_SLAVE cells; we
-    # need ceil(cell_count / channels) boards.
+    # BMS slave board sizing
     bms_slave_count = math.ceil(cell_count_rounded / BMS_CHANNELS_PER_SLAVE)
     bms_total_channels = bms_slave_count * BMS_CHANNELS_PER_SLAVE
 
-    # System-level thermal — addresses Loop 22 critic issue 'cold plates undersized'.
-    # At rated 1C: I = C-rate × cell_capacity_ah; system dissipation = cells × I² × R
-    # Continuous case = 0.5C (matches what we simulate above)
-    discharge_current_per_cell_a = cell_ah * 0.5
-    system_thermal_dissipation_at_05c_kw = round(
-        (cell_count_rounded * (discharge_current_per_cell_a ** 2) * r_ohm) / 1000.0, 2
+    # Build #18p-fix2 (2026-05-22): correct per-cell current for series-parallel
+    # topology. Real per-cell current = string current = total_bus_current /
+    # parallel_strings_total. NOT cell_ah × C-rate (which assumes all-parallel).
+    # Loop 26 physics critic exposed the bug: my prior calc returned 2.16 kW
+    # but actual dissipation is ~15 kW for a 1 MW system.
+    rated_power_kw = float(payload.get("rated_power_kw", 1000))  # 1 MW default for 1MW BESS
+    total_bus_current_a = (rated_power_kw * 1000.0) / dc_bus_voltage_v
+    per_cell_current_a = total_bus_current_a / max(1, parallel_strings_total)
+    # Each cell dissipates I² × R + system overhead for busbars/wiring/
+    # connections/contactors. Real BESS round-trip efficiency is 95-97%
+    # round-trip AC-DC-AC, of which battery is 1-2% and BMS/wiring is
+    # another 1-2%. We model the wiring overhead as 1.5× cell I²R.
+    SYSTEM_OVERHEAD_MULTIPLIER = 1.5  # busbars + tabs + wiring + contactors
+    per_cell_thermal_w = (per_cell_current_a ** 2) * r_ohm
+    system_thermal_dissipation_kw = round(
+        (cell_count_rounded * per_cell_thermal_w * SYSTEM_OVERHEAD_MULTIPLIER) / 1000.0, 2
     )
 
-    # Cold plate sizing — 1 plate per rack is a common topology; each plate must
-    # handle the rack's thermal load × 1.25 safety factor. (Real designs may use
-    # multiple smaller plates per rack — we report a minimum aggregate capacity.)
-    cold_plate_total_capacity_min_kw = round(system_thermal_dissipation_at_05c_kw * 1.25, 2)
-    cold_plate_per_rack_min_capacity_kw = round(cold_plate_total_capacity_min_kw / rack_count, 2)
+    # Cold plate sizing — sized for system dissipation × 1.25 safety factor.
+    # Per-rack capacity is total / rack_count rounded UP to a sensible
+    # commercial cold-plate rating (1, 1.5, 2, 2.5, 3, 4, 5 kW are standard).
+    cold_plate_total_capacity_min_kw = round(system_thermal_dissipation_kw * 1.25, 2)
+    cold_plate_per_rack_raw_kw = cold_plate_total_capacity_min_kw / max(1, rack_count)
+    # Round per-rack capacity to nearest standard commercial rating
+    STANDARD_PLATE_KW = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 4.0, 5.0, 7.5, 10.0]
+    cold_plate_per_rack_min_capacity_kw = next(
+        (s for s in STANDARD_PLATE_KW if s >= cold_plate_per_rack_raw_kw),
+        STANDARD_PLATE_KW[-1],
+    )
+    # Recompute total based on rounded-up per-rack
+    cold_plate_total_capacity_kw = round(cold_plate_per_rack_min_capacity_kw * rack_count, 2)
 
     return {
         "cell_count": cell_count_rounded,           # USE THIS (integer-clean) value in design
@@ -256,13 +345,25 @@ def compute(payload: dict) -> dict:
         "nameplate_capacity_kwh": round(cell_count_rounded * cell_ah * float(payload.get("cell_voltage_v", 3.2)) / 1000.0, 1),
         "rack_count": rack_count,
         "cells_per_rack": cells_per_rack,
+        # Build #18p-fix1: full series-parallel topology — design layer MUST use these
+        "series_cells_per_string": series_cells_per_string,
+        "parallel_strings_per_rack": parallel_strings_per_rack,
+        "parallel_strings_total": parallel_strings_total,
+        "string_voltage_nominal_v": string_voltage_nominal_v,
+        "string_voltage_max_charge_v": topo["string_voltage_max_charge_v"],
+        "dc_bus_voltage_v": dc_bus_voltage_v,
+        "dc_bus_headroom_pct": topo["headroom_pct"],
+        "per_cell_current_at_rated_a": round(per_cell_current_a, 1),
+        "total_bus_current_at_rated_a": round(total_bus_current_a, 1),
         "cell_mass_kg": cell_mass_kg,
         "total_cell_mass_kg": total_cell_mass_kg,
         "bms_slave_count": bms_slave_count,
         "bms_channels_per_slave": BMS_CHANNELS_PER_SLAVE,
         "bms_total_channels": bms_total_channels,
-        "system_thermal_dissipation_at_05c_kw": system_thermal_dissipation_at_05c_kw,
-        "cold_plate_total_capacity_min_kw": cold_plate_total_capacity_min_kw,
+        # Build #18p-fix2: corrected thermal (was 7× too small in Loop 26)
+        "system_thermal_dissipation_kw": system_thermal_dissipation_kw,
+        "system_thermal_dissipation_at_05c_kw": system_thermal_dissipation_kw,  # alias for backward compat
+        "cold_plate_total_capacity_min_kw": cold_plate_total_capacity_kw,
         "cold_plate_per_rack_min_capacity_kw": cold_plate_per_rack_min_capacity_kw,
         "capacity_fade_at_6000_cycles_pct": capacity_fade_pct,
         "internal_resistance_mohm": sim_result["internal_resistance_mohm"],
