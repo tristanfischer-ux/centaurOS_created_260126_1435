@@ -3446,12 +3446,18 @@ function noteCollectorForSubModule(
   const cleanCostReason = (raw?: string): string => {
     if (!raw) return ''
     let s = String(raw)
-    // Strip the `[UP-CAP] LLM proposed £X.XX (Nx current £Y.YY). Exceeds
-    // COST_REPAIR_UP_CAP_RATIO=N; correction rejected.` prefix.
-    s = s.replace(/^\s*\[UP-CAP\][^.]*\.\s*/, '')
+    // Bug fix #E (2026-05-22): the original `^\s*\[UP-CAP\][^.]*\.\s*`
+    // matched up to the FIRST period in the prose — but the embedded
+    // price "£48.00" contains a period BEFORE the sentence-ending one,
+    // so the strip cut at "£48." leaving "00 (19.2× current £2.50)."
+    // as a leading number-fragment. Anchor the strip to the closing
+    // parenthesis of the price-ratio so we always swallow the whole
+    // `[UP-CAP] LLM proposed £X.XX (Nx current £Y.YY).` unit.
+    s = s.replace(/^\s*\[UP-CAP\]\s*LLM\s+proposed\s+£[\d.,]+\s*\([^)]*\)\.\s*/i, '')
     // Strip the explicit "Exceeds COST_REPAIR_UP_CAP_RATIO=N; correction rejected." phrase.
     s = s.replace(/Exceeds\s+COST_REPAIR_UP_CAP_RATIO=\d+;?\s*correction\s+rejected\.?\s*/gi, '')
-    // Strip "LLM proposed £X.XX (Nx current £Y.YY)." phrases.
+    // Strip "LLM proposed £X.XX (Nx current £Y.YY)." phrases anywhere
+    // in the string (defence in depth — also handles mid-string occurrence).
     s = s.replace(/LLM\s+proposed\s+£[\d.,]+\s*\([^)]*\)\.?\s*/gi, '')
     // Strip "correction rejected" leftovers.
     s = s.replace(/correction\s+rejected\.?\s*/gi, '')
