@@ -63,6 +63,9 @@ function intraLinkPeers(m: ModuleSpec, sub_module_id: string): string[] {
   // for-of throws "object is not iterable". Defensive Array.isArray gate.
   const links = Array.isArray(m.grammar_links) ? m.grammar_links : []
   for (const link of links) {
+    // (2026-05-23 EV charger chain crash): individual link can be undefined
+    // when LLM repair patches splice-insert without populating the slot.
+    if (!link) continue
     if (link.from_sub_module === sub_module_id) peers.add(link.to_sub_module)
     if (link.to_sub_module === sub_module_id) peers.add(link.from_sub_module)
   }
@@ -73,6 +76,7 @@ function crossLinkPeers(modules: ModuleSpec[], crossLinks: CrossModuleGrammarLin
   const peers = new Set<string>()
   const links = Array.isArray(crossLinks) ? crossLinks : []
   for (const cl of links) {
+    if (!cl) continue
     if (cl.from_module === mod) peers.add(cl.to_module)
     if (cl.to_module === mod) peers.add(cl.from_module)
   }
@@ -88,7 +92,7 @@ const noOrphanSubModulesGate: GrammarGate = {
   evaluate(modules, crossLinks) {
     const orphans: string[] = []
     for (const m of modules) {
-      const moduleHasCross = (Array.isArray(crossLinks) ? crossLinks : []).some(cl => cl.from_module === m.module || cl.to_module === m.module)
+      const moduleHasCross = (Array.isArray(crossLinks) ? crossLinks : []).some(cl => cl && (cl.from_module === m.module || cl.to_module === m.module))
       for (const sm of (m.sub_modules ?? [])) {
         const intraPeers = intraLinkPeers(m, sm.id)
         if (intraPeers.length === 0 && !moduleHasCross) {
@@ -117,6 +121,7 @@ const noDanglingReferencesGate: GrammarGate = {
     for (const m of modules) {
       const ids = new Set((m.sub_modules ?? []).map(sm => sm.id))
       for (const link of (Array.isArray(m.grammar_links) ? m.grammar_links : [])) {
+        if (!link) continue
         if (!ids.has(link.from_sub_module)) dangling.push(`${m.module}: grammar_link.from_sub_module="${link.from_sub_module}" not declared`)
         if (!ids.has(link.to_sub_module)) dangling.push(`${m.module}: grammar_link.to_sub_module="${link.to_sub_module}" not declared`)
       }
@@ -151,12 +156,12 @@ const sensorHasReceiverGate: GrammarGate = {
     const sensorRegex = /sensor|sensing|probe|transducer|thermistor|encoder/i
     const missing: string[] = []
     for (const m of modules) {
-      const moduleHasOutboundCross = (Array.isArray(crossLinks) ? crossLinks : []).some(cl => cl.from_module === m.module)
+      const moduleHasOutboundCross = (Array.isArray(crossLinks) ? crossLinks : []).some(cl => cl && cl.from_module === m.module)
       for (const sm of (m.sub_modules ?? [])) {
         const looksLikeSensor = sensorRegex.test(sm.name_human ?? sm.id) ||
           (sm.words ?? []).some((w: any) => sensorRegex.test(w.content_character?.name_human ?? w.id ?? ''))
         if (!looksLikeSensor) continue
-        const outboundIntra = (Array.isArray(m.grammar_links) ? m.grammar_links : []).some(l => l.from_sub_module === sm.id)
+        const outboundIntra = (Array.isArray(m.grammar_links) ? m.grammar_links : []).some(l => l && l.from_sub_module === sm.id)
         if (outboundIntra) continue
         if (moduleHasOutboundCross) continue  // module-level cross-link covers this sub-module's role
         missing.push(`${m.module}::${sm.id}`)
@@ -184,12 +189,12 @@ const controllerHasActuatorGate: GrammarGate = {
       // A cross-link from the controller's module to a downstream module is acceptable proof
       // that the controller commands an actuator in another module (e.g. iot_gateway in
       // control_compute_communication commanding LED drivers in environmental_interface).
-      const moduleHasOutboundCross = (Array.isArray(crossLinks) ? crossLinks : []).some(cl => cl.from_module === m.module)
+      const moduleHasOutboundCross = (Array.isArray(crossLinks) ? crossLinks : []).some(cl => cl && cl.from_module === m.module)
       for (const sm of (m.sub_modules ?? [])) {
         const looksLikeController = ctrlRegex.test(sm.name_human ?? sm.id) ||
           (sm.words ?? []).some((w: any) => ctrlRegex.test(w.content_character?.name_human ?? w.id ?? ''))
         if (!looksLikeController) continue
-        const intraOutbound = (Array.isArray(m.grammar_links) ? m.grammar_links : []).some(l => l.from_sub_module === sm.id)
+        const intraOutbound = (Array.isArray(m.grammar_links) ? m.grammar_links : []).some(l => l && l.from_sub_module === sm.id)
         if (intraOutbound || moduleHasOutboundCross) continue
         missing.push(`${m.module}::${sm.id}`)
       }
@@ -215,14 +220,14 @@ const thermalPathClosesGate: GrammarGate = {
     for (const m of modules) {
       // Module-level: does the module have a thermal-related cross-link?
       const moduleHasThermalCross = (Array.isArray(crossLinks) ? crossLinks : []).some(cl =>
-        (cl.from_module === m.module || cl.to_module === m.module) && thermalMechRegex.test(cl.mechanism ?? ''),
+        cl && (cl.from_module === m.module || cl.to_module === m.module) && thermalMechRegex.test(cl.mechanism ?? ''),
       )
       for (const sm of (m.sub_modules ?? [])) {
         const isHeatSource = heatSourceRegex.test(sm.name_human ?? sm.id) ||
           (sm.words ?? []).some((w: any) => heatSourceRegex.test(w.content_character?.name_human ?? w.id ?? ''))
         if (!isHeatSource) continue
         const hasIntraThermal = (Array.isArray(m.grammar_links) ? m.grammar_links : []).some(l =>
-          (l.from_sub_module === sm.id || l.to_sub_module === sm.id) && thermalMechRegex.test(l.mechanism ?? ''),
+          l && (l.from_sub_module === sm.id || l.to_sub_module === sm.id) && thermalMechRegex.test(l.mechanism ?? ''),
         )
         if (hasIntraThermal) continue
         if (moduleHasThermalCross) continue  // module-level cross-link covers the sub-module
@@ -260,6 +265,7 @@ const powerTopologyClosesGate: GrammarGate = {
       if (sources.has(m.module)) continue
       if (!consumesPower(m)) continue
       const hasCrossToSource = (Array.isArray(crossLinks) ? crossLinks : []).some(cl => {
+        if (!cl) return false
         const involves = cl.from_module === m.module || cl.to_module === m.module
         const other = cl.from_module === m.module ? cl.to_module : cl.from_module
         return involves && sources.has(other)
@@ -421,6 +427,7 @@ const declaredLinksUniqueGate: GrammarGate = {
     for (const m of modules) {
       const seen = new Set<string>()
       for (const link of (Array.isArray(m.grammar_links) ? m.grammar_links : [])) {
+        if (!link) continue
         const key = `${link.from_sub_module}::${link.to_sub_module}::${link.mechanism}`
         const rev = `${link.to_sub_module}::${link.from_sub_module}::${link.mechanism}`
         if (seen.has(key) || seen.has(rev)) {
