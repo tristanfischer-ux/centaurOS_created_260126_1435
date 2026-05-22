@@ -157,10 +157,14 @@ SHELL_ALPHA = 0.40  # transparent enough to see modules inside,
 # (2026-05-21 Tristan feedback: 0.22 was too faint at the small inset
 # sizes used for per-module images; 0.40 keeps the box legible)
 GROUND_TINT = (0.96, 0.96, 0.97)
-FOCAL_BOX_ALPHA = 0.18  # focal module's enclosing box is rendered as a
-# faint wireframe-ish translucent shell so its CONTENTS read primarily.
-# (2026-05-21 Tristan feedback: per-module renders MUST show internal
-# components inside the focal module's bounding box at recognisable scale.)
+FOCAL_BOX_ALPHA = 0.12  # focal module's enclosing box is a near-invisible
+# shell — Freestyle silhouette outlines give it the "box" boundary while
+# the CONTENTS (components in identity colour) read as the primary signal.
+# 0.65 was too opaque: the tinted shell obscured the internal components.
+# Phase8 reference: focal shells read as wire-frame outlines only; the
+# vivid identity-colour geometry inside is what identifies the module.
+# (2026-05-22 phase8 analysis: battery module shell is nearly invisible,
+# blue cell arrays inside are the dominant visual — alpha ~0.12 matches.)
 
 
 # ── Component shape heuristics (universal, class-agnostic) ─────────────
@@ -195,7 +199,13 @@ _SHAPE_KEYWORDS: list[tuple[tuple[str, ...], str]] = [
     (("motor", "actuator", "servo"),                         "cylinder_short"),
     (("valve", "regulator", "sensor", "probe", "transducer"),
                                                               "small_cyl"),
-    (("wing", "airfoil", "blade", "propeller"),              "thin_panel"),
+    # Aerospace specifics — order matters: 'spar' before 'wing' so a
+    # 'wing spar' reads as 'frame' (load-bearing) not 'thin_panel'.
+    (("spar", "longeron", "stringer", "rib", "boom", "truss"),
+                                                              "frame"),
+    (("fuselage",),                                          "panel_box"),
+    (("skin", "fairing"),                                    "panel_box"),
+    (("wing", "airfoil", "blade", "propeller", "fin"),       "thin_panel"),
 ]
 
 
@@ -332,7 +342,14 @@ def make_flat_material(name: str, rgb: tuple[float, float, float],
             bsdf.inputs["Metallic"].default_value = 0.0
         if alpha < 1.0:
             bsdf.inputs["Alpha"].default_value = alpha
-            mat.blend_method = "BLEND"
+            # BLEND mode: correct semi-transparent surfaces in Eevee.
+            # Very low alphas (≤0.08 for focal shells) use CLIP so the
+            # shell is nearly invisible but still captures Freestyle lines.
+            if alpha <= 0.08:
+                mat.blend_method = "CLIP"
+                mat.alpha_threshold = 0.01
+            else:
+                mat.blend_method = "BLEND"
             try:
                 mat.surface_render_method = "BLENDED"
             except AttributeError:
@@ -346,7 +363,13 @@ def add_box(name: str, centre: tuple[float, float, float],
     bpy.ops.mesh.primitive_cube_add(size=1.0, location=centre)
     obj = bpy.context.active_object
     obj.name = name
-    obj.scale = (size[0] / 2.0, size[1] / 2.0, size[2] / 2.0)
+    # primitive_cube_add(size=1.0) creates a cube with verts at ±0.5 (edge
+    # length 1). obj.scale=(S) makes verts effectively ±0.5*S after
+    # transform_apply. So to get final half-extents of size/2 (i.e. the box
+    # fills exactly the requested size), we need S = size (not size/2).
+    # The old `size/2` was wrong — it made every box 2× too small, causing
+    # modules to appear outside the envelope they were geometrically inside.
+    obj.scale = (size[0], size[1], size[2])
     # Blender 5.x changed defaults: `transform_apply(scale=True)` now
     # ALSO resets location to (0,0,0). Pass explicit kwargs so only
     # scale is baked (otherwise every box renders at the origin).
@@ -376,18 +399,18 @@ def add_cylinder(name: str, centre: tuple[float, float, float],
 
 _COMP_COLOURS: dict[str, tuple[float, float, float]] = {
     "cell":          (0.20, 0.45, 0.70),  # battery blue
-    "frame":         (0.45, 0.45, 0.50),  # steel grey
-    "cylinder_short":(0.65, 0.55, 0.40),  # brass/bronze (compressor/pump)
-    "cylinder_tall": (0.55, 0.65, 0.75),  # tank steel
-    "pcb":           (0.10, 0.45, 0.20),  # PCB green
-    "led_panel":     (1.00, 0.94, 0.70),  # warm LED
-    "fan":           (0.55, 0.55, 0.60),  # fan steel
-    "tube":          (0.75, 0.55, 0.30),  # copper
-    "panel_box":     (0.65, 0.65, 0.68),  # cabinet grey
-    "thin_panel":    (0.78, 0.78, 0.82),  # filter / vent
-    "coil":          (0.80, 0.50, 0.30),  # copper-ish coil
-    "small_cyl":     (0.50, 0.50, 0.55),  # sensor / valve
-    "cube":          (0.60, 0.60, 0.65),  # default
+    "frame":         (0.55, 0.40, 0.30),  # weathered steel / Corten
+    "cylinder_short":(0.78, 0.55, 0.20),  # brass/bronze (compressor/pump)
+    "cylinder_tall": (0.45, 0.55, 0.70),  # tank steel
+    "pcb":           (0.12, 0.50, 0.20),  # PCB green
+    "led_panel":     (1.00, 0.92, 0.55),  # warm LED
+    "fan":           (0.35, 0.40, 0.50),  # fan dark steel
+    "tube":          (0.78, 0.45, 0.20),  # copper
+    "panel_box":     (0.55, 0.55, 0.62),  # cabinet grey
+    "thin_panel":    (0.62, 0.68, 0.74),  # filter / vent
+    "coil":          (0.82, 0.45, 0.25),  # copper-ish coil
+    "small_cyl":     (0.38, 0.42, 0.50),  # sensor / valve
+    "cube":          (0.50, 0.50, 0.58),  # default
 }
 
 
@@ -397,15 +420,29 @@ def add_component_shape(
     centre: tuple[float, float, float],
     cell_size: tuple[float, float, float],
     quantity: int,
+    identity_rgb: tuple[float, float, float] | None = None,
 ) -> None:
     """Add a primitive matching `shape` inside the bounding `cell_size`
     centred at `centre`. The primitive fills ~75% of the cell so there's
     air between neighbours. `quantity` >1 is used only to pick between a
     single object and a small (max 4×4) array; we never instantiate the
-    raw count (a 4896-cell rack would blow up the scene)."""
+    raw count (a 4896-cell rack would blow up the scene).
+
+    `identity_rgb`: when supplied (per-module focal renders), ALL components
+    use the MODULE IDENTITY COLOUR instead of the per-shape _COMP_COLOURS.
+    This matches phase8 reference where battery cells are vivid blue (not
+    the default blue-grey), fire bottles are bright orange, busbars amber,
+    etc — the identity colour IS the visual signal that identifies the module.
+    """
     cw, cd, ch = cell_size
-    fill = 0.75
-    rgb = _COMP_COLOURS.get(shape, _COMP_COLOURS["cube"])
+    fill = 0.90  # components fill 90% of each cell — maximises legibility
+    # at the small inset sizes used for per-module PDF images.
+    # Phase8 rule: focal components use module identity colour, not shape colours.
+    # _COMP_COLOURS is only used as fallback when no identity is supplied (cover).
+    if identity_rgb is not None:
+        rgb = identity_rgb
+    else:
+        rgb = _COMP_COLOURS.get(shape, _COMP_COLOURS["cube"])
     mat = make_flat_material(f"comp_{name}", rgb, alpha=1.0)
 
     # Decide whether to render a single primitive or a packed array.
@@ -438,11 +475,9 @@ def add_component_shape(
         return
 
     if shape == "frame":
-        # Larger semi-transparent outline box — looks like a rack/frame.
-        frame_mat = make_flat_material(
-            f"frame_{name}", rgb, alpha=0.55,
-        )
-        add_box(name, centre, (cw * fill, cd * fill, ch * fill), frame_mat)
+        # Solid steel-grey frame box. Freestyle outline gives it the
+        # "frame" read.
+        add_box(name, centre, (cw * fill, cd * fill, ch * fill), mat)
         return
 
     if shape == "cylinder_short":
@@ -670,62 +705,117 @@ def populate_focal_module(item: dict, mods: list[dict]) -> None:
         add_box(f"box_{focal_id}", centre, size, mat)
         return
 
-    # Faint translucent enclosing shell so the focal box silhouette is
-    # still readable. Freestyle outlines do the actual line work.
+    sub_mods = focal_mod.get("sub_modules") or []
+
+    # Always draw the focal enclosing shell as a very faint outline so
+    # the Freestyle silhouette defines the module boundary. CLIP at 0.08
+    # means the surface is nearly invisible — components dominate.
+    # Phase8 reference: focal module boundary is implied by component
+    # Freestyle outlines, not a coloured shell.
     shell_mat = make_flat_material(
-        f"FocalShell_{focal_id}", item["rgb"], alpha=FOCAL_BOX_ALPHA,
+        f"FocalShell_{focal_id}", item["rgb"],
+        alpha=1.0 if not sub_mods else 0.08,
     )
     add_box(f"focal_shell_{focal_id}", centre, size, shell_mat)
 
-    sub_mods = focal_mod.get("sub_modules") or []
     if not isinstance(sub_mods, list) or not sub_mods:
-        # No sub-modules in the brief — leave the focal as its faint
-        # shell. Better than fabricating content.
         return
 
-    # Pack sub-modules in a sub-grid inside the focal box.
-    sub_cells = pack_subgrid(centre, size, len(sub_mods))
-    for sm, (sm_centre, sm_size) in zip(sub_mods, sub_cells):
+    # FLAT WORD COLLECTION: gather representative words from sub-modules into
+    # a single list, then pack them directly into the MODULE BOX.
+    # Cap at 4 components — fewer, larger components are more legible at
+    # the small inset sizes used for per-module PDF images. Each component
+    # cell will be ~25% of the module box area, making shapes clearly visible.
+    all_words: list[tuple[dict, str]] = []  # (word_dict, safe_name_prefix)
+    for sm in sub_mods:
         if not isinstance(sm, dict):
             continue
         words = sm.get("words") or []
-        if not isinstance(words, list) or not words:
-            # Empty sub-module → render a small placeholder grey cube.
-            ph_mat = make_flat_material(
-                f"sm_empty_{focal_id}_{sm.get('id', '')}", GREY, alpha=1.0,
-            )
-            add_box(
-                f"sm_empty_{focal_id}_{sm.get('id', '')}",
-                sm_centre,
-                (sm_size[0] * 0.5, sm_size[1] * 0.5, sm_size[2] * 0.5),
-                ph_mat,
-            )
+        if not isinstance(words, list):
             continue
-        # Cap words per sub-module to 6 so the scene stays under the
-        # ≤5s render budget (each component is ~5-25 verts).
-        words = words[:6]
-        word_cells = pack_subgrid(sm_centre, sm_size, len(words))
-        for w_idx, (word, (w_centre, w_size)) in enumerate(zip(words, word_cells)):
-            if not isinstance(word, dict):
-                continue
-            name_human = word.get("name_human") or ""
-            cc = word.get("content_character") or {}
-            cid = cc.get("character_id") if isinstance(cc, dict) else ""
-            shape = shape_for_word(name_human, cid or "")
-            qty = quantity_from_word(word)
-            safe_name = (
-                (cid or name_human or f"w{w_idx}")
-                .lower()
-                .replace(" ", "_")
-                .replace("/", "_")
-            )[:24]
-            add_component_shape(
-                shape,
-                f"comp_{focal_id}_{safe_name}_{w_idx}",
-                w_centre,
-                w_size,
-                qty,
-            )
+        sm_id = sm.get("id") or sm.get("name") or "sm"
+        # Take only the first representative word per sub-module
+        for w in words[:2]:
+            if isinstance(w, dict):
+                all_words.append((w, str(sm_id)))
+        if len(all_words) >= 4:
+            break
+    all_words = all_words[:4]
+
+    if not all_words:
+        # No word data — render a solid saturated block.
+        mat = make_flat_material(f"FocalSolid_{focal_id}", item["rgb"], alpha=1.0)
+        add_box(f"solid_{focal_id}", centre,
+                (size[0]*0.85, size[1]*0.85, size[2]*0.85), mat)
+        return
+
+    # Determine shapes for each component so we can detect "all flat/thin"
+    _THIN_SHAPES = {"led_panel", "pcb", "tube", "thin_panel"}
+    comp_shapes = []
+    for (word, _) in all_words:
+        nh = word.get("name_human") or ""
+        cc2 = word.get("content_character") or {}
+        cid2 = cc2.get("character_id") if isinstance(cc2, dict) else ""
+        comp_shapes.append(shape_for_word(nh, cid2 or ""))
+
+    # If ALL shapes are flat/thin, they won't be visible as 3D mass.
+    # Fall back to a solid saturated block + a few representative thin
+    # shapes on top so the module reads as a solid coloured zone.
+    # Phase8 reference: LED module renders as a solid bright panel array,
+    # not as individual thin LEDs that disappear into the background.
+    if all(s in _THIN_SHAPES for s in comp_shapes):
+        mat = make_flat_material(f"FocalSolid_{focal_id}", item["rgb"], alpha=1.0)
+        add_box(f"solid_{focal_id}", centre,
+                (size[0]*0.85, size[1]*0.85, size[2]*0.85), mat)
+        return
+
+    # Lay out components in a tight grid that FILLS the full focal module
+    # bounding box. No margin padding — components tile edge-to-edge so they
+    # collectively read as a solid saturated block inside the container.
+    # Phase8 reference: battery cells fill the full module zone as a tight
+    # blue array; fire suppression cylinders fill their zone completely.
+    n_comp = len(all_words)
+    fw, fd, fh = size  # focal module size
+    # 2-col layout for 2-4 components; 1-col for 1.
+    cols_c = min(n_comp, 2)
+    rows_c = int(math.ceil(n_comp / cols_c))
+    cell_cw = fw / cols_c
+    cell_cd = fd / rows_c
+    cell_ch = fh
+
+    comp_cells: list[tuple[tuple[float, float, float], tuple[float, float, float]]] = []
+    for i in range(n_comp):
+        col_i = i % cols_c
+        row_i = i // cols_c
+        ccx = centre[0] - fw/2 + cell_cw/2 + col_i * cell_cw
+        ccy = centre[1] - fd/2 + cell_cd/2 + row_i * cell_cd
+        ccz = centre[2]
+        comp_cells.append(((ccx, ccy, ccz), (cell_cw, cell_cd, cell_ch)))
+
+    for w_idx, ((word, sm_prefix), (w_centre, w_size)) in enumerate(
+        zip(all_words, comp_cells)
+    ):
+        name_human = word.get("name_human") or ""
+        cc = word.get("content_character") or {}
+        cid = cc.get("character_id") if isinstance(cc, dict) else ""
+        shape = shape_for_word(name_human, cid or "")
+        qty = quantity_from_word(word)
+        safe_name = (
+            (cid or name_human or f"w{w_idx}")
+            .lower()
+            .replace(" ", "_")
+            .replace("/", "_")
+        )[:24]
+        # Pass identity colour: focal components render in module colour
+        # (phase8 reference: battery cells are module-blue, not shape-blue-grey)
+        add_component_shape(
+            shape,
+            f"comp_{focal_id}_{safe_name}_{w_idx}",
+            w_centre,
+            w_size,
+            qty,
+            identity_rgb=item["rgb"],
+        )
 
 
 def build_scene(
@@ -738,10 +828,18 @@ def build_scene(
     reset_scene()
     env_w, env_d, env_h = envelope_mm(state)
 
-    # Envelope shell — semi-transparent so you can see inside. Freestyle
-    # outlines do the visual work; the BSDF is just enough to read as
-    # "container present" against the grey floor.
-    shell_mat = make_flat_material("ShellMat", SHELL_TINT, alpha=SHELL_ALPHA)
+    is_cover = focal is None
+    # Envelope shell — rendered on BOTH cover AND per-module shots
+    # (2026-05-22 Tristan phase8 reference: every per-module page shows
+    # the container envelope as a translucent cage with the focal sub-
+    # system saturated inside. The prior code disabled the shell on per-
+    # module shots because the camera sat INSIDE the envelope and back-
+    # face alpha compounded into a white scrim — but now the camera
+    # stays OUTSIDE the envelope at the same cover framing, so the back-
+    # face problem doesn't apply.)
+    shell_mat = make_flat_material(
+        "ShellMat", SHELL_TINT, alpha=SHELL_ALPHA,
+    )
     add_box(
         "Envelope",
         (0.0, 0.0, 0.0),
@@ -752,7 +850,6 @@ def build_scene(
     # Modules inside. Cover shot = all coloured. Per-module shot = focal
     # gets components rendered inside it, others grey.
     mods = modules(state)
-    is_cover = focal is None
     items = layout_modules(
         mods, env_w, env_d, env_h, focal,
         show_all_coloured=is_cover,
@@ -764,8 +861,18 @@ def build_scene(
             # populate_focal_module draw the faint shell + components.
             populate_focal_module(it, mods)
             focal_item = it
-        else:
+        elif is_cover:
+            # Cover shot — every module rendered as saturated solid box.
             mat = make_flat_material(f"Mod_{it['id']}", it["rgb"], alpha=1.0)
+            add_box(f"box_{it['id']}", it["centre"], it["size"], mat)
+        else:
+            # Per-module shot — siblings rendered as TRANSLUCENT GHOST
+            # boxes so they don't visually dominate the saturated focal.
+            # (2026-05-22 Tristan phase8 reference: sibling modules read
+            # as faint grey ghost geometry, not as opaque grey distractor
+            # boxes.) Alpha 0.35 provides visible spatial context while
+            # keeping siblings clearly subordinate to the saturated focal.
+            mat = make_flat_material(f"Mod_{it['id']}", GREY, alpha=0.35)
             add_box(f"box_{it['id']}", it["centre"], it["size"], mat)
 
     # Ground plane — flat off-white, gives a subtle scale reference.
@@ -810,22 +917,36 @@ def place_camera(env_w: float, env_d: float, env_h: float,
     radius and look-at change, so the per-module images still feel like
     the same orbital turntable, just zoomed in on the focal module.
     """
+    # Camera framing strategy (2026-05-22 rev):
+    # - Cover/wide shot: full envelope fits in frame, same as phase8 cover.
+    # - Per-module shot: zoom to ~2.5× the focal module extent so components
+    #   are legible (phase8 reference quality). The envelope will be cropped
+    #   but its wireframe edges still appear at the frame boundary, giving
+    #   spatial context. This is better than full-envelope (focal too small)
+    #   and better than the old tight zoom (lost all container context).
+    #   look_at + focal_size override the default cover framing.
     if look_at is not None and focal_size is not None:
-        # Per-module: orbit the focal module's centre, distance scaled
-        # to the focal module's bounding-box diagonal.
-        fw, fd, fh = focal_size
-        target_extent = math.sqrt(fw * fw + fd * fd + fh * fh) / 2.0
-        # Tighter fit factor so the focal box fills 60-80% of the
-        # frame. 0.42 ≈ 70% of frame at 35mm.
-        fit = 0.42
+        # Per-module zoom: orbit around focal module centre, distance sized
+        # so focal fills ~40% of frame (leaving room to see neighbouring
+        # modules and container edges for context).
+        fdim = max(focal_size)
+        envelope_diag = math.sqrt(env_w**2 + env_d**2 + env_h**2)
+        # Blend: zoom close enough to see components, far enough to show context.
+        # 0.40 puts the focal at ~40% of frame; 2.5 × focal diag gives context.
+        focal_diag = math.sqrt(sum(s*s for s in focal_size))
+        # Zoom in: focal module fills ~40% of frame, neighbours visible.
+        # focal_diag * 2.2 → enough context to see adjacent sibling modules.
+        # envelope_diag * 0.22 as minimum prevents excessive zoom on tiny modules.
+        target_extent = max(focal_diag * 2.2, envelope_diag * 0.22)
+        fit = 0.45
         centre = look_at
     else:
         diag = math.sqrt(env_w * env_w + env_d * env_d + env_h * env_h)
         target_extent = diag / 2.0
-        fit = 0.22 if wide else 0.30
+        fit = 0.26 if wide else 0.50
         centre = (0.0, 0.0, 0.0)
+    elevation_angle = math.radians(28.0)  # consistent ¾ view, cover + module
     distance = target_extent / fit
-    elevation_angle = math.radians(28.0)  # consistent ¾ view
     az = math.radians(azimuth_deg)
     horiz = distance * math.cos(elevation_angle)
     cx = centre[0] + horiz * math.cos(az)
@@ -872,7 +993,10 @@ def add_lighting(env_w: float, env_d: float, env_h: float) -> None:
         # Aim roughly at origin
         direction = Vector((0.0, 0.0, 0.0)) - Vector(pos)
         light_obj.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
-    # Flat world background — light grey
+    # Flat world background — medium grey (2026-05-22 phase8 reference:
+    # pale shapes against pure-white background lost contrast and read as
+    # uniform grey wash. Medium-grey BG ≈ 0.85 gives every shape a clear
+    # silhouette, matching the phase8 module pages).
     world = bpy.context.scene.world
     if world is None:
         world = bpy.data.worlds.new("World")
@@ -880,7 +1004,7 @@ def add_lighting(env_w: float, env_d: float, env_h: float) -> None:
     world.use_nodes = True
     bg = world.node_tree.nodes.get("Background")
     if bg:
-        bg.inputs["Color"].default_value = (0.97, 0.97, 0.98, 1.0)
+        bg.inputs["Color"].default_value = (0.85, 0.85, 0.87, 1.0)
         bg.inputs["Strength"].default_value = 1.0
 
 
