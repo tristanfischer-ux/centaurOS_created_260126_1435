@@ -107,7 +107,7 @@ export function ruleQuantityRatio(
           ? `${rhsKey}=${rhs.value}${rhs.unit} ≥ ${lhsKey}=${lhs.value}${lhs.unit} × ${margin} (margin=${ratio}×)`
           : `${rhsKey}=${rhs.value}${rhs.unit} < ${lhsKey}=${lhs.value}${lhs.unit} × ${margin} (margin=${ratio}× insufficient)`,
         affected_quantities: [lhsKey, rhsKey],
-        affected_tools: [lhs.provenance.tool_id, rhs.provenance.tool_id].filter(Boolean) as string[],
+        affected_tools: [lhs.provenance?.tool_id, rhs.provenance?.tool_id].filter(Boolean) as string[],
         severity,
       }
     },
@@ -160,7 +160,7 @@ export function ruleClosure(
           ? `${targetKey}=${target.value.toFixed(2)}${target.unit} ≈ computed=${computed.toFixed(2)} within ±${tolerancePct}% (Δ=${relDiff.toFixed(2)}%)`
           : `${targetKey}=${target.value.toFixed(2)}${target.unit} vs computed=${computed.toFixed(2)} differ by ${relDiff.toFixed(2)}% (tolerance ±${tolerancePct}%)`,
         affected_quantities: [targetKey],
-        affected_tools: [target.provenance.tool_id].filter(Boolean) as string[],
+        affected_tools: [target.provenance?.tool_id].filter(Boolean) as string[],
         severity,
       }
     },
@@ -199,7 +199,7 @@ export function ruleRange(
           ? `${quantityKey}=${q.value}${q.unit} ∈ [${min}, ${max}]`
           : `${quantityKey}=${q.value}${q.unit} outside [${min}, ${max}]`,
         affected_quantities: [quantityKey],
-        affected_tools: [q.provenance.tool_id].filter(Boolean) as string[],
+        affected_tools: [q.provenance?.tool_id].filter(Boolean) as string[],
         severity,
       }
     },
