@@ -373,13 +373,53 @@ const rules = [
 // PLAN REGISTRATION
 // ---------------------------------------------------------------------------
 
+// Build #18q: mass aggregator step — runs LAST (after pybamm + pandapower +
+// ngspice). Reads tool-derived masses from the contract; emits the system-
+// level mass total + container split recommendation.
+const stepMassAggregator: ToolStep = {
+  tool_id: 'mass-aggregator:envelope-check',
+  required: false,
+  feeds_into: [] as string[],
+  input_from_contract: (c: any) => {
+    const total_cell_mass_kg = c.quantities?.total_cell_mass_kg?.value ?? 0
+    const transformer_mass_kg = c.quantities?.transformer_mass_kg?.value ?? null
+    const rack_count = c.quantities?.rack_count?.value ?? 16
+    const max_mass_kg_envelope = c.envelope?.max_mass_kg?.value ?? 28000
+    return {
+      total_cell_mass_kg,
+      transformer_mass_kg,
+      rack_count,
+      max_mass_kg_envelope,
+      pcs_mass_kg_estimate: 1800,         // Sungrow SC1000UD-MV class
+      container_tare_kg_estimate: 4000,    // 40-ft ISO container ISO 668
+      rack_mass_kg_each_estimate: 150,     // steel battery rack
+    }
+  },
+  contract_update: (c: ContractInProgress, output: any) => {
+    const out = output as { total_system_mass_kg: number; mass_budget_breach_kg: number; mass_budget_utilisation_pct: number; recommended_container_count: number; per_container_mass_kg: number }
+    const prov = (f: string) => ({ source: 'tool:mass-aggregator:envelope-check' as const, tool_id: 'mass-aggregator:envelope-check', tool_version: '1.0.0', tool_license: 'free-proprietary' as const, tool_source_url: 'internal://forgeos/orchestrator', invocation_output_field: f, duration_ms: 0 })
+    return {
+      ...c,
+      quantities: {
+        ...c.quantities,
+        total_system_mass_kg: { value: out.total_system_mass_kg, unit: 'kg', family: 'mass', basis: 'dry', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'all-up including container tare', provenance: prov('total_system_mass_kg') },
+        mass_budget_breach_kg: { value: out.mass_budget_breach_kg, unit: 'kg', family: 'mass', basis: 'derived', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'positive=breach', provenance: prov('mass_budget_breach_kg') },
+        mass_budget_utilisation_pct: { value: out.mass_budget_utilisation_pct, unit: '%', family: 'dimensionless', basis: 'derived', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: null, provenance: prov('mass_budget_utilisation_pct') },
+        recommended_container_count: { value: out.recommended_container_count, unit: '', family: 'dimensionless', basis: 'derived', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: '1 = no split needed; ≥2 = MUST split for road transport', provenance: prov('recommended_container_count') },
+        per_container_mass_kg: { value: out.per_container_mass_kg, unit: 'kg', family: 'mass', basis: 'derived', scope: 'container', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'after split', provenance: prov('per_container_mass_kg') },
+      },
+    }
+  },
+}
+
 export const BESS_UTILITY_CONTAINERISED_PLAN: ClassToolPlan = {
   id: 'bess:utility_containerised',
   envelope_predicate: (e) =>
     e.class === 'bess' &&
     e.scale_tier === 'utility_containerised' &&
     (e.nameplate_kwh === undefined || (e.nameplate_kwh >= 2000 && e.nameplate_kwh <= 20000)),
-  tools: [stepPybamm, stepCoolProp, stepNgspice, stepPandaPower, stepOctopart, stepIecStandards],
+  // Mass aggregator runs LAST — depends on pybamm/pandapower outputs.
+  tools: [stepPybamm, stepCoolProp, stepNgspice, stepPandaPower, stepOctopart, stepIecStandards, stepMassAggregator],
   coupled_pairs: [['ngspice:pcs-simulation', 'coolprop:refrigerant-properties']],
   max_iterations: 3,
   convergence_tolerance_pct: 2.0,
