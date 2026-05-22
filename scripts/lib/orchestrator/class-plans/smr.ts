@@ -456,7 +456,7 @@ export const SMR_PLAN: ClassToolPlan = {
     ['smr:decay-heat-loca', 'radiator:sizing'],
     ['ht:ntu-heat-exchanger', 'coolprop:refrigerant-properties'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 2.0,
   consistency_rules: rules,
 }

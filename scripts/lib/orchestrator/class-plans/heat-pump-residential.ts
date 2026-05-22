@@ -878,7 +878,7 @@ export const HEAT_PUMP_RESIDENTIAL_PLAN: ClassToolPlan = {
     ['coolprop:refrigerant-properties', 'refrigeration-cycle:cop'],
     ['refrigeration-cycle:cop', 'ht:ntu-heat-exchanger'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 5.0,
   consistency_rules: rules,
 }

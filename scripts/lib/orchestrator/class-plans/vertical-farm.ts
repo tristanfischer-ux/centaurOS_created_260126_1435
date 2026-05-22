@@ -1298,7 +1298,7 @@ export const VERTICAL_FARM_PLAN: ClassToolPlan = {
     ['hvac:load-sizing', 'dehumidification:sizing'],
     ['led-par:efficacy', 'plant-growth:yield'],
   ],
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 5.0,
   consistency_rules: rules,
 }

@@ -358,7 +358,7 @@ export const BIOREACTOR_PLAN: ClassToolPlan = {
     ['monod:growth-kinetics', 'biosteam:fermentation-stoich'],
     ['coolprop:refrigerant-properties', 'fluids:run'],
   ],
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 3.0,
   consistency_rules: rules,
 }

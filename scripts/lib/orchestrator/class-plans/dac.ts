@@ -383,7 +383,7 @@ export const DAC_PLAN: ClassToolPlan = {
     ['dac:regeneration-energy', 'ht:heat-exchanger'],
     ['dac:contactor-geometry', 'fluids:pipe-sizing'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 2.0,
   consistency_rules: rules,
 }

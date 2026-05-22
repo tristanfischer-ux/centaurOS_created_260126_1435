@@ -552,7 +552,7 @@ export const QUANTUM_COMPUTER_PLAN: ClassToolPlan = {
     ['qutip:qubit-dynamics', 'microwave-control-pulse:drag'],
     ['qubit-chip-thermal:base-plate', 'cryocooler:sizing'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 2.0,
   consistency_rules: rules,
 }

@@ -643,7 +643,7 @@ export const HAPS_PLAN: ClassToolPlan = {
     ['propeller:low-re-bemt', 'motor:altitude-derating'],
     ['ambiance:isa-atmosphere', 'aerosandbox:airfoil-analysis'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 5.0,
   consistency_rules: rules,
 }

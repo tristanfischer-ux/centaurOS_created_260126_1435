@@ -215,7 +215,7 @@ export const GROUND_STATION_PLAN: ClassToolPlan = {
     ['link-budget:rf', 'wireless-link-budget:friis'],
     ['ngspice:pcs-simulation', 'thermal-envelope:ladder'],
   ],
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 5.0,
   consistency_rules: rules,
 }

@@ -672,7 +672,7 @@ export const EVTOL_PLAN: ClassToolPlan = {
     ['pybamm:cell-sizing', 'ngspice:pcs-simulation'],
     ['rotor-tilt-transition:dynamics', 'downwash-recirculation:multirotor'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 5.0,
   consistency_rules: rules,
 }

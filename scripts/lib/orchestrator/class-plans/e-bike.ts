@@ -461,7 +461,7 @@ export const E_BIKE_PLAN: ClassToolPlan = {
     ['rolling-resistance:cycling', 'gear-ratio:bicycle'],
     ['pybamm:cell-sizing', 'motor-prop:matching'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 5.0,
   consistency_rules: rules,
 }

@@ -411,7 +411,7 @@ export const HUMANOID_PLAN: ClassToolPlan = {
     ['pybamm:cell-sizing', 'humanoid:joint-actuator-torque'],
     ['mass-aggregator:envelope-check', 'humanoid:joint-actuator-torque'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 3.0,
   consistency_rules: rules,
 }

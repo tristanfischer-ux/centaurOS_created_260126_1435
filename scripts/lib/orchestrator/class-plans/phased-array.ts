@@ -418,7 +418,7 @@ export const PHASED_ARRAY_PLAN: ClassToolPlan = {
     ['phased-array-antenna:radiation-pattern', 'calibration-imperfection:phase-gain'],
     ['beamforming-codebook:dft-hybrid', 'rf-mems-beamsteering:design'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 2.0,
   consistency_rules: rules,
 }

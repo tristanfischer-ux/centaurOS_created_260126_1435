@@ -466,7 +466,7 @@ export const SATELLITE_INTERPLANETARY_PLAN: ClassToolPlan = {
     ['delta-v-budget:mission', 'chemical-propulsion:sizing'],
     ['delta-v-budget:mission', 'propellant-tank:sizing'],
   ],
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 5.0,
   consistency_rules: rules,
 }

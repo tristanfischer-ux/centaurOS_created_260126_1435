@@ -402,7 +402,7 @@ export const SOLID_STATE_BATTERY_PLAN: ClassToolPlan = {
     ['li-metal-dendrite:monroe-newman', 'stack-compression:pressure'],
     ['ceramic-electrolyte:conductivity', 'pybamm:cell-sizing'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 2.0,
   consistency_rules: rules,
 }

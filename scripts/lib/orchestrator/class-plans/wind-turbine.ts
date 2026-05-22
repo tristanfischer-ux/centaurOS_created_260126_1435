@@ -508,7 +508,7 @@ export const WIND_TURBINE_PLAN: ClassToolPlan = {
     ['wind-resource:iec61400-site', 'wind-resource:iec61400'],
     ['ngspice:pcs-simulation', 'gearbox-load:spectrum'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 3.0,
   consistency_rules: rules,
 }

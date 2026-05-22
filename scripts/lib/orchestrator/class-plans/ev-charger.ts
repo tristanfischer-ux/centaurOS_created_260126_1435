@@ -496,7 +496,7 @@ export const EV_CHARGER_PLAN: ClassToolPlan = {
     ['ngspice:pcs-simulation', 'coolprop:refrigerant-properties'],
     ['coolprop:refrigerant-properties', 'hvac-load:sizing'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 3.0,
   consistency_rules: rules,
 }

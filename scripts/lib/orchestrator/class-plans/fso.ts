@@ -463,7 +463,7 @@ export const FSO_PLAN: ClassToolPlan = {
     ['fso:link-budget', 'atmospheric-scintillation:turbulence'],
     ['pointing-acquisition-tracking:control', 'optical-atp:closed-loop'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 2.0,
   consistency_rules: rules,
 }

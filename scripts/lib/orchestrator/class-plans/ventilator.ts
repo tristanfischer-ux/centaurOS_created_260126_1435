@@ -653,7 +653,7 @@ export const VENTILATOR_PLAN: ClassToolPlan = {
     ['flow-compliance:respiratory', 'peep-valve:sizing'],
     ['ngspice:pcs-simulation', 'control-systems:pid-tuning'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 5.0,
   consistency_rules: rules,
 }

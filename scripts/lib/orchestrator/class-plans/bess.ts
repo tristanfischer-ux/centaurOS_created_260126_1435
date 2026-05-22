@@ -475,7 +475,7 @@ export const BESS_UTILITY_CONTAINERISED_PLAN: ClassToolPlan = {
   // Mass aggregator runs LAST — depends on pybamm/pandapower outputs.
   tools: [stepPybamm, stepCoolProp, stepNgspice, stepPandaPower, stepOctopart, stepIecStandards, stepMassAggregator],
   coupled_pairs: [['ngspice:pcs-simulation', 'coolprop:refrigerant-properties']],
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 2.0,
   consistency_rules: rules,
 }

@@ -293,7 +293,7 @@ export const CNC_MACHINE_PLAN: ClassToolPlan = {
     ['ngspice:pcs-simulation', 'control-systems:run'],
     ['coolprop:refrigerant-properties', 'fluids:run'],
   ],
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 3.0,
   consistency_rules: rules,
 }

@@ -352,8 +352,21 @@ export interface SubmoduleSentenceOptions {
  *
  * Returns just the name when there are no modifiers.
  */
+/**
+ * Strip the trailing " word" template-variable hangover from a name.
+ * Many emitters store name_human as "X word" (a legacy template artefact);
+ * the BoM table-render strips it via the `word()` helper, but until this
+ * helper was added the prose path emitted "A Brady vpd label tag word
+ * (part ...)" literally. Apply at every sentence-builder entry point.
+ * (Bug #6 universal-prose fix — 2026-05-22 Tristan PDF audit.)
+ */
+function stripWordSuffix(name: string | undefined | null): string {
+  if (!name) return ''
+  return name.replace(/\s+word$/i, '').trim()
+}
+
 function renderWordClause(word: WordSpec): string {
-  const charName = word.content_character?.name_human
+  const charName = stripWordSuffix(word.content_character?.name_human)
     || humaniseId(word.content_character?.character_id ?? word.id)
   const strip = modifierStripInline(word.modifier_characters ?? [])
   return strip ? `${charName} (${strip})` : charName
@@ -474,7 +487,7 @@ function modValue(m: ModifyingCharacter | undefined): string {
  *    with a 5-day lead time."
  */
 function renderWordProse(word: WordSpec): string {
-  const charName = word.content_character?.name_human
+  const charName = stripWordSuffix(word.content_character?.name_human)
     || humaniseId(word.content_character?.character_id ?? word.id ?? 'component')
   const mods = word.modifier_characters ?? []
 

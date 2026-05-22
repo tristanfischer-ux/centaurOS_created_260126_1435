@@ -284,7 +284,7 @@ export const PROPULSION_THRUSTER_PRODUCT_PLAN: ClassToolPlan = {
     ['electric-propulsion:sizing', 'propellant-tank:sizing'],
     ['chemical-propulsion:sizing', 'propellant-tank:sizing'],
   ],
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 5.0,
   consistency_rules: rules,
 }

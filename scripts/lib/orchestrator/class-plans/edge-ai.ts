@@ -475,7 +475,7 @@ export const EDGE_AI_PLAN: ClassToolPlan = {
     ['thermal-envelope:ladder', 'fan-coil:sizing'],
     ['thermal-envelope:ladder', 'hvac:load-sizing'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 3.0,
   consistency_rules: rules,
 }

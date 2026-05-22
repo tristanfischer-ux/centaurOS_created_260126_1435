@@ -294,7 +294,7 @@ export const PRINTER_FDM_3D_PLAN: ClassToolPlan = {
     ['motion-kinematics:steps-per-mm', 'ngspice:pcs-simulation'],
     ['coolprop:refrigerant-properties', 'hvac:load-sizing'],
   ],
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 3.0,
   consistency_rules: rules,
 }

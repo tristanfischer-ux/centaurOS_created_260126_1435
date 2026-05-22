@@ -775,7 +775,7 @@ export const SATELLITE_CUBESAT_PLAN: ClassToolPlan = {
     ['solar-array:spacecraft', 'battery-eclipse:cycle'],
     ['delta-v-budget:mission', 'propellant-tank:sizing'],
   ],
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 5.0,
   consistency_rules: rules,
 }

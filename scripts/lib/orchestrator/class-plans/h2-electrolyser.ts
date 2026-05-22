@@ -482,7 +482,7 @@ export const H2_ELECTROLYSER_PLAN: ClassToolPlan = {
     ['electrolyser:efficiency', 'ht:heat-exchanger'],
     ['ngspice:pcs-simulation', 'pandapower:grid-integration'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 2.5,
   consistency_rules: rules,
 }

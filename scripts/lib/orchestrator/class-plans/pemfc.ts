@@ -435,7 +435,7 @@ export const PEMFC_PLAN: ClassToolPlan = {
     ['pemfc:polarisation-curve', 'ht:ntu-heat-exchanger'],
     ['coolprop:refrigerant-properties', 'ht:ntu-heat-exchanger'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 2.5,
   consistency_rules: rules,
 }

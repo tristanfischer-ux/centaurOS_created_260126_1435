@@ -651,7 +651,7 @@ export const DIALYSIS_MACHINE_PLAN: ClassToolPlan = {
     ['osmosis-membrane:dialyser', 'blood-pump:sizing'],
     ['blood-pump:sizing', 'fluids:pipe-sizing'],
   ] as Array<[string, string]>,
-  max_iterations: 3,
+  max_iterations: 5,
   convergence_tolerance_pct: 5.0,
   consistency_rules: rules,
 }
