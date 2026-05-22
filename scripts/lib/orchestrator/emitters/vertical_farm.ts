@@ -87,9 +87,16 @@ function cc(
   fs: string | null = null,
   ms: string | null = null,
 ): ContentCharacter {
+  // Bug fix #6 (2026-05-22 v2): the `word()` helper cleans the Word's
+  // top-level name_human, but the nested content_character.name_human
+  // was passed through unchanged. The LLM Phase-2 reviewer reads the
+  // nested field and copies the " word" suffix verbatim into prose,
+  // producing "Hammond enclosure mounting bracket word (part …)".
+  // Strip here so the upstream data is universally clean.
+  const cleanName = name_human.replace(/\s+word$/i, '')
   return {
     character_id,
-    name_human,
+    name_human: cleanName,
     function_radical_primary: fp,
     function_radical_secondary: fs,
     material_radical_primary: mp,
