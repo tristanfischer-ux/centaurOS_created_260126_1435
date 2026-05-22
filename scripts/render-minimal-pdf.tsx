@@ -289,18 +289,41 @@ function toTitleCaseEng(input: string): string {
     'UK','EU','US','USA','GB','EEA','UAE','MENA','APAC','EMEA','ASEAN',
   ])
   const SMALL_WORDS = new Set(['and','or','of','the','for','to','in','on','a','an','with'])
-  return input.split(/(\s+|\(|\))/).map((tok, idx) => {
+  const tokens = input.split(/(\s+|\(|\))/)
+  // Find the previous non-whitespace/non-paren token's index → so we can ask
+  // "was the previous content token a number?" for the SI-unit rule.
+  const prevContent = (i: number): string | null => {
+    for (let j = i - 1; j >= 0; j--) {
+      const t = tokens[j]
+      if (/^[\s()]+$/.test(t)) continue
+      return t
+    }
+    return null
+  }
+  return tokens.map((tok, idx) => {
     if (/^[\s()]+$/.test(tok)) return tok
     // If the token is already all-uppercase (≥2 letters) and contains a
     // letter, treat it as a deliberately-cased acronym and leave it.
     if (/^[A-Z]{2,}\d*$/.test(tok)) return tok
     const upper = tok.toUpperCase()
     if (ACRONYMS.has(upper)) return upper
-    // Physical unit tokens after a number: leave lowercase ("m²", "kg", "kW",
-    // "ppfd"). Detected when token is single-letter or short-with-symbols and
-    // the previous non-space token is a number. Without this, "100 m²" gets
-    // title-cased to "100 M²" which is incorrect SI notation.
-    if (/^[a-z]{1,4}[²³°]?$/.test(tok)) return tok.toLowerCase()
+    // (2026-05-22 Tristan): the SI-unit rule was too aggressive — it
+    // lowercased ANY short token, so part labels like "fan Speed Controller"
+    // and "fan Power Cable" had their first word collapsed to lowercase.
+    // Restrict the rule to ITS DOCUMENTED INTENT: only lowercase short
+    // tokens immediately after a NUMBER (i.e. SI units like "kg", "kW",
+    // "m²", "L/min"). For all other positions the token is a noun/adj
+    // and should be capitalised.
+    // SI / engineering units: token starts lowercase + contains only letters
+    // / digits / slashes / power symbols (e.g. "kg", "m²", "kg/year",
+    // "umol/m²/s", "l/min", "ppfd"). The previous content token must be a
+    // number — that gate prevents collapsing real noun-tokens like "fan",
+    // "ozone", "pump" which are pre-token labels not unit suffixes.
+    if (/^[a-z][a-z0-9²³°\/]{0,9}$/.test(tok)) {
+      const prev = prevContent(idx)
+      const prevIsNumber = prev !== null && /^-?\d+(?:\.\d+)?$/.test(prev)
+      if (prevIsNumber) return tok.toLowerCase()
+    }
     const lower = tok.toLowerCase()
     if (idx > 0 && SMALL_WORDS.has(lower)) return lower
     return lower.charAt(0).toUpperCase() + lower.slice(1)
@@ -2375,8 +2398,11 @@ function formatPerfValue(v: unknown): string {
     return v.toPrecision(2)
   }
   const s = String(v).trim()
-  // Numeric-string with unit suffix → split, round number part, recombine.
-  const m = s.match(/^(-?\d+\.\d+)(\s*\S.*)?$/)
+  // Numeric-string with optional unit suffix → split, round, recombine.
+  // (2026-05-22 Tristan: integer values like "25000 kg/year" were not being
+  // localised because the regex required a decimal. Now accepts pure-int too,
+  // so "25000 kg/year" → "25,000 kg/year".)
+  const m = s.match(/^(-?\d+(?:\.\d+)?)(\s*\S.*)?$/)
   if (m) {
     const num = parseFloat(m[1])
     if (Number.isFinite(num)) {
@@ -2409,7 +2435,7 @@ function PerformanceCardBody({ state }: { state: any }) {
     <View>
       <SubHeading>Performance characteristics</SubHeading>
       <Text style={{ fontSize: 10, color: MUTED, marginBottom: 12, lineHeight: 1.5 }}>
-        Numeric spec sheet for this product class — resolved value alongside the brief constraint (where set), so contradictions between modules and the brief are visible at a glance.
+        Numeric spec sheet for this product class — the resolved value the design must deliver for each metric.
       </Text>
 
       {card.warnings && card.warnings.length > 0 ? (
@@ -2434,7 +2460,6 @@ function PerformanceCardBody({ state }: { state: any }) {
             <View style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT }}>
               <Text style={{ flex: 3, fontSize: 7.5, color: MUTED, letterSpacing: 0.8 }}>METRIC</Text>
               <Text style={{ flex: 2, fontSize: 7.5, color: MUTED, letterSpacing: 0.8, textAlign: 'right' }}>VALUE</Text>
-              <Text style={{ flex: 2, fontSize: 7.5, color: MUTED, letterSpacing: 0.8, textAlign: 'right' }}>BRIEF TARGET</Text>
               <Text style={{ width: 14, fontSize: 7.5, color: MUTED, textAlign: 'center' }}> </Text>
             </View>
             {section.metrics.map((m: any, mi: number) => {
@@ -2450,9 +2475,6 @@ function PerformanceCardBody({ state }: { state: any }) {
                   </View>
                   <Text style={{ flex: 2, fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: m.value !== null ? INK : '#94a3b8', textAlign: 'right' }}>
                     {m.value !== null ? formatPerfValue(m.value) : '—'}
-                  </Text>
-                  <Text style={{ flex: 2, fontSize: 9.5, color: INK_SOFT, textAlign: 'right' }}>
-                    {m.brief_target !== null ? String(m.brief_target) : ''}
                   </Text>
                   <Text style={{ width: 14, fontSize: 10, color: colour, textAlign: 'center' }}>{sym}</Text>
                 </View>
@@ -3875,17 +3897,32 @@ function ModuleSection({
               key={sm.id}
               style={{ paddingVertical: 11, borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT }}
             >
-              <View style={{ flexDirection: 'row', marginBottom: 5, alignItems: 'baseline' }} wrap={false}>
-                <Text style={{ width: 36, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT_SOFT }}>
-                  {index}.{sm.idx}
-                </Text>
-                <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK }}>
-                  {britishise(sm.name.charAt(0).toUpperCase() + sm.name.slice(1))}
-                </Text>
+              {/* Bug fix (2026-05-22 Tristan): wrap title-row PLUS the first prose
+                  chunk together so the sub-module title never splits from its
+                  first paragraph at a page break. Earlier wrap={false} on the
+                  title alone allowed the prose to render onto the previous
+                  page after the title moved — producing the overlapping-text
+                  smear seen on Module 3.1 Fertigation skid. */}
+              <View wrap={false}>
+                <View style={{ flexDirection: 'row', marginBottom: 5, alignItems: 'baseline' }}>
+                  <Text style={{ width: 36, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT_SOFT }}>
+                    {index}.{sm.idx}
+                  </Text>
+                  <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK }}>
+                    {britishise(sm.name.charAt(0).toUpperCase() + sm.name.slice(1))}
+                  </Text>
+                </View>
+                {proseChunks.length > 0 ? (
+                  <Text
+                    style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.6, paddingLeft: 36, marginBottom: 5, textAlign: 'justify' }}
+                  >
+                    {partLinkMap && partLinkMap.size > 0 ? renderProseWithLinks(proseChunks[0], partLinkMap) : proseChunks[0]}
+                  </Text>
+                ) : null}
               </View>
-              {proseChunks.map((chunk, ci) => (
+              {proseChunks.slice(1).map((chunk, ci) => (
                 <Text
-                  key={ci}
+                  key={ci + 1}
                   style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.6, paddingLeft: 36, marginBottom: 5, textAlign: 'justify' }}
                 >
                   {partLinkMap && partLinkMap.size > 0 ? renderProseWithLinks(chunk, partLinkMap) : chunk}
