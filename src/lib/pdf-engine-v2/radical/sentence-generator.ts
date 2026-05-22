@@ -542,7 +542,22 @@ function renderWordProse(word: WordSpec): string {
     }
     if (formValue) openParts.push(formValue)
   }
-  openParts.push(charName.toLowerCase())
+  // Bug fix #8 (2026-05-23): preserve ALL-CAPS acronyms (1-5 letters) in
+  // charName. Previously we blanket-lowercased "EMI input filter" → "emi
+  // input filter" — the acronym lost its capitalisation. Now we lowercase
+  // ONLY tokens that are not all-uppercase acronyms (≤5 letters, all
+  // letters). Examples preserved: EMI, PCB, BMS, HMI, IGBT, MOSFET, RF, DC,
+  // AC, USB, CCS2. Examples lowercased: Bearing → bearing, Compressor →
+  // compressor. Common product-noun first-cap is removed (so opener reads
+  // "A Fluidmaster ½-inch float valve" not "A Fluidmaster ½-inch Float Valve").
+  const lowercasePreservingAcronyms = (s: string): string => {
+    return s.split(/\s+/).map(tok => {
+      // Preserve all-caps acronyms (1-6 letters or digit-letter mix like CCS2)
+      if (/^[A-Z][A-Z0-9]{0,5}$/.test(tok)) return tok
+      return tok.toLowerCase()
+    }).join(' ')
+  }
+  openParts.push(lowercasePreservingAcronyms(charName))
   let opener = openParts.join(' ')
   // Parenthetical: part number + material + dimensions (when not opener)
   const paren: string[] = []
@@ -616,7 +631,25 @@ function renderWordProse(word: WordSpec): string {
     ? ` (additional: ${leftovers.map(m => `${humaniseId(m.kind)}: ${modValue(m)}`).join('; ')})`
     : ''
 
-  return ensureTerminalPunctuation(`${opener}${perfClause}${complianceClause}${leftoverClause}${procClause}`.trim())
+  const finalProse = `${opener}${perfClause}${complianceClause}${leftoverClause}${procClause}`.trim()
+  return ensureTerminalPunctuation(fixIndefiniteArticle(finalProse))
+}
+
+/**
+ * Convert "A {vowel-letter…}" → "An {vowel-letter…}" for engineering acronyms
+ * and brand names starting with A/E/I/O/U. Engineering prose context guarantees
+ * the token after "A " is a manufacturer (Infineon, Arconic), an acronym (EMI,
+ * IGBT, IBC, OEM, ABS), a dimension ("1.5 m"), or a product noun. The
+ * "A user" / "A unit" yew-sound exception doesn't naturally appear here
+ * (those words aren't content nouns in this pipeline), so a flat
+ * orthographic-vowel rule is safe.
+ *
+ * Bug fix #8 (2026-05-23, HP chain-12 audit): rendered "A emi input filter
+ * (1.9 A capacity)" — both the article and the acronym case were wrong.
+ * The acronym-preserving lowercase fix is upstream; this fixes the article.
+ */
+function fixIndefiniteArticle(s: string): string {
+  return s.replace(/\bA\s+([AEIOUaeiou])/g, 'An $1')
 }
 
 /**

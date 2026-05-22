@@ -90,6 +90,11 @@ export function classifyProduct(briefText: string): ProductClassification {
       productClass = 'evtol'
     } else if (lower.match(/satellite|cubesat|orbit|payload|launch/)) {
       productClass = 'aerospace'
+    } else if (lower.match(/\bcnc\b|machining cent(?:re|er)|\b5[- ]?axis\b|\bvmc\b|vertical machining/)) {
+      // 2026-05-23 (CNC chain audit): CNC briefs often mention "robot
+      // integration" as an EXCLUDED component, which would trip the generic
+      // robotics catch. Match CNC-specific signals first.
+      productClass = 'cnc_machine'
     } else if (lower.match(/robot|actuator|manipulator|autonomous/)) {
       productClass = 'robotics'
     } else if (lower.match(/vehicle|car|drivetrain|crash|homologation/)) {
