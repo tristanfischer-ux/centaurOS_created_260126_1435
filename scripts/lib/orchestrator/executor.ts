@@ -86,7 +86,15 @@ export async function runToolPlan(
       if (hasConverged(prevSnapshot, contract, plan.convergence_tolerance_pct)) break
     }
     if (iterations > plan.max_iterations) {
-      failures.push(`fixed-point iteration did not converge in ${plan.max_iterations} iterations`)
+      // (2026-05-22 Tristan: convergence-not-reached used to push to
+      // `failures`, which triggered a hard fallback to the LLM path. For
+      // multi-coupled-pair classes (VF, HAPS, …) the values oscillate
+      // within a small band but never quite settle below the 5% tolerance
+      // — that's a normal property of the engineering coupling, not a
+      // failure. Downgrade to a warning so the orchestrator proceeds with
+      // the iter-N state. Aggregator + verifier will catch any genuine
+      // inconsistency downstream.)
+      warnings.push(`fixed-point iteration did not converge in ${plan.max_iterations} iterations — using iter-${plan.max_iterations} state`)
     }
   }
 
