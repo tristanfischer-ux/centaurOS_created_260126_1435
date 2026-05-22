@@ -674,8 +674,13 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
         const m = design.modules.find((x: any) => x.module === p.module)
         if (!m) { skipped++; reasons.push(`skip append_to_overview: module "${p.module}" not found`); continue }
         // Build #19c content validator (2026-05-22, Loop 28 Bugs 2 + 3)
-        const appendText = typeof p.text === 'string' ? p.text : ''
+        // Bug #6 universal-prose fix (2026-05-23): Phase 2 LLM patches emit
+        // "A Toray wing assembly word (part …)" with the schema-suffix baked
+        // into appended prose. Strip " word" ONLY when followed by " (" so
+        // legitimate "listed on this word." prose is preserved.
+        let appendText = typeof p.text === 'string' ? p.text : ''
         if (appendText) {
+          appendText = appendText.replace(/(\w)\s+word(\s*\()/gi, '$1$2')
           const cv = validateProseContent(appendText)
           if (!cv.ok) {
             skipped++; reasons.push(`REJECT append_to_overview ${p.module}: forbidden phrase (${cv.pattern_name}) "${cv.matched_phrase}" — contradicts tool output`)
@@ -3452,6 +3457,10 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   } catch (err) {
     console.error(`[chain] design decisions review build failed: ${(err as Error).message}`)
   }
+  // Final-pass " word" suffix strip — Phase 2 LLM specialists sometimes re-emit
+  // name_human with the schema-suffix after the post-orchestrator strip ran.
+  // Catches whatever later stages reintroduced before render reads state.
+  try { stripWordSuffixFromDesign((state as any).design) } catch {}
   const statePath = resolve(outDir, 'state.json')
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   logAction({ step: 'save_state', path: statePath, accepted: allPassed, acceptance_status: acceptanceStatus, decision_count: designDecisions.length })
