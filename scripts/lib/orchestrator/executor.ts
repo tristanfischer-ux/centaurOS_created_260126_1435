@@ -146,8 +146,16 @@ function snapshotForConvergence(c: ContractInProgress): ContractInProgress {
   }
 }
 
-/** Returns true if max relative change across all quantities is below
- *  the tolerance. Missing or added quantities count as "changed". */
+/** Returns true if max relative change across COMMON quantities is below
+ *  the tolerance. New quantities added between iterations count as
+ *  PROGRESS (a coupled tool ran and produced output for the first time),
+ *  not as non-convergence. Removed quantities still signal instability.
+ *
+ *  (2026-05-22 Tristan: previously, ANY new key flagged the iteration
+ *  as non-converged. With VF's 2 coupled pairs (4 tools), tool A's
+ *  output in iter N enables tool B to compute a new field in iter N+1
+ *  — that's a genuine fixed-point step, not divergence. Returning
+ *  "not converged" trapped VF in the LLM-fallback path.) */
 function hasConverged(
   prev: ContractInProgress,
   curr: ContractInProgress,
@@ -157,11 +165,12 @@ function hasConverged(
   const prevKeys = new Set(Object.keys(prev.quantities))
   const currKeys = new Set(Object.keys(curr.quantities))
 
-  // Added/removed quantities = not converged
-  if (prevKeys.size !== currKeys.size) return false
+  // Removed quantities = a tool retracted output → unstable, not converged
   for (const k of prevKeys) if (!currKeys.has(k)) return false
 
-  // Numeric comparison
+  // Numeric comparison on COMMON keys only. New keys (in curr but not
+  // prev) are accepted as one-time progress on this iteration; they
+  // will be checked for stability on the NEXT iteration.
   for (const k of prevKeys) {
     const a = prev.quantities[k].value
     const b = curr.quantities[k].value
