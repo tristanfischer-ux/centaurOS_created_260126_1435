@@ -55,12 +55,30 @@ export interface ToolsUsedPage {
   title: string
   /** Intro paragraph explaining what this page is. */
   intro: string
-  /** Per-tool attribution. */
+  /** Per-tool attribution — tools that COMPUTED claims for this design. */
   tools: ToolAttributionEntry[]
-  /** Tools that contributed no claims (registered but not used). */
-  unused_tool_ids: string[]
+  /** Tools that are AVAILABLE in the orchestrator's registry but did NOT
+   *  run for this design (either the class plan didn't include them, or
+   *  they were declared optional and weren't applicable). Surfaced on
+   *  the report so the reader sees the FULL inventory of engineering
+   *  tools the system can use, not just the ones invoked this time. */
+  available_but_unused: Array<{ tool_id: string; name: string; version: string; license: License; source_url: string; domain: string; what_it_does: string }>
   /** Disclaimer text shown at end of page. */
   disclaimer: string
+}
+
+/** Human-readable description per tool_id for the "available but unused"
+ *  section. Per Tristan 2026-05-22: "end of the report you can have a
+ *  summary saying which tools are available and what they do." */
+const TOOL_DESCRIPTIONS: Record<string, string> = {
+  'pybamm:cell-sizing': 'Doyle-Fuller-Newman cell physics simulation: cell sizing, voltage profile, capacity fade, internal resistance, thermal dissipation.',
+  'coolprop:refrigerant-properties': 'Thermophysical properties (Tsat, Psat, density, enthalpy, latent heat, specific heat) for 150+ fluids — refrigerants, coolants, water, ammonia.',
+  'ngspice:pcs-simulation': 'SPICE-level transient + DC circuit simulation. Used for PCS dissipation, DC-link ripple, switching losses, filter sizing.',
+  'pandapower:grid-integration': 'AC/DC power flow + short-circuit analysis. Computes transformer sizing, PCC fault level, voltage profiles, harmonic distortion.',
+  'opendss:feeder-flow': 'Distribution feeder load flow (EPRI). Voltage profile along radial/meshed feeders, time-series analysis, EN 50160 compliance check.',
+  'cantera:thermochemistry': 'Chemical thermodynamics + kinetics. Combustion equilibrium, refrigerant cycle thermo, fermentation kinetics.',
+  'octopart:parts-lookup': 'Real-time parts catalog: availability, pricing, lead times across 22+ component distributors (Digi-Key, Mouser, Farnell).',
+  'iec-standards:lookup': 'Mandatory regulatory standards per (class, region). IEC 62619, UL 9540, NFPA 855, ENA G99, EN 14825, etc.',
 }
 
 const DEFAULT_INTRO = (
@@ -125,11 +143,35 @@ export function buildToolsUsedPage(contract: ContractInProgress): ToolsUsedPage 
     if (!entry.tool_name) entry.tool_name = humaniseToolId(entry.tool_id)
   }
 
+  // Build #18m: list tools that are AVAILABLE in the registry but did
+  // NOT contribute claims to this design. The reader sees the FULL
+  // engineering-tool inventory and which subset was applicable.
+  const used_tool_ids = new Set(byTool.keys())
+  const available_but_unused: ToolsUsedPage['available_but_unused'] = []
+  try {
+    // Lazy import to avoid module cycle
+    const { listTools } = require('./registry') as typeof import('./registry')
+    for (const [tool_id, tool] of listTools()) {
+      if (used_tool_ids.has(tool_id)) continue
+      available_but_unused.push({
+        tool_id,
+        name: tool.name,
+        version: tool.version,
+        license: tool.license,
+        source_url: tool.source_url,
+        domain: tool.domain,
+        what_it_does: TOOL_DESCRIPTIONS[tool_id] ?? '(no description registered)',
+      })
+    }
+  } catch {
+    // Registry not available — skip the unused-tools section
+  }
+
   return {
     title: 'COMPUTATIONS BY VERIFIED ENGINEERING TOOLS',
     intro: DEFAULT_INTRO,
     tools: Array.from(byTool.values()).sort((a, b) => a.tool_id.localeCompare(b.tool_id)),
-    unused_tool_ids: [],
+    available_but_unused,
     disclaimer: DEFAULT_DISCLAIMER,
   }
 }
@@ -181,6 +223,20 @@ export function renderToolsUsedPageAsText(page: ToolsUsedPage): string {
       lines.push(`      ... and ${tool.claims.length - 12} more claims`)
     }
     lines.push('')
+  }
+  // Build #18m: render the available-but-unused section
+  if (page.available_but_unused.length > 0) {
+    lines.push('')
+    lines.push('TOOLS AVAILABLE IN THE ORCHESTRATOR BUT NOT USED FOR THIS DESIGN')
+    lines.push('(these tools are wired in and can be invoked for other product classes')
+    lines.push(' or for additional analyses; this design did not require their output)')
+    lines.push('')
+    for (const t of page.available_but_unused) {
+      lines.push(`  ${t.name} v${t.version}  (${t.license}, ${t.domain})`)
+      lines.push(`    ${t.source_url}`)
+      lines.push(`    ${t.what_it_does}`)
+      lines.push('')
+    }
   }
   lines.push(page.disclaimer)
   return lines.join('\n')
