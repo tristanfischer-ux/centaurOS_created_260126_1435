@@ -95,6 +95,23 @@ export function classifyProduct(briefText: string): ProductClassification {
       // integration" as an EXCLUDED component, which would trip the generic
       // robotics catch. Match CNC-specific signals first.
       productClass = 'cnc_machine'
+    } else if (lower.match(/wind turbine|onshore wind|offshore wind|\bhawt\b|\bvawt\b|rotor blade|yaw drive|pitch system/)) {
+      // 2026-05-23 (wind turbine L4 audit): wind turbine briefs contain
+      // "rotor blades" + "actuators" + "pitch" — all trip the generic
+      // robotics catch. Need explicit wind-turbine pattern first.
+      productClass = 'wind_turbine'
+    } else if (lower.match(/solar inverter|pv inverter|string inverter|central inverter|1500\s*v\s*dc|photovoltaic inverter/)) {
+      // 2026-05-23: solar inverter briefs mention "active front end" + power
+      // electronics — should map to solar_inverter, not consumer_electronics.
+      productClass = 'solar_inverter'
+    } else if (lower.match(/electrolyser|electrolyzer|\bpem stack\b|hydrogen production|h2\s*\/?h2 stack|green hydrogen/)) {
+      productClass = 'h2_electrolyser'
+    } else if (lower.match(/\bauv\b|autonomous underwater|subsea inspection|underwater vehicle|rov\b/)) {
+      productClass = 'auv'
+    } else if (lower.match(/dc charger|dc fast charger|ev charger|ccs2|ultra[- ]?rapid/)) {
+      productClass = 'ev_charger'
+    } else if (lower.match(/bioreactor|fermenter|single[- ]?use bag|cell culture vessel|sterile manufacture/)) {
+      productClass = 'bioreactor'
     } else if (lower.match(/robot|actuator|manipulator|autonomous/)) {
       productClass = 'robotics'
     } else if (lower.match(/vehicle|car|drivetrain|crash|homologation/)) {
