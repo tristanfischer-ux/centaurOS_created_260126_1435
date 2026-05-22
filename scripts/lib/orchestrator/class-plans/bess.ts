@@ -44,7 +44,7 @@ const stepPybamm: ToolStep = {
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { cell_count: number; nameplate_capacity_kwh: number; thermal_dissipation_at_05c_w: number }
-    const prov = (field: string) => ({ source: 'tool:pybamm:cell-sizing' as const, tool_id: 'pybamm:cell-sizing', tool_version: '23.5-stub', tool_license: 'BSD-3-Clause' as const, tool_source_url: 'github.com/pybamm-team/PyBaMM', invocation_output_field: field, duration_ms: 0 })
+    const prov = (field: string) => ({ source: 'tool:pybamm:cell-sizing' as const, tool_id: 'pybamm:cell-sizing', tool_version: '26.4.3', tool_license: 'BSD-3-Clause' as const, tool_source_url: 'github.com/pybamm-team/PyBaMM', invocation_output_field: field, duration_ms: 0 })
     return {
       ...c,
       quantities: {
@@ -63,7 +63,7 @@ const stepCoolProp: ToolStep = {
   input_from_contract: () => ({ fluid: 'r513a', temperature_c: 35 }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { latent_heat_kj_kg: number; cp_liquid_kj_kgk: number }
-    const prov = (f: string) => ({ source: 'tool:coolprop:refrigerant-properties' as const, tool_id: 'coolprop:refrigerant-properties', tool_version: '6.4.3-stub', tool_license: 'MIT' as const, tool_source_url: 'coolprop.org', invocation_output_field: f, duration_ms: 0 })
+    const prov = (f: string) => ({ source: 'tool:coolprop:refrigerant-properties' as const, tool_id: 'coolprop:refrigerant-properties', tool_version: '7.2.0', tool_license: 'MIT' as const, tool_source_url: 'coolprop.org', invocation_output_field: f, duration_ms: 0 })
     return {
       ...c,
       quantities: {
@@ -81,7 +81,7 @@ const stepNgspice: ToolStep = {
   input_from_contract: () => ({ rated_power_kw: 1000, dc_bus_voltage_v: 800, ac_output_voltage_v: 400, topology: 'sic_two_level' as const }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { dissipated_power_kw: number; inverter_efficiency_pct: number; ac_continuous_current_a: number; dc_link_ripple_pct: number }
-    const prov = (f: string) => ({ source: 'tool:ngspice:pcs-simulation' as const, tool_id: 'ngspice:pcs-simulation', tool_version: '41-stub', tool_license: 'GPL-3.0' as const, tool_source_url: 'ngspice.sourceforge.io', invocation_output_field: f, duration_ms: 0 })
+    const prov = (f: string) => ({ source: 'tool:ngspice:pcs-simulation' as const, tool_id: 'ngspice:pcs-simulation', tool_version: '46', tool_license: 'GPL-3.0' as const, tool_source_url: 'ngspice.sourceforge.io', invocation_output_field: f, duration_ms: 0 })
     return {
       ...c,
       quantities: {
@@ -107,9 +107,28 @@ const stepPandaPower: ToolStep = {
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { transformer_rating_kva: number; transformer_mass_kg: number; pcc_short_circuit_ka: number }
-    const prov = (f: string) => ({ source: 'tool:pandapower:grid-integration' as const, tool_id: 'pandapower:grid-integration', tool_version: '2.13-stub', tool_license: 'BSD-3-Clause' as const, tool_source_url: 'github.com/e2nIEE/pandapower', invocation_output_field: f, duration_ms: 0 })
+    const prov = (f: string) => ({ source: 'tool:pandapower:grid-integration' as const, tool_id: 'pandapower:grid-integration', tool_version: '3.4.0', tool_license: 'BSD-3-Clause' as const, tool_source_url: 'github.com/e2nIEE/pandapower', invocation_output_field: f, duration_ms: 0 })
+    // Build #18l: feed pandapower's transformer rating into the BoM via
+    // a macro_assembly_price. The renderer's macro-override (Build #4)
+    // matches step_up_transformer word names by ≥66% token overlap and
+    // uses the macro's total_gbp as the BoM line total. £12/kVA for a
+    // 1 MVA-class dry-type MV transformer is industry-typical.
+    const kva = out.transformer_rating_kva
+    const transformerMacro = {
+      word_name: 'step_up_transformer',
+      unit_price_gbp: 12,
+      dimension_basis: 'kw_power' as const,
+      dimension_value: kva,
+      total_gbp: 12 * kva,
+      source_detail: `pandapower-derived: £12/kVA × ${kva} kVA = £${(12 * kva).toLocaleString()} (dry-type Dyn11 MV step-up, 6% impedance)`,
+    }
     return {
       ...c,
+      // Build #18l: append transformer macro if not already present.
+      macro_assembly_prices: [
+        ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'step_up_transformer'),
+        transformerMacro,
+      ],
       quantities: {
         ...c.quantities,
         transformer_rating_kva: { value: out.transformer_rating_kva, unit: 'kVA', family: 'power', basis: 'rated', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('transformer_rating_kva') },
