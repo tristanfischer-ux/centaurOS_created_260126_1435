@@ -229,6 +229,49 @@ function logAction(record: Record<string, any>): void {
   logger.log({ step_name: step, action_type: actionType, ...record })
 }
 
+/**
+ * Universal " word" suffix strip on the design tree.
+ *
+ * Many emitters historically stored `name_human` as "X word" (a template
+ * artefact). The Word()-level strip and cc()-level strip in vertical_farm.ts
+ * cleaned VF, but BESS (deterministic-emitter.ts) and any future emitter
+ * that doesn't go through those helpers still emits raw " word" suffixes.
+ * The LLM reviewer then copies them verbatim into prose, producing visible
+ * text like "A Bilco deflagration vent panel word (part DV-4, …)".
+ *
+ * Apply once at the design level (post orchestrator OR best-of-N LLM) so
+ * EVERY downstream consumer (reviewers, narrator, BoM, PDF renderer) sees
+ * clean data. Universal across all 35 emitters.
+ *
+ * (2026-05-22 Tristan VF + BESS audit: " word" appeared in both runs even
+ * after the per-emitter strips; the universal fix is at this chain layer.)
+ */
+function stripWordSuffixFromDesign(design: any): void {
+  if (!design || typeof design !== 'object') return
+  const stripIfStr = (obj: any, key: string): void => {
+    const v = obj?.[key]
+    if (typeof v === 'string') {
+      const cleaned = v.replace(/\s+word$/i, '').trim()
+      if (cleaned !== v) obj[key] = cleaned
+    }
+  }
+  const modules = Array.isArray(design?.modules) ? design.modules : []
+  for (const m of modules) {
+    stripIfStr(m, 'name_human')
+    const subs = Array.isArray(m?.sub_modules) ? m.sub_modules : []
+    for (const sm of subs) {
+      stripIfStr(sm, 'name_human')
+      const words = Array.isArray(sm?.words) ? sm.words : []
+      for (const w of words) {
+        stripIfStr(w, 'name_human')
+        if (w?.content_character && typeof w.content_character === 'object') {
+          stripIfStr(w.content_character, 'name_human')
+        }
+      }
+    }
+  }
+}
+
 function summarise(modules: any[]): { modules: number; sub_modules: number; words: number; dp_keys: number; grammar_links: number; cross_links_unused?: number; overview_chars: number } {
   let sm = 0, w = 0, dp = 0, gl = 0, oc = 0
   for (const m of modules) {
@@ -2115,6 +2158,7 @@ async function main() {
     if (orchResult.ok && orchResult.design) {
       design = orchResult.design
       orchestratorRan = true
+      stripWordSuffixFromDesign(design)
 
       // Bug fix #15 (2026-05-22): per-emitter `brief_overview_prose` often
       // leaves `target_customers` and `why_now` as empty strings (every
@@ -2324,6 +2368,7 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   scored.sort((a, b) => b.score - a.score)
   const best = scored[0]
   design = best.design
+  stripWordSuffixFromDesign(design)
   console.error(`[chain] Generator best-of-${N_CANDIDATES}: picked candidate with score ${best.score.toFixed(3)} (${best.reasons.join(', ')})`)
   writeFileSync(resolve(outDir, '4-generator.raw.txt'), best.raw)
   writeFileSync(resolve(outDir, '4-generator.json'), JSON.stringify(design, null, 2))
