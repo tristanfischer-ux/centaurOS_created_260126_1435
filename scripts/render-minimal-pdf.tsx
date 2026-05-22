@@ -27,6 +27,7 @@ import { getClassStandards, mergeBriefAndClassStandards, type RegulatoryStandard
 import { getClassHazards, computeHazardRPN, type ClassHazard } from '../src/lib/pdf-engine-v2/class-hazards'
 import { resolvePriceBand, type PriceBand, type PriceBandVerdict } from '../src/lib/pdf-engine-v2/class-price-bands'
 import { resolveCostStack, computeCostStack, type CostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
+import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
 
@@ -5870,9 +5871,38 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
               ) : null}
             </View>
 
+            {/* Natural-language narrative for the reader (Tristan 2026-05-22).
+                Rendered BEFORE the academic Paper/Physics blocks so a non-
+                specialist can understand what the tool does without parsing
+                citation strings. See src/lib/pdf-engine-v2/tool-narratives.ts. */}
+            {(() => {
+              const narr = getToolNarrative(tool.tool_id)
+              if (!narr) return null
+              return (
+                <View style={{ marginTop: 4, marginBottom: 8, padding: 8, backgroundColor: '#ffffff', borderRadius: 3, borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
+                  <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What it does. </Text>
+                    {narr.description}
+                  </Text>
+                  <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Origin. </Text>
+                    {narr.origin}
+                  </Text>
+                  <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>What the results mean. </Text>
+                    {narr.results_interpretation}
+                  </Text>
+                  <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>
+                    <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>How it was used here. </Text>
+                    {narr.usage_pattern}
+                  </Text>
+                </View>
+              )
+            })()}
+
             {tool.tool_paper ? (
-              <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 2 }}>
-                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Paper: </Text>
+              <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5, marginBottom: 2 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Reference paper / standard: </Text>
                 {tool.tool_paper}
                 {tool.tool_doi ? (
                   <Text style={{ color: ACCENT_SOFT }}>{`  · DOI:${tool.tool_doi}`}</Text>
@@ -5881,8 +5911,8 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
             ) : null}
 
             {tool.physics_basis ? (
-              <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 2 }}>
-                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Physics: </Text>
+              <Text style={{ fontSize: 8.5, color: MUTED, lineHeight: 1.5, marginBottom: 2 }}>
+                <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>Underlying math: </Text>
                 {tool.physics_basis}
                 {tool.physics_paper_doi ? (
                   <Text style={{ color: ACCENT_SOFT }}>{`  · DOI:${tool.physics_paper_doi}`}</Text>
