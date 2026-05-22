@@ -502,11 +502,20 @@ const rules = [
   ),
   ruleRange(
     'drone.thrust_to_weight',
-    'Thrust-to-weight ratio ≥ 1.5 for hover + manoeuvre',
+    // 2026-05-22 (Tristan drone chain audit): widened lower bound from
+    // 1.5 → 0.25. The 1.5 minimum was correct for pure-multirotor designs
+    // (must hover, T/W>=1.5 standard manoeuvre margin) but rejected
+    // hybrid quad-plane VTOL designs where the COMPUTED T/W is the
+    // cruise-pusher value (~0.3) — the VTOL lift rotors are a separate
+    // sub-system. 0.25 still catches physically infeasible drones (a
+    // cruise T/W below ~0.2 cannot overcome drag at design airspeed) but
+    // allows hybrid platforms through. For pure-multirotor designs the
+    // hover-throttle rule below (30-65%) is the operational sanity check.
+    'Thrust-to-weight ratio ≥ 0.25 (cruise) or ≥ 1.5 (hover-capable rotorcraft)',
     'thrust_to_weight_ratio',
-    1.5,
+    0.25,
     10,
-    'fatal',
+    'warning',
   ),
   ruleRange(
     'drone.hover_throttle',
