@@ -159,6 +159,17 @@ def pcs_dc_operating_point(rated_kw: float, dc_bus_v: float, efficiency: float) 
     output = run_ngspice(netlist)
     op_voltage_match = re.search(r"V\(dc_in\)\s*=\s*([\d\.\-+eE]+)", output)
     op_voltage_v = float(op_voltage_match.group(1)) if op_voltage_match else None
+    # Build #18p: per Loop 22 physics critic — the LCL filter current rating
+    # must match the actual AC continuous current. Critic flagged a 100A LCL
+    # filter rating against 1443A continuous = 14× under-rated. Filter must
+    # carry continuous AC × 1.15 safety per IEC 61800-9-2.
+    lcl_filter_rating_a = round(ac_continuous_a * 1.15, 0)
+    # DC contactor rating — must handle DC continuous + 30% transient
+    dc_contactor_rating_a = round(dc_continuous_a * 1.30, 0)
+    # DC breaker rating — coordination with contactor + arc-flash margin
+    dc_breaker_rating_a = round(dc_continuous_a * 1.50, 0)
+    # AC contactor rating
+    ac_contactor_rating_a = round(ac_continuous_a * 1.30, 0)
     return {
         "inverter_efficiency_pct": round(efficiency * 100.0, 2),
         "dissipated_power_kw": round(dissipated_kw, 2),
@@ -170,6 +181,11 @@ def pcs_dc_operating_point(rated_kw: float, dc_bus_v: float, efficiency: float) 
         "ac_thd_pct": 3.5,
         "filter_inductor_min_uh": round(50 + 10 * (rated_kw / 100), 1),
         "filter_capacitor_min_uf": round(200 + 0.5 * rated_kw, 1),
+        # Build #18p: protection-coordination ratings
+        "lcl_filter_rating_a": lcl_filter_rating_a,
+        "dc_contactor_rating_a": dc_contactor_rating_a,
+        "dc_breaker_rating_a": dc_breaker_rating_a,
+        "ac_contactor_rating_a": ac_contactor_rating_a,
         "_ngspice_op_voltage_v": op_voltage_v,
     }
 

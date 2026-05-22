@@ -43,16 +43,26 @@ const stepPybamm: ToolStep = {
     ambient_temp_c: 25,
   }),
   contract_update: (c: ContractInProgress, output: any) => {
-    const out = output as { cell_count: number; nameplate_capacity_kwh: number; thermal_dissipation_at_05c_w: number }
+    const out = output as {
+      cell_count: number
+      nameplate_capacity_kwh: number
+      thermal_dissipation_at_05c_w: number
+      // Build #18p: derived integer-clean pack topology + BMS sizing
+      rack_count: number
+      cells_per_rack: number
+      cell_mass_kg: number
+      total_cell_mass_kg: number
+      bms_slave_count: number
+      bms_channels_per_slave: number
+      bms_total_channels: number
+      system_thermal_dissipation_at_05c_kw: number
+      cold_plate_total_capacity_min_kw: number
+      cold_plate_per_rack_min_capacity_kw: number
+    }
     const prov = (field: string) => ({ source: 'tool:pybamm:cell-sizing' as const, tool_id: 'pybamm:cell-sizing', tool_version: '26.4.3', tool_license: 'BSD-3-Clause' as const, tool_source_url: 'github.com/pybamm-team/PyBaMM', invocation_output_field: field, duration_ms: 0 })
     // Build #18n-fix1 (2026-05-22): feed pybamm's cell_count into BoM
     // via macro_assembly_price. word_name must match the design's
-    // actual emitted word — Loop 22 emits 'lfp_prismatic_cell' (not
-    // 'battery_cell'). With tokens=['lfp','prismatic','cell'] a
-    // candidate of 'lfp_prismatic_cell' scores 1.0 (exact). £85/cell
-    // installed = CATL CB-280Ah-A-50 trade + module integration
-    // labour @ 0.25 h/cell × £40/h + busbar/sense wiring at 8%
-    // material markup. 2026 market for 280 Ah LFP in £20k-cell qty.
+    // actual emitted word — Loop 22 emits 'lfp_prismatic_cell'.
     const cellMacro = {
       word_name: 'lfp_prismatic_cell',
       unit_price_gbp: 85,
@@ -61,16 +71,36 @@ const stepPybamm: ToolStep = {
       total_gbp: 85 * out.cell_count,
       source_detail: `pybamm-derived: £85/cell × ${out.cell_count.toLocaleString()} cells = £${(85 * out.cell_count).toLocaleString()} (CATL CB-280Ah-A-50 + module integration)`,
     }
+    // Build #18p: macro for BMS slave boards. The word name matches the
+    // bms_slave_module that Loop 21 flagged as macro_assembly_miss.
+    // £45/board for ISL94212-class 12-channel BMS slave with isolation.
+    const bmsSlaveMacro = {
+      word_name: 'bms_slave_module',
+      unit_price_gbp: 45,
+      dimension_basis: 'count' as const,
+      dimension_value: out.bms_slave_count,
+      total_gbp: 45 * out.bms_slave_count,
+      source_detail: `pybamm-derived: £45/slave × ${out.bms_slave_count} slaves = £${(45 * out.bms_slave_count).toLocaleString()} (ISL94212 12-ch isolated BMS slave; ${out.bms_total_channels} total channels for ${out.cell_count} cells)`,
+    }
     return {
       ...c,
       macro_assembly_prices: [
-        ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'lfp_prismatic_cell'),
+        ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'lfp_prismatic_cell' && m.word_name !== 'bms_slave_module'),
         cellMacro,
+        bmsSlaveMacro,
       ],
       quantities: {
         ...c.quantities,
         cell_count: { value: out.cell_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'cell', uncertainty_pct: 2.5, temporal_resolution_s: null, condition: null, provenance: prov('cell_count') },
         nameplate_capacity_kwh: { value: out.nameplate_capacity_kwh, unit: 'kWh', family: 'energy', basis: 'nameplate', scope: 'system', uncertainty_pct: 1.0, temporal_resolution_s: null, condition: 'BoL, 25°C', provenance: prov('nameplate_capacity_kwh') },
+        // Build #18p: derived constants — design MUST use these literally
+        rack_count: { value: out.rack_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'pack', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('rack_count') },
+        cells_per_rack: { value: out.cells_per_rack, unit: '', family: 'dimensionless', basis: 'rated', scope: 'rack', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('cells_per_rack') },
+        total_cell_mass_kg: { value: out.total_cell_mass_kg, unit: 'kg', family: 'mass', basis: 'continuous', scope: 'pack', uncertainty_pct: 2, temporal_resolution_s: null, condition: 'cells only, exc. racks/wiring', provenance: prov('total_cell_mass_kg') },
+        bms_slave_count: { value: out.bms_slave_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'pack', uncertainty_pct: 0, temporal_resolution_s: null, condition: '12-ch slave', provenance: prov('bms_slave_count') },
+        bms_total_channels: { value: out.bms_total_channels, unit: '', family: 'dimensionless', basis: 'rated', scope: 'pack', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('bms_total_channels') },
+        cold_plate_total_capacity_min_kw: { value: out.cold_plate_total_capacity_min_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'sized for cell dissipation × 1.25', provenance: prov('cold_plate_total_capacity_min_kw') },
+        cold_plate_per_rack_min_capacity_kw: { value: out.cold_plate_per_rack_min_capacity_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'rack', uncertainty_pct: 10, temporal_resolution_s: null, condition: null, provenance: prov('cold_plate_per_rack_min_capacity_kw') },
       },
     }
   },
@@ -136,7 +166,18 @@ const stepNgspice: ToolStep = {
   feeds_into: ['coolprop:refrigerant-properties'] as string[],
   input_from_contract: () => ({ rated_power_kw: 1000, dc_bus_voltage_v: 800, ac_output_voltage_v: 400, topology: 'sic_two_level' as const }),
   contract_update: (c: ContractInProgress, output: any) => {
-    const out = output as { dissipated_power_kw: number; inverter_efficiency_pct: number; ac_continuous_current_a: number; dc_link_ripple_pct: number }
+    const out = output as {
+      dissipated_power_kw: number
+      inverter_efficiency_pct: number
+      ac_continuous_current_a: number
+      dc_continuous_current_a: number
+      dc_link_ripple_pct: number
+      // Build #18p: protection-coordination ratings
+      lcl_filter_rating_a: number
+      dc_contactor_rating_a: number
+      dc_breaker_rating_a: number
+      ac_contactor_rating_a: number
+    }
     const prov = (f: string) => ({ source: 'tool:ngspice:pcs-simulation' as const, tool_id: 'ngspice:pcs-simulation', tool_version: '46', tool_license: 'GPL-3.0' as const, tool_source_url: 'ngspice.sourceforge.io', invocation_output_field: f, duration_ms: 0 })
     // Build #18n: feed ngspice efficiency into PCS pricing.
     // Sungrow SC1000UD-MV SiC two-level @ 1 MW = £80k baseline; £80/kW for
@@ -163,7 +204,13 @@ const stepNgspice: ToolStep = {
         inverter_dissipated_kw: { value: out.dissipated_power_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'full load', provenance: prov('dissipated_power_kw') },
         inverter_efficiency_pct: { value: out.inverter_efficiency_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 0.5, temporal_resolution_s: null, condition: 'A2/W35', provenance: prov('inverter_efficiency_pct') },
         ac_continuous_current_a: { value: out.ac_continuous_current_a, unit: 'A', family: 'current', basis: 'continuous', scope: 'system', uncertainty_pct: 1, temporal_resolution_s: null, condition: 'AC PCS output', provenance: prov('ac_continuous_current_a') },
+        dc_continuous_current_a: { value: out.dc_continuous_current_a, unit: 'A', family: 'current', basis: 'continuous', scope: 'system', uncertainty_pct: 1, temporal_resolution_s: null, condition: 'DC bus to PCS', provenance: prov('dc_continuous_current_a') },
         dc_link_ripple_pct: { value: out.dc_link_ripple_pct, unit: '%', family: 'dimensionless', basis: 'continuous', scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null, condition: null, provenance: prov('dc_link_ripple_pct') },
+        // Build #18p: protection-coordination ratings (design MUST use these literally for filter/contactor/breaker sizing)
+        lcl_filter_rating_a: { value: out.lcl_filter_rating_a, unit: 'A', family: 'current', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'AC continuous × 1.15 per IEC 61800-9-2', provenance: prov('lcl_filter_rating_a') },
+        dc_contactor_rating_a: { value: out.dc_contactor_rating_a, unit: 'A', family: 'current', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'DC continuous × 1.30', provenance: prov('dc_contactor_rating_a') },
+        dc_breaker_rating_a: { value: out.dc_breaker_rating_a, unit: 'A', family: 'current', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'DC continuous × 1.50 (arc-flash coord)', provenance: prov('dc_breaker_rating_a') },
+        ac_contactor_rating_a: { value: out.ac_contactor_rating_a, unit: 'A', family: 'current', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'AC continuous × 1.30', provenance: prov('ac_contactor_rating_a') },
       },
     }
   },

@@ -145,6 +145,52 @@ def real_pybamm_voltage_profile(chemistry: str, c_rate: float = 0.5) -> dict:
     }
 
 
+CELL_MASS_KG_BY_CHEMISTRY = {
+    "lfp": 5.3,   # CATL CB-280Ah-A-50, EVE 280Ah, others — 280 Ah prismatic class
+    "nmc": 4.7,   # higher energy density per kg
+    "lto": 5.9,   # higher mass per kWh
+}
+
+# BMS slave board channels (industry standard 12 or 16; we use 12 = lowest-risk)
+BMS_CHANNELS_PER_SLAVE = 12
+
+# Target cells per rack — most container-class BESS designs use 280-300 cells
+# per rack (one or two 24V battery modules per rack × 7-8 modules). Round
+# rack_count to nearest integer that divides cell_count exactly.
+TARGET_CELLS_PER_RACK = 280
+
+
+def derive_pack_topology(cell_count_raw: int) -> tuple[int, int, int]:
+    """
+    Build #18p: return (rack_count, cells_per_rack, cell_count_rounded) such
+    that cell_count_rounded = rack_count × cells_per_rack EXACTLY (no orphans).
+
+    Algorithm:
+      1. Start with rack_count ≈ cell_count_raw / TARGET_CELLS_PER_RACK
+      2. Search rack_count ± 4 for an integer that divides into cell_count_raw
+         with smallest remainder; round cell_count_raw UP to that multiple
+         (so we never under-deliver capacity).
+
+    Returns a configuration that the LLM emission layer MUST use literally;
+    cross-tool consistency rules check rack_count × cells_per_rack == cell_count.
+    """
+    best = None
+    target_racks = max(2, round(cell_count_raw / TARGET_CELLS_PER_RACK))
+    for r in range(max(2, target_racks - 4), target_racks + 5):
+        if r <= 0:
+            continue
+        cells_per_rack = math.ceil(cell_count_raw / r)  # round UP per-rack
+        cell_count_rounded = r * cells_per_rack
+        excess = cell_count_rounded - cell_count_raw
+        cells_per_rack_dist = abs(cells_per_rack - TARGET_CELLS_PER_RACK)
+        # Prefer: lowest excess, then closest to TARGET_CELLS_PER_RACK
+        score = (excess, cells_per_rack_dist)
+        if best is None or score < best[0]:
+            best = (score, r, cells_per_rack, cell_count_rounded)
+    _, r, cells_per_rack, cell_count_rounded = best  # type: ignore[index]
+    return r, cells_per_rack, cell_count_rounded
+
+
 def compute(payload: dict) -> dict:
     chemistry = str(payload.get("cell_chemistry", "lfp")).lower()
     cell_count, theoretical, nameplate = deterministic_cell_count(payload)
@@ -175,10 +221,49 @@ def compute(payload: dict) -> dict:
     r_ohm = sim_result["internal_resistance_mohm"] / 1000.0
     thermal_w = (discharge_current_a ** 2) * r_ohm
 
+    # Build #18p: derive integer-clean pack topology (rack_count × cells_per_rack
+    # must be EXACT to avoid the orphan-cell bug the physics critic flagged in
+    # Loop 22: '5006 / 18 = 278.11 cells per rack — mathematically impossible').
+    rack_count, cells_per_rack, cell_count_rounded = derive_pack_topology(cell_count)
+
+    cell_mass_kg = CELL_MASS_KG_BY_CHEMISTRY.get(chemistry, 5.3)
+    total_cell_mass_kg = round(cell_count_rounded * cell_mass_kg, 1)
+
+    # BMS slave board sizing — addresses Loop 22 critic issue 'only 18 ICs
+    # for 5006 cells'. Each slave handles BMS_CHANNELS_PER_SLAVE cells; we
+    # need ceil(cell_count / channels) boards.
+    bms_slave_count = math.ceil(cell_count_rounded / BMS_CHANNELS_PER_SLAVE)
+    bms_total_channels = bms_slave_count * BMS_CHANNELS_PER_SLAVE
+
+    # System-level thermal — addresses Loop 22 critic issue 'cold plates undersized'.
+    # At rated 1C: I = C-rate × cell_capacity_ah; system dissipation = cells × I² × R
+    # Continuous case = 0.5C (matches what we simulate above)
+    discharge_current_per_cell_a = cell_ah * 0.5
+    system_thermal_dissipation_at_05c_kw = round(
+        (cell_count_rounded * (discharge_current_per_cell_a ** 2) * r_ohm) / 1000.0, 2
+    )
+
+    # Cold plate sizing — 1 plate per rack is a common topology; each plate must
+    # handle the rack's thermal load × 1.25 safety factor. (Real designs may use
+    # multiple smaller plates per rack — we report a minimum aggregate capacity.)
+    cold_plate_total_capacity_min_kw = round(system_thermal_dissipation_at_05c_kw * 1.25, 2)
+    cold_plate_per_rack_min_capacity_kw = round(cold_plate_total_capacity_min_kw / rack_count, 2)
+
     return {
-        "cell_count": cell_count,
+        "cell_count": cell_count_rounded,           # USE THIS (integer-clean) value in design
+        "cell_count_raw_physics": cell_count,        # original physics-derived (with EoL margin)
         "cell_count_theoretical": theoretical,
-        "nameplate_capacity_kwh": round(nameplate, 1),
+        "nameplate_capacity_kwh": round(cell_count_rounded * cell_ah * float(payload.get("cell_voltage_v", 3.2)) / 1000.0, 1),
+        "rack_count": rack_count,
+        "cells_per_rack": cells_per_rack,
+        "cell_mass_kg": cell_mass_kg,
+        "total_cell_mass_kg": total_cell_mass_kg,
+        "bms_slave_count": bms_slave_count,
+        "bms_channels_per_slave": BMS_CHANNELS_PER_SLAVE,
+        "bms_total_channels": bms_total_channels,
+        "system_thermal_dissipation_at_05c_kw": system_thermal_dissipation_at_05c_kw,
+        "cold_plate_total_capacity_min_kw": cold_plate_total_capacity_min_kw,
+        "cold_plate_per_rack_min_capacity_kw": cold_plate_per_rack_min_capacity_kw,
         "capacity_fade_at_6000_cycles_pct": capacity_fade_pct,
         "internal_resistance_mohm": sim_result["internal_resistance_mohm"],
         "thermal_dissipation_at_05c_w": round(thermal_w, 2),
