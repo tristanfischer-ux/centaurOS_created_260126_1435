@@ -135,6 +135,9 @@ export function buildToolsUsedPage(contract: ContractInProgress): ToolsUsedPage 
 }
 
 function isToolSourced(q: TypedQuantity): boolean {
+  // Defensive: legacy quantities don't carry provenance. Treat as
+  // non-tool-sourced so they're skipped in the Tools-Used page.
+  if (!q || typeof q !== 'object' || !q.provenance) return false
   return typeof q.provenance.source === 'string' && q.provenance.source.startsWith('tool:')
 }
 
