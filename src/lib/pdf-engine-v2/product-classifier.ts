@@ -81,7 +81,14 @@ export function classifyProduct(briefText: string): ProductClassification {
   // These are checked AFTER specific classes. "autonomous" appears in both
   // AUV ("autonomous underwater") and robotics — AUV is caught above.
   if (productClass === 'unknown') {
-    if (lower.match(/satellite|cubesat|orbit|payload|launch/)) {
+    // 2026-05-22 (Tristan eVTOL chain audit): eVTOL must match BEFORE the
+    // generic 'aerospace' catch — the eVTOL brief contains "passenger payload"
+    // which trips the aerospace rule and routes the design to a too-generic
+    // class. Distinct eVTOL signals: 'eVTOL' string itself, tilt-rotor /
+    // tiltrotor / UAM / urban air mobility / vertical take-off references.
+    if (lower.match(/\bevtol\b|tilt[- ]?rotor|urban air mobility|\buam\b/)) {
+      productClass = 'evtol'
+    } else if (lower.match(/satellite|cubesat|orbit|payload|launch/)) {
       productClass = 'aerospace'
     } else if (lower.match(/robot|actuator|manipulator|autonomous/)) {
       productClass = 'robotics'
