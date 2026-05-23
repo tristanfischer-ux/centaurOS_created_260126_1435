@@ -186,8 +186,13 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   // closer to the actual Liebherr / Rothe Erde / IMO slewing-ring
   // sizing rule for utility wind class.
   const yawBearingAxialKg = Math.round((nacelleMassKg + totalRotorMassKg) * 2.5)
-  // Yaw drive total: ~0.5% of rated power (industry rule of thumb)
-  const yawTotalKw = Math.max(0.5, ratedPowerKw * 0.005)
+  // 2026-05-23 L30 post-mortem: 0.5% of rated power gave 30 kW for 6 MW —
+  // critic correctly noted that's underpowered for 300t rotating mass
+  // (180t nacelle + 122t rotor) + 155m rotor diameter (gyroscopic effects).
+  // Industry actual for 6 MW utility (Vestas EnVentus V162 6 MW = 8×11kW =
+  // 88kW; SGRE SG 14-222 ~110 kW): 1.2-1.5% of rated power. Use 1.3%
+  // which gives 78 kW for 6 MW class — within band, exceeds critic floor.
+  const yawTotalKw = Math.max(0.5, ratedPowerKw * 0.013)
   const yawMotorCount = ratedPowerKw < 200 ? 2 : ratedPowerKw < 2000 ? 4 : 6
   const yawMotorEachKw = Math.max(0.25, yawTotalKw / yawMotorCount)
   // Generator AC voltage: small wind ≤400 V; utility scale ≥690 V

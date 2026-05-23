@@ -3438,7 +3438,11 @@ registerArchetype('wind_turbine', (brief: any) => {
       // 2026-05-23 L22: renamed step_up_transformer → grid_step_up_transformer to
       // match the new step_up_transformer_word added to wind-turbine.ts emitter.
       // Both semantic tokens "step" + "transformer" appear in candidate.
-      word_name: 'grid_step_up_transformer',
+      // 2026-05-23 L30 revert: but "grid" wasn't in step_up_transformer_word
+      // (strict matcher requires ALL semantic tokens), so macro was orphaned.
+      // Renamed back to step_up_transformer — semantic tokens ["step",
+      // "transformer"] match step_up_transformer_word cleanly.
+      word_name: 'step_up_transformer',
       unit_price_gbp: 18,
       dimension_basis: 'kw_power',
       dimension_value: ratedKw,
