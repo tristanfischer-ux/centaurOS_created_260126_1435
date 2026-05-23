@@ -129,8 +129,13 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   const genVForCurrent = ratedPowerKw < 500 ? 400 : ratedPowerKw < 5000 ? 690 : 3300
   const acContinuousA = q(contract, 'ac_continuous_current_a', (ratedPowerKw * 1000) / (genVForCurrent * Math.sqrt(3) * 0.95))
   const totalMassKg = q(contract, 'total_system_mass_kg', ratedPowerKw * 25 + ratedPowerKw * 18 + hubHeightM * 150)
-  const generatorType = q(contract, 'generator_type', 1)
-  const isOffshore = generatorType >= 2 || /offshore|monopile|jacket|floating|sea/i.test(briefDesc)
+  // 2026-05-23 (post-L16): use deployment_class enum (1=onshore, 2=offshore)
+  // emitted by engineering-contract.ts:3280 wind builder. Falls back to
+  // generator_type for any callers still on the older convention.
+  // ContractInProgress doesn't carry brief; emitter cannot regex — see
+  // drawer_forgeos_decisions_e5760c27e3cb7dbb.
+  const deploymentClass = q(contract, 'deployment_class', q(contract, 'generator_type', 1))
+  const isOffshore = deploymentClass >= 2
 
   // ── 2026-05-23 SCALE-AWARE PHYSICS — Physics Critic-driven additions ──
   // These propagate brief-driven physics into the word modifiers rather
