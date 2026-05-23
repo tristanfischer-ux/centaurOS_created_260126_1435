@@ -3374,9 +3374,9 @@ async function main() {
     physicsCritique: critique,
     // 2026-05-20 iter-9 Step 1: physics repair loop diagnostics (Tristan
     // "design that does work" directive). state.physicsRepair carries the
-    // before/after metrics so the renderer + audit can see whether the
-    // chain successfully auto-resolved physics findings.
-    physicsRepair: physicsRepairResult ?? null,
+    // 2026-05-23 prune #2: state.physicsRepair removed (no reader). The
+    // before/after metrics are already serialised into actions.jsonl via
+    // logAction (line ~2728) — that's the only consumer.
     physicsLedger,
     // 2026-05-19 v5.1 audit fix #1 (Grok + GPT-5.5): persist complianceGate
     // in the INITIAL state object, not just the post-engines re-stamp block.
@@ -3753,11 +3753,10 @@ async function main() {
       recommendations_unknown: Array.isArray(liveState.partRecommendations)
         ? liveState.partRecommendations.filter((r: any) => r.confidence === 'unknown').length
         : 0,
-      // Engine B/C attribution: how many rows have price estimates / reference flags now?
-      with_price_estimate: pv.filter((v: any) => v.price_estimate_gbp != null).length,
-      with_engine_b_class: pv.filter((v: any) => v.engine_b_component_class != null && v.engine_b_component_class !== 'unknown').length,
-      with_engine_c_flag: pv.filter((v: any) => v.engine_c_flag != null).length,
-      engine_c_out_of_range: pv.filter((v: any) => v.engine_c_flag === 'over' || v.engine_c_flag === 'under').length,
+      // 2026-05-23 prune #2: removed with_price_estimate, with_engine_b_class,
+      // with_engine_c_flag, engine_c_out_of_range — none had any reader
+      // (renderer and design-decisions-review only read total/verified/
+      // stripped/uncertain/skipped/recommendations_total/recommendations_unknown).
     }
     // ── G2 Cost-Reality Gate (Tristan v5 directive 2026-05-19): deterministic
     // BoM-total sanity check vs implausibility threshold. Engine C already
@@ -3901,7 +3900,9 @@ async function main() {
                 unpriced_lines: bomUnpricedLines,
               }
             }
-            liveState.cost_reality_band = band_reality
+            // 2026-05-23 prune #2: removed liveState.cost_reality_band — no
+            // reader. The same data lives inside cost_reality_rejection
+            // (which IS read by renderer G2 badge), so we lose nothing.
           }
         }
       } catch (err) {
@@ -3934,7 +3935,9 @@ async function main() {
         }
       }
       liveState.cost_reality_status = cost_reality_status
-      liveState.cost_reality_verdict = cost_reality_verdict
+      // 2026-05-23 prune #2: removed liveState.cost_reality_verdict — no
+      // reader. state.cost_reality.verdict (nested) IS read by worker and
+      // renderer; this top-level shadow was unused.
       liveState.cost_reality_rejection = cost_reality_rejection
       liveState.cost_reality = {
         bom_total_gbp: Math.round(bomTotalGbp),
