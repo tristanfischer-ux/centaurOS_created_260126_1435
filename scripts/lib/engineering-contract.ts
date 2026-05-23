@@ -6867,6 +6867,14 @@ registerArchetype('pemfc', (brief: any) => {
 })
 
 // ---------------- smr -----------------------------
+// Full archetype contract — replaces buildMinimalContract stub. Small
+// Modular Reactor (NuScale VOYGR / Rolls-Royce SMR / GE BWRX-300 /
+// Westinghouse AP300 / X-energy Xe-100 / TerraPower Natrium class).
+// Modelled on bess / wind_turbine pattern. Macro prices grounded in
+// IAEA SMR Book 2024 + DOE Light Water Reactor Sustainability Report +
+// Rolls-Royce SMR Phase A submission. Installed £4M-8M per MWe net
+// (per INSTALLED_ASP_BENCHMARKS; brief drives in MWt, convert via
+// thermal efficiency 33% PWR / 38% BWR / 42% HTGR / 45% MSR).
 registerArchetype('smr', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'MWt').toLowerCase()
@@ -6892,60 +6900,1227 @@ registerArchetype('smr', (brief: any) => {
     }
     return 50  // class default: small-SMR thermal output
   })()
-  const enrichmentPct = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*%\s+enrich/i, 4.95)
+  const enrichmentPct = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*%\s+enrich/i, /haleu/i.test(desc) ? 15 : 4.95)
   const refuellingYears = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:year|yr)\s+(?:refuel|fuel)/i, 5)
-  const fuelType = /haleu/i.test(desc) ? 2 : /trisostructural|triso/i.test(desc) ? 3 : 1
-  const designLifeYears = extractRangeFromDesc(desc, /(\d{2,3})\s*(?:year|yr)\s*(?:life|design)/i, 40)
-  const q1 = {
+  // Fuel form drives a lot of downstream geometry + safety case:
+  //   1 = UO₂ low-enriched (≤5% U-235), conventional PWR/BWR
+  //   2 = HALEU UO₂ (5-19.75%), required for SMRs like X-energy or BWRX-300
+  //   3 = TRISO pebble/compact (HTGR fuel: UO₂ kernels in pyrolytic carbon + SiC layers)
+  //   4 = Sodium-bonded metal fuel (Natrium-class SFR)
+  const fuelType: 1 | 2 | 3 | 4 = /sodium[\s-]?bond|metal\s+fuel|natrium/i.test(desc) ? 4
+    : /trisostructural|triso/i.test(desc) ? 3
+    : /haleu/i.test(desc) || enrichmentPct > 5 ? 2
+    : 1
+  // Coolant class drives reactor vessel pressure, containment design,
+  // thermal efficiency. PWR ~33%, BWR ~38%, HTGR ~42%, MSR/SFR ~45%.
+  const coolantClass: 'pwr' | 'bwr' | 'htgr' | 'msr' | 'sfr' = /molten[\s-]?salt|msr/i.test(desc) ? 'msr'
+    : /sodium|sfr|natrium/i.test(desc) ? 'sfr'
+    : /htgr|gas[\s-]?cooled|helium/i.test(desc) || fuelType === 3 ? 'htgr'
+    : /bwr|boil/i.test(desc) ? 'bwr'
+    : 'pwr'
+  const designLifeYears = extractRangeFromDesc(desc, /(\d{2,3})\s*(?:year|yr)\s*(?:life|design)/i, 60)
+  // Thermal-to-electric efficiency
+  const thermalEfficiency = coolantClass === 'pwr' ? 0.33
+    : coolantClass === 'bwr' ? 0.38
+    : coolantClass === 'htgr' ? 0.42
+    : coolantClass === 'msr' ? 0.44
+    : 0.40  // SFR
+  const ratedMwe = ratedMwt * thermalEfficiency
+  // Reactor vessel — most expensive single forging. Dimensions derived
+  // from rated thermal power. SMR vessels are integral (SG + pressuriser +
+  // riser inside vessel for PWR) so much larger than just core volume.
+  // Empirical scaling from NuScale / Rolls-Royce / BWRX-300 disclosures:
+  //   PWR  integral: ~1.5 m³ vessel per MWt (NuScale 4.6×23m for 250 MWt)
+  //   BWR  integral: ~1.2 m³ vessel per MWt (BWRX-300 reuses ABWR design)
+  //   HTGR: ~6 m³ vessel per MWt (low-power-density helium-cooled)
+  //   MSR:  ~1.0 m³ vessel per MWt (molten salt high density)
+  //   SFR:  ~1.3 m³ vessel per MWt (Natrium-class pool design)
+  const vesselVolumePerMwt = coolantClass === 'pwr' ? 1.5
+    : coolantClass === 'bwr' ? 1.2
+    : coolantClass === 'htgr' ? 6.0
+    : coolantClass === 'msr' ? 1.0
+    : 1.3
+  const vesselVolumeM3 = ratedMwt * vesselVolumePerMwt
+  // Core volume — fuel + moderator only, much smaller than vessel.
+  //   PWR  ~100 MWt/m³ core power density
+  //   BWR  ~55  MWt/m³
+  //   HTGR ~7   MWt/m³ (low density pebble bed / prismatic block)
+  //   MSR  ~25  MWt/m³
+  //   SFR  ~300 MWt/m³
+  const corePowerDensityMwtPerM3 = coolantClass === 'pwr' ? 100
+    : coolantClass === 'bwr' ? 55
+    : coolantClass === 'htgr' ? 7
+    : coolantClass === 'msr' ? 25
+    : 300
+  const coreVolumeM3 = ratedMwt / corePowerDensityMwtPerM3
+  // Vessel as cylinder with L/D = 5 (typical SMR integral design)
+  const vesselLoverD = 5
+  const vesselDiameterM = Math.cbrt((4 * vesselVolumeM3) / (Math.PI * vesselLoverD))
+  const vesselHeightM = vesselDiameterM * vesselLoverD
+  // Vessel design pressure (operating × 1.13 ASME III safety margin)
+  const vesselDesignPressureBar = coolantClass === 'pwr' ? 175
+    : coolantClass === 'bwr' ? 80
+    : coolantClass === 'htgr' ? 70
+    : coolantClass === 'msr' ? 5
+    : 4  // SFR is low-pressure
+  // Hoop stress sizing: t = P × D / (2 × σ_allow). P in MPa, D in m,
+  // σ in MPa, t in m. SA-508 allowable 200 MPa per ASME BPVC Section II.
+  // Plus 6 mm corrosion allowance + 25% manufacturing margin.
+  const designPressureMpa = vesselDesignPressureBar / 10  // bar → MPa
+  const allowableStressMpa = 200
+  const vesselWallThicknessM = (designPressureMpa * vesselDiameterM) / (2 * allowableStressMpa) * 1.25 + 0.006
+  const vesselSurfaceAreaM2 = Math.PI * vesselDiameterM * vesselHeightM + 2 * Math.PI * Math.pow(vesselDiameterM / 2, 2)
+  const vesselMassKg = vesselSurfaceAreaM2 * vesselWallThicknessM * 7850  // SA-508 density
+  // Passive decay-heat removal — NRC/IAEA SMR criteria require passive
+  // (no AC power) for >72 hr; the integral natural-circulation chimney +
+  // ambient air or external water pool. Drives a dimensional gate later.
+  const passiveDecayHeatHr = extractRangeFromDesc(desc, /(\d{2,4})\s*(?:hr|hour)\s*passive/i, 72)
+  // Containment design pressure — must absorb DBA LOCA. PWR: 4-5 bar typical
+  // (steam release), HTGR: <1 bar (no high-pressure steam release), MSR/SFR
+  // intermediate (sodium fires / salt vapour).
+  const containmentDesignPressureBar = coolantClass === 'pwr' ? 4
+    : coolantClass === 'bwr' ? 3
+    : coolantClass === 'htgr' ? 1
+    : coolantClass === 'msr' ? 1.5
+    : 2  // SFR
+  // Neutron economy k-eff at BoC — typical 1.10-1.30 with control rods out.
+  // Reactor MUST shut down (k<1) with all control rods in (shutdown margin).
+  const keffBocWithoutControl = 1.18
+  // Fuel burnup target (GWd/tU) — 45-55 for conventional PWR/BWR; up to
+  // 160 for HALEU SMRs (BWRX-300 design 60-80; X-energy TRISO 165).
+  const burnupGwdT = extractRangeFromDesc(desc, /(\d{2,3})\s*GWd/i,
+    fuelType === 3 ? 160 : fuelType === 2 ? 65 : 50)
+  // Refuelling fraction per outage — modern PWR 1/3 reload; HTGR pebble-bed
+  // is continuous online; SFR ~1/4 reload.
+  const refuellingFraction = coolantClass === 'htgr' ? 0.05 : coolantClass === 'sfr' ? 0.25 : 0.33
+  // Total uranium loading kg (initial core). Energy delivered between
+  // refuellings = P × t × CF; mass of uranium = energy / burnup_GWd_per_t.
+  // (MWt × days × 1e-3 GWd/MWd) / (GWd/tU) = tU; × 1000 = kgU
+  const capacityFactorAssumed = 0.92
+  const fuelLoadingKgU = (ratedMwt * refuellingYears * 365 * capacityFactorAssumed * 1e-3) / burnupGwdT * 1000
+  // Containment dimensions — concrete + steel liner shell
+  const containmentDiameterM = vesselDiameterM * 2.2  // typical headroom for refuelling crane
+  const containmentHeightM = vesselHeightM * 1.8
+  // Total balance-of-plant: turbine + generator + condenser (often outside
+  // the "modular" boundary but counted in installed-ASP envelope).
+  const turbineGeneratorKw = ratedMwe * 1000
+  // Total site mass estimate (vessel + steam generators + pumps + control
+  // rod drives + structural internals + containment).
+  const steamGeneratorMassKg = (coolantClass === 'pwr' || coolantClass === 'bwr') ? vesselMassKg * 0.4 : vesselMassKg * 0.15
+  const reactorInternalsMassKg = vesselMassKg * 0.25
+  // Containment shell — steel liner is thin (6-12 mm), so far less mass
+  // than vessel despite larger surface area. NuScale containment ~250 t
+  // for ~80 t vessel; ratio ~3 but mass dominated by concrete not liner.
+  // Liner is ~25% of vessel mass; rest of containment is concrete.
+  const containmentSteelMassKg = vesselMassKg * 0.6  // containment liner: thin but large area
+  const containmentConcreteM3 = Math.PI * Math.pow(containmentDiameterM / 2, 2) * containmentHeightM * 0.6  // 60% wall fraction
+  const containmentConcreteMassKg = containmentConcreteM3 * 2400  // reinforced concrete density
+
+  const quantities: Record<string, Quantity> = {
     rated_thermal_power_mwt: q(ratedMwt, 'MWt', 'power', 'rated', 'system', 'brief'),
-    fuel_enrichment_pct: q(enrichmentPct, '%', 'dimensionless', 'rated', 'system', 'brief'),
+    rated_electrical_power_mwe: q(ratedMwe, 'MWe', 'power', 'net', 'system', 'calculator', { source_detail: 'thermal × η_th; PWR 33% / BWR 38% / HTGR 42% / MSR 44% / SFR 40%' }),
+    thermal_efficiency: q(thermalEfficiency, '', 'dimensionless', 'rated', 'system', 'physics_constant'),
+    coolant_class: q(coolantClass === 'pwr' ? 1 : coolantClass === 'bwr' ? 2 : coolantClass === 'htgr' ? 3 : coolantClass === 'msr' ? 4 : 5, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=PWR, 2=BWR, 3=HTGR helium-cooled, 4=MSR molten-salt, 5=SFR sodium-cooled' }),
+    fuel_enrichment_pct: q(enrichmentPct, '%', 'dimensionless', 'rated', 'system', 'brief', { source_detail: '≤5% LEU conventional, 5-19.75% HALEU advanced SMR' }),
+    fuel_form: q(fuelType, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=UO₂ LEU, 2=HALEU UO₂, 3=TRISO pebble/compact, 4=sodium-bonded metal' }),
     refuelling_interval_years: q(refuellingYears, 'yr', 'time', 'cycle', 'system', 'brief'),
-    fuel_form: q(fuelType, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'enum: 1=UO2, 2=HALEU UO2, 3=TRISO' }),
     design_life_years: q(designLifeYears, 'yr', 'time', 'lifetime', 'system', 'brief'),
-  } as Record<string, Quantity>
-  return buildMinimalContract('smr', brief, q1, `${ratedMwt} MWt SMR, ${enrichmentPct}% enrichment, ${refuellingYears}-yr refuelling, ${designLifeYears}-yr design life.`)
+    core_power_density_mwt_m3: q(corePowerDensityMwtPerM3, 'MW/m³', 'power', 'rated', 'system', 'physics_constant'),
+    core_volume_m3: q(coreVolumeM3, 'm³', 'volume', 'rated', 'system', 'calculator', { source_detail: 'rated_mwt / core_power_density' }),
+    reactor_vessel_diameter_m: q(vesselDiameterM, 'm', 'length', 'rated', 'system', 'calculator', { source_detail: 'sized from core × 1.7 (integral SG inside vessel) at L/D=3' }),
+    reactor_vessel_height_m: q(vesselHeightM, 'm', 'length', 'rated', 'system', 'calculator'),
+    reactor_vessel_design_pressure_bar: q(vesselDesignPressureBar, 'bar', 'pressure', 'max', 'system', 'physics_constant', { source_detail: 'PWR 15.5 MPa op / 17.5 MPa design; HTGR 7 MPa; MSR <0.5 MPa' }),
+    reactor_vessel_wall_thickness_m: q(vesselWallThicknessM, 'm', 'length', 'rated', 'system', 'calculator', { source_detail: 'hoop-stress sized @ SA-508 200 MPa allowable + ASME III safety factor' }),
+    reactor_vessel_mass_kg: q(vesselMassKg, 'kg', 'mass', 'gross', 'system', 'calculator', { source_detail: 'SA-508 Class 3 forged steel at 7850 kg/m³' }),
+    passive_decay_heat_removal_hours: q(passiveDecayHeatHr, 'h', 'time', 'min', 'system', 'physics_constant', { source_detail: 'NRC SECY-15-0077 / IAEA SSR-2/1 require ≥72 hr passive without AC power' }),
+    containment_design_pressure_bar: q(containmentDesignPressureBar, 'bar', 'pressure', 'max', 'system', 'physics_constant', { source_detail: 'sized for DBA LOCA pressure rise + leak-rate test margin' }),
+    containment_diameter_m: q(containmentDiameterM, 'm', 'length', 'rated', 'system', 'calculator'),
+    containment_height_m: q(containmentHeightM, 'm', 'length', 'rated', 'system', 'calculator'),
+    containment_steel_mass_kg: q(containmentSteelMassKg, 'kg', 'mass', 'gross', 'system', 'calculator', { source_detail: 'inner steel liner; concrete shell separately' }),
+    containment_concrete_mass_kg: q(containmentConcreteMassKg, 'kg', 'mass', 'gross', 'site', 'calculator'),
+    keff_boc_no_control: q(keffBocWithoutControl, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'k_eff with all control rods withdrawn; 1.10-1.30 typical' }),
+    fuel_burnup_gwd_per_tu: q(burnupGwdT, 'GWd/tU', 'energy', 'lifetime', 'system', 'brief', { source_detail: 'PWR 45-55 / BWRX HALEU 60-80 / TRISO 160-180' }),
+    refuelling_fraction_per_outage: q(refuellingFraction, '', 'dimensionless', 'cycle', 'system', 'physics_constant'),
+    initial_fuel_loading_kg_u: q(fuelLoadingKgU, 'kg', 'mass', 'fuel', 'system', 'calculator'),
+    steam_generator_mass_kg: q(steamGeneratorMassKg, 'kg', 'mass', 'gross', 'module', 'calculator', { source_detail: '40% vessel mass for PWR/BWR (integral SG); 15% for HTGR/MSR/SFR (IHX heat exchangers)' }),
+    reactor_internals_mass_kg: q(reactorInternalsMassKg, 'kg', 'mass', 'empty', 'module', 'calculator', { source_detail: 'core barrel + upper plenum + control-rod guide tubes' }),
+    turbine_generator_capacity_kw: q(turbineGeneratorKw, 'kW', 'power', 'net', 'system', 'calculator', { source_detail: 'often outside the modular boundary but in installed ASP envelope' }),
+  }
+
+  // Topology constraints — typed edges
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'fuel_assembly',
+      to_part: 'reactor_core_internals',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: fuelLoadingKgU * 1.3,  // fuel + cladding + spacer grids
+      required_unit: 'kg',
+      required_margin_factor: 3.0,
+      material_context: fuelType === 3 ? 'TRISO_pebbles_in_graphite_block_or_pebble_bed'
+        : fuelType === 4 ? 'metal_fuel_pins_in_HT9_steel_cladding_sodium_bonded'
+        : `UO2_pellets_in_zircaloy-4_or_zirlo_cladding_${enrichmentPct.toFixed(1)}pct_enriched`,
+    },
+    {
+      from_part: 'reactor_core_internals',
+      to_part: 'reactor_vessel',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: reactorInternalsMassKg + fuelLoadingKgU * 1.3,
+      required_unit: 'kg',
+      required_margin_factor: 1.5,
+      material_context: 'SA-508_Class_3_forged_low_alloy_steel_with_308L_stainless_cladding_per_ASME_BPVC_Section_III_Subsection_NB',
+    },
+    {
+      from_part: 'reactor_vessel',
+      to_part: 'primary_coolant',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: ratedMwt,  // MW thermal must be removable
+      required_unit: 'MW',
+      required_margin_factor: 1.1,
+      material_context: coolantClass === 'pwr' ? 'borated_light_water_15.5_MPa_320C_natural_circulation_or_canned_pumps'
+        : coolantClass === 'bwr' ? 'boiling_light_water_7_MPa_286C_natural_circulation'
+        : coolantClass === 'htgr' ? 'helium_7_MPa_750C_circulator_blower'
+        : coolantClass === 'msr' ? 'FLiBe_or_NaCl_KCl_molten_salt_700C_atmospheric_pressure_centrifugal_pump'
+        : 'liquid_sodium_550C_atmospheric_pressure_EM_pump',
+    },
+    {
+      from_part: 'primary_coolant_loop',
+      to_part: 'steam_generator_or_ihx',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: ratedMwt,
+      required_unit: 'MW',
+      material_context: coolantClass === 'pwr' ? 'integral_helical_or_once_through_SG_inconel_690_tubes'
+        : coolantClass === 'htgr' ? 'IHX_helium_to_water_or_helium_to_S-CO2_compact_PCHE'
+        : coolantClass === 'msr' || coolantClass === 'sfr' ? 'IHX_then_secondary_loop_then_SG_isolating_primary_radioactive_inventory'
+        : 'direct_BWR_no_SG_required',
+    },
+    {
+      from_part: 'control_rod_drives',
+      to_part: 'reactor_core_internals',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: 2000,  // total CRD assembly mass typical
+      required_unit: 'kg',
+      material_context: coolantClass === 'msr' ? 'control_rods_in_axial_neutron_absorber_or_drain_tank_freeze_plug'
+        : 'magnetic_jack_or_hydraulic_CRDM_with_gravity_scram_per_RG_1.155',
+    },
+    {
+      from_part: 'reactor_coolant_system',
+      to_part: 'passive_residual_heat_removal',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: ratedMwt * 0.07,  // 7% decay heat at shutdown peak
+      required_unit: 'MW',
+      required_margin_factor: 1.3,
+      material_context: `passive_decay_heat_removal_${passiveDecayHeatHr}_hr_no_AC_power_per_NRC_SRP_15.0.3`,
+    },
+    {
+      from_part: 'reactor_vessel_external',
+      to_part: 'primary_containment',
+      mechanism: 'mechanical',
+      constraint_kind: 'material_compatibility',
+      required_value: containmentDesignPressureBar,
+      required_unit: 'bar',
+      material_context: `steel-lined_reinforced_concrete_containment_design_pressure_${containmentDesignPressureBar}_bar_per_10_CFR_50_App_J_leak_test`,
+    },
+    {
+      from_part: 'steam_generator_secondary',
+      to_part: 'turbine_generator',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: ratedMwt,
+      required_unit: 'MW',
+      material_context: 'saturated_or_superheated_steam_to_turbine_per_balance_of_plant_BOP_outside_modular_boundary',
+    },
+  ]
+
+  // Macro-assembly pricing — NuScale VOYGR / Rolls-Royce SMR / X-energy /
+  // BWRX-300 / TerraPower disclosures. Word names chosen for ≥0.66 token
+  // overlap with Stage 1.7 emissions (reactor_vessel, steam_generators,
+  // control_rod_drives, primary_coolant_pumps, containment_structure,
+  // turbine_generator, instrumentation_and_control, refuelling_machinery,
+  // fuel_assemblies). Pricing basis at FOAK 2024-2026:
+  //   Reactor vessel: £25-40/kg SA-508 forged + clad (vs £4/kg structural
+  //     steel; nuclear-grade is 6-10× because of forging size + ASME III
+  //     + inspection). Largest single forging in heavy industry today.
+  //   Steam generators: £18/kg Inconel 690 tubed compact units
+  //     (NuScale 12-module SG bundle is ~£40M each)
+  //   Control rod drives: £180,000 per drive × N_drives (typically 16-69)
+  //   Primary coolant pumps: £1.2M each canned-rotor (PWR) or £2.5M EM pump (SFR)
+  //   Containment: £55/kg steel liner + £450/m³ reinforced concrete
+  //     (concrete is dirt-cheap vs special-grade neutron-irradiation-resistant
+  //     vessels)
+  //   Turbine + generator: £600/kW for steam Rankine (outside the
+  //     "modular" boundary technically, but counted in installed ASP)
+  //   I&C: £45M flat for nuclear-grade Class 1E + diverse + safety per 10 CFR 50.55a(h)
+  //   Refuelling machinery: £18M flat (cask + manipulator + spent-fuel pool)
+  //   Initial fuel loading: £8,000/kg HM for LEU; £35,000/kg HM for HALEU
+  //     (DOE 2024 status; HALEU enrichment is TENEX/Centrus bottleneck,
+  //     declining toward £15-20k/kg by 2030 with capacity ramp); TRISO £45k
+  //     (BWXT/X-energy disclosed pricing); metal fuel £30k (Natrium Project)
+  const vesselPerKg = 32  // SA-508 Class 3 forged + clad, ASME III stamped
+  const sgPerKg = 18
+  const numControlRods = Math.max(16, Math.round(coreVolumeM3 * 1.5))
+  const numPrimaryPumps = (coolantClass === 'pwr' || coolantClass === 'bwr') ? 4 : coolantClass === 'msr' ? 2 : 2
+  const fuelPerKgU = fuelType === 2 ? 35000 : fuelType === 3 ? 45000 : fuelType === 4 ? 30000 : 8000
+  const turbinePerKw = 600
+  const concretePerM3 = 450
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'reactor_pressure_vessel',
+      unit_price_gbp: vesselPerKg,
+      dimension_basis: 'kg_mass',
+      dimension_value: vesselMassKg,
+      total_gbp: vesselPerKg * vesselMassKg,
+      source_detail: `£${vesselPerKg}/kg × ${vesselMassKg.toFixed(0)} kg (SA-508 Class 3 forged low-alloy steel with 308L SS internal cladding; ASME BPVC Section III Subsection NB; single forging at ${vesselDiameterM.toFixed(1)} m × ${vesselHeightM.toFixed(1)} m × ${(vesselWallThicknessM * 1000).toFixed(0)} mm wall; Doosan Heavy / Japan Steel Works / Sheffield Forgemasters class)`,
+    },
+    {
+      word_name: 'steam_generators_or_ihx',
+      unit_price_gbp: sgPerKg,
+      dimension_basis: 'kg_mass',
+      dimension_value: steamGeneratorMassKg,
+      total_gbp: sgPerKg * steamGeneratorMassKg,
+      source_detail: `£${sgPerKg}/kg × ${steamGeneratorMassKg.toFixed(0)} kg (${coolantClass === 'pwr' || coolantClass === 'bwr' ? 'Inconel 690 helical or once-through SG, ASME III Class 1' : coolantClass === 'htgr' ? 'compact PCHE IHX helium-to-water' : 'sodium/salt-to-secondary IHX with double-wall stress-relieving tubes'})`,
+    },
+    {
+      word_name: 'control_rod_drive_mechanisms',
+      unit_price_gbp: 180_000,
+      dimension_basis: 'each',
+      dimension_value: numControlRods,
+      total_gbp: 180_000 * numControlRods,
+      source_detail: `£180,000 × ${numControlRods} CRDMs (${coolantClass === 'msr' ? 'control rods + freeze-plug drain valve passive shutdown' : 'magnetic-jack or hydraulic CRDM per RG 1.155 with gravity scram + ATWS mitigation'})`,
+    },
+    {
+      word_name: 'primary_coolant_pumps',
+      unit_price_gbp: coolantClass === 'sfr' ? 2_500_000 : 1_200_000,
+      dimension_basis: 'each',
+      dimension_value: numPrimaryPumps,
+      total_gbp: (coolantClass === 'sfr' ? 2_500_000 : 1_200_000) * numPrimaryPumps,
+      source_detail: `£${(coolantClass === 'sfr' ? 2.5 : 1.2).toFixed(1)}M × ${numPrimaryPumps} pumps (${coolantClass === 'pwr' ? 'KSB/Flowserve canned-rotor RCP, 15.5 MPa, hermetically sealed' : coolantClass === 'sfr' ? 'EM pump for liquid sodium, no rotating seal' : coolantClass === 'htgr' ? 'helium circulator blower' : 'centrifugal pump for molten salt'})`,
+    },
+    {
+      word_name: 'containment_steel_liner',
+      unit_price_gbp: 55,
+      dimension_basis: 'kg_mass',
+      dimension_value: containmentSteelMassKg,
+      total_gbp: 55 * containmentSteelMassKg,
+      source_detail: `£55/kg × ${containmentSteelMassKg.toFixed(0)} kg (welded carbon-steel liner with epoxy coating; 6-12 mm plate; leak-tested per 10 CFR 50 App J)`,
+    },
+    {
+      word_name: 'containment_reinforced_concrete',
+      unit_price_gbp: concretePerM3,
+      dimension_basis: 'cubic_metre',
+      dimension_value: containmentConcreteM3,
+      total_gbp: concretePerM3 * containmentConcreteM3,
+      source_detail: `£${concretePerM3}/m³ × ${containmentConcreteM3.toFixed(0)} m³ (post-tensioned reinforced concrete + boron-doped neutron shielding for radiation protection; designed for DBA + aircraft impact per RG 1.91)`,
+    },
+    {
+      word_name: 'turbine_generator_set',
+      unit_price_gbp: turbinePerKw,
+      dimension_basis: 'kw_power',
+      dimension_value: turbineGeneratorKw,
+      total_gbp: turbinePerKw * turbineGeneratorKw,
+      source_detail: `£${turbinePerKw}/kW × ${turbineGeneratorKw.toFixed(0)} kW (${coolantClass === 'htgr' ? 'supercritical CO₂ Brayton cycle or steam Rankine' : 'steam Rankine condensing turbine'} + 4-pole synchronous generator; Siemens/MHI/GE class; outside modular boundary but counted in installed ASP envelope)`,
+    },
+    {
+      word_name: 'instrumentation_and_control_class_1e',
+      unit_price_gbp: 45_000_000,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 45_000_000,
+      source_detail: `£45M flat — Class 1E safety-related I&C per 10 CFR 50.55a(h) and IEEE Std 603; diverse and redundant 4-train protection system; Westinghouse Common Q or Mitsubishi MELTAC class; ATWS mitigation + post-accident monitoring per RG 1.97`,
+    },
+    {
+      word_name: 'refuelling_machinery',
+      unit_price_gbp: 18_000_000,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 18_000_000,
+      source_detail: `£18M flat — refuelling cavity + overhead manipulator + transfer cask + spent-fuel pool with passive heat removal; ${refuellingYears}-yr refuelling interval (${(refuellingFraction * 100).toFixed(0)}% reload per outage)`,
+    },
+    {
+      word_name: 'initial_fuel_assemblies',
+      unit_price_gbp: fuelPerKgU,
+      dimension_basis: 'kg_mass',
+      dimension_value: fuelLoadingKgU,
+      total_gbp: fuelPerKgU * fuelLoadingKgU,
+      source_detail: `£${fuelPerKgU.toLocaleString()}/kg HM × ${fuelLoadingKgU.toFixed(0)} kg (${fuelType === 1 ? 'UO₂ LEU ≤5% in zircaloy cladding (Westinghouse/Framatome)' : fuelType === 2 ? 'HALEU UO₂ 5-19.75% — TENEX/Centrus currently rate-limited; DOE HALEU stock-up programme' : fuelType === 3 ? 'TRISO compacts (BWXT/X-energy) — UO₂ kernels coated PyC/SiC/PyC' : 'sodium-bonded metal fuel pins in HT9 steel cladding (Natrium)'})`,
+    },
+  ]
+
+  // Closures — design-rule gates
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'passive_decay_heat_removal_meets_nrc_iaea',
+    status: passiveDecayHeatHr >= 72 ? 'pass' : passiveDecayHeatHr >= 24 ? 'warn' : 'fail',
+    measured: passiveDecayHeatHr,
+    required: '≥72 hr passive decay-heat removal without AC power per NRC SECY-15-0077 + IAEA SSR-2/1 SMR Design Requirements',
+    reason: `Passive decay-heat removal ${passiveDecayHeatHr} hr. <72 hr means operator action or AC power required to prevent core damage — disqualifies SMR safety case under NRC SMR Design-Specific Review Standard. NuScale ULTC submission claimed 30 days passive.`,
+  })
+  closures.push({
+    invariant_id: 'neutron_economy_keff_within_range',
+    status: keffBocWithoutControl >= 1.00 && keffBocWithoutControl <= 1.30 ? 'pass' : 'fail',
+    measured: keffBocWithoutControl,
+    required: '1.00 ≤ k_eff_BoC (no control) ≤ 1.30 — critical mass achievable, excess reactivity within shutdown margin',
+    reason: `k_eff BoC ${keffBocWithoutControl.toFixed(3)}. <1.00 = subcritical, no useful power. >1.30 = excess reactivity exceeds reasonable shutdown margin; would require excessive burnable poisons.`,
+  })
+  closures.push({
+    invariant_id: 'fuel_burnup_meets_brief',
+    status: burnupGwdT >= 40 ? 'pass' : 'warn',
+    measured: burnupGwdT,
+    required: '≥40 GWd/tU for economic fuel utilisation (PWR target ≥45, HALEU SMRs 60-180)',
+    reason: `Fuel burnup ${burnupGwdT.toFixed(0)} GWd/tU. <40 means uneconomic short cycle. ${fuelType === 3 ? 'TRISO targets 160-180 — extremely high burnup attainable due to multi-layer fuel particle integrity' : fuelType === 2 ? 'HALEU enables ≥60 GWd/tU compact cores' : 'LEU UO₂ practical limit 55-60 GWd/tU before cladding integrity concerns'}.`,
+  })
+  closures.push({
+    invariant_id: 'containment_design_pressure_dba_loca',
+    status: containmentDesignPressureBar >= (coolantClass === 'pwr' ? 4 : coolantClass === 'bwr' ? 3 : 1) ? 'pass' : 'fail',
+    measured: containmentDesignPressureBar,
+    required: `Containment design pressure ≥ DBA LOCA peak — ${coolantClass === 'pwr' ? '4 bar steam release' : coolantClass === 'bwr' ? '3 bar with suppression pool' : coolantClass === 'htgr' ? '1 bar (no high-pressure steam release)' : '1-2 bar (sodium fire or salt vapour)'}`,
+    reason: `Containment design pressure ${containmentDesignPressureBar} bar adequate for ${coolantClass.toUpperCase()} DBA LOCA per 10 CFR 50 App A GDC 16 + RG 1.157.`,
+  })
+  closures.push({
+    invariant_id: 'enrichment_below_haleu_limit',
+    status: enrichmentPct <= 19.75 ? 'pass' : 'fail',
+    measured: enrichmentPct,
+    required: '≤19.75 wt% U-235 per NRC 10 CFR 50.46 and IAEA proliferation-resistance category (HALEU upper bound)',
+    reason: `Enrichment ${enrichmentPct.toFixed(2)}% U-235. ≤19.75% remains in HALEU low-enriched category; ≥20% crosses into HEU triggering Category I material control + IAEA safeguards.`,
+  })
+  closures.push({
+    invariant_id: 'design_life_meets_smr_class',
+    status: designLifeYears >= 40 ? 'pass' : 'warn',
+    measured: designLifeYears,
+    required: '≥40 years design life (NRC initial licence; renewable to 80 with surveillance per 10 CFR 54)',
+    reason: `Design life ${designLifeYears} yr. <40 yr = uneconomic for capital recovery against £4-8M/MWe FOAK CapEx. Modern SMR designs target 60 yr (NuScale, BWRX-300) with 80-yr renewal pathway.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'smr',
+    brief_summary: `${ratedMwt.toFixed(0)} MWt / ${ratedMwe.toFixed(0)} MWe ${coolantClass.toUpperCase()} small modular reactor, ${(thermalEfficiency * 100).toFixed(0)}% thermal efficiency. ${fuelType === 1 ? 'LEU UO₂' : fuelType === 2 ? 'HALEU UO₂' : fuelType === 3 ? 'TRISO' : 'sodium-bonded metal'} fuel at ${enrichmentPct.toFixed(1)}% enrichment, ${burnupGwdT.toFixed(0)} GWd/tU burnup target. Reactor vessel ${vesselDiameterM.toFixed(1)} m × ${vesselHeightM.toFixed(1)} m × ${(vesselWallThicknessM * 1000).toFixed(0)} mm wall (${(vesselMassKg / 1000).toFixed(0)} t SA-508). Containment ${containmentDiameterM.toFixed(0)} m × ${containmentHeightM.toFixed(0)} m, ${containmentDesignPressureBar} bar design. ${refuellingYears}-yr refuelling (${(refuellingFraction * 100).toFixed(0)}% reload), ${designLifeYears}-yr design life. ${passiveDecayHeatHr} hr passive decay-heat removal (NRC SECY-15-0077 / IAEA SSR-2/1). Macro-assembly raw BoM = £${(macroAssemblyTotal / 1_000_000).toFixed(1)}M (≈£${(macroAssemblyTotal / ratedMwe / 1_000_000).toFixed(2)}M/MWe vs £4-8M/MWe installed FOAK benchmark).`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
 })
 
 // ---------------- humanoid ------------------------
+// Full archetype contract — replaces buildMinimalContract stub. Bipedal
+// general-purpose humanoid robot (Tesla Optimus / Figure 02 / 1X Neo /
+// Agility Digit / Boston Dynamics Atlas / Unitree H1 class). Modelled
+// on evtol / drone pattern. Macro prices grounded in IDTechEx Humanoid
+// Robots 2024-2034 report + Tesla AI Day disclosures + Figure series
+// B raise PR + Agility Robotics OPEX teardowns. At production scale,
+// per-unit BoM target £25k-150k; current prototypes £500k-2M each.
 registerArchetype('humanoid', (brief: any) => {
   const desc = String(brief?.product_description ?? '')
   const massKg = Number(brief?.constraints?.max_mass_kg?.value ?? 60)
-  const heightM = extractRangeFromDesc(desc, /(\d(?:\.\d+)?)\s*m\s+(?:tall|height)/i, 1.7)
-  const dofCount = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*(?:DOF|degree[s]? of freedom)/i, 40)
-  const payloadKg = extractRangeFromDesc(desc, /(\d{1,3})\s*kg\s+payload/i, 20)
+  // Height from brief or scaled by mass. Empirically humanoid mass/height
+  // follows ≈ 30 × height² (kg, m) — i.e. tall + light, short + chunky.
+  const heightM = (() => {
+    const m = desc.match(/(\d(?:\.\d+)?)\s*m\s+(?:tall|height)/i)
+      ?? desc.match(/height[\s:]{0,8}(\d(?:\.\d+)?)\s*m\b/i)
+    if (m) return parseFloat(m[1])
+    // From dimensions if present (max_dimensions_mm.h)
+    const h = Number(brief?.constraints?.max_dimensions_mm?.h ?? 0)
+    if (h > 0) return h / 1000
+    // Mass scaling: m_kg ≈ 30 × h_m²  →  h ≈ √(m/30)
+    return Math.max(1.2, Math.min(2.0, Math.sqrt(massKg / 30)))
+  })()
+  // DOF count scales with capability tier. Brief overrides; otherwise:
+  //   minimum bipedal walker = 12 (6 per leg + spine)
+  //   typical full humanoid = 28-40 (arms + waist + neck)
+  //   high-dexterity manipulation = 50+ (5-finger hands × 2 + waist)
+  const dofCount = (() => {
+    const m = desc.match(/(\d{1,3})\s*-?\s*(\d{1,3})?\s*(?:DOF|degree[s]? of freedom|dof)/i)
+    if (m) {
+      const a = parseFloat(m[1])
+      const b = m[2] ? parseFloat(m[2]) : a
+      return Math.round((a + b) / 2)
+    }
+    if (/dexter|fine[\s-]?manipulat|five[\s-]?finger|articulated\s+hand/i.test(desc)) return 52
+    if (/whole[\s-]?body|advanced|optimus|figure/i.test(desc)) return 35
+    return /walking[\s-]?only|locomotion[\s-]?focused|legged/i.test(desc) ? 14 : 28
+  })()
+  // Payload at full arm extension (≠ overhead crane load) — typically
+  // 0.20-0.50 × robot mass for bipedal humanoid. Optimus Gen 2 target 20kg
+  // (at body, ≈11kg at arm extension); Figure 02 target 25kg; Digit 16kg.
+  const payloadKg = (() => {
+    const m = desc.match(/(\d{1,3})\s*kg\s+payload/i) ?? desc.match(/payload[\s:]{0,8}(\d{1,3})\s*kg/i)
+    if (m) return parseFloat(m[1])
+    return Math.round(massKg * 0.30)
+  })()
   const walkingSpeedMs = extractRangeFromDesc(desc, /(\d(?:\.\d+)?)\s*m\/s/i, 1.2)
-  const batteryRuntimeHr = extractRangeFromDesc(desc, /(\d(?:\.\d+)?)\s*hours?/i, 5)
-  const q1 = {
+  const batteryRuntimeHr = extractRangeFromDesc(desc, /(\d(?:\.\d+)?)\s*(?:hr|hour|h\b)/i, 4)
+  // Industrial vs consumer — drives ISO 10218-1 vs ISO 13482 safety route
+  const isIndustrial = /industrial|factory|warehouse|logistics|manufacturing|workplace|optimus|digit|agility/i.test(desc)
+  const isConsumer = !isIndustrial && /home|consumer|domestic|household|1x\s+neo/i.test(desc)
+  // Actuator class — Series Elastic Actuator (SEA), harmonic drive (HD),
+  // or quasi-direct drive (QDD). Distribution typical for general humanoid:
+  //   Legs: 6 high-torque actuators each (12 total) — QDD typically £1500-3000/unit
+  //   Arms: 6 actuators each (12 total) — HD typically £700-1500/unit
+  //   Waist + neck: 3-5 actuators — SEA typically £600-1200/unit
+  //   Hands: 8-22 actuators (if dexterous) — small SEA £200-500/unit
+  // Average cost per DOF varies by location; we model legs vs arms vs hands.
+  const dofLegs = 12  // standardise 6 per leg
+  const dofArms = Math.min(14, Math.max(8, dofCount - dofLegs - 5))  // arms = remainder less spine/neck
+  const dofWaistNeck = 5
+  const dofHands = Math.max(0, dofCount - dofLegs - dofArms - dofWaistNeck)
+  const legActuatorAvgGbp = 2200  // QDD or harmonic-drive, 50-200 Nm
+  const armActuatorAvgGbp = 1100  // smaller harmonic-drive, 10-80 Nm
+  const waistNeckActuatorAvgGbp = 900
+  const handActuatorAvgGbp = 350   // miniature, 0.5-5 Nm
+  // Battery — sized from runtime + walking-power budget. Typical 35 kg
+  // robot draws ~250 W standing, ~500-1000 W walking depending on speed.
+  // Standby ~80 W. Mixed-duty average ~400 W for general manipulation work.
+  const avgPowerW = Math.max(250, 200 + 6 * massKg)  // body-mass-scaled empirical
+  const battEnergyKwh = (avgPowerW * batteryRuntimeHr) / 1000
+  const batteryPackSpecificEnergyWhKg = 220  // Li-ion 18650 or pouch, robotic pack-level
+  const batteryMassKg = (battEnergyKwh * 1000) / batteryPackSpecificEnergyWhKg
+  // Compute — typically NVIDIA Jetson Orin + ARM CPUs for VLA inference.
+  // Capability tiers: edge inference 30 TOPS / 100 TOPS / 275 TOPS Orin AGX.
+  const computeTops = /275\s*tops|jetson\s+agx|orin\s+64/i.test(desc) ? 275
+    : /200\s*tops|jetson\s+orin\s+nano/i.test(desc) ? 100
+    : 30
+  // Sensors — typical full humanoid:
+  //   Cameras: 4-12 (head stereo + body + wrist-mounted)
+  //   IMU: 1-2 (chest + pelvis for state estimation)
+  //   Force/torque (FT): per ankle + per wrist = 4 typically
+  //   Time-of-flight (ToF) lidar / depth: 1-2 for navigation/obstacles
+  const cameraCount = dofHands >= 8 ? 8 : 6  // dexterous adds wrist cameras
+  const imuCount = 2
+  const ftSensorCount = 4  // 2 ankles + 2 wrists
+  const tofLidarCount = 2  // head + chest
+  // Structural frame — aluminium for industrial, CFRP for consumer (lighter).
+  const isCarbonFrame = isConsumer || /carbon\s*fibre|carbon\s*fiber|cfrp/i.test(desc)
+  const frameMaterial: 'aluminium' | 'cfrp_aluminium_hybrid' = isCarbonFrame ? 'cfrp_aluminium_hybrid' : 'aluminium'
+  // Frame mass fraction
+  const frameMassKg = massKg * (isCarbonFrame ? 0.25 : 0.32)
+  // Total actuator mass (typically 35-45% of total mass)
+  const actuatorMassKg = massKg * 0.40
+  // Electronics + battery + sensors mass = remainder
+  const electronicsMassKg = massKg - frameMassKg - actuatorMassKg - batteryMassKg
+  // Bus voltage — 48 V DC typical for current humanoids
+  const dcBusVoltage = 48
+  // Walking power at rated speed (for closure)
+  const walkingPowerW = avgPowerW * (0.5 + walkingSpeedMs * 0.6)
+  // Mass-stability check: actuator stall-torque at hip joint must hold robot upright
+  const hipStallTorqueNm = massKg * 9.81 * (heightM / 2) * 1.3  // 1.3× safety
+  // Fall-recovery capability — design class flag
+  const fallRecoveryCapable = !/no[\s-]?fall|simple[\s-]?walker/i.test(desc)
+
+  const quantities: Record<string, Quantity> = {
     robot_mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
     height_m: q(heightM, 'm', 'length', 'rated', 'system', 'brief'),
-    dof_count: q(dofCount, '', 'dimensionless', 'rated', 'system', 'brief'),
-    payload_capacity_kg: q(payloadKg, 'kg', 'mass', 'payload', 'system', 'brief'),
+    dof_count_total: q(dofCount, '', 'dimensionless', 'rated', 'system', 'brief'),
+    dof_legs: q(dofLegs, '', 'dimensionless', 'rated', 'module', 'physics_constant', { source_detail: '6 per leg × 2 = 12; hip3 + knee + ankle2' }),
+    dof_arms: q(dofArms, '', 'dimensionless', 'rated', 'module', 'calculator'),
+    dof_waist_neck: q(dofWaistNeck, '', 'dimensionless', 'rated', 'module', 'physics_constant'),
+    dof_hands: q(dofHands, '', 'dimensionless', 'rated', 'module', 'calculator', { source_detail: 'remaining DOF after legs/arms/waist; 0 = grippers, ≥10 = dexterous' }),
+    payload_capacity_at_arm_extension_kg: q(payloadKg, 'kg', 'mass', 'payload', 'system', 'brief', { source_detail: 'payload at full-arm-extension; ≈0.3 × robot mass typical for bipedal' }),
     walking_speed_ms: q(walkingSpeedMs, 'm/s', 'velocity', 'rated', 'system', 'brief'),
     battery_runtime_hours: q(batteryRuntimeHr, 'h', 'time', 'continuous', 'system', 'brief'),
-  } as Record<string, Quantity>
-  return buildMinimalContract('humanoid', brief, q1, `Humanoid robot, ${massKg} kg, ${heightM} m tall, ${dofCount} DOF, ${payloadKg} kg payload, ${walkingSpeedMs} m/s walking, ${batteryRuntimeHr} hr runtime.`)
+    average_power_draw_w: q(avgPowerW, 'W', 'power', 'continuous', 'system', 'calculator', { source_detail: '200 + 6 × mass_kg (empirical mixed-duty)' }),
+    walking_power_w: q(walkingPowerW, 'W', 'power', 'continuous', 'system', 'calculator', { source_detail: 'power × (0.5 + speed × 0.6)' }),
+    battery_energy_kwh: q(battEnergyKwh, 'kWh', 'energy', 'usable', 'pack', 'calculator', { source_detail: 'avg_power × runtime / 1000' }),
+    battery_pack_specific_energy_wh_kg: q(batteryPackSpecificEnergyWhKg, 'Wh/kg', 'energy', 'nameplate', 'pack', 'physics_constant', { source_detail: '220 Wh/kg Li-ion 18650/pouch robotic pack-level (cell 280 × 0.78 pack ratio)' }),
+    battery_mass_kg: q(batteryMassKg, 'kg', 'mass', 'gross_takeoff', 'pack', 'calculator'),
+    dc_bus_voltage_v: q(dcBusVoltage, 'V', 'voltage', 'DC', 'system', 'physics_constant', { source_detail: '48 V SELV; preferred for safety + sufficient for QDD actuators' }),
+    compute_tops: q(computeTops, 'TOPS', 'dimensionless', 'rated', 'module', 'physics_constant', { source_detail: 'NVIDIA Jetson Orin Nano/NX/AGX class for VLA model inference' }),
+    camera_count: q(cameraCount, '', 'dimensionless', 'rated', 'module', 'physics_constant', { source_detail: 'head stereo (2) + body (2) + wrist-mounted (2-4)' }),
+    imu_count: q(imuCount, '', 'dimensionless', 'rated', 'module', 'physics_constant'),
+    force_torque_sensor_count: q(ftSensorCount, '', 'dimensionless', 'rated', 'module', 'physics_constant', { source_detail: '2× ankles + 2× wrists for contact-rich manipulation' }),
+    tof_lidar_count: q(tofLidarCount, '', 'dimensionless', 'rated', 'module', 'physics_constant'),
+    frame_material: q(frameMaterial === 'aluminium' ? 1 : 2, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=aluminium, 2=CFRP/aluminium hybrid (lighter, costlier)' }),
+    frame_mass_kg: q(frameMassKg, 'kg', 'mass', 'empty', 'module', 'calculator'),
+    actuator_assembly_mass_kg: q(actuatorMassKg, 'kg', 'mass', 'empty', 'module', 'calculator', { source_detail: '40% of robot mass typical (legs dominate)' }),
+    electronics_sensors_mass_kg: q(electronicsMassKg, 'kg', 'mass', 'empty', 'module', 'calculator', { source_detail: 'remainder after frame + actuators + battery' }),
+    hip_actuator_stall_torque_required_nm: q(hipStallTorqueNm, 'N·m', 'force', 'peak', 'module', 'calculator', { source_detail: 'mass × g × CoM_height × 1.3 safety; sets QDD/HD selection' }),
+    fall_recovery_capable: q(fallRecoveryCapable ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator'),
+    deployment_class: q(isIndustrial ? 1 : isConsumer ? 2 : 3, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=industrial (ISO 10218-1), 2=consumer (ISO 13482), 3=general/research' }),
+  }
+
+  // Topology constraints — typed edges
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'battery_pack',
+      to_part: 'power_distribution_bus',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (walkingPowerW * 1.5) / dcBusVoltage,  // 1.5× peak vs continuous
+      required_unit: 'A',
+      required_margin_factor: 1.5,
+      material_context: `${dcBusVoltage}_V_DC_SELV_bus_with_e-fuse_protection_per_IEC_62133`,
+    },
+    {
+      from_part: 'power_distribution_bus',
+      to_part: 'leg_actuators',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (dofLegs * 60) / dcBusVoltage,  // 60 W per leg actuator avg
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+      material_context: 'QDD_or_harmonic_drive_leg_actuator_50-200Nm_with_FOC_servo_drive',
+    },
+    {
+      from_part: 'leg_actuators',
+      to_part: 'hip_knee_ankle_joints',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: massKg + payloadKg,  // standing static
+      required_unit: 'kg',
+      required_margin_factor: 2.0,  // 2× for impact/recovery
+      material_context: `actuator_stall_torque_at_hip_must_exceed_${hipStallTorqueNm.toFixed(0)}_Nm_for_balance_recovery`,
+    },
+    {
+      from_part: 'arm_actuators',
+      to_part: 'shoulder_elbow_wrist_joints',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: payloadKg * 1.3,  // payload at extension × dynamic factor
+      required_unit: 'kg',
+      required_margin_factor: 1.5,
+      material_context: 'harmonic_drive_or_strain_wave_gear_arm_actuator_10-80Nm_with_backlash_under_30arcsec',
+    },
+    {
+      from_part: 'compute_module',
+      to_part: 'motor_controllers',
+      mechanism: 'data',
+      constraint_kind: 'data_bandwidth',
+      required_value: 1000,  // 1 kHz minimum for real-time servo loop
+      required_unit: 'Hz',
+      material_context: 'EtherCAT_or_RS485_DC_bus_servo_loop_1-10kHz_jitter_under_100us_per_IEC_61784',
+    },
+    {
+      from_part: 'cameras_imu_ft_sensors',
+      to_part: 'compute_module',
+      mechanism: 'data',
+      constraint_kind: 'data_bandwidth',
+      required_value: cameraCount * 1500 + imuCount * 5 + ftSensorCount * 10,  // 1.5 Gbps per camera + IMU + FT
+      required_unit: 'Mbps',
+      material_context: 'USB3_or_MIPI_CSI-2_camera + I2C/SPI_IMU + SPI_FT_sensors aggregated into Jetson Orin',
+    },
+    {
+      from_part: 'battery_pack',
+      to_part: 'thermal_management',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: walkingPowerW * 0.15,  // 15% of power dissipates as heat in cells + drives
+      required_unit: 'W',
+      material_context: 'forced_air_cooling_with_heat_pipes_to_chassis_skin_or_active_blower_for_dense_pack',
+    },
+    {
+      from_part: 'enclosure_skin',
+      to_part: 'workspace_environment',
+      mechanism: 'mechanical',
+      constraint_kind: 'material_compatibility',
+      material_context: isIndustrial
+        ? 'ISO_10218-1_industrial_collaborative_robot_safety_rating_with_emergency_stop_and_safety-monitored_stop_per_TS_15066'
+        : isConsumer
+        ? 'ISO_13482_personal_care_robot_safety_with_soft_skin_padding_and_force-limited_actuators_per_TS_15066'
+        : 'ANSI/RIA_R15.06_general_robot_safety',
+    },
+  ]
+
+  // Macro-assembly pricing — IDTechEx Humanoid Robots 2024-2034 +
+  // Tesla AI Day 4 + Figure series B PR + Agility Robotics Digit
+  // teardown. Word names chosen for ≥0.66 token overlap with Stage 1.7
+  // emissions (actuator, structural_frame, battery_pack, compute_module,
+  // sensors, end_effector, thermal_management, enclosure_skin).
+  // 2024 cost basis (target production scale 50k-100k units/yr):
+  //   Leg QDD actuators: £2200 each × 12 (legs)
+  //   Arm harmonic-drive actuators: £1100 each × dofArms
+  //   Waist + neck actuators: £900 each × 5
+  //   Hand actuators (miniature): £350 each × dofHands
+  //   Structural frame: £45/kg aluminium / £180/kg CFRP-hybrid
+  //   Battery pack: £450/kWh (Tesla 4680 derivative for production scale)
+  //   Compute module: £750 (Jetson Orin Nano) to £3500 (AGX 64GB)
+  //   Sensors: cameras £180 each, IMU £120 each, FT £950 each, ToF £450 each
+  //   End-effectors (hands or grippers): £1500 (gripper), £8500 (5-finger dexterous)
+  //   Thermal management: £180 (passive heat-pipes) to £450 (forced-air with blower)
+  //   Enclosure / skin: £80/kg painted aluminium or moulded polymer
+  const computeCost = computeTops >= 250 ? 3500 : computeTops >= 100 ? 1500 : 750
+  const endEffectorCost = dofHands >= 10 ? 8500 * 2 : 1500 * 2  // 2 hands
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'leg_actuator_assembly',
+      unit_price_gbp: legActuatorAvgGbp,
+      dimension_basis: 'each',
+      dimension_value: dofLegs,
+      total_gbp: legActuatorAvgGbp * dofLegs,
+      source_detail: `£${legActuatorAvgGbp} × ${dofLegs} leg actuators (QDD or harmonic-drive 50-200 Nm @ ${dcBusVoltage} V, FOC servo drive with absolute encoder; hip3 + knee + ankle2 per leg; Unitree/Anybotics/MIT mini-cheetah class)`,
+    },
+    {
+      word_name: 'arm_actuator_assembly',
+      unit_price_gbp: armActuatorAvgGbp,
+      dimension_basis: 'each',
+      dimension_value: dofArms,
+      total_gbp: armActuatorAvgGbp * dofArms,
+      source_detail: `£${armActuatorAvgGbp} × ${dofArms} arm actuators (harmonic-drive strain-wave-gear 10-80 Nm with absolute encoder; <30 arcsec backlash; Harmonic Drive Systems CSF series or domestic equivalent)`,
+    },
+    {
+      word_name: 'waist_neck_actuators',
+      unit_price_gbp: waistNeckActuatorAvgGbp,
+      dimension_basis: 'each',
+      dimension_value: dofWaistNeck,
+      total_gbp: waistNeckActuatorAvgGbp * dofWaistNeck,
+      source_detail: `£${waistNeckActuatorAvgGbp} × ${dofWaistNeck} waist + neck (SEA series-elastic 5-30 Nm + pan/tilt neck servos for sensor orientation)`,
+    },
+    ...(dofHands > 0 ? [{
+      word_name: 'hand_finger_actuators' as const,
+      unit_price_gbp: handActuatorAvgGbp,
+      dimension_basis: 'each' as const,
+      dimension_value: dofHands,
+      total_gbp: handActuatorAvgGbp * dofHands,
+      source_detail: `£${handActuatorAvgGbp} × ${dofHands} miniature actuators (tendon-driven or direct-drive ${dofHands >= 10 ? '5-finger dexterous hand' : 'thumb + index for power-grasp'} 0.5-5 Nm; Shadow Robot or Wonik Robotics class)`,
+    }] : []),
+    {
+      word_name: 'structural_frame',
+      unit_price_gbp: isCarbonFrame ? 180 : 45,
+      dimension_basis: 'kg_mass',
+      dimension_value: frameMassKg,
+      total_gbp: (isCarbonFrame ? 180 : 45) * frameMassKg,
+      source_detail: `£${isCarbonFrame ? 180 : 45}/kg × ${frameMassKg.toFixed(1)} kg (${isCarbonFrame ? 'CFRP shells + aluminium endplates for dynamic mass reduction; +50% performance, +3× cost' : '7075-T6 aluminium machined or cast structural members + steel fasteners'})`,
+    },
+    {
+      word_name: 'lithium_ion_battery_pack',
+      unit_price_gbp: 450,
+      dimension_basis: 'kwh_capacity',
+      dimension_value: battEnergyKwh,
+      total_gbp: 450 * battEnergyKwh,
+      source_detail: `£450/kWh × ${battEnergyKwh.toFixed(2)} kWh (${dcBusVoltage} V Li-ion pouch or 18650/21700 cells, BMS with cell-level monitoring, contactors + e-fuse; ${batteryPackSpecificEnergyWhKg} Wh/kg pack-level)`,
+    },
+    {
+      word_name: 'compute_module',
+      unit_price_gbp: computeCost,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: computeCost,
+      source_detail: `£${computeCost} (NVIDIA Jetson Orin ${computeTops}-TOPS edge inference for VLA model + dedicated ARM Cortex-A78 for real-time motion control + FPGA for servo loop offload)`,
+    },
+    {
+      word_name: 'sensor_suite',
+      unit_price_gbp: cameraCount * 180 + imuCount * 120 + ftSensorCount * 950 + tofLidarCount * 450,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: cameraCount * 180 + imuCount * 120 + ftSensorCount * 950 + tofLidarCount * 450,
+      source_detail: `£${(cameraCount * 180 + imuCount * 120 + ftSensorCount * 950 + tofLidarCount * 450).toLocaleString()} aggregated (${cameraCount} × £180 RGB/depth cameras + ${imuCount} × £120 9-axis IMU + ${ftSensorCount} × £950 6-axis FT at wrists/ankles + ${tofLidarCount} × £450 ToF depth/lidar)`,
+    },
+    {
+      word_name: 'end_effector_hands',
+      unit_price_gbp: dofHands >= 10 ? 8500 : 1500,
+      dimension_basis: 'each',
+      dimension_value: 2,
+      total_gbp: endEffectorCost,
+      source_detail: `£${(endEffectorCost / 2).toLocaleString()} × 2 (${dofHands >= 10 ? '5-finger dexterous hand with tendon-driven fingers + tactile sensors per fingertip; Shadow / Wonik / SCHUNK SVH class' : 'parallel-jaw gripper or 2-finger underactuated hand for power-grasp manipulation'})`,
+    },
+    {
+      word_name: 'thermal_management_cooling',
+      unit_price_gbp: 450,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 450,
+      source_detail: `£450 flat — forced-air cooling with blower fan + heat-pipe to chassis skin for battery + motor drives; <60°C surface temp limit per ISO 13482`,
+    },
+    {
+      word_name: 'enclosure_skin_panels',
+      unit_price_gbp: 80,
+      dimension_basis: 'kg_mass',
+      dimension_value: massKg * 0.10,  // ~10% mass for shells
+      total_gbp: 80 * massKg * 0.10,
+      source_detail: `£80/kg × ${(massKg * 0.10).toFixed(1)} kg (${isConsumer ? 'soft TPE/silicone skin over EPP foam for force-limited contact; ISO 13482' : 'moulded polycarbonate or sheet-aluminium shells with IP54 dust + water spray rating'})`,
+    },
+  ]
+
+  // Closures — design-rule gates
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'walking_speed_meets_brief',
+    status: walkingSpeedMs >= 0.5 ? 'pass' : 'warn',
+    measured: walkingSpeedMs,
+    required: '≥0.5 m/s walking speed — minimum useful bipedal mobility (Digit operates 0.75-1.5 m/s; Optimus Gen 2 demos 0.6 m/s)',
+    reason: `Walking speed ${walkingSpeedMs.toFixed(2)} m/s. <0.5 m/s = quasi-static walking, very limited utility. Human walking speed 1.2-1.4 m/s for reference.`,
+  })
+  closures.push({
+    invariant_id: 'payload_at_full_extension_meets_brief',
+    status: payloadKg >= 5 ? 'pass' : 'warn',
+    measured: payloadKg,
+    required: '≥5 kg payload at full arm extension — minimum useful manipulation (Optimus Gen 2 target 11 kg single-arm; Figure 02 target 15 kg)',
+    reason: `Payload ${payloadKg} kg at arm extension. Hip joints require ${hipStallTorqueNm.toFixed(0)} Nm stall torque to maintain stability with this load. <5 kg payload limits commercial utility to lightweight inspection/observation roles.`,
+  })
+  closures.push({
+    invariant_id: 'runtime_at_typical_duty_meets_brief',
+    status: batteryRuntimeHr >= 2 ? 'pass' : 'warn',
+    measured: batteryRuntimeHr,
+    required: '≥2 hr runtime at typical mixed-duty (manipulation + locomotion); ≥4 hr for full-shift industrial deployment',
+    reason: `Runtime ${batteryRuntimeHr.toFixed(1)} hr at ${avgPowerW.toFixed(0)} W average draw. Battery ${battEnergyKwh.toFixed(2)} kWh / ${batteryMassKg.toFixed(1)} kg. <2 hr forces continuous swapping; ≥4 hr enables single-charge shift work.`,
+  })
+  closures.push({
+    invariant_id: 'fall_recovery_capable',
+    status: fallRecoveryCapable ? 'pass' : 'warn',
+    measured: fallRecoveryCapable ? 1 : 0,
+    required: 'Fall-recovery capability — robot must self-recover from prone or supine position OR detect fall + safe-shutdown without injury (Atlas/Optimus demonstrate get-up; Digit detects + safe-state)',
+    reason: `Fall-recovery ${fallRecoveryCapable ? 'designed in (capable of get-up sequence after impact-safe shutdown)' : 'not implemented — robot requires human intervention after fall, reducing autonomy'}.`,
+  })
+  closures.push({
+    invariant_id: isIndustrial ? 'iso_10218_1_industrial_safety' : isConsumer ? 'iso_13482_personal_care_robot_safety' : 'general_robot_safety',
+    status: isIndustrial ? 'pass' : isConsumer ? 'warn' : 'warn',
+    measured: 1,
+    required: isIndustrial
+      ? 'ISO 10218-1 + ISO/TS 15066 — collaborative industrial robot safety: safety-rated monitored stop, hand-guiding, speed/separation, power/force limiting'
+      : isConsumer
+      ? 'ISO 13482 personal care robot safety — force-limited actuators, soft skin, emergency stop, user-presence detection'
+      : 'ANSI/RIA R15.06 general — no formal certification path; voluntary safety standards apply',
+    reason: `${isIndustrial ? 'Industrial deployment: by construction includes E-stop + safety-monitored stop + ISO/TS 15066 force-limit table compliance for hand-guided operation' : isConsumer ? 'Consumer deployment: requires ISO 13482 certification; current state of art (Neo, Tesla Bot consumer) still in pre-certification phase' : 'General/research deployment — no commercial sale path without further safety certification'}.`,
+  })
+  closures.push({
+    invariant_id: 'mass_balance_actuators_dominate',
+    status: actuatorMassKg + frameMassKg + batteryMassKg + electronicsMassKg <= massKg * 1.05 ? 'pass'
+          : actuatorMassKg + frameMassKg + batteryMassKg + electronicsMassKg <= massKg * 1.15 ? 'warn'
+          : 'fail',
+    measured: actuatorMassKg + frameMassKg + batteryMassKg + electronicsMassKg,
+    required: `Component masses sum within ±5% of robot mass ${massKg} kg`,
+    reason: `Actuators ${actuatorMassKg.toFixed(1)} + frame ${frameMassKg.toFixed(1)} + battery ${batteryMassKg.toFixed(1)} + electronics ${electronicsMassKg.toFixed(1)} = ${(actuatorMassKg + frameMassKg + batteryMassKg + electronicsMassKg).toFixed(1)} kg vs target ${massKg} kg. Within 5% if mass budget closes; warn ±15%; fail beyond.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'humanoid',
+    brief_summary: `${isIndustrial ? 'Industrial' : isConsumer ? 'Consumer' : 'General-purpose'} bipedal humanoid robot, ${massKg} kg / ${heightM.toFixed(2)} m / ${dofCount} DOF (legs ${dofLegs} + arms ${dofArms} + waist/neck ${dofWaistNeck} + hands ${dofHands}). ${payloadKg} kg payload at arm extension, ${walkingSpeedMs.toFixed(1)} m/s walking. ${battEnergyKwh.toFixed(2)} kWh ${dcBusVoltage} V Li-ion pack (${batteryMassKg.toFixed(1)} kg @ ${batteryPackSpecificEnergyWhKg} Wh/kg pack), ${batteryRuntimeHr.toFixed(1)} hr runtime @ ${avgPowerW.toFixed(0)} W avg. ${computeTops} TOPS Jetson Orin compute, ${cameraCount} cameras + ${imuCount} IMU + ${ftSensorCount} FT + ${tofLidarCount} ToF lidar. ${frameMaterial.replace('_', ' + ')} frame ${frameMassKg.toFixed(1)} kg. ${dofHands >= 10 ? '5-finger dexterous hands' : '2-finger grippers'}. ${isIndustrial ? 'ISO 10218-1 + TS 15066 industrial safety' : isConsumer ? 'ISO 13482 personal-care robot' : 'general-purpose'}. Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })} (≈£${Math.round(macroAssemblyTotal).toLocaleString()}/unit vs £25k-150k production-scale per-unit benchmark).`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
 })
 
 // ---------------- dac -----------------------------
+// Full archetype contract — replaces buildMinimalContract stub. Direct
+// Air Capture plant (Climeworks Orca/Mammoth / Carbon Engineering / Heirloom
+// / Verdox / Global Thermostat class). Modelled on bess / wind_turbine
+// pattern. Macro prices grounded in IEA Direct Air Capture: A Key
+// Technology for Net Zero 2022 + RMI The State of Climate Tech 2024 +
+// Climeworks Mammoth public disclosures + Carbon Engineering DAC1 cost
+// model. Installed £400-1500/tCO₂/yr (per INSTALLED_ASP_BENCHMARKS;
+// solid-sorbent lower band, liquid-hydroxide upper band including
+// pellet-reactor + calciner + slaker).
 registerArchetype('dac', (brief: any) => {
   const desc = String(brief?.product_description ?? '')
   const tp = brief?.constraints?.target_performance ?? {}
+  // Capture capacity (t CO₂ / year) — primary brief variable. Accept
+  // t/yr, kt/yr, Mt/yr. Reject if unit is concentration (ppm) or % capture.
   const captureTonsYr = (() => {
+    const descCap = desc.match(/(\d{1,4}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(t|kt|mt|tonne[s]?|metric\s+ton[s]?|tons?)\s*(?:CO2|CO₂)?\s*(?:\/|per)?\s*(?:yr|year|annum|a)/i)
+      ?? desc.match(/capture[\s:]{0,8}(\d{1,4}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(t|kt|mt|tonne[s]?)\s*(?:CO2|CO₂)?\s*(?:\/|per)?\s*(?:yr|year|annum)?/i)
+    if (descCap) {
+      const v = parseFloat(descCap[1].replace(/,/g, ''))
+      const unit = descCap[2].toLowerCase()
+      if (unit === 'mt' || unit === 'megaton' || unit === 'megatonne') return v * 1_000_000
+      if (unit === 'kt' || unit === 'kiloton' || unit === 'kilotonne') return v * 1000
+      return v
+    }
     const u = String(tp.unit ?? '').toLowerCase()
-    if (u === 'mt' || u === 'mt/yr' || u === 'megaton_yr') return Number(tp.value ?? 0) * 1e6
-    if (u === 'kt' || u === 'kt/yr') return Number(tp.value ?? 0) * 1000
-    return Number(tp.value ?? 1000)
+    if (Number(tp.value ?? 0) > 0) {
+      if (u === 'mt' || u === 'mt/yr' || u === 'megaton_yr' || u === 'megatonne') return Number(tp.value) * 1_000_000
+      if (u === 'kt' || u === 'kt/yr' || u === 'kiloton') return Number(tp.value) * 1000
+      if (u === 't/yr' || u === 'tonne' || u === 'ton' || u === 't') return Number(tp.value)
+      // Wrong unit (ppm, %, kJ/mol) → fall to default
+    }
+    return 1000  // class default: 1 kt/yr pilot plant
   })()
-  const sorbentType = /mof/i.test(desc) ? 2 : /koh|hydroxide/i.test(desc) ? 3 : /zeolite/i.test(desc) ? 4 : 1
-  const energyGjTon = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*GJ\/(?:ton|tonne)/i, 8)
-  const costPerTonGbp = extractRangeFromDesc(desc, /£?(\d{2,4})\s*\/?\s*(?:ton|tonne)/i, 400)
-  const q1 = {
-    capture_rate_tons_co2_per_year: q(captureTonsYr, 't/yr', 'flow_rate', 'rated', 'system', 'brief'),
-    sorbent_type: q(sorbentType, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'enum: 1=amine_silica, 2=MOF, 3=KOH, 4=zeolite' }),
-    regeneration_energy_gj_per_ton: q(energyGjTon, 'GJ/t', 'energy', 'rated', 'system', 'brief'),
-    target_cost_gbp_per_ton: q(costPerTonGbp, 'GBP/t', 'currency', 'rated', 'system', 'brief'),
-  } as Record<string, Quantity>
-  return buildMinimalContract('dac', brief, q1, `DAC plant, ${captureTonsYr} t CO2/yr, sorbent type ${sorbentType}, ${energyGjTon} GJ/t regen energy, target £${costPerTonGbp}/t.`)
+  // Sorbent class enum (1-4) — choice drives nearly every downstream parameter
+  //   1 = solid amine on silica (Climeworks / Heirloom / Global Thermostat)
+  //   2 = metal-organic framework (MOF) (Verdox electroswing-class)
+  //   3 = liquid potassium hydroxide / sodium hydroxide (Carbon Engineering)
+  //   4 = zeolite / molecular sieve (research scale)
+  const sorbentType: 1 | 2 | 3 | 4 = /mof|metal[\s-]?organic[\s-]?framework/i.test(desc) ? 2
+    : /koh|naoh|hydroxide|liquid[\s-]?solvent|sodium[\s-]?hydroxide|carbon\s+engineering/i.test(desc) ? 3
+    : /zeolite|molecular[\s-]?sieve/i.test(desc) ? 4
+    : 1
+  // Process — high-temperature swing (HT) for liquid, low-temperature swing
+  // (LT, vacuum + steam <120°C) for solid amine/MOF.
+  const isHighTempProcess = sorbentType === 3 || /high[\s-]?temp|calciner|900\s*°?C/i.test(desc)
+  // Regeneration temperature (°C) — drives energy footprint:
+  //   Solid amine: 90-120°C (steam or hot air); LT-DAC
+  //   MOF: 85-120°C; LT-DAC, vacuum-assisted
+  //   Liquid KOH: 900°C (calciner for CaCO₃→CaO+CO₂); HT-DAC
+  //   Zeolite: 250°C; medium-temp
+  const regenTempC = extractRangeFromDesc(desc, /(\d{2,4})\s*°?C\s*(?:regen|reactiv|swing)/i,
+    sorbentType === 3 ? 900 : sorbentType === 4 ? 250 : 100)
+  // Energy intensity GJ per t CO₂ — sorbent-class specific:
+  //   Solid amine: 5-10 GJ/t (60% thermal low-grade heat + 40% electricity)
+  //   MOF: 4-8 GJ/t (vacuum-assisted, lower thermal duty)
+  //   Liquid hydroxide: 8-14 GJ/t (high-temp calciner)
+  //   Zeolite: 7-10 GJ/t
+  const energyGjPerTon = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*GJ\/(?:ton|tonne|t)/i,
+    sorbentType === 1 ? 7.5 : sorbentType === 2 ? 6 : sorbentType === 3 ? 10 : 8)
+  // Split thermal / electrical intensity
+  const thermalFraction = sorbentType === 3 ? 0.75 : sorbentType === 2 ? 0.55 : 0.65
+  const thermalGjPerTon = energyGjPerTon * thermalFraction
+  const electricalGjPerTon = energyGjPerTon * (1 - thermalFraction)
+  // Continuous power demand. (GJ/tCO2 × tCO2/yr) → MW.
+  // Conversion: 1 GJ/yr = 1e9 J / (8760×3600 s) = 31.71 W = 31.71e-6 MW
+  // So MW = energyGjPerTon × captureTonsYr × 1e9 / 31_536_000 / 1e6
+  //       = (energyGjPerTon × captureTonsYr) / 31_536
+  const totalContinuousMw = (energyGjPerTon * captureTonsYr) / 31_536
+  const electricalContinuousMw = totalContinuousMw * (1 - thermalFraction)
+  const thermalContinuousMw = totalContinuousMw * thermalFraction
+  // Capture efficiency at design — typical 85-95% at design air-flow.
+  // Atmospheric CO₂ ≈ 420 ppm → mass concentration 0.00076 kg CO₂/m³ air.
+  const captureEfficiencyAtDesign = sorbentType === 3 ? 0.95 : sorbentType === 2 ? 0.92 : 0.85
+  // Air mass flow needed per ton CO₂ captured (theoretical, then divided by efficiency)
+  const co2MassConcKgPerM3 = 0.00076  // 420 ppm × 44/29 × air density
+  const airFlowM3PerTon = 1000 / (co2MassConcKgPerM3 * captureEfficiencyAtDesign)  // ~1.5M m³ air per t CO₂
+  const annualAirFlowM3 = airFlowM3PerTon * captureTonsYr
+  // Contactor face velocity — typical 1.5-3 m/s for solid amine; 4-6 m/s
+  // for MOF (lower pressure drop). Carbon Engineering 1-2 m/s through
+  // PVC fill in cross-flow cooling-tower-like contactor.
+  const contactorFaceVelocityMs = sorbentType === 3 ? 1.5 : sorbentType === 2 ? 5 : 2.2
+  // Required contactor face area (m²) — annual / (face_velocity × s/yr × utilisation)
+  const utilisationFactor = 0.85  // capacity factor
+  const contactorFaceAreaM2 = annualAirFlowM3 / (contactorFaceVelocityMs * 3600 * 8760 * utilisationFactor)
+  // Sorbent inventory — solid amine inventory grows ~ 30-60 t per kt/yr capture
+  //   (Climeworks Orca 4 kt/yr → 250 t amine inventory).
+  const sorbentInventoryT = sorbentType === 3 ? captureTonsYr * 0.02  // liquid is much less per kt due to continuous turnover
+    : sorbentType === 1 ? captureTonsYr * 0.05
+    : sorbentType === 2 ? captureTonsYr * 0.04  // MOF higher uptake per kg
+    : captureTonsYr * 0.03
+  // Sorbent lifetime cycles — drives replacement cost
+  //   Solid amine: 1500-3000 cycles before 30% capacity loss; replace every 3-5 yr
+  //   MOF: 2000-5000 cycles
+  //   Liquid hydroxide: 500-1000 cycles before degradation
+  //   Zeolite: 5000-10000 cycles (most stable)
+  const sorbentLifetimeCycles = sorbentType === 4 ? 7000 : sorbentType === 2 ? 3500 : sorbentType === 3 ? 750 : 2200
+  const sorbentReplacementYears = sorbentLifetimeCycles / 365  // ~6 cycles/day typical
+  // Water consumption — solid amine produces water as byproduct; liquid needs
+  // make-up. Typical < 5 L/kg CO₂ for solid; 1-3 L/kg for liquid (loop closes).
+  const waterConsumptionLPerKgCo2 = sorbentType === 3 ? 4 : sorbentType === 1 ? 2 : 1.5
+  // CO₂ purity required for sequestration / utilisation
+  //   For geological storage: ≥95% (allow some H₂O + N₂ contamination)
+  //   For food-grade utilisation (e.g. carbonation): ≥99.97%
+  //   For methanol/synfuel production: ≥99.5%
+  const co2PurityPctRequired = /food|beverage|carbonation/i.test(desc) ? 99.97
+    : /methanol|synfuel|sustainable\s+aviation|jet/i.test(desc) ? 99.5
+    : 96
+  // CO₂ compression train pressure (bar) — typical pipeline injection 100-150 bar;
+  // geological storage may require 200 bar at depth.
+  const co2CompressionPressureBar = extractRangeFromDesc(desc, /(\d{2,4})\s*bar/i,
+    /pipeline|sequest|inject/i.test(desc) ? 150 : 100)
+  // CO₂ compression power (electrical) — typical 0.10-0.15 kWh/kg CO₂ for
+  // 1→100 bar 4-stage centrifugal with intercooling.
+  // Conversion: kWh/kg × t/yr × 1000 kg/t = kWh/yr; / 8760 h/yr = kW; / 1000 = MW.
+  const compressionKwhPerKg = 0.12
+  const compressionMw = (compressionKwhPerKg * captureTonsYr * 1000) / 8760 / 1000
+  // Modular contactor cells. Climeworks design uses 70 t/yr "collectors"
+  // (cube-shaped fan boxes); Carbon Engineering uses ~10 kt/yr 20-m-tall
+  // cross-flow contactor towers.
+  const modularCollectorTonsPerUnit = sorbentType === 3 ? 10000 : 70
+  const numCollectorModules = Math.ceil(captureTonsYr / modularCollectorTonsPerUnit)
+  // Cost per ton at scale — target. Brief override otherwise.
+  const targetCostPerTonGbp = extractRangeFromDesc(desc, /£?(\d{2,4})\s*\/?\s*(?:t|ton|tonne)/i, 400)
+
+  const quantities: Record<string, Quantity> = {
+    capture_capacity_tco2_per_year: q(captureTonsYr, 't/yr', 'flow_rate', 'rated', 'system', 'brief'),
+    sorbent_class: q(sorbentType, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=solid amine on silica, 2=MOF metal-organic framework, 3=liquid KOH/NaOH (HT process), 4=zeolite' }),
+    process_type: q(isHighTempProcess ? 2 : 1, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=low-temp swing (LT-DAC, <120°C), 2=high-temp swing (HT-DAC, calciner ≥900°C)' }),
+    regeneration_temperature_c: q(regenTempC, '°C', 'temperature', 'max', 'system', 'physics_constant', { source_detail: 'solid amine 90-120 / MOF 85-120 / liquid hydroxide 900 (calciner) / zeolite 250' }),
+    energy_intensity_gj_per_tco2: q(energyGjPerTon, 'GJ/t', 'energy', 'rated', 'system', 'brief', { source_detail: 'thermal + electrical aggregate per t CO₂ captured' }),
+    thermal_energy_gj_per_tco2: q(thermalGjPerTon, 'GJ/t', 'energy', 'rated', 'system', 'calculator'),
+    electrical_energy_gj_per_tco2: q(electricalGjPerTon, 'GJ/t', 'energy', 'rated', 'system', 'calculator'),
+    total_continuous_power_mw: q(totalContinuousMw, 'MW', 'power', 'continuous', 'system', 'calculator'),
+    electrical_continuous_power_mw: q(electricalContinuousMw, 'MW', 'power', 'continuous', 'system', 'calculator'),
+    thermal_continuous_power_mw: q(thermalContinuousMw, 'MW', 'power', 'continuous', 'system', 'calculator'),
+    capture_efficiency_at_design: q(captureEfficiencyAtDesign, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'solid amine 85% / MOF 92% / liquid hydroxide 95% / zeolite 88%' }),
+    co2_inlet_concentration_ppm: q(420, 'ppm', 'dimensionless', 'typical', 'system', 'physics_constant', { source_detail: 'atmospheric CO₂ 2024-2026 baseline 420-425 ppm' }),
+    air_flow_m3_per_tco2: q(airFlowM3PerTon, 'm³/t', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '1000 / (CO₂_mass_concentration × efficiency); ~1.5-2 million m³ air per t CO₂' }),
+    annual_air_throughput_m3: q(annualAirFlowM3, 'm³/yr', 'flow_rate', 'rated', 'system', 'calculator'),
+    contactor_face_velocity_ms: q(contactorFaceVelocityMs, 'm/s', 'velocity', 'rated', 'module', 'physics_constant', { source_detail: 'solid amine 1.5-3 / MOF 4-6 / liquid hydroxide cross-flow 1-2' }),
+    contactor_face_area_m2: q(contactorFaceAreaM2, 'm²', 'area', 'aperture', 'system', 'calculator', { source_detail: 'annual_air_flow / (face_velocity × seconds_per_year × utilisation 0.85)' }),
+    sorbent_inventory_tonnes: q(sorbentInventoryT, 't', 'mass', 'gross', 'module', 'calculator', { source_detail: 'Climeworks Orca 4 kt/yr → ~200 t amine inventory benchmark' }),
+    sorbent_lifetime_cycles: q(sorbentLifetimeCycles, '', 'dimensionless', 'lifetime', 'module', 'physics_constant'),
+    sorbent_replacement_interval_years: q(sorbentReplacementYears, 'yr', 'time', 'cycle', 'module', 'calculator'),
+    water_consumption_l_per_kg_co2: q(waterConsumptionLPerKgCo2, 'L/kg', 'flow_rate', 'rated', 'system', 'physics_constant', { source_detail: 'solid amine 1-3 / MOF 1-2 / liquid hydroxide 3-5 (make-up water for evaporative loss)' }),
+    co2_purity_required_pct: q(co2PurityPctRequired, '%', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'geological storage ≥95%, methanol/synfuel ≥99.5%, food-grade ≥99.97%' }),
+    co2_compression_pressure_bar: q(co2CompressionPressureBar, 'bar', 'pressure', 'rated', 'module', 'brief', { source_detail: 'pipeline injection 100-150 bar typical; deep saline aquifer up to 200 bar' }),
+    co2_compression_power_mw: q(compressionMw, 'MW', 'power', 'continuous', 'module', 'calculator'),
+    num_collector_modules: q(numCollectorModules, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `${modularCollectorTonsPerUnit} t/yr per module (${sorbentType === 3 ? 'large cross-flow contactor tower' : 'modular collector cube'})` }),
+    target_cost_gbp_per_tco2: q(targetCostPerTonGbp, 'GBP/t', 'currency', 'rated', 'system', 'brief'),
+  }
+
+  // Topology constraints — typed edges. DAC has dual mass-transport
+  // (air loop for adsorption + steam/heat loop for desorption + CO₂
+  // compression train downstream) overlaid with electrical (fans + pumps
+  // + compressors) and thermal (heat-recovery between regen and incoming).
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'ambient_air_intake',
+      to_part: 'contactor_structure',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: annualAirFlowM3 / (8760 * 3600),  // m³/s
+      required_unit: 'm³/s',
+      required_margin_factor: 1.2,
+      material_context: sorbentType === 3
+        ? 'cross-flow_contactor_PVC_fill_with_recirculating_KOH_spray'
+        : sorbentType === 2
+        ? 'monolithic_MOF_structured_packing_with_axial_air_flow'
+        : 'modular_sorbent_bed_cubes_with_axial_fan_intake',
+    },
+    {
+      from_part: 'electrical_grid_input',
+      to_part: 'fan_array_motors',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (electricalContinuousMw * 0.4 * 1_000_000) / (3 * 415),  // 40% of electricity to fans, three-phase
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+      material_context: '415_V_three_phase_grid_supply_with_VFD_for_variable_air_flow_control_per_IEC_60204',
+    },
+    {
+      from_part: 'contactor_structure',
+      to_part: 'regeneration_skid',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: thermalContinuousMw,
+      required_unit: 'MW',
+      required_margin_factor: 1.15,
+      material_context: isHighTempProcess
+        ? 'calciner_900C_natural_gas_or_electric_resistance_or_hydrogen_combustion'
+        : 'steam_supply_100-120C_from_waste_heat_or_low-grade_geothermal_or_electric_heat_pump',
+    },
+    {
+      from_part: 'regeneration_skid',
+      to_part: 'co2_compression_train',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: captureTonsYr / 8760,  // t/hr
+      required_unit: 't/hr',
+      material_context: '4-stage_centrifugal_or_reciprocating_compressor_with_intercooling_water_or_air_cooled',
+    },
+    {
+      from_part: 'co2_compression_train',
+      to_part: 'pipeline_injection_point',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: co2CompressionPressureBar,
+      required_unit: 'bar',
+      material_context: `dense_phase_CO2_at_${co2CompressionPressureBar}_bar_for_pipeline_or_well_injection_per_ASME_B31.4_pipeline_code`,
+    },
+    {
+      from_part: 'regeneration_steam',
+      to_part: 'heat_recovery_loop',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: thermalContinuousMw * 0.4,  // 40% heat recovery typical
+      required_unit: 'MW',
+      material_context: 'plate_or_shell_tube_heat_exchanger_recovers_low-grade_heat_from_outgoing_steam_to_preheat_incoming_air_or_water',
+    },
+    {
+      from_part: 'control_system',
+      to_part: 'fan_compressor_valves',
+      mechanism: 'data',
+      constraint_kind: 'data_bandwidth',
+      required_value: 100,
+      required_unit: 'Hz',
+      material_context: 'plant_DCS_per_IEC_62443_with_SIS_safety-instrumented_system_for_high-temp_calciner_or_solvent_loop',
+    },
+    {
+      from_part: 'water_treatment_plant',
+      to_part: 'process_water_supply',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: waterConsumptionLPerKgCo2 * captureTonsYr,  // L/yr; convert downstream
+      required_unit: 'L/yr',
+      material_context: 'deionised_water_supply_for_sorbent_replenishment_and_make-up_for_evaporative_losses',
+    },
+    {
+      from_part: 'foundation_pad',
+      to_part: 'collector_modules',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: numCollectorModules * (sorbentType === 3 ? 500_000 : 8000),  // kg
+      required_unit: 'kg',
+      required_margin_factor: 1.5,
+      material_context: 'reinforced_concrete_slab_or_piled_foundation_designed_for_wind_load_+_seismic_class_per_local_code',
+    },
+  ]
+
+  // Macro-assembly pricing — Climeworks Mammoth + Carbon Engineering DAC1
+  // + Heirloom + Verdox public disclosures + IEA 2022 DAC cost analysis.
+  // Word names chosen for ≥0.66 token overlap with Stage 1.7 emissions
+  // (contactor_structure, sorbent_inventory, regeneration_skid,
+  // co2_compression_train, heat_recovery_loop, control_system, foundation,
+  // power_supply_infrastructure, water_treatment).
+  // Pricing per kt/yr at scale (FOAK 2024):
+  //   Contactor (fans + ducts + structural cage):
+  //     Solid amine: £180/(tCO2/yr) — modular collector cubes
+  //     MOF:         £150/(tCO2/yr) — lower pressure drop, smaller fans
+  //     Liquid hydroxide: £120/(tCO2/yr) — single large tower more efficient at MW scale
+  //   Sorbent inventory:
+  //     Solid amine: £85/kg sorbent (silica-supported amine)
+  //     MOF:         £450/kg (early-stage premium; declining)
+  //     Liquid KOH:  £1.2/kg (cheap but high turnover)
+  //     Zeolite:     £25/kg
+  //   Regeneration skid (heat exchangers + vacuum pumps OR calciner):
+  //     LT-DAC: £35/(tCO2/yr) — heat exchangers + vacuum pumps
+  //     HT-DAC (with calciner): £180/(tCO2/yr) — natural-gas/H2 calciner is dominant
+  //   CO₂ compression train: £140/(tCO2/yr) — 4-stage centrifugal + intercooling
+  //   Heat recovery: £45/(tCO2/yr) — plate + shell-tube exchangers
+  //   Control system + DCS: £180k flat + £8/(tCO2/yr) — SIS for HT-DAC
+  //   Foundation (concrete + piles): £25/(tCO2/yr)
+  //   Power supply (transformer + switchgear + cabling): £85/(tCO2/yr)
+  //   Water treatment (DI + RO): £15/(tCO2/yr)
+  const contactorPerTon = sorbentType === 3 ? 120 : sorbentType === 2 ? 150 : 180
+  const sorbentPricePerKg = sorbentType === 1 ? 85 : sorbentType === 2 ? 450 : sorbentType === 3 ? 1.2 : 25
+  const sorbentMassKg = sorbentInventoryT * 1000
+  const regenSkidPerTon = isHighTempProcess ? 180 : 35
+  const compressionTrainPerTon = 140
+  const heatRecoveryPerTon = 45
+  const foundationPerTon = 25
+  const powerSupplyPerTon = 85
+  const waterTreatmentPerTon = 15
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'contactor_structure_with_fans',
+      unit_price_gbp: contactorPerTon,
+      dimension_basis: 'each',
+      dimension_value: captureTonsYr,
+      total_gbp: contactorPerTon * captureTonsYr,
+      source_detail: `£${contactorPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (${sorbentType === 3 ? 'cross-flow contactor tower with PVC fill + KOH spray + axial fans, Carbon Engineering DAC1 class' : sorbentType === 2 ? 'monolithic MOF structured packing + axial-flow fans + housing' : 'modular collector cubes with axial fans, ducts, sorbent baskets, structural cage; Climeworks/Heirloom class'}; ${numCollectorModules} units of ${modularCollectorTonsPerUnit} t/yr each; ${contactorFaceAreaM2.toFixed(0)} m² total face area @ ${contactorFaceVelocityMs} m/s)`,
+    },
+    {
+      word_name: 'sorbent_inventory',
+      unit_price_gbp: sorbentPricePerKg,
+      dimension_basis: 'kg_mass',
+      dimension_value: sorbentMassKg,
+      total_gbp: sorbentPricePerKg * sorbentMassKg,
+      source_detail: `£${sorbentPricePerKg}/kg × ${sorbentMassKg.toFixed(0)} kg (${sorbentType === 1 ? 'amine-functionalised silica or PEI on porous silica gel; ~3-5 yr replacement' : sorbentType === 2 ? 'MOF MIL-101 or amine-grafted MOF; early-stage premium, declining cost trajectory' : sorbentType === 3 ? 'KOH/NaOH solution; high turnover (~1.5 yr lifetime) but cheap make-up' : 'zeolite 13X molecular sieve; longest lifetime but lower CO₂ uptake per kg'}); annual replacement cost ~£${(sorbentPricePerKg * sorbentMassKg / sorbentReplacementYears).toLocaleString(undefined, { maximumFractionDigits: 0 })}/yr`,
+    },
+    {
+      word_name: 'regeneration_skid',
+      unit_price_gbp: regenSkidPerTon,
+      dimension_basis: 'each',
+      dimension_value: captureTonsYr,
+      total_gbp: regenSkidPerTon * captureTonsYr,
+      source_detail: `£${regenSkidPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (${isHighTempProcess ? `${regenTempC}°C calciner — natural-gas, hydrogen or electric resistance heating; lime slaker; refractory-lined rotary kiln; £180/(tCO₂/yr) dominant cost at HT-DAC scale` : `${regenTempC}°C steam regeneration — plate + shell-tube heat exchangers + dry vacuum pumps + valves + piping; can run on waste heat from adjacent facility`})`,
+    },
+    {
+      word_name: 'co2_compression_train',
+      unit_price_gbp: compressionTrainPerTon,
+      dimension_basis: 'each',
+      dimension_value: captureTonsYr,
+      total_gbp: compressionTrainPerTon * captureTonsYr,
+      source_detail: `£${compressionTrainPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (4-stage centrifugal compressor 1 → ${co2CompressionPressureBar} bar with water-cooled intercooling, moisture knock-out drum, molecular sieve dehydrator to ≤50 ppm H₂O, MAN/Atlas Copco/Mitsubishi class; ${compressionMw.toFixed(2)} MW electric drive)`,
+    },
+    {
+      word_name: 'heat_recovery_loop',
+      unit_price_gbp: heatRecoveryPerTon,
+      dimension_basis: 'each',
+      dimension_value: captureTonsYr,
+      total_gbp: heatRecoveryPerTon * captureTonsYr,
+      source_detail: `£${heatRecoveryPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (plate heat exchangers + shell-tube economiser recovering ~40% of regen heat into incoming air or process water; cuts thermal demand by ~20-30%)`,
+    },
+    {
+      word_name: 'control_system_dcs',
+      unit_price_gbp: 180_000 + 8 * captureTonsYr,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 180_000 + 8 * captureTonsYr,
+      source_detail: `£${(180_000 + 8 * captureTonsYr).toLocaleString()} (Emerson DeltaV or Honeywell Experion DCS + ${isHighTempProcess ? 'SIL-2 SIS for calciner trip + fuel-isolation per IEC 61511' : 'standard process control'}; HMI + historian + cybersecurity per IEC 62443)`,
+    },
+    {
+      word_name: 'foundation_concrete',
+      unit_price_gbp: foundationPerTon,
+      dimension_basis: 'each',
+      dimension_value: captureTonsYr,
+      total_gbp: foundationPerTon * captureTonsYr,
+      source_detail: `£${foundationPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (reinforced concrete slab + piled foundation for contactor + regen + compression infrastructure; designed for wind loading + seismic per local code)`,
+    },
+    {
+      word_name: 'power_supply_infrastructure',
+      unit_price_gbp: powerSupplyPerTon,
+      dimension_basis: 'each',
+      dimension_value: captureTonsYr,
+      total_gbp: powerSupplyPerTon * captureTonsYr,
+      source_detail: `£${powerSupplyPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (${electricalContinuousMw.toFixed(1)} MW supply: 11/33 kV step-down transformer + MV switchgear + LV distribution + cabling; grid-connected or co-located with renewable generation)`,
+    },
+    {
+      word_name: 'water_treatment_plant',
+      unit_price_gbp: waterTreatmentPerTon,
+      dimension_basis: 'each',
+      dimension_value: captureTonsYr,
+      total_gbp: waterTreatmentPerTon * captureTonsYr,
+      source_detail: `£${waterTreatmentPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (RO + DI water for sorbent make-up + cooling; ~${(waterConsumptionLPerKgCo2 * captureTonsYr).toLocaleString()} L/yr process water demand)`,
+    },
+  ]
+
+  // Closures — design-rule gates
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'capture_efficiency_above_85pct_at_design',
+    status: captureEfficiencyAtDesign >= 0.85 ? 'pass' : captureEfficiencyAtDesign >= 0.75 ? 'warn' : 'fail',
+    measured: captureEfficiencyAtDesign,
+    required: '≥85% capture efficiency at design air-flow (single-pass through contactor)',
+    reason: `Capture efficiency ${(captureEfficiencyAtDesign * 100).toFixed(0)}% at design face velocity ${contactorFaceVelocityMs} m/s. Below 85% means high air-throughput multiplier; below 75% economics become marginal.`,
+  })
+  closures.push({
+    invariant_id: 'energy_intensity_within_class_band',
+    status: (sorbentType === 1 && energyGjPerTon >= 5 && energyGjPerTon <= 10)
+         || (sorbentType === 2 && energyGjPerTon >= 4 && energyGjPerTon <= 8)
+         || (sorbentType === 3 && energyGjPerTon >= 8 && energyGjPerTon <= 14)
+         || (sorbentType === 4 && energyGjPerTon >= 7 && energyGjPerTon <= 10) ? 'pass' : 'warn',
+    measured: energyGjPerTon,
+    required: sorbentType === 1 ? '5-10 GJ/tCO₂ (solid amine band)'
+      : sorbentType === 2 ? '4-8 GJ/tCO₂ (MOF band — lower thermal duty via vacuum)'
+      : sorbentType === 3 ? '8-14 GJ/tCO₂ (liquid hydroxide HT-DAC band — calciner-dominated)'
+      : '7-10 GJ/tCO₂ (zeolite band)',
+    reason: `Energy intensity ${energyGjPerTon.toFixed(1)} GJ/tCO₂ (${thermalGjPerTon.toFixed(1)} thermal + ${electricalGjPerTon.toFixed(1)} electrical). Outside band signals unrealistic sorbent performance or process integration gap.`,
+  })
+  closures.push({
+    invariant_id: 'water_consumption_below_5l_per_kg_co2',
+    status: waterConsumptionLPerKgCo2 <= 5 ? 'pass' : 'warn',
+    measured: waterConsumptionLPerKgCo2,
+    required: '≤5 L water/kg CO₂ captured — siting-feasibility threshold in arid regions (Carbon Engineering target 3-4 L/kg; Climeworks solid amine 1-2 L/kg)',
+    reason: `Water consumption ${waterConsumptionLPerKgCo2.toFixed(1)} L/kg CO₂. >5 L/kg restricts siting to humid regions; restricts ability to co-locate with geological storage in arid basins.`,
+  })
+  closures.push({
+    invariant_id: 'sorbent_lifetime_economic_threshold',
+    status: sorbentLifetimeCycles >= 1000 ? 'pass' : sorbentLifetimeCycles >= 500 ? 'warn' : 'fail',
+    measured: sorbentLifetimeCycles,
+    required: '≥1000 cycles before 30% capacity loss — minimum for cost-effective sorbent amortisation (solid amine 1500-3000, MOF 2000-5000, KOH 500-1000, zeolite 5000+)',
+    reason: `Sorbent lifetime ${sorbentLifetimeCycles} cycles → ${sorbentReplacementYears.toFixed(1)} yr at 6 cycles/day. Annual replacement cost £${(sorbentPricePerKg * sorbentMassKg / sorbentReplacementYears).toLocaleString(undefined, { maximumFractionDigits: 0 })}/yr; if cycles <1000 OpEx becomes prohibitive.`,
+  })
+  closures.push({
+    invariant_id: 'co2_purity_meets_downstream_use',
+    status: co2PurityPctRequired <= 99.97 ? 'pass' : 'warn',
+    measured: co2PurityPctRequired,
+    required: 'Geological storage ≥95%, methanol/synfuel ≥99.5%, food-grade ≥99.97% per ISO 5145 / EIGA Doc 70',
+    reason: `Required ${co2PurityPctRequired}% purity ${co2PurityPctRequired >= 99.97 ? '— requires additional polish unit (molecular sieve + activated carbon + cryogenic distillation) beyond standard DAC train' : '— achievable with standard 4-stage compression + mol-sieve drying + KO drum sequence'}.`,
+  })
+  closures.push({
+    invariant_id: 'cost_per_ton_within_class_band',
+    status: targetCostPerTonGbp >= 200 && targetCostPerTonGbp <= 1500 ? 'pass' : 'warn',
+    measured: targetCostPerTonGbp,
+    required: '£200-1500/tCO₂ installed (solid amine 400-1000, liquid hydroxide 500-1500, MOF early-stage 800-2000 declining)',
+    reason: `Target £${targetCostPerTonGbp}/tCO₂. <£200 unrealistic at current technology readiness; >£1500 indicates either FOAK premium or process inefficiency. DOE Carbon Negative Shot target £80/tCO₂ by 2050.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+  const installedAspPerTon = macroAssemblyTotal / captureTonsYr
+
+  return {
+    product_class: 'dac',
+    brief_summary: `${(captureTonsYr / 1000).toFixed(1)} kt CO₂/yr direct air capture plant, ${sorbentType === 1 ? 'solid amine' : sorbentType === 2 ? 'MOF' : sorbentType === 3 ? 'liquid hydroxide (HT-DAC with calciner)' : 'zeolite'} sorbent (${sorbentInventoryT.toFixed(1)} t inventory, ${sorbentLifetimeCycles} cycles / ${sorbentReplacementYears.toFixed(1)} yr replacement). ${energyGjPerTon.toFixed(1)} GJ/tCO₂ regeneration energy (${thermalGjPerTon.toFixed(1)} thermal @ ${regenTempC}°C + ${electricalGjPerTon.toFixed(1)} electrical). ${totalContinuousMw.toFixed(1)} MW total demand (${electricalContinuousMw.toFixed(1)} MW elec + ${thermalContinuousMw.toFixed(1)} MW thermal). ${numCollectorModules} × ${modularCollectorTonsPerUnit} t/yr collector modules, ${contactorFaceAreaM2.toFixed(0)} m² face area @ ${contactorFaceVelocityMs} m/s. ${(captureEfficiencyAtDesign * 100).toFixed(0)}% capture efficiency at design. ${waterConsumptionLPerKgCo2} L/kg water consumption. CO₂ output ${co2PurityPctRequired}% purity @ ${co2CompressionPressureBar} bar. Macro-assembly raw BoM = £${(macroAssemblyTotal / 1_000_000).toFixed(1)}M (≈£${installedAspPerTon.toFixed(0)}/(tCO₂/yr) vs £400-1500/(tCO₂/yr) installed benchmark; target £${targetCostPerTonGbp}/tCO₂ OpEx).`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
 })
 
 // ---------------------------------------------------------------------------

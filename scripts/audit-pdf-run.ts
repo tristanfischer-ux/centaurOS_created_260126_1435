@@ -44,7 +44,7 @@ import { join, basename, dirname } from 'node:path'
 // Industry-typical installed ASP per unit of rated capacity, GBP. Used to
 // flag cost models that are >3× under or over benchmark.
 // Sources: BNEF 2024, IEA 2023, Bioplan 2023, Wood Mackenzie 2024.
-const INSTALLED_ASP_BENCHMARKS: Record<string, { unit: 'mw' | 'kwh' | 'l' | 'kw_thermal' | 'kw_charge'; gbp_per_unit_low: number; gbp_per_unit_high: number; capacity_key: string }> = {
+const INSTALLED_ASP_BENCHMARKS: Record<string, { unit: 'mw' | 'kwh' | 'l' | 'kw_thermal' | 'kw_charge' | 'tco2_per_yr'; gbp_per_unit_low: number; gbp_per_unit_high: number; capacity_key: string }> = {
   wind_turbine:         { unit: 'mw',         gbp_per_unit_low:    800_000, gbp_per_unit_high: 1_500_000, capacity_key: 'rated_power_kw' },
   solar_inverter:       { unit: 'kw_charge',  gbp_per_unit_low:         80, gbp_per_unit_high:       250, capacity_key: 'rated_power_kw' },
   h2_electrolyser:      { unit: 'kw_charge',  gbp_per_unit_low:        800, gbp_per_unit_high:     2_500, capacity_key: 'rated_power_kw' },
@@ -55,6 +55,7 @@ const INSTALLED_ASP_BENCHMARKS: Record<string, { unit: 'mw' | 'kwh' | 'l' | 'kw_
   ups_inverter:         { unit: 'kw_charge',  gbp_per_unit_low:        400, gbp_per_unit_high:     1_200, capacity_key: 'rated_power_kw' },
   pemfc:                { unit: 'kw_charge',  gbp_per_unit_low:      1_500, gbp_per_unit_high:     4_000, capacity_key: 'rated_power_kw' },
   smr:                  { unit: 'mw',         gbp_per_unit_low:  4_000_000, gbp_per_unit_high: 8_000_000, capacity_key: 'rated_power_kw' },
+  dac:                  { unit: 'tco2_per_yr',gbp_per_unit_low:        400, gbp_per_unit_high:     1_500, capacity_key: 'capture_capacity_tco2_per_year' },
 }
 
 interface AuditFinding {
