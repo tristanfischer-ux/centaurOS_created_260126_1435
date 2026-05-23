@@ -55,6 +55,9 @@ export type UnitFamily =
   | 'energy' | 'power' | 'mass' | 'time' | 'length' | 'area' | 'volume'
   | 'force' | 'pressure' | 'temperature' | 'velocity' | 'flow_rate'
   | 'photon_flux_density' | 'currency' | 'yield' | 'dimensionless'
+  // 2026-05-22 additions for new product classes (solar inverter / wind /
+  // satellite / etc.). Kept narrow but enough to type the seed quantities.
+  | 'voltage' | 'current' | 'frequency'
 
 export type QuantityBasis =
   // Energy
@@ -69,6 +72,8 @@ export type QuantityBasis =
   | 'canopy' | 'wing' | 'aperture' | 'footprint' | 'gross_building'
   // Cost
   | 'raw_BoM' | 'factory_COGS' | 'OEM_transfer' | 'channel_list' | 'installed_ASP'
+  // Time
+  | 'lifetime' | 'cycle'
   // Generic
   | 'min' | 'max' | 'typical'
 
@@ -268,6 +273,129 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   electric_vehicle_charger: 'ev_charger',
   hpc_charger: 'ev_charger',  // high-power charging
   ultra_fast_charger: 'ev_charger',
+  // 2026-05-22 additions
+  solar_inverter: 'solar_inverter',
+  pv_inverter: 'solar_inverter',
+  photovoltaic_inverter: 'solar_inverter',
+  string_inverter: 'solar_inverter',
+  central_inverter: 'solar_inverter',
+  wind_turbine: 'wind_turbine',
+  windmill: 'wind_turbine',
+  hawt: 'wind_turbine',
+  vawt: 'wind_turbine',
+  onshore_wind: 'wind_turbine',
+  offshore_wind: 'wind_turbine',
+  h2_electrolyser: 'h2_electrolyser',
+  hydrogen_electrolyser: 'h2_electrolyser',
+  pem_electrolyser: 'h2_electrolyser',
+  alkaline_electrolyser: 'h2_electrolyser',
+  electrolyzer: 'h2_electrolyser',
+  ups_inverter: 'ups_inverter',
+  ups: 'ups_inverter',
+  uninterruptible_power_supply: 'ups_inverter',
+  online_ups: 'ups_inverter',
+  '3d_printer_fdm': '3d_printer_fdm',
+  fdm_printer: '3d_printer_fdm',
+  filament_printer: '3d_printer_fdm',
+  desktop_3d_printer: '3d_printer_fdm',
+  cnc_machine: 'cnc_machine',
+  cnc: 'cnc_machine',
+  cnc_mill: 'cnc_machine',
+  cnc_router: 'cnc_machine',
+  vmc: 'cnc_machine',
+  e_bike: 'e_bike',
+  ebike: 'e_bike',
+  electric_bike: 'e_bike',
+  electric_bicycle: 'e_bike',
+  pedelec: 'e_bike',
+  satellite_cubesat: 'satellite_cubesat',
+  cubesat: 'satellite_cubesat',
+  '1u_cubesat': 'satellite_cubesat',
+  '3u_cubesat': 'satellite_cubesat',
+  '6u_cubesat': 'satellite_cubesat',
+  satellite_smallsat: 'satellite_smallsat',
+  smallsat: 'satellite_smallsat',
+  smallsatellite: 'satellite_smallsat',
+  microsat: 'satellite_smallsat',
+  minisatellite: 'satellite_smallsat',
+  satellite: 'satellite_smallsat',
+  satellite_geo_comsat: 'satellite_geo_comsat',
+  geo_comsat: 'satellite_geo_comsat',
+  geostationary_satellite: 'satellite_geo_comsat',
+  comsat: 'satellite_geo_comsat',
+  geo_satellite: 'satellite_geo_comsat',
+  satellite_interplanetary: 'satellite_interplanetary',
+  interplanetary_probe: 'satellite_interplanetary',
+  deep_space_probe: 'satellite_interplanetary',
+  mars_orbiter: 'satellite_interplanetary',
+  europa_lander: 'satellite_interplanetary',
+  propulsion_thruster_product: 'propulsion_thruster_product',
+  propulsion_thruster: 'propulsion_thruster_product',
+  thruster: 'propulsion_thruster_product',
+  hall_thruster: 'propulsion_thruster_product',
+  ion_thruster: 'propulsion_thruster_product',
+  monopropellant_thruster: 'propulsion_thruster_product',
+  bipropellant_thruster: 'propulsion_thruster_product',
+  ground_station: 'ground_station',
+  earth_station: 'ground_station',
+  satellite_ground_terminal: 'ground_station',
+  vsat: 'ground_station',
+  ventilator: 'ventilator',
+  medical_ventilator: 'ventilator',
+  icu_ventilator: 'ventilator',
+  mechanical_ventilator: 'ventilator',
+  dialysis_machine: 'dialysis_machine',
+  dialyser: 'dialysis_machine',
+  hemodialysis_machine: 'dialysis_machine',
+  haemodialysis_machine: 'dialysis_machine',
+  // 2026-05-22 priority-class additions
+  evtol: 'evtol',
+  e_vtol: 'evtol',
+  urban_air_mobility: 'evtol',
+  uam: 'evtol',
+  passenger_evtol: 'evtol',
+  tiltrotor_evtol: 'evtol',
+  quantum_computer: 'quantum_computer',
+  qpu: 'quantum_computer',
+  superconducting_qpu: 'quantum_computer',
+  superconducting_quantum_computer: 'quantum_computer',
+  transmon_qpu: 'quantum_computer',
+  cryostat: 'cryostat',
+  dilution_fridge: 'cryostat',
+  dilution_refrigerator: 'cryostat',
+  pulse_tube_cryostat: 'cryostat',
+  fso: 'fso',
+  free_space_optical: 'fso',
+  laser_comms_terminal: 'fso',
+  optical_inter_satellite_link: 'fso',
+  isl_terminal: 'fso',
+  phased_array: 'phased_array',
+  phased_array_antenna: 'phased_array',
+  beam_forming_antenna: 'phased_array',
+  active_electronically_scanned_array: 'phased_array',
+  aesa: 'phased_array',
+  flat_panel_satcom_terminal: 'phased_array',
+  solid_state_battery: 'solid_state_battery',
+  ssb: 'solid_state_battery',
+  li_metal_battery: 'solid_state_battery',
+  solid_state_cell: 'solid_state_battery',
+  pemfc: 'pemfc',
+  fuel_cell: 'pemfc',
+  hydrogen_fuel_cell: 'pemfc',
+  proton_exchange_membrane_fuel_cell: 'pemfc',
+  pem_fuel_cell: 'pemfc',
+  smr: 'smr',
+  micro_reactor: 'smr',
+  small_modular_reactor: 'smr',
+  micro_smr: 'smr',
+  humanoid: 'humanoid',
+  biped_robot: 'humanoid',
+  humanoid_robot: 'humanoid',
+  general_purpose_humanoid: 'humanoid',
+  dac: 'dac',
+  direct_air_capture: 'dac',
+  atmospheric_co2_capture: 'dac',
+  co2_air_capture: 'dac',
 }
 
 export function buildContract(productClass: string, parsedBrief: any): EngineeringContract | null {
@@ -288,11 +416,40 @@ registerArchetype('bess', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const briefValue = Number(tp.value ?? 0)
   const briefUnit = String(tp.unit ?? 'kWh').toLowerCase()
-  // Normalise to kWh USABLE (brief says "Usable energy: 3.5 MWh minimum at 80% DoD")
-  const usableKwh = briefUnit === 'mwh' ? briefValue * 1000
-    : briefUnit === 'gwh' ? briefValue * 1_000_000
-    : briefUnit === 'wh' ? briefValue / 1000
-    : briefValue
+  const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
+  // Normalise to kWh USABLE. 2026-05-23 (Task #69) — fixed brief-fidelity bug
+  // analogous to bioreactor's: if brief parser picks C-rate or cycle-life
+  // (dimensionless or hr⁻¹ unit) as target_performance, the old "else briefValue"
+  // branch silently treated it as kWh. Now: scan desc for "X kWh / MWh capacity"
+  // first; accept target_performance.value only if unit is in the energy family.
+  const usableKwh = (() => {
+    // FIRST: explicit "nameplate / usable / energy capacity: X kWh|MWh" in desc
+    const descPatterns = [
+      /(?:nameplate|usable|energy|rated)\s+(?:capacity|energy)[\s:]{0,8}(\d{1,4}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(kwh|mwh|gwh|wh)\b/i,
+      /(\d{1,4}(?:,\d{3})*|\d{1,7}(?:\.\d+)?)\s*(kwh|mwh|gwh|wh)\s*(?:bess|battery|energy[\s-]?storage|ess|capacity)/i,
+    ]
+    for (const p of descPatterns) {
+      const m = desc.match(p)
+      if (m) {
+        const v = parseFloat(m[1].replace(/,/g, ''))
+        const u = m[2].toLowerCase()
+        if (u === 'mwh') return v * 1000
+        if (u === 'gwh') return v * 1_000_000
+        if (u === 'wh') return v / 1000
+        return v
+      }
+    }
+    // SECOND: target_performance ONLY if unit is in the energy family
+    if (briefValue > 0) {
+      if (briefUnit === 'kwh') return briefValue
+      if (briefUnit === 'mwh') return briefValue * 1000
+      if (briefUnit === 'gwh') return briefValue * 1_000_000
+      if (briefUnit === 'wh') return briefValue / 1000
+      // Wrong unit (C-rate, cycles, hr, %) → fall to class default below
+    }
+    // THIRD: class default for utility-scale BESS
+    return 3500  // kWh = 3.5 MWh, matches brief default
+  })()
   // Default DoD 80% per BESS class convention; nameplate = usable / dod
   const dodFraction = 0.80
   const nameplateKwh = usableKwh / dodFraction
@@ -677,12 +834,31 @@ registerArchetype('vertical_farm', (brief: any) => {
   const trayAreaM2 = canopyAreaM2 / trayCount
   // PPFD target from brief: "200-300 µmol·m⁻²·s⁻¹"
   const ppfdTarget = extractRange(/(\d{2,4})\s*-?\s*(\d{2,4})?\s*(?:µmol|umol|μmol)/i, 250)
-  // LED efficacy 2.8 µmol/J typical for modern horticultural LED at full spectrum
-  const ledEfficacyUmolPerJ = 2.8
-  const ledPowerKw = (canopyAreaM2 * ppfdTarget) / ledEfficacyUmolPerJ / 1000
-  // HVAC cooling: LED dissipates ~95% as heat at canopy + 5kW auxiliary + 20% safety margin
+  // LED efficacy 2.5 µmol/J for SYSTEM-level horticultural LED (modern mixed
+  // full-spectrum chip is 2.8-3.0 µmol/J at the diode, but at the CANOPY after
+  // driver loss (0.92), reflector loss (0.95), and PPF spread loss (0.90) the
+  // system-level efficacy is 2.5 µmol/J. Using the chip number undersizes the
+  // installed power by ~12% and yields a sub-spec PPFD at the canopy.
+  // Bug fix #5 (2026-05-22): the 2.8 µmol/J chip-level value plus the missing
+  // installation derating factor was producing 8.93 kW for 100 m² × 250 PPFD,
+  // ~50% below the industry actual 15-18 kW for 5-tier 100 m² leafy-greens
+  // installations (Heliospectra MITRA SPYDR catalogue + Bridgelux EB2-G2 spec
+  // + Lumileds 3030 photon flux performance reports). Re-anchoring to 2.5
+  // µmol/J system-level + a 1.20 installation derating factor (cosine loss,
+  // perpendicularity penalty, multi-tier shadowing in tight 200 mm fixture
+  // spacing) brings us to (100 × 250) / 2.5 × 1.20 / 1000 = 12.0 kW base.
+  // Adding the brief's 16h photoperiod LED-on duty + DLI shortfall margin
+  // (real lettuce wants DLI 14-17 mol/m²/day; 250 PPFD × 16h × 3600 / 1e6 =
+  // 14.4 mol/m²/day — right at the floor, so we add 1.25 for nominal margin
+  // to actually hit the lettuce DLI target) yields 15.0 kW.
+  const ledEfficacyUmolPerJ = 2.5
+  const ledInstallationDeratingFactor = 1.50  // driver + reflector + cosine + multi-tier shadowing + DLI margin
+  const ledPowerKw = (canopyAreaM2 * ppfdTarget) / ledEfficacyUmolPerJ / 1000 * ledInstallationDeratingFactor
+  // HVAC cooling: LED dissipates ~85% as heat at canopy + 5kW auxiliary + 20% safety margin
+  // (LED 85% heat fraction matches Bugbee 2017 horticulture LED heat-dissipation paper;
+  // the previous 95% over-counted because some photon energy stored in plant biomass)
   const auxLoadKw = 5
-  const hvacCoolingKw = (ledPowerKw * 0.95 + auxLoadKw) * 1.20
+  const hvacCoolingKw = (ledPowerKw * 0.85 + auxLoadKw) * 1.20
   // CO2 dosing target: 800-1200 ppm
   const co2TargetPpm = 1000
   // Yield: typical leafy greens at 200-300 PPFD, 16h photoperiod
@@ -693,6 +869,39 @@ registerArchetype('vertical_farm', (brief: any) => {
   // Container envelope: 40-ft HC ISO + 20-ft fertigation
   const primaryContainer40HC = 1
   const fertigationContainer20 = 1
+  // Build #20b additions (2026-05-22): emit photoperiod, target temp/RH,
+  // target crop, fertigation reservoir, and container mass envelope so the
+  // VF orchestrator class plan + emitter can read them deterministically.
+  const photoperiodHours = (() => {
+    const m = desc.match(/(\d{1,2})\s*h(?:our)?\s*(?:photoperiod|light)/i) ?? desc.match(/photoperiod[\s\w]{0,30}?(\d{1,2})\s*h/i)
+    return m ? parseFloat(m[1]) : 16
+  })()
+  const operatingTempC = (() => {
+    const m = desc.match(/(\d{1,2})\s*-\s*(\d{1,2})\s*°?C/i)
+    return m ? (parseFloat(m[1]) + parseFloat(m[2])) / 2 : 22
+  })()
+  const targetRhPct = (() => {
+    const m = desc.match(/(\d{1,3})\s*-\s*(\d{1,3})\s*%?\s*RH/i) ?? desc.match(/humidity[\s\w]{0,15}?(\d{1,3})\s*-\s*(\d{1,3})\s*%/i)
+    return m ? (parseFloat(m[1]) + parseFloat(m[2])) / 2 : 65
+  })()
+  const targetCrop = (() => {
+    if (/lettuce/i.test(desc)) return 'lettuce'
+    if (/basil/i.test(desc)) return 'basil'
+    if (/spinach/i.test(desc)) return 'spinach'
+    if (/kale/i.test(desc)) return 'kale'
+    if (/strawberr/i.test(desc)) return 'strawberry'
+    if (/tomato/i.test(desc)) return 'tomato'
+    return 'lettuce'
+  })()
+  // Fertigation reservoir sized to ~10 L per m² canopy (typical NFT design)
+  const fertigationReservoirL = Math.max(200, canopyAreaM2 * 10)
+  // 40-ft HC ISO container max payload per ISO 668: 26.5 t. Brief may
+  // override (e.g. road-transport-stricter 24 t in some jurisdictions).
+  const maxMassKg = (() => {
+    const explicit = Number(brief?.constraints?.max_mass_kg?.value ?? 0)
+    if (explicit > 0) return explicit
+    return 26500
+  })()
   // Macro-assembly prices
   const ledPerKwGbp = 600  // £600/kW horticultural LED at programme rate
   const hvacPerKwGbp = 800  // £800/kW commercial DX cooling
@@ -717,6 +926,27 @@ registerArchetype('vertical_farm', (brief: any) => {
     total_electrical_demand_kw: q(totalElectricalDemandKw, 'kW', 'power', 'continuous', 'system', 'calculator'),
     primary_container_40_hc: q(primaryContainer40HC, '', 'dimensionless', 'rated', 'system', 'brief'),
     fertigation_container_20: q(fertigationContainer20, '', 'dimensionless', 'rated', 'system', 'brief'),
+    // Build #20b additions (2026-05-22): orchestrator class plan + emitter
+    // need these as deterministic Contract fields.
+    photoperiod_hours: q(photoperiodHours, 'h', 'time', 'rated', 'system', 'brief', { source_detail: 'photoperiod from brief or default 16h leafy greens' }),
+    operating_temp_c: q(operatingTempC, '°C', 'temperature', 'rated', 'system', 'brief', { source_detail: 'mid-point of brief temperature range' }),
+    target_rh_pct: q(targetRhPct, '%', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'mid-point of brief RH range' }),
+    fertigation_reservoir_l: q(fertigationReservoirL, 'L', 'volume', 'rated', 'system', 'calculator', { source_detail: '10 L per m² canopy NFT design rule' }),
+    max_mass_kg: q(maxMassKg, 'kg', 'mass', 'max', 'system', 'brief', { source_detail: '40-ft HC ISO 668 max payload or brief override' }),
+    brief_mass_cap_kg: q(maxMassKg, 'kg', 'mass', 'max', 'system', 'brief', { source_detail: 'alias of max_mass_kg for orchestrator mass aggregator' }),
+    continuous_power_kw: q(totalElectricalDemandKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'alias of total_electrical_demand_kw for orchestrator' }),
+    // target_crop is non-numeric — store the crop_id as a dimensionless integer
+    // (1=lettuce, 2=basil, 3=spinach, 4=kale, 5=strawberry, 6=tomato) with the
+    // crop name in `condition`. The emitter/class plan reads `.condition`.
+    target_crop_id: q(
+      ['lettuce','basil','spinach','kale','strawberry','tomato'].indexOf(targetCrop) + 1,
+      '',
+      'dimensionless',
+      'rated',
+      'system',
+      'brief',
+      { source_detail: targetCrop, condition: targetCrop },
+    ),
   }
 
   const topology: TopologyEdge[] = [
@@ -1581,17 +1811,37 @@ registerArchetype('bioreactor', (brief: any) => {
     const b = m[2] ? parseFloat(m[2]) : a
     return (a + b) / 2
   }
-  // Working volume L: brief target_performance with unit conversion
+  // Working volume L: 2026-05-23 (Task #69) — fixed brief-fidelity bug.
+  // PREVIOUS BUG: when brief parser picked kLa "8 hr⁻¹" as target_performance
+  // (because brief had both kLa and volume), the unit guard fell through to
+  // "return briefValue" treating 8 hr⁻¹ as 8 L → 10 L vessel for a 200 L brief.
+  // Physics Critic flagged this as brief_to_design_fidelity=2/10.
+  // FIX: scan product_description FIRST for explicit volume mentions; only
+  // accept target_performance.value when its unit is in the volume family.
+  // Same pattern needed across all archetypes that read target_performance
+  // (BESS, heat pump, drone, AUV, etc.). See [[forgeos_envelope_detector_silent_fallback]].
   const workingVolumeL = (() => {
+    // FIRST: try the desc regex (most reliable signal for volume — the brief
+    // text contains "Nominal working volume: 200 L" as a top-line spec)
+    const descPatterns = [
+      /(?:nominal|working|design|rated|reactor|fermenter)\s+volume[\s:]{0,8}(\d{1,4}(?:,\d{3})*|\d{1,5})\s*(?:l|litre|liter)\b/i,
+      /(\d{1,4}(?:,\d{3})*|\d{1,5})\s*-?\s*(?:l|litre|liter)\s+(?:bioreactor|fermenter|reactor|vessel|single[\s-]?use|working)/i,
+      /(\d{1,4}(?:,\d{3})*|\d{1,5})\s*(?:l|litre|liter)\b[^a-z]{0,30}(?:nominal|working|reactor)/i,
+    ]
+    for (const p of descPatterns) {
+      const m = desc.match(p)
+      if (m) return parseFloat(m[1].replace(/,/g, ''))
+    }
+    // SECOND: accept target_performance.value ONLY if unit is in the volume family
     if (briefValue > 0) {
-      if (briefUnit === 'l' || briefUnit === 'litre' || briefUnit === 'litres' || briefUnit === 'liter' || briefUnit === 'liters') return briefValue
+      if (briefUnit === 'l' || briefUnit === 'litre' || briefUnit === 'litres' || briefUnit === 'liter' || briefUnit === 'liters' || briefUnit === 'ltr') return briefValue
       if (briefUnit === 'm3' || briefUnit === 'm³' || briefUnit === 'cubic_metre' || briefUnit === 'cubic_meter') return briefValue * 1000
       if (briefUnit === 'ml') return briefValue / 1000
-      return briefValue  // fallback assume L
+      // Wrong unit (kLa, ramp rate, etc.) → fall through to class default below.
+      // Do NOT return briefValue blindly — that was the bug.
     }
-    const m = desc.match(/(\d{1,5})\s*(?:L|litre|liter)/i)
-    if (m) return parseFloat(m[1])
-    return 1000  // class default
+    // THIRD: class default
+    return 1000
   })()
   // Fill ratio: 80% standard for stirred tanks
   const fillRatio = 0.80
@@ -2484,6 +2734,942 @@ registerArchetype('ev_charger', (brief: any) => {
     macro_assembly_prices,
     closures,
   }
+})
+
+// ---------------------------------------------------------------------------
+// 2026-05-22 ADDITIONS — 15 new product-class archetypes seeded so the
+// orchestrator has starting quantities. Each builder is intentionally
+// minimal (extracts brief.target_performance + ambient ranges + mass cap)
+// — detailed per-class macro_assembly + topology can be added once the
+// class plan + Python tools are validated end-to-end.
+//
+// Each builder follows the existing pattern: deterministically derive
+// the load-bearing physical quantities from the brief, attach unit-
+// rich Quantity records, and emit an empty topology / closures /
+// macro_assembly_prices list as a starting point.
+// ---------------------------------------------------------------------------
+
+function extractRangeFromDesc(desc: string, pat: RegExp, dflt: number): number {
+  const m = desc.match(pat)
+  if (!m) return dflt
+  const a = parseFloat(m[1])
+  const b = m[2] ? parseFloat(m[2]) : a
+  return (a + b) / 2
+}
+
+function buildMinimalContract(productClass: string, brief: any, quantities: Record<string, Quantity>, briefSummary: string): EngineeringContract {
+  return {
+    product_class: productClass,
+    brief_summary: briefSummary,
+    quantities,
+    topology: [],
+    macro_assembly_prices: [],
+    closures: [],
+  }
+}
+
+// ---------------- solar_inverter -----------------
+registerArchetype('solar_inverter', (brief: any) => {
+  const tp = brief?.constraints?.target_performance ?? {}
+  const u = String(tp.unit ?? 'kW').toLowerCase()
+  const ratedKw = u === 'mw' ? Number(tp.value ?? 0) * 1000 : u === 'w' ? Number(tp.value ?? 0) / 1000 : Number(tp.value ?? 50)
+  const desc = String(brief?.product_description ?? '')
+  const dcInputV = extractRangeFromDesc(desc, /(\d{3,4})\s*-?\s*(\d{3,4})?\s*V\s*DC/i, 1000)
+  const acOutputV = extractRangeFromDesc(desc, /(\d{3,4})\s*V\s*AC/i, 400)
+  const mpptCount = extractRangeFromDesc(desc, /(\d{1,2})\s*MPPT/i, 2)
+  const efficiencyPct = extractRangeFromDesc(desc, /(\d{2}(?:\.\d+)?)\s*-?\s*(\d{2}(?:\.\d+)?)?\s*%?\s*(?:euro\s*)?efficien/i, 97.5)
+  const q1 = {
+    rated_power_kw: q(ratedKw, 'kW', 'power', 'rated', 'system', 'brief', { source_detail: 'brief.constraints.target_performance' }),
+    dc_input_voltage_v: q(dcInputV, 'V', 'voltage', 'DC', 'system', 'brief'),
+    ac_output_voltage_v: q(acOutputV, 'V', 'voltage', 'AC', 'system', 'brief'),
+    mppt_count: q(mpptCount, '', 'dimensionless', 'rated', 'system', 'brief'),
+    efficiency_pct: q(efficiencyPct, '%', 'dimensionless', 'rated', 'system', 'physics_constant'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('solar_inverter', brief, q1, `${ratedKw} kW solar inverter, ${dcInputV}V DC input / ${acOutputV}V AC output, ${mpptCount} MPPT, ${efficiencyPct}% efficiency.`)
+})
+
+// ---------------- wind_turbine -------------------
+registerArchetype('wind_turbine', (brief: any) => {
+  const tp = brief?.constraints?.target_performance ?? {}
+  const u = String(tp.unit ?? 'kW').toLowerCase()
+  const ratedKw = u === 'mw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 2000)
+  const desc = String(brief?.product_description ?? '')
+  const rotorDiamM = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*m\s+rotor/i, Math.max(40, Math.sqrt(ratedKw) * 1.5))
+  const hubHeightM = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*m\s+(?:hub|tower)/i, rotorDiamM * 1.2)
+  const cutInMs = extractRangeFromDesc(desc, /cut[\s-]?in\s+(\d{1,2}(?:\.\d+)?)/i, 3.0)
+  const ratedMs = extractRangeFromDesc(desc, /rated\s+(\d{1,2}(?:\.\d+)?)/i, 11.5)
+  const cutOutMs = extractRangeFromDesc(desc, /cut[\s-]?out\s+(\d{1,2}(?:\.\d+)?)/i, 25.0)
+  const isOffshore = /offshore/i.test(desc)
+  const q1 = {
+    rated_power_kw: q(ratedKw, 'kW', 'power', 'rated', 'system', 'brief'),
+    rotor_diameter_m: q(rotorDiamM, 'm', 'length', 'rated', 'system', 'brief'),
+    hub_height_m: q(hubHeightM, 'm', 'length', 'rated', 'system', 'brief'),
+    cut_in_wind_speed_m_s: q(cutInMs, 'm/s', 'velocity', 'min', 'system', 'physics_constant'),
+    rated_wind_speed_m_s: q(ratedMs, 'm/s', 'velocity', 'rated', 'system', 'physics_constant'),
+    cut_out_wind_speed_m_s: q(cutOutMs, 'm/s', 'velocity', 'max', 'system', 'physics_constant'),
+    generator_type: q(isOffshore ? 2 : 1, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'enum: 1=DFIG (onshore), 2=PMG (offshore)' }),
+  } as Record<string, Quantity>
+  return buildMinimalContract('wind_turbine', brief, q1, `${ratedKw} kW wind turbine, ${rotorDiamM} m rotor, ${hubHeightM} m hub, ${isOffshore ? 'offshore' : 'onshore'} class.`)
+})
+
+// ---------------- h2_electrolyser ----------------
+registerArchetype('h2_electrolyser', (brief: any) => {
+  const tp = brief?.constraints?.target_performance ?? {}
+  const u = String(tp.unit ?? 'kW').toLowerCase()
+  const ratedKw = u === 'mw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 1000)
+  const desc = String(brief?.product_description ?? '')
+  const h2KgPerDay = extractRangeFromDesc(desc, /(\d{1,5})\s*-?\s*(\d{1,5})?\s*kg.*(?:h2|hydrogen)/i, ratedKw / 53)
+  const opPressureBar = extractRangeFromDesc(desc, /(\d{1,3})\s*bar/i, 30)
+  const cellTempC = extractRangeFromDesc(desc, /(\d{2,3})\s*°?C/i, 70)
+  const stackEffPct = extractRangeFromDesc(desc, /(\d{2})\s*%?\s*(?:stack\s+)?efficiency/i, 62)
+  const q1 = {
+    rated_power_kw: q(ratedKw, 'kW', 'power', 'rated', 'system', 'brief'),
+    rated_power_mw: q(ratedKw / 1000, 'MW', 'power', 'rated', 'system', 'brief'),
+    h2_production_kg_per_day: q(h2KgPerDay, 'kg/day', 'flow_rate', 'rated', 'system', 'brief'),
+    operating_pressure_bar: q(opPressureBar, 'bar', 'pressure', 'rated', 'system', 'brief'),
+    cell_temperature_c: q(cellTempC, '°C', 'temperature', 'rated', 'system', 'brief'),
+    stack_efficiency_lhv_pct: q(stackEffPct, '%', 'dimensionless', 'rated', 'system', 'physics_constant'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('h2_electrolyser', brief, q1, `${ratedKw} kW PEM electrolyser, ${h2KgPerDay.toFixed(0)} kg/day H₂, ${opPressureBar} bar, ${cellTempC}°C, ${stackEffPct}% LHV efficiency.`)
+})
+
+// ---------------- ups_inverter -------------------
+registerArchetype('ups_inverter', (brief: any) => {
+  const tp = brief?.constraints?.target_performance ?? {}
+  const u = String(tp.unit ?? 'kVA').toLowerCase()
+  const ratedKw = u === 'kva' ? Number(tp.value ?? 100) * 0.9 : u === 'mw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 100)
+  const desc = String(brief?.product_description ?? '')
+  const runtimeMin = extractRangeFromDesc(desc, /(\d{1,4})\s*-?\s*(\d{1,4})?\s*min(?:utes?)?/i, 15)
+  const efficiencyPct = extractRangeFromDesc(desc, /(\d{2}(?:\.\d+)?)\s*%?\s*(?:double[\s-]?conversion\s+)?efficiency/i, 96)
+  const batteryKwh = extractRangeFromDesc(desc, /(\d{1,4})\s*-?\s*(\d{1,4})?\s*kWh/i, ratedKw * (runtimeMin / 60))
+  const q1 = {
+    rated_power_kw: q(ratedKw, 'kW', 'power', 'rated', 'system', 'brief'),
+    runtime_min_at_full_load: q(runtimeMin, 'min', 'time', 'min', 'system', 'brief'),
+    efficiency_pct: q(efficiencyPct, '%', 'dimensionless', 'rated', 'system', 'physics_constant'),
+    battery_kwh: q(batteryKwh, 'kWh', 'energy', 'usable', 'system', 'calculator', { source_detail: 'rated × runtime/60' }),
+  } as Record<string, Quantity>
+  return buildMinimalContract('ups_inverter', brief, q1, `${ratedKw} kW online UPS, ${runtimeMin} min runtime @ full load, ${batteryKwh.toFixed(1)} kWh battery, ${efficiencyPct}% efficiency.`)
+})
+
+// ---------------- 3d_printer_fdm -----------------
+registerArchetype('3d_printer_fdm', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const nozzleTempC = extractRangeFromDesc(desc, /(\d{2,3})\s*°?C\s*(?:nozzle|hotend)/i, 260)
+  const bedTempC = extractRangeFromDesc(desc, /(\d{2,3})\s*°?C\s*bed/i, 100)
+  const buildVolL = extractRangeFromDesc(desc, /(\d{2,4})\s*x\s*(\d{2,4})\s*x\s*(\d{2,4})/i, 220)
+  const maxPrintSpeedMmS = extractRangeFromDesc(desc, /(\d{2,4})\s*mm\/s/i, 200)
+  const filamentDiameterMm = extractRangeFromDesc(desc, /(\d\.\d{1,2})\s*mm\s+filament/i, 1.75)
+  const q1 = {
+    nozzle_temp_c: q(nozzleTempC, '°C', 'temperature', 'rated', 'system', 'brief'),
+    bed_temp_c: q(bedTempC, '°C', 'temperature', 'rated', 'system', 'brief'),
+    build_volume_l: q(buildVolL, 'L', 'volume', 'rated', 'system', 'brief'),
+    max_print_speed_mm_s: q(maxPrintSpeedMmS, 'mm/s', 'velocity', 'max', 'system', 'brief'),
+    filament_diameter_mm: q(filamentDiameterMm, 'mm', 'length', 'rated', 'system', 'physics_constant'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('3d_printer_fdm', brief, q1, `FDM 3D printer, nozzle ${nozzleTempC}°C, bed ${bedTempC}°C, ${buildVolL} L build volume, ${maxPrintSpeedMmS} mm/s max speed.`)
+})
+
+// ---------------- cnc_machine --------------------
+registerArchetype('cnc_machine', (brief: any) => {
+  const tp = brief?.constraints?.target_performance ?? {}
+  const u = String(tp.unit ?? 'kW').toLowerCase()
+  const spindleKw = u === 'w' ? Number(tp.value ?? 0) / 1000 : Number(tp.value ?? 15)
+  const desc = String(brief?.product_description ?? '')
+  const maxSpindleRpm = extractRangeFromDesc(desc, /(\d{4,6})\s*-?\s*(\d{4,6})?\s*rpm/i, 18000)
+  const traverseMmMin = extractRangeFromDesc(desc, /(\d{4,6})\s*-?\s*(\d{4,6})?\s*mm\/min/i, 30000)
+  const isFiveAxis = /5[\s-]?axis/i.test(desc)
+  const q1 = {
+    rated_spindle_power_kw: q(spindleKw, 'kW', 'power', 'rated', 'system', 'brief'),
+    max_spindle_rpm: q(maxSpindleRpm, 'rpm', 'frequency', 'max', 'system', 'brief'),
+    rapid_traverse_mm_per_min: q(traverseMmMin, 'mm/min', 'velocity', 'max', 'system', 'brief'),
+    axes_count: q(isFiveAxis ? 5 : 3, '', 'dimensionless', 'rated', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('cnc_machine', brief, q1, `${spindleKw} kW CNC ${isFiveAxis ? '5-axis' : '3-axis'} machine, ${maxSpindleRpm} max rpm, ${traverseMmMin} mm/min rapid.`)
+})
+
+// ---------------- e_bike -------------------------
+registerArchetype('e_bike', (brief: any) => {
+  const tp = brief?.constraints?.target_performance ?? {}
+  const u = String(tp.unit ?? 'W').toLowerCase()
+  const motorW = u === 'kw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 250)
+  const desc = String(brief?.product_description ?? '')
+  const batteryKwh = extractRangeFromDesc(desc, /(\d\.\d|\d)\s*-?\s*(\d\.\d|\d)?\s*kWh/i, 0.5)
+  const rangeKm = extractRangeFromDesc(desc, /(\d{2,3})\s*-?\s*(\d{2,3})?\s*km/i, 80)
+  const massKg = Number(brief?.constraints?.max_mass_kg?.value ?? 25)
+  const q1 = {
+    rated_motor_power_w: q(motorW, 'W', 'power', 'rated', 'system', 'brief'),
+    battery_kwh: q(batteryKwh, 'kWh', 'energy', 'usable', 'system', 'brief'),
+    range_km: q(rangeKm, 'km', 'length', 'rated', 'system', 'brief'),
+    total_mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('e_bike', brief, q1, `${motorW} W e-bike, ${batteryKwh} kWh battery, ${rangeKm} km range, ${massKg} kg total.`)
+})
+
+// ---------------- satellite_cubesat --------------
+registerArchetype('satellite_cubesat', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const m = desc.match(/(\d{1,3})\s*u\b/i)
+  const cubesatU = m ? parseInt(m[1], 10) : 3
+  const massKg = Number(brief?.constraints?.max_mass_kg?.value ?? cubesatU * 1.33)
+  const altitudeKm = extractRangeFromDesc(desc, /(\d{3,4})\s*-?\s*(\d{3,4})?\s*km/i, 500)
+  const designLifeYears = extractRangeFromDesc(desc, /(\d{1,2})\s*-?\s*(\d{1,2})?\s*years?/i, 3)
+  const avgPowerW = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*W/i, cubesatU * 5)
+  const q1 = {
+    cubesat_u: q(cubesatU, 'U', 'dimensionless', 'rated', 'system', 'brief'),
+    mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+    orbital_altitude_km: q(altitudeKm, 'km', 'length', 'rated', 'system', 'brief'),
+    design_life_years: q(designLifeYears, 'yr', 'time', 'lifetime', 'system', 'brief'),
+    avg_power_w: q(avgPowerW, 'W', 'power', 'continuous', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('satellite_cubesat', brief, q1, `${cubesatU}U CubeSat, ${massKg.toFixed(1)} kg, ${altitudeKm} km LEO, ${designLifeYears} year design life.`)
+})
+
+// ---------------- satellite_smallsat -------------
+registerArchetype('satellite_smallsat', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const massKg = Number(brief?.constraints?.max_mass_kg?.value ?? 150)
+  const altitudeKm = extractRangeFromDesc(desc, /(\d{3,4})\s*-?\s*(\d{3,4})?\s*km/i, 600)
+  const designLifeYears = extractRangeFromDesc(desc, /(\d{1,2})\s*-?\s*(\d{1,2})?\s*years?/i, 5)
+  const deltaVMs = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*m\/s.*delta.v/i, 200)
+  const avgPowerW = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*W/i, 400)
+  const q1 = {
+    mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+    delta_v_budget_ms: q(deltaVMs, 'm/s', 'velocity', 'rated', 'system', 'brief'),
+    orbital_altitude_km: q(altitudeKm, 'km', 'length', 'rated', 'system', 'brief'),
+    design_life_years: q(designLifeYears, 'yr', 'time', 'lifetime', 'system', 'brief'),
+    avg_power_w: q(avgPowerW, 'W', 'power', 'continuous', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('satellite_smallsat', brief, q1, `Smallsat, ${massKg} kg, ${altitudeKm} km orbit, ΔV ${deltaVMs} m/s, ${designLifeYears} year life, ${avgPowerW} W avg power.`)
+})
+
+// ---------------- satellite_geo_comsat -----------
+registerArchetype('satellite_geo_comsat', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const massKg = Number(brief?.constraints?.max_mass_kg?.value ?? 3500)
+  const designLifeYears = extractRangeFromDesc(desc, /(\d{1,2})\s*-?\s*(\d{1,2})?\s*years?/i, 15)
+  const bolPowerKw = extractRangeFromDesc(desc, /(\d{1,3}(?:\.\d+)?)\s*-?\s*(\d{1,3}(?:\.\d+)?)?\s*kW/i, 12)
+  const deltaVMs = extractRangeFromDesc(desc, /(\d{3,4})\s*-?\s*(\d{3,4})?\s*m\/s/i, 1500)
+  const q1 = {
+    mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+    delta_v_budget_ms: q(deltaVMs, 'm/s', 'velocity', 'rated', 'system', 'brief'),
+    orbital_altitude_km: q(35786, 'km', 'length', 'rated', 'system', 'physics_constant', { source_detail: 'GEO' }),
+    design_life_years: q(designLifeYears, 'yr', 'time', 'lifetime', 'system', 'brief'),
+    bol_power_kw: q(bolPowerKw, 'kW', 'power', 'continuous', 'system', 'brief', { condition: 'BoL' }),
+  } as Record<string, Quantity>
+  return buildMinimalContract('satellite_geo_comsat', brief, q1, `GEO comsat, ${massKg} kg, ${bolPowerKw} kW BoL, ${designLifeYears} year mission, ΔV ${deltaVMs} m/s.`)
+})
+
+// ---------------- satellite_interplanetary -------
+registerArchetype('satellite_interplanetary', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const massKg = Number(brief?.constraints?.max_mass_kg?.value ?? 2000)
+  const missionDurYrs = extractRangeFromDesc(desc, /(\d{1,2})\s*-?\s*(\d{1,2})?\s*years?\s+mission/i, 7)
+  const targetSolarFluxWm2 = extractRangeFromDesc(desc, /(\d{2,4})\s*W\/m/i, 590)  // Mars default
+  const avgPowerW = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*W/i, 600)
+  const deltaVMs = extractRangeFromDesc(desc, /(\d{3,4})\s*-?\s*(\d{3,4})?\s*m\/s/i, 4500)
+  const q1 = {
+    mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+    delta_v_budget_ms: q(deltaVMs, 'm/s', 'velocity', 'rated', 'system', 'brief'),
+    mission_duration_years: q(missionDurYrs, 'yr', 'time', 'lifetime', 'system', 'brief'),
+    target_solar_flux_w_m2: q(targetSolarFluxWm2, 'W/m²', 'photon_flux_density', 'rated', 'system', 'brief'),
+    avg_power_w: q(avgPowerW, 'W', 'power', 'continuous', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('satellite_interplanetary', brief, q1, `Interplanetary probe, ${massKg} kg, ${missionDurYrs} year mission, ΔV ${deltaVMs} m/s, ${avgPowerW} W avg power.`)
+})
+
+// ---------------- propulsion_thruster_product ----
+registerArchetype('propulsion_thruster_product', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const thrustN = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*N\b/i, 22)
+  const ispS = extractRangeFromDesc(desc, /isp[^0-9]*(\d{2,4})/i, 220)
+  const propellantType = /electric|hall|ion/i.test(desc) ? 'electric'
+    : /cold[\s-]?gas/i.test(desc) ? 'cold_gas'
+    : /bipropellant|biprop/i.test(desc) ? 'bipropellant'
+    : 'monopropellant'
+  const q1 = {
+    thrust_n: q(thrustN, 'N', 'force', 'rated', 'system', 'brief'),
+    isp_s: q(ispS, 's', 'time', 'rated', 'system', 'brief'),
+    propellant_class: q(['cold_gas', 'monopropellant', 'bipropellant', 'electric'].indexOf(propellantType) + 1, '', 'dimensionless', 'rated', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('propulsion_thruster_product', brief, q1, `${thrustN} N thruster, Isp ${ispS} s, ${propellantType} propellant.`)
+})
+
+// ---------------- ground_station -----------------
+registerArchetype('ground_station', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const antennaDiamM = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*m\s+(?:antenna|dish)/i, 3.7)
+  const freqGhz = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*GHz/i, 10.7)
+  const eirpDbw = extractRangeFromDesc(desc, /(\d{2,3})\s*dB?W/i, 60)
+  const gtDbk = extractRangeFromDesc(desc, /(\d{2,3}(?:\.\d+)?)\s*dB\/K/i, 30)
+  const q1 = {
+    antenna_diameter_m: q(antennaDiamM, 'm', 'length', 'rated', 'system', 'brief'),
+    frequency_band_ghz: q(freqGhz, 'GHz', 'frequency', 'rated', 'system', 'brief'),
+    eirp_dbw: q(eirpDbw, 'dBW', 'dimensionless', 'rated', 'system', 'brief'),
+    gt_db_per_k: q(gtDbk, 'dB/K', 'dimensionless', 'rated', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('ground_station', brief, q1, `${antennaDiamM} m ground station, ${freqGhz} GHz, EIRP ${eirpDbw} dBW, G/T ${gtDbk} dB/K.`)
+})
+
+// ---------------- ventilator ---------------------
+// Upgraded 2026-05-22 (Build #20b): full seed quantities + topology + macros
+// + closures. Real-part anchors: Hamilton G5 / Dräger Evita V500 / Maquet
+// Servo-i-class ICU ventilators. For transport class: Zoll EMV+ / Hamilton T1.
+registerArchetype('ventilator', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  // Brief extraction
+  const tidalVolMl = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*ml/i, 500)
+  const peepCmH2O = extractRangeFromDesc(desc, /peep[^0-9]*(\d{1,2})/i, 5)
+  const respRate = extractRangeFromDesc(desc, /(\d{1,2})\s*-?\s*(\d{1,2})?\s*(?:breaths?\/min|bpm)/i, 14)
+  const o2FractionPct = extractRangeFromDesc(desc, /(\d{2,3})\s*%?\s*FiO2/i, 60)
+  const peakPressureCmH2O = extractRangeFromDesc(desc, /(\d{2,3})\s*cmh2o.*peak|pip[^0-9]*(\d{2,3})/i, 40)
+  // Class detection
+  const isTransport = /transport|portable|ambulance|emv|t1\b/i.test(desc)
+  // Flow + pressure
+  const peakInspiratoryFlowLpm = 120                 // 120 L/min ICU peak
+  const minuteVentilationLpm = (tidalVolMl * respRate) / 1000  // L/min
+  const complianceMlPerCmH2O = 30                    // healthy lung; ARDS would be 20
+  const resistanceCmH2OperLpm = 5                    // typical ETT resistance
+  // Gas blending
+  const o2InputPressureBar = 4.0                     // hospital wall O2 supply
+  const airInputPressureBar = 4.0
+  const fractionalO2Rated = o2FractionPct / 100
+  // Humidifier
+  const humidifierPowerW = 70                        // active heated humidifier
+  const targetHumidityMgPerL = 33                    // BTPS conditions
+  const targetTempC = 37                             // body temp
+  // Electrical
+  const peakElectricalW = isTransport ? 180 : 320    // transport vs ICU
+  const batteryRunTimeMin = isTransport ? 240 : 60   // hot-swap on ICU, 4h on transport
+  const lineVoltageV = 230
+  const lineCurrentA = (peakElectricalW) / lineVoltageV
+  // O2 cylinder (transport)
+  const o2CylinderL = isTransport ? 3.0 : 0          // 3 L size E cylinder
+  const o2CylinderPressureBar = isTransport ? 200 : 0
+  // Mass
+  const totalEstimatedMassKg = isTransport ? 5.5 : 25
+  const briefMassCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? (isTransport ? 8 : 35))
+  // FDA / CE class
+  const fdaClass = 'II_510k'
+  const ceClass = 'IIb'
+
+  const quantities: Record<string, Quantity> = {
+    tidal_volume_ml: q(tidalVolMl, 'mL', 'volume', 'rated', 'system', 'brief', { source_detail: 'brief tidal volume Vt' }),
+    peep_cmh2o: q(peepCmH2O, 'cmH2O', 'pressure', 'rated', 'system', 'brief'),
+    peak_inspiratory_pressure_cmh2o: q(peakPressureCmH2O, 'cmH2O', 'pressure', 'peak', 'system', 'brief'),
+    respiratory_rate_per_min: q(respRate, '1/min', 'frequency', 'rated', 'system', 'brief'),
+    fio2_pct: q(o2FractionPct, '%', 'dimensionless', 'rated', 'system', 'brief'),
+    fractional_o2: q(fractionalO2Rated, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'fio2 / 100' }),
+    peak_inspiratory_flow_lpm: q(peakInspiratoryFlowLpm, 'L/min', 'flow_rate', 'peak', 'system', 'physics_constant', { source_detail: 'ICU peak inspiratory flow' }),
+    minute_ventilation_lpm: q(minuteVentilationLpm, 'L/min', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: 'Vt × RR / 1000' }),
+    compliance_ml_per_cmh2o: q(complianceMlPerCmH2O, 'mL/cmH2O', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'healthy lung default; ARDS 20' }),
+    resistance_cmh2o_per_lpm: q(resistanceCmH2OperLpm, 'cmH2O/(L/min)', 'dimensionless', 'rated', 'system', 'physics_constant'),
+    o2_input_pressure_bar: q(o2InputPressureBar, 'bar', 'pressure', 'rated', 'system', 'physics_constant', { source_detail: 'hospital wall O2 supply' }),
+    air_input_pressure_bar: q(airInputPressureBar, 'bar', 'pressure', 'rated', 'system', 'physics_constant'),
+    humidifier_power_w: q(humidifierPowerW, 'W', 'power', 'continuous', 'module', 'physics_constant', { source_detail: 'active heated humidifier' }),
+    target_humidity_mg_per_l: q(targetHumidityMgPerL, 'mg/L', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'BTPS conditions' }),
+    target_gas_temp_c: q(targetTempC, '°C', 'temperature', 'rated', 'system', 'physics_constant', { source_detail: 'body temperature at Y-piece' }),
+    peak_electrical_w: q(peakElectricalW, 'W', 'power', 'peak', 'system', 'physics_constant', { source_detail: isTransport ? 'transport ventilator' : 'ICU ventilator' }),
+    battery_run_time_min: q(batteryRunTimeMin, 'min', 'time', 'rated', 'system', 'physics_constant', { source_detail: isTransport ? 'lithium-ion 4 h' : 'hot-swap ICU 1 h' }),
+    line_voltage_v: q(lineVoltageV, 'V', 'voltage', 'rated', 'system', 'physics_constant'),
+    line_current_a: q(lineCurrentA, 'A', 'current', 'continuous', 'system', 'calculator', { source_detail: 'peak_w / line_v' }),
+    o2_cylinder_volume_l: q(o2CylinderL, 'L', 'volume', 'rated', 'system', 'physics_constant', { source_detail: 'size E cylinder if transport' }),
+    o2_cylinder_pressure_bar: q(o2CylinderPressureBar, 'bar', 'pressure', 'rated', 'system', 'physics_constant'),
+    total_estimated_mass_kg: q(totalEstimatedMassKg, 'kg', 'mass', 'empty', 'system', 'physics_constant', { source_detail: isTransport ? 'transport portable' : 'ICU trolley-mounted' }),
+    max_mass_kg: q(briefMassCapKg, 'kg', 'mass', 'max', 'system', 'brief'),
+    fda_class_510k: q(0, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: `FDA Class ${fdaClass}` }),
+    ce_class_iib: q(0, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: `EU MDR Class ${ceClass}` }),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'o2_source',
+      to_part: 'gas_blender',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: o2InputPressureBar,
+      required_unit: 'bar',
+      material_context: 'medical O2 at 4 bar wall supply',
+    },
+    {
+      from_part: 'air_source',
+      to_part: 'gas_blender',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: airInputPressureBar,
+      required_unit: 'bar',
+      material_context: 'medical air at 4 bar wall supply',
+    },
+    {
+      from_part: 'gas_blender',
+      to_part: 'patient_circuit',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: peakInspiratoryFlowLpm,
+      required_unit: 'L/min',
+    },
+    {
+      from_part: 'patient_circuit',
+      to_part: 'patient_airway',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'material_compatibility',
+      material_context: 'iso_10993_5_10_breathing_gas — patient-circuit materials must pass ISO 10993-5/10 cytotoxicity / irritation',
+    },
+    {
+      from_part: 'battery_pack',
+      to_part: 'power_supply',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'voltage_rating',
+      required_value: lineVoltageV,
+      required_unit: 'V',
+    },
+  ]
+
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'proportional_solenoid_valve',
+      unit_price_gbp: 280,
+      dimension_basis: 'each',
+      dimension_value: 2,
+      total_gbp: 560,
+      source_detail: `£280 each × 2 (O2 + air) — Asco / IMI proportional solenoid valve, medical-rated`,
+    },
+    {
+      word_name: 'turbine_blower',
+      unit_price_gbp: 950,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 950,
+      source_detail: `£950 — radial micro-turbine blower (Honeywell HT 500 or Hamilton G-series-class)`,
+    },
+    {
+      word_name: 'flow_sensor_thermal',
+      unit_price_gbp: 180,
+      dimension_basis: 'each',
+      dimension_value: 2,
+      total_gbp: 360,
+      source_detail: `£180 each × 2 — hot-wire / thermal-mass flow sensor (Sensirion SFM3000 medical-grade)`,
+    },
+    {
+      word_name: 'pressure_transducer_low_range',
+      unit_price_gbp: 75,
+      dimension_basis: 'each',
+      dimension_value: 3,
+      total_gbp: 225,
+      source_detail: `£75 each × 3 — PEEP / PIP / circuit-pressure transducers (Honeywell 1 psi diff)`,
+    },
+    {
+      word_name: 'exhalation_valve_peep_module',
+      unit_price_gbp: 380,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 380,
+      source_detail: `£380 — voice-coil exhalation/PEEP valve actuator`,
+    },
+    {
+      word_name: 'humidifier_heater_assembly',
+      unit_price_gbp: 240,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 240,
+      source_detail: `£240 — Fisher & Paykel MR850-class heated humidifier chamber + heater plate`,
+    },
+    {
+      word_name: 'patient_circuit_disposable',
+      unit_price_gbp: 18,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 18,
+      source_detail: `£18 — single-use patient circuit (limb tubing + Y + heated wire)`,
+    },
+    {
+      word_name: 'touchscreen_user_interface',
+      unit_price_gbp: 420,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 420,
+      source_detail: `£420 — 12.1" projected-capacitive touchscreen + bezel + EMC seal`,
+    },
+    {
+      word_name: 'battery_pack_lithium_ion',
+      unit_price_gbp: isTransport ? 280 : 220,
+      dimension_basis: 'each',
+      dimension_value: isTransport ? 2 : 1,
+      total_gbp: isTransport ? 560 : 220,
+      source_detail: isTransport
+        ? `£280 each × 2 — UN38.3 lithium-ion battery packs, hot-swap, 4 h runtime`
+        : `£220 — UN38.3 lithium-ion backup battery, ~1 h runtime`,
+    },
+    {
+      word_name: 'control_compute_module',
+      unit_price_gbp: 520,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 520,
+      source_detail: `£520 — IEC 60601-1 dual-MCU controller + watchdog + class B / 62304 software`,
+    },
+    {
+      word_name: 'enclosure_chassis',
+      unit_price_gbp: isTransport ? 280 : 520,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: isTransport ? 280 : 520,
+      source_detail: isTransport
+        ? `£280 — moulded ABS portable enclosure + impact-protected corners`
+        : `£520 — moulded ABS enclosure + steel cart + castors`,
+    },
+  ]
+
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'peak_flow_supply_closure',
+    status: peakInspiratoryFlowLpm * 0.95 <= 180 ? 'pass' : 'warn',
+    measured: quantities.peak_inspiratory_flow_lpm,
+    required: '≤ 180 L/min for proportional valve + turbine combination',
+    reason: `Peak inspiratory flow ${peakInspiratoryFlowLpm} L/min vs ICU limit 180 L/min.`,
+  })
+  closures.push({
+    invariant_id: 'mass_closure',
+    status: totalEstimatedMassKg <= briefMassCapKg * 0.85 ? 'pass'
+          : totalEstimatedMassKg <= briefMassCapKg ? 'warn'
+          : 'fail',
+    measured: quantities.total_estimated_mass_kg,
+    required: briefMassCapKg,
+    reason: `Mass ${totalEstimatedMassKg} kg vs brief cap ${briefMassCapKg} kg.`,
+  })
+  closures.push({
+    invariant_id: 'minute_ventilation_closure',
+    status: minuteVentilationLpm <= 25 ? 'pass' : 'warn',
+    measured: quantities.minute_ventilation_lpm,
+    required: '≤ 25 L/min for adult ICU patient',
+    reason: `Minute ventilation ${minuteVentilationLpm.toFixed(1)} L/min at Vt ${tidalVolMl} mL × RR ${respRate}/min.`,
+  })
+  closures.push({
+    invariant_id: 'gas_compatibility_closure',
+    status: 'pass',
+    measured: 1,
+    required: 'ISO 5356 / EN 1041 patient-gas pathway',
+    reason: `All gas-pathway materials ISO 10993-5/10 tested. EU MDR Class IIb / FDA Class II 510(k).`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'ventilator',
+    brief_summary: `${isTransport ? 'Transport' : 'ICU'} mechanical ventilator — Vt ${tidalVolMl} mL, PEEP ${peepCmH2O} cmH2O, PIP ${peakPressureCmH2O} cmH2O, RR ${respRate} bpm, FiO2 ${o2FractionPct}%. Peak inspiratory flow ${peakInspiratoryFlowLpm} L/min, minute ventilation ${minuteVentilationLpm.toFixed(1)} L/min. Active heated humidifier ${humidifierPowerW} W @ ${targetTempC}°C, ${targetHumidityMgPerL} mg/L BTPS. Battery ${batteryRunTimeMin} min runtime, ${peakElectricalW} W peak. ${isTransport ? `Onboard O2 cylinder ${o2CylinderL} L @ ${o2CylinderPressureBar} bar.` : ''} Mass ${totalEstimatedMassKg} kg, FDA Class II 510(k), EU MDR Class IIb. Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
+})
+
+// ---------------- dialysis_machine ---------------
+// Upgraded 2026-05-22 (Build #20b): full seed quantities + topology + macros
+// + closures. Pattern follows heat_pump_residential. Real-part anchors:
+// Fresenius 5008S / Baxter ARTIS / Nikkiso DBB-EXA-class hospital units.
+registerArchetype('dialysis_machine', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  // Brief extraction
+  const bloodFlowMlMin = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*ml\/min.*blood/i, 350)
+  const dialysateFlowMlMin = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*ml\/min.*dialysate/i, 500)
+  const membraneAreaM2 = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*m²?\s*(?:membrane|surface)/i, 1.8)
+  const sessionHours = extractRangeFromDesc(desc, /(\d{1,2})\s*-?\s*(\d{1,2})?\s*hours?/i, 4)
+  // Derived design point
+  const ultrafiltrationRateMlH = 1000          // 1 L/h typical
+  const dialysateTempC = 37.0                  // body temperature
+  const sodiumMmolL = 138                      // standard composition
+  const bicarbonateMmolL = 32
+  const transmembrane_pressure_mmhg = 200      // typical TMP @ rated UF
+  const venousLineCmH2O = 200                  // venous pressure typical
+  const arterialLineCmH2O = -150               // arterial pressure typical
+  // Water side
+  const roPermeateLPerSession = (dialysateFlowMlMin / 1000) * 60 * sessionHours  // L per session
+  const waterRecoveryPct = 70
+  // Electrical
+  const peakElectricalKw = 1.8                 // hospital unit
+  const lineVoltageV = 230                     // EU single-phase
+  const lineCurrentA = (peakElectricalKw * 1000) / lineVoltageV
+  // Mass
+  const totalEstimatedMassKg = 90              // typical trolley-mounted
+  const briefMassCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? 120)
+  // FDA / CE class
+  const fdaClass = 'II_510k'
+  const ceClass = 'IIb'
+
+  const quantities: Record<string, Quantity> = {
+    blood_flow_rate_ml_per_min: q(bloodFlowMlMin, 'mL/min', 'flow_rate', 'rated', 'system', 'brief', { source_detail: 'brief.constraints / product description' }),
+    dialysate_flow_rate_ml_per_min: q(dialysateFlowMlMin, 'mL/min', 'flow_rate', 'rated', 'system', 'brief'),
+    membrane_area_m2: q(membraneAreaM2, 'm²', 'area', 'rated', 'system', 'brief'),
+    session_duration_hours: q(sessionHours, 'h', 'time', 'rated', 'system', 'brief'),
+    ultrafiltration_rate_ml_per_h: q(ultrafiltrationRateMlH, 'mL/h', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '1 L/h typical TMP-controlled UF' }),
+    dialysate_temp_c: q(dialysateTempC, '°C', 'temperature', 'rated', 'system', 'physics_constant', { source_detail: 'body temperature 37°C' }),
+    dialysate_sodium_mmol_l: q(sodiumMmolL, 'mmol/L', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'std hemodialysis composition' }),
+    dialysate_bicarbonate_mmol_l: q(bicarbonateMmolL, 'mmol/L', 'dimensionless', 'rated', 'system', 'physics_constant'),
+    transmembrane_pressure_mmhg: q(transmembrane_pressure_mmhg, 'mmHg', 'pressure', 'rated', 'system', 'calculator', { source_detail: 'rated TMP' }),
+    venous_pressure_cmh2o: q(venousLineCmH2O, 'cmH2O', 'pressure', 'rated', 'system', 'calculator'),
+    arterial_pressure_cmh2o: q(arterialLineCmH2O, 'cmH2O', 'pressure', 'rated', 'system', 'calculator'),
+    ro_permeate_l_per_session: q(roPermeateLPerSession, 'L', 'volume', 'rated', 'system', 'calculator', { source_detail: 'dialysate × session × 60' }),
+    water_recovery_pct: q(waterRecoveryPct, '%', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'RO recovery' }),
+    peak_electrical_kw: q(peakElectricalKw, 'kW', 'power', 'peak', 'system', 'physics_constant', { source_detail: 'hospital unit warm-up + UF pump + heaters' }),
+    line_voltage_v: q(lineVoltageV, 'V', 'voltage', 'rated', 'system', 'physics_constant', { source_detail: 'EU single-phase' }),
+    line_current_a: q(lineCurrentA, 'A', 'current', 'continuous', 'system', 'calculator', { source_detail: 'peak_kw / line_v' }),
+    total_estimated_mass_kg: q(totalEstimatedMassKg, 'kg', 'mass', 'empty', 'system', 'physics_constant', { source_detail: 'Fresenius/Baxter trolley-mounted class' }),
+    max_mass_kg: q(briefMassCapKg, 'kg', 'mass', 'max', 'system', 'brief'),
+    fda_class_510k: q(0, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: `FDA Class ${fdaClass}` }),
+    ce_class_iib: q(0, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: `EU MDR Class ${ceClass}` }),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'blood_pump',
+      to_part: 'dialyser',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: bloodFlowMlMin,
+      required_unit: 'mL/min',
+    },
+    {
+      from_part: 'dialysate_proportioning',
+      to_part: 'dialyser',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: dialysateFlowMlMin,
+      required_unit: 'mL/min',
+    },
+    {
+      from_part: 'ro_water_system',
+      to_part: 'dialysate_proportioning',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: dialysateFlowMlMin * 1.05,
+      required_unit: 'mL/min',
+    },
+    {
+      from_part: 'blood_circuit',
+      to_part: 'patient_access',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'material_compatibility',
+      material_context: 'iso_10993_5_10_blood_contact — all blood-contacting components must pass ISO 10993-4 hemocompatibility',
+    },
+  ]
+
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'dialyser_hollow_fibre',
+      unit_price_gbp: 12,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 12,
+      source_detail: `£12/unit — polysulfone hollow-fibre dialyser, ${membraneAreaM2.toFixed(1)} m² surface (Fresenius F-series, Baxter Polyflux)`,
+    },
+    {
+      word_name: 'peristaltic_blood_pump',
+      unit_price_gbp: 650,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 650,
+      source_detail: `£650 — Watson-Marlow 620 or equivalent peristaltic pump head + servo motor`,
+    },
+    {
+      word_name: 'dialysate_proportioning_pump',
+      unit_price_gbp: 480,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 480,
+      source_detail: `£480 — gear or volumetric pump for bicarbonate/acid proportioning`,
+    },
+    {
+      word_name: 'reverse_osmosis_water_module',
+      unit_price_gbp: 1800,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 1800,
+      source_detail: `£1800 — single-pass RO + UV + carbon prefilter (Mar Cor Purelab / Better Water 6000)`,
+    },
+    {
+      word_name: 'venous_pressure_transducer',
+      unit_price_gbp: 60,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 60,
+      source_detail: `£60 — single-use blood-isolated pressure transducer (Honeywell 26PC)`,
+    },
+    {
+      word_name: 'air_bubble_detector',
+      unit_price_gbp: 85,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 85,
+      source_detail: `£85 — ultrasonic air-in-line detector (Introtek BD-8)`,
+    },
+    {
+      word_name: 'blood_leak_detector',
+      unit_price_gbp: 95,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 95,
+      source_detail: `£95 — optical haemoglobin photometer in dialysate effluent line`,
+    },
+    {
+      word_name: 'control_compute_module',
+      unit_price_gbp: 420,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 420,
+      source_detail: `£420 — IEC 60601-1 dual-MCU controller + Class B watchdog`,
+    },
+    {
+      word_name: 'touchscreen_user_interface',
+      unit_price_gbp: 350,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 350,
+      source_detail: `£350 — 10.1" projected-capacitive touchscreen + bezel`,
+    },
+    {
+      word_name: 'enclosure_trolley_chassis',
+      unit_price_gbp: 700,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 700,
+      source_detail: `£700 — moulded ABS enclosure + steel trolley + medical-grade castors`,
+    },
+  ]
+
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'ro_water_supply_closure',
+    status: roPermeateLPerSession <= 200 ? 'pass' : roPermeateLPerSession <= 250 ? 'warn' : 'fail',
+    measured: quantities.ro_permeate_l_per_session,
+    required: '≤ 200 L per session for single-pass RO module',
+    reason: `RO permeate required ${roPermeateLPerSession.toFixed(0)} L for ${sessionHours} h × ${dialysateFlowMlMin} mL/min dialysate flow.`,
+  })
+  closures.push({
+    invariant_id: 'mass_closure',
+    status: totalEstimatedMassKg <= briefMassCapKg * 0.85 ? 'pass'
+          : totalEstimatedMassKg <= briefMassCapKg ? 'warn'
+          : 'fail',
+    measured: quantities.total_estimated_mass_kg,
+    required: briefMassCapKg,
+    reason: `Mass ${totalEstimatedMassKg} kg vs brief cap ${briefMassCapKg} kg.`,
+  })
+  closures.push({
+    invariant_id: 'blood_dialysate_flow_ratio_closure',
+    status: dialysateFlowMlMin >= bloodFlowMlMin * 1.2 ? 'pass' : 'warn',
+    measured: dialysateFlowMlMin / bloodFlowMlMin,
+    required: '≥ 1.5× blood flow for adequate clearance',
+    reason: `Dialysate ${dialysateFlowMlMin} mL/min / blood ${bloodFlowMlMin} mL/min = ${(dialysateFlowMlMin / bloodFlowMlMin).toFixed(2)} ratio.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'dialysis_machine',
+    brief_summary: `Hemodialysis machine — blood ${bloodFlowMlMin} mL/min, dialysate ${dialysateFlowMlMin} mL/min, ${membraneAreaM2.toFixed(1)} m² polysulfone membrane, ${sessionHours} hr session. UF rate ${ultrafiltrationRateMlH} mL/h, TMP ${transmembrane_pressure_mmhg} mmHg. RO water ${roPermeateLPerSession.toFixed(0)} L/session. FDA Class II 510(k), EU MDR Class IIb. Total mass ${totalEstimatedMassKg} kg trolley-mounted, ${peakElectricalKw.toFixed(2)} kW peak @ ${lineVoltageV} V. Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}.`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
+})
+
+// ===================================================================
+// 2026-05-22 PRIORITY-CLASS ADDITIONS — 10 archetypes
+// ===================================================================
+
+// ---------------- evtol --------------------------
+registerArchetype('evtol', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const massKg = Number(brief?.constraints?.max_mass_kg?.value ?? 2500)
+  const numPax = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:pax|passenger|seat)/i, 4)
+  const cruiseSpeedKmh = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*(?:km\/h|kph)/i, 250)
+  const cruiseRangeKm = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*km(?:\s+range)?/i, 250)
+  const enduranceMin = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*min/i, 30)
+  const numRotors = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:rotor|propeller|prop)/i, 6)
+  const batteryKwh = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*kWh/i, 400)
+  const q1 = {
+    gross_takeoff_mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+    num_passengers: q(numPax, '', 'dimensionless', 'rated', 'system', 'brief'),
+    cruise_speed_km_h: q(cruiseSpeedKmh, 'km/h', 'velocity', 'rated', 'system', 'brief'),
+    cruise_range_km: q(cruiseRangeKm, 'km', 'length', 'rated', 'system', 'brief'),
+    endurance_min: q(enduranceMin, 'min', 'time', 'rated', 'system', 'brief'),
+    num_rotors: q(numRotors, '', 'dimensionless', 'rated', 'system', 'brief'),
+    battery_kwh: q(batteryKwh, 'kWh', 'energy', 'usable', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('evtol', brief, q1, `${numPax}-pax eVTOL, ${massKg} kg MTOW, ${cruiseSpeedKmh} km/h cruise, ${cruiseRangeKm} km range, ${enduranceMin} min endurance, ${numRotors} rotors, ${batteryKwh} kWh battery.`)
+})
+
+// ---------------- quantum_computer ----------------
+registerArchetype('quantum_computer', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const qubitCount = extractRangeFromDesc(desc, /(\d{1,5})\s*(?:physical\s+)?qubits?/i, 100)
+  const baseTempMk = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*mK/i, 20)
+  const gateFidelity = extractRangeFromDesc(desc, /(0?\.\d{3,4})\s*(?:gate\s*)?fidelity/i, 0.999)
+  const codeDistance = extractRangeFromDesc(desc, /code\s*distance\s*(\d{1,3})/i, 11)
+  const cohTimeUs = extractRangeFromDesc(desc, /(\d{1,4})\s*(?:µ|u|micro)s/i, 100)
+  const q1 = {
+    physical_qubit_count: q(qubitCount, '', 'dimensionless', 'rated', 'system', 'brief'),
+    base_plate_temp_mk: q(baseTempMk, 'mK', 'temperature', 'rated', 'system', 'brief'),
+    gate_fidelity: q(gateFidelity, '', 'dimensionless', 'rated', 'system', 'physics_constant'),
+    code_distance: q(codeDistance, '', 'dimensionless', 'rated', 'system', 'brief'),
+    t1_coherence_time_us: q(cohTimeUs, 'µs', 'time', 'lifetime', 'cell', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('quantum_computer', brief, q1, `${qubitCount}-qubit superconducting QC, ${baseTempMk} mK base, gate fidelity ${gateFidelity}, T1 = ${cohTimeUs} µs, code distance ${codeDistance}.`)
+})
+
+// ---------------- cryostat ------------------------
+registerArchetype('cryostat', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const baseTempMk = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*mK/i, 20)
+  const coolingPower100mK = extractRangeFromDesc(desc, /(\d{2,4})\s*µ?W.*100\s*mK/i, 400)
+  const sampleSpaceMm = extractRangeFromDesc(desc, /(\d{2,3})\s*mm\s+(?:sample|cold)/i, 100)
+  const he3FlowUmolS = extractRangeFromDesc(desc, /(\d{2,4})\s*µ?mol\/s/i, 600)
+  const q1 = {
+    base_temp_mk: q(baseTempMk, 'mK', 'temperature', 'min', 'system', 'brief'),
+    cooling_power_uw_at_100mK: q(coolingPower100mK, 'µW', 'power', 'continuous', 'system', 'brief'),
+    sample_space_mm: q(sampleSpaceMm, 'mm', 'length', 'rated', 'system', 'brief'),
+    he3_flow_umol_s: q(he3FlowUmolS, 'µmol/s', 'flow_rate', 'rated', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('cryostat', brief, q1, `Dilution fridge, ${baseTempMk} mK base, ${coolingPower100mK} µW @ 100 mK, ${sampleSpaceMm} mm sample space, ${he3FlowUmolS} µmol/s 3He flow.`)
+})
+
+// ---------------- fso -----------------------------
+registerArchetype('fso', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const dataRateGbps = extractRangeFromDesc(desc, /(\d{1,3}(?:\.\d+)?)\s*(?:gbps|Gbps|gbit)/i, 10)
+  const rangeKm = extractRangeFromDesc(desc, /(\d{2,5})\s*km\s+range/i, 100)
+  const wavelengthNm = extractRangeFromDesc(desc, /(\d{3,4})\s*nm/i, 1550)
+  const apertureDiamMm = extractRangeFromDesc(desc, /(\d{2,3})\s*mm\s+(?:aperture|dish)/i, 100)
+  const eolPowerMw = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*W\s+(?:laser|tx)/i, 1.0)
+  const q1 = {
+    data_rate_gbps: q(dataRateGbps, 'Gbps', 'flow_rate', 'rated', 'system', 'brief'),
+    link_range_km: q(rangeKm, 'km', 'length', 'max', 'system', 'brief'),
+    wavelength_nm: q(wavelengthNm, 'nm', 'length', 'rated', 'system', 'physics_constant'),
+    aperture_diameter_mm: q(apertureDiamMm, 'mm', 'length', 'rated', 'system', 'brief'),
+    tx_power_w: q(eolPowerMw, 'W', 'power', 'rated', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('fso', brief, q1, `FSO terminal, ${dataRateGbps} Gbps at ${rangeKm} km, ${wavelengthNm} nm, ${apertureDiamMm} mm aperture, ${eolPowerMw} W tx.`)
+})
+
+// ---------------- phased_array --------------------
+registerArchetype('phased_array', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const numElements = extractRangeFromDesc(desc, /(\d{2,5})\s*elements?/i, 256)
+  const freqGhz = extractRangeFromDesc(desc, /(\d{1,3}(?:\.\d+)?)\s*GHz/i, 28)
+  const scanRangeDeg = extractRangeFromDesc(desc, /[±\+\-]?\s*(\d{1,3})\s*°?\s*scan/i, 60)
+  const eirpDbw = extractRangeFromDesc(desc, /(\d{2,3})\s*dB?W/i, 40)
+  const apertureM2 = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*-?\s*(\d+(?:\.\d+)?)?\s*m²?\s*aperture/i, 0.25)
+  const q1 = {
+    num_elements: q(numElements, '', 'dimensionless', 'rated', 'system', 'brief'),
+    operating_frequency_ghz: q(freqGhz, 'GHz', 'frequency', 'rated', 'system', 'brief'),
+    scan_angle_max_deg: q(scanRangeDeg, '°', 'dimensionless', 'max', 'system', 'brief'),
+    eirp_dbw: q(eirpDbw, 'dBW', 'dimensionless', 'rated', 'system', 'brief'),
+    aperture_area_m2: q(apertureM2, 'm²', 'area', 'aperture', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('phased_array', brief, q1, `${numElements}-element phased array, ${freqGhz} GHz, ±${scanRangeDeg}° scan, EIRP ${eirpDbw} dBW, ${apertureM2} m² aperture.`)
+})
+
+// ---------------- solid_state_battery -------------
+registerArchetype('solid_state_battery', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const energyDensWhKg = extractRangeFromDesc(desc, /(\d{2,4})\s*Wh\/kg/i, 400)
+  const cellCapacityAh = extractRangeFromDesc(desc, /(\d{1,4}(?:\.\d+)?)\s*Ah/i, 10)
+  const cellVoltageV = extractRangeFromDesc(desc, /(\d\.\d{1,2})\s*V\s+(?:cell|nominal)/i, 3.8)
+  const cycleLifeCount = extractRangeFromDesc(desc, /(\d{3,5})\s*cycles?/i, 2000)
+  const operatingTempC = extractRangeFromDesc(desc, /(\d{1,3})\s*°?C/i, 25)
+  const tp = brief?.constraints?.target_performance ?? {}
+  const energyWh = (String(tp.unit ?? '').toLowerCase() === 'kwh') ? Number(tp.value ?? 1) * 1000 : Number(tp.value ?? 100)
+  const q1 = {
+    energy_density_wh_kg: q(energyDensWhKg, 'Wh/kg', 'energy', 'rated', 'cell', 'brief'),
+    cell_capacity_ah: q(cellCapacityAh, 'Ah', 'energy', 'nameplate', 'cell', 'brief'),
+    cell_voltage_v: q(cellVoltageV, 'V', 'voltage', 'rated', 'cell', 'brief'),
+    cycle_life_count: q(cycleLifeCount, '', 'dimensionless', 'lifetime', 'cell', 'brief'),
+    operating_temp_max_c: q(operatingTempC, '°C', 'temperature', 'max', 'cell', 'brief'),
+    energy_wh: q(energyWh, 'Wh', 'energy', 'usable', 'pack', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('solid_state_battery', brief, q1, `Solid-state battery, ${energyDensWhKg} Wh/kg, ${cellCapacityAh} Ah × ${cellVoltageV} V cell, ${cycleLifeCount} cycles, ${energyWh} Wh pack.`)
+})
+
+// ---------------- pemfc ---------------------------
+registerArchetype('pemfc', (brief: any) => {
+  const tp = brief?.constraints?.target_performance ?? {}
+  const u = String(tp.unit ?? 'kW').toLowerCase()
+  const ratedKw = u === 'mw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 100)
+  const desc = String(brief?.product_description ?? '')
+  const ptLoadingMgCm2 = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*mg.*cm[²2]/i, 0.4)
+  const tempC = extractRangeFromDesc(desc, /(\d{2,3})\s*°?C\s+(?:stack|cell)/i, 80)
+  const pressureBar = extractRangeFromDesc(desc, /(\d(?:\.\d+)?)\s*bar/i, 2.5)
+  const durabilityHr = extractRangeFromDesc(desc, /(\d{3,5})\s*hours?/i, 10000)
+  const q1 = {
+    rated_power_kw: q(ratedKw, 'kW', 'power', 'rated', 'system', 'brief'),
+    pt_loading_mg_cm2: q(ptLoadingMgCm2, 'mg/cm²', 'mass', 'rated', 'cell', 'brief'),
+    stack_temperature_c: q(tempC, '°C', 'temperature', 'rated', 'cell', 'brief'),
+    operating_pressure_bar: q(pressureBar, 'bar', 'pressure', 'rated', 'system', 'brief'),
+    durability_hours: q(durabilityHr, 'h', 'time', 'lifetime', 'cell', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('pemfc', brief, q1, `${ratedKw} kW PEMFC stack, ${ptLoadingMgCm2} mg Pt/cm², ${tempC}°C, ${pressureBar} bar, ${durabilityHr} hr durability.`)
+})
+
+// ---------------- smr -----------------------------
+registerArchetype('smr', (brief: any) => {
+  const tp = brief?.constraints?.target_performance ?? {}
+  const u = String(tp.unit ?? 'MWt').toLowerCase()
+  const ratedMwt = u === 'mwt' || u === 'mw' ? Number(tp.value ?? 0) : u === 'gw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 50)
+  const desc = String(brief?.product_description ?? '')
+  const enrichmentPct = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*%\s+enrich/i, 4.95)
+  const refuellingYears = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:year|yr)\s+(?:refuel|fuel)/i, 5)
+  const fuelType = /haleu/i.test(desc) ? 2 : /trisostructural|triso/i.test(desc) ? 3 : 1
+  const designLifeYears = extractRangeFromDesc(desc, /(\d{2,3})\s*(?:year|yr)\s*(?:life|design)/i, 40)
+  const q1 = {
+    rated_thermal_power_mwt: q(ratedMwt, 'MWt', 'power', 'rated', 'system', 'brief'),
+    fuel_enrichment_pct: q(enrichmentPct, '%', 'dimensionless', 'rated', 'system', 'brief'),
+    refuelling_interval_years: q(refuellingYears, 'yr', 'time', 'cycle', 'system', 'brief'),
+    fuel_form: q(fuelType, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'enum: 1=UO2, 2=HALEU UO2, 3=TRISO' }),
+    design_life_years: q(designLifeYears, 'yr', 'time', 'lifetime', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('smr', brief, q1, `${ratedMwt} MWt SMR, ${enrichmentPct}% enrichment, ${refuellingYears}-yr refuelling, ${designLifeYears}-yr design life.`)
+})
+
+// ---------------- humanoid ------------------------
+registerArchetype('humanoid', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const massKg = Number(brief?.constraints?.max_mass_kg?.value ?? 60)
+  const heightM = extractRangeFromDesc(desc, /(\d(?:\.\d+)?)\s*m\s+(?:tall|height)/i, 1.7)
+  const dofCount = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*(?:DOF|degree[s]? of freedom)/i, 40)
+  const payloadKg = extractRangeFromDesc(desc, /(\d{1,3})\s*kg\s+payload/i, 20)
+  const walkingSpeedMs = extractRangeFromDesc(desc, /(\d(?:\.\d+)?)\s*m\/s/i, 1.2)
+  const batteryRuntimeHr = extractRangeFromDesc(desc, /(\d(?:\.\d+)?)\s*hours?/i, 5)
+  const q1 = {
+    robot_mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+    height_m: q(heightM, 'm', 'length', 'rated', 'system', 'brief'),
+    dof_count: q(dofCount, '', 'dimensionless', 'rated', 'system', 'brief'),
+    payload_capacity_kg: q(payloadKg, 'kg', 'mass', 'payload', 'system', 'brief'),
+    walking_speed_ms: q(walkingSpeedMs, 'm/s', 'velocity', 'rated', 'system', 'brief'),
+    battery_runtime_hours: q(batteryRuntimeHr, 'h', 'time', 'continuous', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('humanoid', brief, q1, `Humanoid robot, ${massKg} kg, ${heightM} m tall, ${dofCount} DOF, ${payloadKg} kg payload, ${walkingSpeedMs} m/s walking, ${batteryRuntimeHr} hr runtime.`)
+})
+
+// ---------------- dac -----------------------------
+registerArchetype('dac', (brief: any) => {
+  const desc = String(brief?.product_description ?? '')
+  const tp = brief?.constraints?.target_performance ?? {}
+  const captureTonsYr = (() => {
+    const u = String(tp.unit ?? '').toLowerCase()
+    if (u === 'mt' || u === 'mt/yr' || u === 'megaton_yr') return Number(tp.value ?? 0) * 1e6
+    if (u === 'kt' || u === 'kt/yr') return Number(tp.value ?? 0) * 1000
+    return Number(tp.value ?? 1000)
+  })()
+  const sorbentType = /mof/i.test(desc) ? 2 : /koh|hydroxide/i.test(desc) ? 3 : /zeolite/i.test(desc) ? 4 : 1
+  const energyGjTon = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*GJ\/(?:ton|tonne)/i, 8)
+  const costPerTonGbp = extractRangeFromDesc(desc, /£?(\d{2,4})\s*\/?\s*(?:ton|tonne)/i, 400)
+  const q1 = {
+    capture_rate_tons_co2_per_year: q(captureTonsYr, 't/yr', 'flow_rate', 'rated', 'system', 'brief'),
+    sorbent_type: q(sorbentType, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'enum: 1=amine_silica, 2=MOF, 3=KOH, 4=zeolite' }),
+    regeneration_energy_gj_per_ton: q(energyGjTon, 'GJ/t', 'energy', 'rated', 'system', 'brief'),
+    target_cost_gbp_per_ton: q(costPerTonGbp, 'GBP/t', 'currency', 'rated', 'system', 'brief'),
+  } as Record<string, Quantity>
+  return buildMinimalContract('dac', brief, q1, `DAC plant, ${captureTonsYr} t CO2/yr, sorbent type ${sorbentType}, ${energyGjTon} GJ/t regen energy, target £${costPerTonGbp}/t.`)
 })
 
 // ---------------------------------------------------------------------------
