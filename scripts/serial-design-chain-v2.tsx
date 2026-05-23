@@ -3443,7 +3443,12 @@ async function main() {
   // Final-pass " word" suffix strip — Phase 2 LLM specialists sometimes re-emit
   // name_human with the schema-suffix after the post-orchestrator strip ran.
   // Catches whatever later stages reintroduced before render reads state.
-  try { stripWordSuffixFromDesign((state as any).design) } catch {}
+  // 2026-05-23 P2-4 bugfix: was reading (state as any).design — a field that
+  // doesn't exist (the actual field is state.moduleDecomposition per the
+  // state-construction at line ~3332). This made the final-pass strip a
+  // silent no-op for the entire history of this chain. Renderer was relying
+  // on the pre-orchestrator strip at line 2189 + a Generator-side cleanup.
+  try { stripWordSuffixFromDesign(state.moduleDecomposition) } catch {}
   const statePath = resolve(outDir, 'state.json')
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   logAction({ step: 'save_state', path: statePath, accepted: allPassed, acceptance_status: acceptanceStatus, decision_count: designDecisions.length })
