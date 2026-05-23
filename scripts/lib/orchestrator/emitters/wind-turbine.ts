@@ -132,13 +132,12 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   const isDirectDrive = drivetrainType >= 2
   const generatorRpm = isDirectDrive ? rotorRpm : 1500
   const gearboxRatio = isDirectDrive ? 1 : q(contract, 'gearbox_ratio', 1500 / Math.max(1, rotorRpm))
-  // 2026-05-23 (post-L15): use generator AC voltage, not hardcoded 400 V.
-  // generatorAcV is computed below from ratedPowerKw class — but we need
-  // it here, so compute it inline. ratedPowerKw < 500 → 400 V; 500-5000 →
-  // 690 V; ≥5000 → 3300 V. Wrong denominator = oversized cable: at 6 MW
-  // 3300 V the actual current is ~1100 A, not 8661 A.
+  // 2026-05-23 (post-L18): FORCE-recompute AC current from generator V
+  // class. Contract may have pre-emitted a value using wrong denominator
+  // (400 V assumed). Always-recompute is correct because the generator
+  // voltage class is determined HERE from rated power.
   const genVForCurrent = ratedPowerKw < 500 ? 400 : ratedPowerKw < 5000 ? 690 : 3300
-  const acContinuousA = q(contract, 'ac_continuous_current_a', (ratedPowerKw * 1000) / (genVForCurrent * Math.sqrt(3) * 0.95))
+  const acContinuousA = (ratedPowerKw * 1000) / (genVForCurrent * Math.sqrt(3) * 0.95)
   const totalMassKg = q(contract, 'total_system_mass_kg', ratedPowerKw * 25 + ratedPowerKw * 18 + hubHeightM * 150)
   // 2026-05-23 (post-L16): use deployment_class enum (1=onshore, 2=offshore)
   // emitted by engineering-contract.ts:3280 wind builder. Falls back to
@@ -213,14 +212,15 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   // plus 50% reserve. Energy = motor_kw × 3 blades × 0.5 hr × 0.5 reserve.
   const pitchBatteryKwh = Math.max(2, pitchMotorEachKw * 3 * 0.5 * 0.5)
 
-  // Geometric chain — blade root → pitch bearing → hub bore MUST be
-  // concentric and sized for physical load path. Industry typical:
-  // blade root diameter ≈ 0.025 × rotor diameter; pitch bearing OD ≈
-  // root × 1.6 (carries 24-bolt flange); hub bore ≈ pitch bearing OD ×
-  // 1.1 (mounting flange clearance).
+  // 2026-05-23 L18 post-fix: blade root, pitch bearing OD, hub bore are
+  // CONCENTRIC at essentially the same diameter (the flange-bolted joint
+  // is a single circle). Industry rule: pitch bearing OD = blade root
+  // diameter × 1.05 (minor outer-race flange thickness); hub bore = pitch
+  // bearing OD + 5 cm clearance. Previous formula (×1.6, ×1.1) implied
+  // step-up adapters that don't exist in real turbines.
   const bladeRootDiameterM = rotorDiameterM * 0.025
-  const pitchBearingOdM = bladeRootDiameterM * 1.6
-  const hubBoreM = pitchBearingOdM * 1.1
+  const pitchBearingOdM = bladeRootDiameterM * 1.05  // outer race ~5% larger
+  const hubBoreM = pitchBearingOdM + 0.05  // 50 mm clearance
 
   // Transformer voltage class: LV side = generator AC voltage (single
   // source of truth); HV side = grid connection voltage (33 kV for
@@ -293,9 +293,15 @@ function emitRotorBlades(p: WindTurbineParams): DesignModule {
       word('rotor_blade_word', 'rotor blade',
         cc('rotor_blade', 'rotor blade', 'aero_lift_function', 'composite_glass_epoxy'),
         [mod('quantity', fmtQty(p.bladeCount)), mod('dimension', `${(p.rotorDiameterM / 2).toFixed(1)} m length, ${p.bladeRootDiameterM.toFixed(2)} m root`), mod('form', 'twist-tapered, structural foam + glass + carbon-spar'), mod('capacity', p.bladeMassEachKg.toFixed(0), 'kg each'), mod('regulatory', 'IEC 61400-23')]),
+      // 2026-05-23 L18 post-fix: bolt count scales with FLANGE CIRCUMFERENCE
+      // at ~80 mm bolt pitch (industry minimum for M30+ bolts on root flange).
+      // Previous formula (×120 for utility) gave 360 bolts on 12.2 m
+      // circumference = impossible 33 mm pitch. Now: count = floor(π × D / 0.08).
+      // 100 kW: π × 0.4 / 0.08 = 16 → 16 bolts per blade.
+      // 6 MW: π × 3.88 / 0.08 = 152 → 152 bolts per blade (utility scale).
       word('blade_root_bolt_word', 'blade root bolt',
         cc('blade_root_bolt', 'blade root bolt', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', fmtQty(p.bladeCount * (p.ratedPowerKw < 500 ? 24 : p.ratedPowerKw < 2000 ? 60 : 120))), mod('form', p.ratedPowerKw < 500 ? 'M30 10.9 grade' : p.ratedPowerKw < 2000 ? 'M36 10.9 grade' : 'M42 10.9 grade'), mod('dimension', `bolted on ${p.bladeRootDiameterM.toFixed(2)} m root flange`)]),
+        [mod('quantity', fmtQty(p.bladeCount * Math.max(16, Math.floor(Math.PI * p.bladeRootDiameterM / 0.08)))), mod('form', p.ratedPowerKw < 500 ? 'M30 10.9 grade' : p.ratedPowerKw < 2000 ? 'M36 10.9 grade' : 'M42 10.9 grade'), mod('dimension', `${(Math.PI * p.bladeRootDiameterM * 1000 / Math.max(16, Math.floor(Math.PI * p.bladeRootDiameterM / 0.08))).toFixed(0)} mm pitch on Ø${p.bladeRootDiameterM.toFixed(2)} m flange`)]),
       word('lightning_receptor_word', 'lightning receptor',
         cc('lightning_receptor', 'lightning receptor', 'electrical_conducting_function', 'copper'),
         [mod('quantity', fmtQty(p.bladeCount)), mod('regulatory', 'IEC 61400-24'), mod('form', 'tip-mounted brass')]),
