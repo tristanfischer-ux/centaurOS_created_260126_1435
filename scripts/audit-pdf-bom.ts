@@ -199,26 +199,64 @@ async function audit(outDir: string): Promise<{ findings: Finding[]; bom: BomExt
   for (const [k, v] of bom.module_subtotals) {
     if (k.endsWith('__header')) moduleHeaders.set(k.replace('__header', ''), v)
   }
+  // 2026-05-23 L24 fix v2: don't replicate the renderer's matcher here.
+  // Instead read the renderer's actual decisions from
+  // state.partVerifications[].contract_override_reason. A row with that
+  // field set was claimed by a macro at render time. Compare the SUM of
+  // claimed macro money against the TOTAL of all macros — anything not
+  // claimed is genuinely orphaned (or duplicate / contradictory like
+  // direct_drive_pmg_drivetrain + planetary_gearbox both emitted).
+  // Dedup macros by name + take max per name (orchestrator + engineering
+  // may both emit same-named macros; that's not orphaned).
+  const dedupedMacros = new Map<string, number>()
   for (const m of allMacros) {
-    const macroAmt = Number(m.total_gbp)
-    // Try to find a module header that matches some token of the macro name
-    const macroTokens = m.word_name.toLowerCase().split('_').filter(t => t.length >= 4)
-    let bestHeader: [string, number] | null = null
-    for (const [hk, hv] of moduleHeaders) {
-      const hkTokens = hk.split('_').filter(t => t.length >= 4)
-      const shared = macroTokens.filter(t => hkTokens.some(h => h.includes(t) || t.includes(h))).length
-      if (shared > 0 && (!bestHeader || hv > bestHeader[1])) {
-        bestHeader = [hk, hv]
+    const existing = dedupedMacros.get(m.word_name) ?? 0
+    dedupedMacros.set(m.word_name, Math.max(existing, Number(m.total_gbp)))
+  }
+  // Collect which macro names the renderer claimed (via contract_override_reason)
+  const pvList = (state?.partVerifications ?? []) as Array<any>
+  const claimedMacroNames = new Set<string>()
+  let claimedMacroTotal = 0
+  for (const p of pvList) {
+    const reason = String(p?.contract_override_reason ?? '')
+    if (!reason) continue
+    // Extract macro name from reason text. The renderer writes
+    // "Contract macro-assembly (exact|N% token match): <source_detail>".
+    // We need to identify WHICH macro it was. Walk dedupedMacros and find
+    // the one whose source_detail prefix matches reason content.
+    for (const [name, _amt] of dedupedMacros) {
+      // Match by checking if the reason contains the macro's name OR a
+      // distinctive token from it. The renderer doesn't write the name
+      // directly so we have to infer — use word_id mapping instead.
+      // Actually simpler: state.engineeringContract.macro_assembly_prices
+      // entries have word_name + source_detail; the reason contains
+      // source_detail verbatim.
+      const macroSource = allMacros.find(m => m.word_name === name)?.source_detail ?? ''
+      if (macroSource && reason.includes(macroSource.slice(0, 60))) {
+        if (!claimedMacroNames.has(name)) {
+          claimedMacroNames.add(name)
+          claimedMacroTotal += dedupedMacros.get(name) ?? 0
+        }
+        break
       }
     }
-    if (!bestHeader || bestHeader[1] < macroAmt * 0.5) {
-      findings.push({
-        severity: macroAmt > 50_000 ? 'HIGH' : 'MED',
-        check_id: 'B-2',
-        detail: `Macro "${m.word_name}" £${Math.round(macroAmt).toLocaleString()} is ORPHANED — no BoM module sub-total within 0.5-1.5× (best candidate: ${bestHeader ? bestHeader[0] + ' £' + Math.round(bestHeader[1]).toLocaleString() : 'none'}). Macro→word matcher in render-minimal-pdf.tsx:885 needs better tokenisation OR rename macro in engineering-contract.ts.`,
-      })
-    }
   }
+  const macroSumTotal = Array.from(dedupedMacros.values()).reduce((a, v) => a + v, 0)
+  // Flag macros that the renderer did NOT claim.
+  for (const [macroName, macroAmt] of dedupedMacros) {
+    if (claimedMacroNames.has(macroName)) continue
+    findings.push({
+      severity: macroAmt > 50_000 ? 'HIGH' : 'MED',
+      check_id: 'B-2',
+      detail: `Macro "${macroName}" £${Math.round(macroAmt).toLocaleString()} was NOT claimed by any word at render time (no row has contract_override_reason matching this macro's source_detail). Causes: (a) emitter has no word_id whose semantic tokens match this macro → add a word OR rename macro; (b) two macros emitted with different names representing the same budget (e.g. orchestrator emits planetary_gearbox + direct_drive_pmg_drivetrain — only one applies per brief based on isDirectDrive).`,
+    })
+  }
+  // Add summary
+  findings.push({
+    severity: 'INFO',
+    check_id: 'B-2-SUMMARY',
+    detail: `Macros: ${dedupedMacros.size} unique. Claimed by renderer: ${claimedMacroNames.size} (£${Math.round(claimedMacroTotal).toLocaleString()}). Total of all macros: £${Math.round(macroSumTotal).toLocaleString()}.`,
+  })
 
   // ── B-3 cover total ≡ sum of BoM module sub-totals ──
   if (bom.cover_raw_materials_bom_gbp != null && moduleHeaders.size > 0) {
