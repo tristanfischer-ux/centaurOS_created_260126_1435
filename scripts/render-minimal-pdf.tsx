@@ -2529,7 +2529,11 @@ function PerformanceCardBody({ state }: { state: any }) {
       ) : null}
 
       {sectionsWithRows.map((section: any, si: number) => (
-        <View key={si} style={{ marginBottom: 10 }} wrap={false}>
+        // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
+        // minPresenceAhead — variable-height section can overflow remaining
+        // page space and overdraw at same Y if wrap=false (wind-turbine p18
+        // overlap bug). 200pt ≈ 16 body lines reserves a safe-fit window.
+        <View key={si} style={{ marginBottom: 10 }} minPresenceAhead={200}>
           <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, letterSpacing: 1.2, marginBottom: 3, textTransform: 'uppercase' }}>
             {section.name}
           </Text>
@@ -2659,7 +2663,10 @@ function BriefRevisionNoticePage({ state, project }: { state: any; project: stri
           const badgeBg = applied ? '#d1fae5' : '#fed7aa'
           const revisedLabel = applied ? 'Revised' : 'Proposed'
           return (
-          <View key={`rev-${idx}`} wrap={false} style={{ marginBottom: 16 }}>
+          // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
+          // minPresenceAhead — engineering review row carries variable-length
+          // original/revised values; wrap=false caused page-overlap bug.
+          <View key={`rev-${idx}`} minPresenceAhead={120} style={{ marginBottom: 16 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
               <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, flex: 1 }}>
                 Revision {idx + 1} — iter {h.iter}: {h.target_constraint}
@@ -2916,7 +2923,10 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
       </Text>
 
       {km ? (
-        <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }} wrap={false}>
+        // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
+        // minPresenceAhead — operational headline carries 3 headline metrics
+        // + deployment-context paragraph; wrap=false caused page-overlap bug.
+        <View style={{ marginBottom: 16, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }} minPresenceAhead={120}>
           <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, letterSpacing: 0.8, marginBottom: 8 }}>
             OPERATIONAL HEADLINE — what this design must deliver
           </Text>
@@ -3065,7 +3075,11 @@ function ModuleConnectionMapPage({
         the heading + table together in a single wrap=false block so they
         always travel as one unit.
       */}
-      <View wrap={false}>
+      {/* 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
+          minPresenceAhead — Module legend table grows with module count;
+          wrap=false caused page-overlap bug. 120pt keeps heading + first
+          rows together; if not enough space, push whole block to next page. */}
+      <View minPresenceAhead={120}>
         <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 8, marginBottom: 8 }}>
           Module legend
         </Text>
@@ -3759,7 +3773,10 @@ function ModuleDesignTradeOffsBlock({ state, moduleId }: { state: any; moduleId:
   const choices = review.choices.filter((c: any) => scopeMatchesModule(String(c.scope ?? '')))
   if (choices.length === 0) return null
   return (
-    <View style={{ marginTop: 14, paddingTop: 10, paddingHorizontal: 12, paddingBottom: 8, backgroundColor: '#fbfcfe', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 4 }} wrap={false}>
+    // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
+    // minPresenceAhead — design trade-offs callout grows with choices array
+    // (each choice = title + alt + rationale); wrap=false caused overlap bug.
+    <View style={{ marginTop: 14, paddingTop: 10, paddingHorizontal: 12, paddingBottom: 8, backgroundColor: '#fbfcfe', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 4 }} minPresenceAhead={120}>
       <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, letterSpacing: 0.6, marginBottom: 6 }}>
         DESIGN TRADE-OFFS — this module
       </Text>
@@ -4178,7 +4195,10 @@ function RiskPage({ state, project, manualReviewBadges }: { state: any; project:
             CROSS-CUTTING SYSTEM FINDINGS
           </Text>
           {systemRisks.map((r, ri) => (
-            <View key={r.id || ri} style={{ marginBottom: 10, padding: 12, backgroundColor: '#ffe4e6', borderLeftWidth: 4, borderLeftColor: '#b91c1c', borderRadius: 4 }} wrap={false}>
+            // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false}
+            // with minPresenceAhead — system-risk card has variable why/action
+            // prose; wrap=false caused page-overlap bug.
+            <View key={r.id || ri} style={{ marginBottom: 10, padding: 12, backgroundColor: '#ffe4e6', borderLeftWidth: 4, borderLeftColor: '#b91c1c', borderRadius: 4 }} minPresenceAhead={100}>
               <Text style={{ fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.8 }}>{r.id}</Text>
               <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: '#7f1d1d', marginTop: 3, marginBottom: 4 }}>{r.issue}</Text>
               <Text style={{ fontSize: 9.5, color: '#475569', lineHeight: 1.5, marginBottom: 3 }}>
@@ -4359,7 +4379,10 @@ function DesignDecisionsPage({ state, project }: { state: any; project: string }
     const { reasoning, consequences } = extractConsequences(d)
     const topic = humanise(d.kind) + ' on ' + clean_prose(String(d.word_name ?? d.word_id))
     return (
-      <View key={`dec-${idx}`} wrap={false} style={{ marginBottom: 18, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
+      // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
+      // minPresenceAhead — made-decision card has variable reasoning +
+      // consequences list; wrap=false caused page-overlap bug.
+      <View key={`dec-${idx}`} minPresenceAhead={120} style={{ marginBottom: 18, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, flex: 1 }}>
             Decision {idx + 1} — {topic}
@@ -4398,7 +4421,10 @@ function DesignDecisionsPage({ state, project }: { state: any; project: string }
   // Fallback (no recommendation) — keep the original "open question" framing
   // so the human can still pick. This path should be rare; logged above.
   const renderOpenQuestionCard = (d: any, idx: number) => (
-    <View key={`dec-${idx}`} wrap={false} style={{ marginBottom: 18, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
+    // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
+    // minPresenceAhead — open-question decision card has variable prose;
+    // wrap=false caused page-overlap bug.
+    <View key={`dec-${idx}`} minPresenceAhead={120} style={{ marginBottom: 18, padding: 12, backgroundColor: '#f7f8fa', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: ACCENT }}>
       <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
         <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: ACCENT, flex: 1 }}>
           Decision {idx + 1} — {humanise(d.kind)} on {clean_prose(String(d.word_name ?? d.word_id))}
@@ -4584,7 +4610,10 @@ function _PartsPendingVerificationPage_unused({ state, project }: { state: any; 
           Plausible but unverified — human to confirm
         </Text>
         {uncertain.map((v, idx) => (
-          <View key={`vrfy-${idx}`} wrap={false} style={{ marginBottom: 12, padding: 10, backgroundColor: '#fff7ed', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: '#c2410c' }}>
+          // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
+          // minPresenceAhead — uncertain-part card has variable manufacturer +
+          // part-number + recommendation prose; wrap=false caused overlap bug.
+          <View key={`vrfy-${idx}`} minPresenceAhead={120} style={{ marginBottom: 12, padding: 10, backgroundColor: '#fff7ed', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: '#c2410c' }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
               <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, flex: 1 }}>
                 {clean_prose(String(v.word_name ?? v.word_id))}
@@ -5255,9 +5284,13 @@ function SuppliersPage({ state, project }: { state: any; project: string }) {
       ? clean_prose(String(c.llm_reasoning)).slice(0, 220)
       : ''
     return (
+      // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
+      // minPresenceAhead — supplier card is 4-6 inches tall with capability
+      // one-liner + 3 fit_bullets + contact CTAs; wrap=false caused page-18
+      // wind-turbine overlap bug. 200pt reserves enough space for safe fit.
       <View
         key={`cand-${idx}`}
-        wrap={false}
+        minPresenceAhead={200}
         style={{
           marginBottom: 10,
           padding: 12,
@@ -5843,7 +5876,10 @@ function SystemLevelRisksPage({ state, project }: { state: any; project: string 
         Cross-cutting issues that span more than one module — checked before you read individual modules, in case a cumulative effect needs the system-level view.
       </Text>
       {risks.map((r, ri) => (
-        <View key={r.id || ri} style={{ marginBottom: 12, padding: 14, backgroundColor: '#ffe4e6', borderLeftWidth: 4, borderLeftColor: '#b91c1c', borderRadius: 4 }} wrap={false}>
+        // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
+        // minPresenceAhead — system-risk card has variable why/action prose
+        // (≈ 4-6 lines each); wrap=false caused page-overlap bug.
+        <View key={r.id || ri} style={{ marginBottom: 12, padding: 14, backgroundColor: '#ffe4e6', borderLeftWidth: 4, borderLeftColor: '#b91c1c', borderRadius: 4 }} minPresenceAhead={120}>
           <Text style={{ fontSize: 7.5, color: '#94a3b8', letterSpacing: 0.8 }}>{r.id}</Text>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: '#7f1d1d', marginTop: 3, marginBottom: 4 }}>{r.issue}</Text>
           <Text style={{ fontSize: 10, color: '#475569', lineHeight: 1.5, marginBottom: 3 }}>
@@ -5936,10 +5972,14 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
         const visibleClaims = claims.slice(0, 12)
         const extraClaims = claims.length - visibleClaims.length
         return (
+          // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
+          // minPresenceAhead — Tools-Used card carries up to 12 claims + 4
+          // narrative paragraphs; wrap=false caused page-18 wind-turbine
+          // overlap bug. 200pt reserves enough space for safe fit.
           <View
             key={tool.tool_id || `tool-${ti}`}
             style={{ marginBottom: 14, padding: 12, backgroundColor: '#f8fafc', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 4 }}
-            wrap={false}
+            minPresenceAhead={200}
           >
             <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
               <Text style={{ flex: 1, fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK }}>
