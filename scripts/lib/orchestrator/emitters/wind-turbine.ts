@@ -170,13 +170,14 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   // Hub static load: must carry transient rotor + dynamic + safety
   // factor (IEC 61400-1 load case DLC1.5/1.6 emergency stop)
   const hubStaticLoadKg = Math.round(totalRotorMassKg * 3.0)
-  // 2026-05-23 L25 post-mortem: yaw bearing carries nacelle + rotor MASS
-  // (verified against Vestas/Siemens-Gamesa published nacelle mass + rotor
-  // mass figures for 6 MW direct-drive class). Use 1.8× safety factor
-  // (was 1.3) to cover dynamic gust + emergency-stop overload per IEC
-  // 61400-4 DLC1.5/2.2. For 6 MW direct-drive: (180 + 92) × 1.8 = 490 t
-  // axial capacity — exceeds Physics Critic's stated 400 t head mass.
-  const yawBearingAxialKg = Math.round((nacelleMassKg + totalRotorMassKg) * 1.8)
+  // 2026-05-23 L26 post-mortem: 1.8× still too tight. Physics Critic on
+  // L26 noted "5.2 MN axial rating leaves only 1.0 MN margin over 4.2 MN
+  // static mass, inadequate for 1.12 MN dynamic thrust + overturning".
+  // Bump to 2.5× — gives 6.67 MN for 6 MW class with 4.2 MN head mass,
+  // 2.5 MN margin (covers 2× dynamic + thrust + safety). This is
+  // closer to the actual Liebherr / Rothe Erde / IMO slewing-ring
+  // sizing rule for utility wind class.
+  const yawBearingAxialKg = Math.round((nacelleMassKg + totalRotorMassKg) * 2.5)
   // Yaw drive total: ~0.5% of rated power (industry rule of thumb)
   const yawTotalKw = Math.max(0.5, ratedPowerKw * 0.005)
   const yawMotorCount = ratedPowerKw < 200 ? 2 : ratedPowerKw < 2000 ? 4 : 6
@@ -561,6 +562,15 @@ function emitTowerYaw(p: WindTurbineParams): DesignModule {
       word('climbing_ladder_word', 'climbing ladder',
         cc('climbing_ladder', 'climbing ladder', null, 'aluminium'),
         [mod('quantity', '×1'), mod('regulatory', 'EN 14122-4'), mod('dimension', p.hubHeightM.toFixed(0), 'm')]),
+      // 2026-05-23 L26 post-mortem: Physics Critic flagged "no cooling loops
+      // to reject 360 kW generator losses + 100 kW converter losses for 6 MW
+      // class" → rapid thermal runaway + NdFeB demagnetization. Add a
+      // nacelle thermal management subsystem sized for generator + converter
+      // continuous losses (typically 4-6% of rated). Liquid-to-air radiator
+      // + glycol/water loop + redundant pumps.
+      word('nacelle_thermal_loop_word', 'nacelle thermal-management loop',
+        cc('nacelle_thermal_loop', 'water/glycol cooling loop with liquid-to-air radiator', 'thermal_transfer_function', 'aluminium'),
+        [mod('quantity', '×1'), mod('capacity', Math.round(p.ratedPowerKw * 0.06).toFixed(0), 'kW thermal'), mod('form', 'water/glycol loop, 2× redundant centrifugal pumps, liquid-to-air radiator with fans'), mod('dimension', `${(p.ratedPowerKw * 0.06 / 100).toFixed(1)} m² radiator face area`), mod('regulatory', 'IEC 60079-7 (Ex e) for offshore — atmosphere safety')]),
     ])
   return {
     module: 'tower_yaw',
