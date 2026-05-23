@@ -145,6 +145,22 @@ const stepGearboxLoad: ToolStep = {
     const out = output as { gearbox_ratio: number; gearbox_torque_nm: number; gearbox_design_life_h: number }
     const prov = (f: string) => ({ source: 'tool:gearbox-load:spectrum' as const, tool_id: 'gearbox-load:spectrum', tool_version: '1.0.0', tool_license: 'free-proprietary' as const, tool_source_url: 'internal://forgeos/gearbox', invocation_output_field: f, duration_ms: 0 })
     const ratedKw = c.quantities?.rated_power_kw?.value ?? 50
+    // 2026-05-23 L24 post-mortem: skip emitting planetary_gearbox macro
+    // when the brief is direct-drive. Engineering contract emits
+    // direct_drive_pmg_drivetrain in that case; planetary_gearbox would
+    // be a contradictory phantom budget (double-counting £180/kW).
+    const isDirectDrive = (c.quantities?.drivetrain_type?.value ?? 1) >= 2
+    if (isDirectDrive) {
+      return {
+        ...c,
+        quantities: {
+          ...c.quantities,
+          gearbox_ratio: { value: 1, unit: '', family: 'dimensionless', basis: 'rated', scope: 'subassembly', uncertainty_pct: 0, temporal_resolution_s: null, condition: 'direct-drive — no gearbox', provenance: prov('gearbox_ratio') },
+          gearbox_input_torque_nm: { value: out.gearbox_torque_nm ?? 11000, unit: 'N·m', family: 'force', basis: 'rated', scope: 'subassembly', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'rotor torque (no gear-ratio multiply)', provenance: prov('gearbox_torque_nm') },
+          gearbox_design_life_h: { value: out.gearbox_design_life_h ?? 175000, unit: 'h', family: 'time', basis: 'lifetime', scope: 'subassembly', uncertainty_pct: 20, temporal_resolution_s: null, condition: 'N/A direct-drive', provenance: prov('gearbox_design_life_h') },
+        },
+      }
+    }
     const gearboxMacro = {
       word_name: 'planetary_gearbox',
       unit_price_gbp: 180,
@@ -183,29 +199,23 @@ const stepNgspice: ToolStep = {
     const out = output as { converter_efficiency_pct: number; generator_efficiency_pct: number; ac_continuous_current_a: number }
     const prov = (f: string) => ({ source: 'tool:ngspice:pcs-simulation' as const, tool_id: 'ngspice:pcs-simulation', tool_version: '46', tool_license: 'GPL-3.0' as const, tool_source_url: 'ngspice.sourceforge.io', invocation_output_field: f, duration_ms: 0 })
     const ratedKw = c.quantities?.rated_power_kw?.value ?? 50
-    const generatorMacro = {
-      word_name: 'pm_generator',
-      unit_price_gbp: 220,
-      dimension_basis: 'kw_power' as const,
-      dimension_value: ratedKw,
-      total_gbp: 220 * ratedKw,
-      source_detail: `ngspice-derived: £220/kW × ${ratedKw} kW = £${(220 * ratedKw).toLocaleString()} (PMSG, η=${(out.generator_efficiency_pct ?? 94).toFixed(1)}%)`,
-    }
-    const converterMacro = {
-      word_name: 'wind_converter',
-      unit_price_gbp: 130,
-      dimension_basis: 'kw_power' as const,
-      dimension_value: ratedKw,
-      total_gbp: 130 * ratedKw,
-      source_detail: `ngspice-derived: £130/kW × ${ratedKw} kW = £${(130 * ratedKw).toLocaleString()} (back-to-back IGBT, η=${(out.converter_efficiency_pct ?? 97).toFixed(1)}%)`,
-    }
+    // 2026-05-23 L24 post-mortem: stop emitting pm_generator + wind_converter
+    // macros from ngspice step. The engineering contract (scripts/lib/
+    // engineering-contract.ts wind builder) is the AUTHORITATIVE source for
+    // macro costs and already emits direct_drive_pmg_drivetrain (covers
+    // generator) + generator_side_converter (covers converter) keyed on
+    // isDirectDrive. The ngspice-derived macros were DUPLICATING this budget:
+    //   - For direct-drive: pm_generator £1.32M + engineering £2.1M drivetrain
+    //     = £3.42M double-count → cover £21.9M but BoM shows £18.6M, leaving
+    //     £3.18M "unmatched_macros" invisible per-module.
+    //   - For geared: pm_generator (assumes PMSG) contradicts geared_dfig_
+    //     drivetrain's DFIG generator.
+    // ngspice continues to emit USEFUL QUANTITIES (efficiencies, currents);
+    // just no macros. Keep ratedKw + others for future tool reuse.
+    void ratedKw  // referenced below in quantities block
     return {
       ...c,
-      macro_assembly_prices: [
-        ...((c.macro_assembly_prices ?? []) as any[]).filter(m => m.word_name !== 'pm_generator' && m.word_name !== 'wind_converter'),
-        generatorMacro,
-        converterMacro,
-      ],
+      // macros NOT modified by ngspice step — engineering contract authoritative.
       quantities: {
         ...c.quantities,
         generator_efficiency_pct: { value: out.generator_efficiency_pct ?? 94, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'subassembly', uncertainty_pct: 1, temporal_resolution_s: null, condition: 'rated power', provenance: prov('generator_efficiency_pct') },
