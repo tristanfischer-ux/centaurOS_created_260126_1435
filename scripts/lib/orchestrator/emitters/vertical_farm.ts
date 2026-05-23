@@ -70,6 +70,19 @@ function q(contract: ContractInProgress, key: string, fallback: number): number 
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback
 }
 
+// 2026-05-23 P1-4: scale-determining fallbacks need a defensive log when
+// fired. Without this, a VF brief with empty contract.quantities silently
+// emits a 100 m² / 8 trolley / 30 kW / 18 t design regardless of brief.
+// The orchestrator tool plan SHOULD populate these via canopy_calc /
+// lighting_design / hvac_sizing / mass_aggregator / energy_aggregator —
+// when one fires, an upstream tool didn't run or produced no output.
+function qScale(contract: ContractInProgress, key: string, fallback: number): number {
+  const v = (contract.quantities as Record<string, { value?: number }> | undefined)?.[key]?.value
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  console.error(`[vf-emitter] ⚠️  SCALE_FALLBACK_FIRED key=${key} value=${fallback} (orchestrator tool plan did not populate contract.quantities[${key}]; design will use default scale)`)
+  return fallback
+}
+
 function fmtQty(n: number): string {
   if (Number.isInteger(n)) return `×${n}`
   return `×${n.toFixed(2)}`
@@ -250,11 +263,11 @@ interface VfParams {
 }
 
 function deriveVfParams(c: ContractInProgress): VfParams {
-  const canopyAreaM2 = q(c, 'canopy_area_m2', 100)
-  const trolleyCount = Math.max(1, Math.round(q(c, 'trolley_count', 8)))
+  const canopyAreaM2 = qScale(c, 'canopy_area_m2', 100)
+  const trolleyCount = Math.max(1, Math.round(qScale(c, 'trolley_count', 8)))
   const tiersPerTrolley = Math.max(1, Math.round(q(c, 'tiers_per_trolley', 5)))
   const trayCount = Math.max(1, Math.round(q(c, 'tray_count', trolleyCount * tiersPerTrolley)))
-  const ledInstalledKw = q(c, 'led_installed_power_kw', 12)
+  const ledInstalledKw = qScale(c, 'led_installed_power_kw', 12)
   const ledHeatLoadKw = q(c, 'led_heat_load_kw', ledInstalledKw * 0.55)
   const ppfdUmolM2s = q(c, 'led_ppfd_umol_m2_s', 250)
   const dliMolM2Day = q(c, 'led_dli_mol_m2_day', 17)
@@ -277,7 +290,7 @@ function deriveVfParams(c: ContractInProgress): VfParams {
   const co2TankKg = q(c, 'co2_tank_size_kg', 100)
   const co2InjectionPoints = Math.max(1, Math.round(q(c, 'co2_injection_points', 1)))
   const transpirationKgDay = q(c, 'plant_transpiration_kg_day', 60)
-  const annualYieldKg = q(c, 'annual_yield_kg', 25000)
+  const annualYieldKg = qScale(c, 'annual_yield_kg', 25000)
   const yieldKgM2Yr = q(c, 'crop_annual_yield_kg_m2', 30)
   const cropCycleDays = Math.max(1, Math.round(q(c, 'crop_cycle_days', 35)))
   const cropCyclesPerYear = q(c, 'crop_cycles_per_year', 10)
@@ -286,12 +299,12 @@ function deriveVfParams(c: ContractInProgress): VfParams {
   const fertigationReservoirL = q(c, 'fertigation_reservoir_l', 1000)
   const uvcLamps = Math.max(1, Math.round(q(c, 'uvc_lamps_required', 2)))
   const uvcDoseMjCm2 = q(c, 'uvc_target_dose_mj_cm2', 44)
-  const totalElectricalKw = q(c, 'total_electrical_kw', 30)
+  const totalElectricalKw = qScale(c, 'total_electrical_kw', 30)
   const supplyKwAvailable = q(c, 'supply_kw_available', q(c, 'grid_connection_rated_kw', 44))
   const serviceTransformerKva = q(c, 'service_transformer_kva', 0)
-  const totalSystemMassKg = q(c, 'total_system_mass_kg', 18000)
+  const totalSystemMassKg = qScale(c, 'total_system_mass_kg', 18000)
   const massBudgetUtilisationPct = q(c, 'mass_budget_utilisation_pct', 70)
-  const recommendedContainerCount = Math.max(1, Math.round(q(c, 'recommended_container_count', 1)))
+  const recommendedContainerCount = Math.max(1, Math.round(qScale(c, 'recommended_container_count', 1)))
   const photoperiodHours = q(c, 'photoperiod_hours', 16)
   const operatingTempC = q(c, 'operating_temp_c', 22)
   const targetRhPct = q(c, 'target_rh_pct', 65)
