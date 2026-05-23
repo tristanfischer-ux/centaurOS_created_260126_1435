@@ -80,15 +80,17 @@ export async function orchestrateDesign(
   }
   const envErrors = validateEnvelope(envelope)
   if (envErrors.length > 0) {
-    return failResult(initialContract, envErrors, fallback_on_failure)
+    const prefix = loud_failures ? '[LOUD] ' : ''
+    return failResult(initialContract, envErrors.map(e => `${prefix}envelope validation: ${e}`), fallback_on_failure)
   }
 
   // ── Step 2: Select tool plan ──────────────────────────────────────────
   const plan = selectPlan(envelope)
   if (!plan) {
+    const prefix = loud_failures ? '[LOUD] ' : ''
     return failResult(
       initialContract,
-      [`no tool plan registered for envelope: ${JSON.stringify(envelope)}`],
+      [`${prefix}no tool plan registered for envelope ${envelope.class}/${envelope.scale_tier} — class needs a ClassToolPlan in scripts/lib/orchestrator/class-plans/<class>.ts with envelope_predicate matching this envelope`],
       fallback_on_failure,
     )
   }
@@ -104,7 +106,8 @@ export async function orchestrateDesign(
   const executorOutcome = await runToolPlan(plan, contractWithEnv, parsedConstraints)
   const toolFailures = executorOutcome.failures
   if (toolFailures.length > 0 && fallback_on_failure) {
-    return failResult(executorOutcome.contract, toolFailures, fallback_on_failure, executorOutcome.tool_results, executorOutcome.iterations)
+    const prefix = loud_failures ? '[LOUD] ' : ''
+    return failResult(executorOutcome.contract, toolFailures.map(f => `${prefix}tool failure: ${f}`), fallback_on_failure, executorOutcome.tool_results, executorOutcome.iterations)
   }
 
   // ── Step 4: Cross-tool consistency verifier ──────────────────────────
@@ -114,9 +117,10 @@ export async function orchestrateDesign(
     executorOutcome.tool_results,
   )
   if (!verifierOutcome.passed && fallback_on_failure) {
+    const prefix = loud_failures ? '[LOUD] ' : ''
     return failResult(
       executorOutcome.contract,
-      verifierOutcome.fatal_failures.map(r => `consistency failure: ${r.detail}`),
+      verifierOutcome.fatal_failures.map(r => `${prefix}consistency failure: ${r.detail}`),
       fallback_on_failure,
       executorOutcome.tool_results,
       executorOutcome.iterations,
@@ -129,9 +133,10 @@ export async function orchestrateDesign(
   // ── Step 6: Assemble DesignJSON ──────────────────────────────────────
   const assemblerOutcome = await assembleDesign(aggregatorOutcome.contract, envelope, parsedConstraints)
   if (!assemblerOutcome.ok || !assemblerOutcome.design) {
+    const prefix = loud_failures ? '[LOUD] ' : ''
     return failResult(
       aggregatorOutcome.contract,
-      [assemblerOutcome.error ?? 'assembler returned no design'],
+      [`${prefix}assembler failed: ${assemblerOutcome.error ?? 'returned no design'}`],
       fallback_on_failure,
       executorOutcome.tool_results,
       executorOutcome.iterations,

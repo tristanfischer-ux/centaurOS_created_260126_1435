@@ -142,6 +142,52 @@ test('100 Nm³/hr only, → 500 kW commercial', {
   target_performance: { value: 100, unit: 'Nm3/hr' },
 }, { class: 'h2_electrolyser', scale_tier: 'commercial' })  // 100 * 5.0 = 500 kW
 
+console.log('\n══ BESS ══════════════════════════════════════════════════════════════')
+console.log('Scenario 1: parser picked C-rate (suspected bug)')
+test('parser picked C-rate, MWh in desc', {
+  product_class: 'bess',
+  product_description: 'A 4 MWh utility-scale BESS in a 40-foot container. Nameplate capacity: 4 MWh. C-rate: 0.5C.',
+  target_performance: { value: 0.5, unit: 'C' },
+}, { class: 'bess', scale_tier: 'utility_containerised' })
+
+console.log('Scenario 2: 100 kWh light_commercial')
+test('100 kWh via target_performance', {
+  product_class: 'bess',
+  product_description: 'A 100 kWh commercial BESS',
+  target_performance: { value: 100, unit: 'kWh' },
+}, { class: 'bess', scale_tier: 'light_commercial' })
+
+console.log('\n══ EV CHARGER ════════════════════════════════════════════════════════')
+console.log('Scenario 1: parser picked efficiency')
+test('parser picked efficiency, kW in desc', {
+  product_class: 'ev_charger',
+  product_description: 'A 350 kW DC fast charger with 97% efficiency. Output power: 350 kW.',
+  target_performance: { value: 97, unit: '%' },
+}, { class: 'ev_charger', scale_tier: 'ultra_fast' })
+
+console.log('Scenario 2: 150 kW happy path')
+test('150 kW dc_fast', {
+  product_class: 'ev_charger',
+  product_description: 'A 150 kW DC fast charger',
+  target_performance: { value: 150, unit: 'kW' },
+}, { class: 'ev_charger', scale_tier: 'dc_fast' })
+
+console.log('\n══ PEMFC ═════════════════════════════════════════════════════════════')
+console.log('Scenario 1: parser picked Pt loading')
+test('parser picked Pt loading, kW in desc', {
+  product_class: 'pemfc',
+  product_description: 'A 100 kW automotive fuel cell stack. Rated power: 100 kW. Pt loading: 0.4 mg/cm².',
+  target_performance: { value: 0.4, unit: 'mg/cm2' },
+}, { class: 'pemfc', scale_tier: 'transport' })
+
+console.log('\n══ SMR ═══════════════════════════════════════════════════════════════')
+console.log('Scenario 1: parser picked capacity factor')
+test('parser picked capacity factor, MWe in desc', {
+  product_class: 'smr',
+  product_description: 'A 300 MWe small modular reactor with 95% capacity factor. Rated thermal power: 900 MWt. Net electrical output: 300 MWe.',
+  target_performance: { value: 95, unit: '%' },
+}, { class: 'smr', scale_tier: 'medium_smr' })
+
 console.log('\n══════════════════════════════════════════════════════════════════════')
 console.log(`Pass: ${pass}  Fail: ${fail}`)
 process.exit(fail > 0 ? 1 : 0)
