@@ -3980,15 +3980,27 @@ async function main() {
   if (process.env.PDF_ENGINE_WORKER === '1' && !renderEnv.RENDER_NO_OPEN) {
     renderEnv.RENDER_NO_OPEN = '1'
   }
-  execFileSync('npx', ['tsx', resolve(__dirname, 'render-minimal-pdf.tsx'), statePath, pdfPath], {
-    stdio: 'inherit',
-    cwd: resolve(__dirname, '..'),
-    env: renderEnv,
-  })
+  // 2026-05-23 P2-5: wrap render subprocess in try/catch → exit 5 (render
+  // failed) so worker can distinguish renderer crashes from integrity failures
+  // (exit 6) or chain logic failures (exit 1). All non-zero exits stamp the
+  // run as 'failed' but the code helps debugging from error_log.
+  try {
+    execFileSync('npx', ['tsx', resolve(__dirname, 'render-minimal-pdf.tsx'), statePath, pdfPath], {
+      stdio: 'inherit',
+      cwd: resolve(__dirname, '..'),
+      env: renderEnv,
+    })
+  } catch (err) {
+    console.error(`[chain] render subprocess failed: ${(err as Error).message}`)
+    logAction({ step: 'render_subprocess', ok: false, error: String(err) })
+    process.exit(5)
+  }
 
   // 2026-05-23 P0-2: post-render PDF integrity check. Catches catastrophic
   // render failures (0-byte file, JSON-serialised-as-PDF, missing PDF header)
-  // BEFORE the founder receives a "ready" status. Hard-exit code 8 on fail.
+  // BEFORE the founder receives a "ready" status. Hard-exit code 6 on fail
+  // (was 8 pre-P2-5; remapped to align with the canonical exit-code table
+  // documented in CLAUDE.md).
   try {
     const pdfStat = statSync(pdfPath)
     if (pdfStat.size < 1024) {
@@ -3999,7 +4011,7 @@ async function main() {
       console.error(`║  Size: ${String(pdfStat.size).padEnd(60)} ║`)
       console.error('╚══════════════════════════════════════════════════════════════════════╝')
       logAction({ step: 'integrity_check', ok: false, reason: 'pdf_size_too_small', size: pdfStat.size })
-      process.exit(8)
+      process.exit(6)
     }
     const headerBuf = readFileSync(pdfPath).slice(0, 8).toString('utf-8')
     if (!headerBuf.startsWith('%PDF-')) {
@@ -4009,14 +4021,14 @@ async function main() {
       console.error(`║  Header (first 8 bytes): ${headerBuf.padEnd(46)} ║`)
       console.error('╚══════════════════════════════════════════════════════════════════════╝')
       logAction({ step: 'integrity_check', ok: false, reason: 'pdf_header_missing', header: headerBuf })
-      process.exit(8)
+      process.exit(6)
     }
     console.error(`[chain] integrity check: PDF ${pdfStat.size} bytes, %PDF header OK`)
     logAction({ step: 'integrity_check', ok: true, size: pdfStat.size })
   } catch (err) {
     console.error(`[chain] integrity check threw: ${(err as Error).message}`)
     logAction({ step: 'integrity_check', ok: false, error: String(err) })
-    process.exit(8)
+    process.exit(6)
   }
 
   // 2026-05-23 P0-5: auto-audit every chain run via the 5-axis audit script.

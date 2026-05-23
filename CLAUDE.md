@@ -37,6 +37,28 @@ Both reference files were regenerated 2026-05-17 by discovery agents. If they lo
 
 ---
 
+## Chain exit codes (canonical — P2-5 2026-05-23)
+
+Worker treats any non-zero exit as a failed run, but the code is preserved
+in `pdf_engine_runs.error_log` for diagnosis. Worker retry policy may
+eventually differ per code (currently uniform: no retry).
+
+| Code | Meaning | Source |
+|---|---|---|
+| 0 | Success — PDF rendered + integrity-verified | normal completion |
+| 1 | Unexpected error (catch-all + bad CLI args) | `main().catch` or `process.argv` |
+| 2 | Brief refinement loop exhausted — original brief unfixable | Stage 2.6, line ~1992 |
+| 3 | G0.5 reconciliation halt — brief-vs-design scale mismatch | Stage 7.5, line ~2778 |
+| 5 | Render subprocess failed — react-pdf crashed | Stage 48, line ~3983 |
+| 6 | PDF integrity check failed (size < 1 KB OR header ≠ %PDF-) | Stage 48.5, lines ~4002/4012/4019 |
+| 7 | Orchestrator hard fail (when engineeringContract present but tool plan crashed) | Stage 17.5, line ~2360 |
+
+Codes 4, 8, 9 are reserved (4: brief-rewrite unfixable distinct from refinement halt; 8 was used pre-P2-5 for integrity, now mapped to 6).
+
+When adding a new fatal exit, allocate the next free code AND update this table.
+
+---
+
 ## ForgeOS PDF Engine — Mistakes to Avoid (codified 2026-05-13)
 
 Read these BEFORE editing the radical pipeline or running an iter loop:
