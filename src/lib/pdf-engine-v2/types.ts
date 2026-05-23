@@ -23,10 +23,58 @@ export interface StructuredBriefDimensions {
 // BLOCKER-6 fix: flattened single shape with nullable value — no discriminated
 // union needed. Matches the prompt schema (BLOCKER-4) and eliminates any-coercion
 // silent drops when narrowing the former undiscriminated union.
+//
+// P1-1 (2026-05-23): extended with optional `metrics: Array<StructuredBriefMetric>`
+// to collapse the unit-family bug class (4 RED cross-cuts). Old consumers continue
+// to read key_metric/value/unit/source unchanged (this stays = metrics[0] of the
+// highest-confidence SCALE metric). New consumers prefer the typed metrics array
+// and filter by category. See `metrics[]` doc-comment for migration pattern.
 export interface StructuredBriefPerformance {
   key_metric: string | null
   value: number | null
   unit: string | null
+  source: BriefSourceTag
+  /**
+   * P1-1: all quantitative performance metrics extracted from the brief, each
+   * categorised so downstream layers (envelope, archetype builder, emitter,
+   * cost-stack) can pick the right one for their purpose rather than guessing
+   * what the single key_metric represents.
+   *
+   * - 'scale'       — determines product size (kWh capacity, kW power, L volume, kg mass)
+   * - 'performance' — operating spec at scale (kLa, efficacy, throughput, SCOP)
+   * - 'efficiency'  — ratio metrics (efficacy, COP, specific energy, density)
+   * - 'durability'  — lifetime / cycle / fatigue (cycles, MTBF, years, hours)
+   * - 'cost'        — pricing metrics surfaced as constraints (£/unit, £/kWh)
+   *
+   * Old fields (key_metric/value/unit/source) ALSO populated for back-compat;
+   * they mirror metrics[0] of the highest-confidence scale entry when present.
+   *
+   * Empty array means parser found no quantitative metrics (e.g. brief is pure
+   * qualitative: "lightweight", "efficient" — no numbers). Schema is OPTIONAL
+   * so legacy parser outputs without this field still validate.
+   */
+  metrics?: StructuredBriefMetric[]
+}
+
+/**
+ * P1-1 (2026-05-23): a single categorised quantitative metric extracted from
+ * a brief. The parser MUST emit all metrics found, not just the most prominent
+ * one — downstream layers select by category.
+ */
+export interface StructuredBriefMetric {
+  /** Canonical metric key, e.g. "rated_power_kw", "working_volume_l", "nameplate_capacity_kwh".
+   *  Snake_case engineering metric names; the parser should use the same
+   *  vocabulary as the contract.quantities schema where possible so consumers
+   *  can map by exact key when known. */
+  key_metric: string
+  /** Numeric value in the unit specified. */
+  value: number
+  /** Unit string, normalised: kW, MW, kWh, L, kg, m, m², mm, K, °C, mbar,
+   *  hr⁻¹, kg/kg, kg/hr, t/yr, A, V, Hz, ppm, etc. */
+  unit: string
+  /** Category — determines which downstream layer selects this metric. */
+  category: 'scale' | 'performance' | 'efficiency' | 'durability' | 'cost'
+  /** Provenance: 'user' = explicitly stated; 'inferred' = derived. */
   source: BriefSourceTag
 }
 

@@ -380,7 +380,22 @@ export async function runBriefParsing(
       parsed.constraints.additional_constraints = []
     }
 
-    console.log(`[brief-parse] OK — confidence=${parsed.confidence}, missing=${parsed.missing_mandatory_fields.length} fields`)
+    // P1-1 (2026-05-23): normalise the new metrics[] field. Default to empty
+    // array when LLM didn't emit (e.g. brief is qualitative-only). Then
+    // reconcile so legacy target_performance fields mirror the highest-
+    // confidence scale metric for back-compat with ~70 unmigrated consumers.
+    if (parsed.constraints?.target_performance && !Array.isArray(parsed.constraints.target_performance.metrics)) {
+      parsed.constraints.target_performance.metrics = []
+    }
+    try {
+      const { reconcileLegacyTargetPerformance } = await import('../brief-metrics')
+      reconcileLegacyTargetPerformance(parsed)
+    } catch (err) {
+      console.error(`[brief-parse] metrics reconciliation failed: ${(err as Error).message}`)
+    }
+
+    const metricsCount = parsed.constraints?.target_performance?.metrics?.length ?? 0
+    console.log(`[brief-parse] OK — confidence=${parsed.confidence}, missing=${parsed.missing_mandatory_fields.length} fields, metrics=${metricsCount}`)
 
     logger.logStage({
       step_name: 'brief_parsing',

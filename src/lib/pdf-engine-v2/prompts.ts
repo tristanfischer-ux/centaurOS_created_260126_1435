@@ -24,7 +24,7 @@ Required output schema:
     "unit_cost_ceiling": { "value": number|null, "currency": "GBP"|"USD"|"EUR", "source": "user"|"inferred"|"missing" },
     "max_mass_kg": { "value": number|null, "source": "user"|"inferred"|"missing" },
     "max_dimensions_mm": { "w": number|null, "d": number|null, "h": number|null, "source": "user"|"inferred"|"missing" },
-    "target_performance": { "key_metric": string|null, "value": number|null, "unit": string|null, "source": "user"|"inferred"|"missing" },
+    "target_performance": { "key_metric": string|null, "value": number|null, "unit": string|null, "source": "user"|"inferred"|"missing", "metrics": [{ "key_metric": string, "value": number, "unit": string, "category": "scale"|"performance"|"efficiency"|"durability"|"cost", "source": "user"|"inferred" }] },
     "target_process": { "value": string|null, "source": "user"|"inferred"|"missing" },
     "target_material": { "value": string|null, "source": "user"|"inferred"|"missing" },
     "batch_size": { "value": number|null, "source": "user"|"inferred"|"missing" },
@@ -73,7 +73,20 @@ SAFETY STANDARDS — MANDATORY:
 
 DIMENSIONS AND UNITS:
 - Dimensions: always in mm. Mass: always in kg. Cost: preserve the user's stated currency.
-- Operating environment temperatures: for high-altitude or subsea products, infer from physics (e.g. stratosphere = -56 °C to -40 °C at 20 km). Mark source = "inferred". For other products, leave null with source = "missing" if not stated.`
+- Operating environment temperatures: for high-altitude or subsea products, infer from physics (e.g. stratosphere = -56 °C to -40 °C at 20 km). Mark source = "inferred". For other products, leave null with source = "missing" if not stated.
+
+MULTI-METRIC EXTRACTION (P1-1 — 2026-05-23 root-cause fix for unit-family bug class):
+- target_performance.metrics MUST contain EVERY quantitative performance metric you find in the brief, not just the most prominent one. Downstream engineering layers (envelope detection, archetype builder, emitter, cost-stack) each need different categories — when you provide only one metric, those layers have to guess which category it belongs to and routinely pick the wrong one (e.g. parsing "8 hr⁻¹ kLa" as bioreactor volume = 8 L, when the real volume is 200 L).
+- For each metric, set category as follows:
+  * "scale"       = determines product physical size: rated_power_kw, nameplate_capacity_kwh, working_volume_l, max_mass_kg, swept_area_m2, hydrogen_production_kg_per_hr, co2_capture_tpy, qubit_count, etc.
+  * "performance" = operating spec at a given scale: kLa (bioreactor), efficacy (LEDs), SCOP/COP (heat pump), throughput_l_per_min, depth_rating_m, etc.
+  * "efficiency"  = ratio/density metrics: wall_plug_efficacy_umol_per_j, specific_energy_wh_kg, energy_density_wh_l, etc.
+  * "durability"  = lifetime/cycle metrics: cycle_count, hours_to_failure, design_life_years, etc.
+  * "cost"        = pricing metrics surfaced as constraint: cost_per_kwh_gbp, cost_per_kw_gbp, etc.
+- Use SNAKE_CASE engineering metric names; prefer canonical names used in published datasheets (e.g. "rated_power_kw" not "max_power" or "power_output").
+- Always emit at least ONE metric with category = "scale" when the brief contains any quantitative scale info. This is the single most important metric for downstream layers; getting it right prevents the entire wrong-size-design bug class.
+- Source tagging on metrics matches the same rules as other constraint fields: "user" only when verbatim in the brief.
+- target_performance.key_metric/value/unit (the legacy single-metric fields) MUST mirror metrics[0] of the highest-confidence "scale" entry — they are kept for back-compat with consumers that have not migrated to the metrics[] array yet.`
 
 // ─── Stage 3: Research Synthesis ───────────────────────────────────────────
 
