@@ -872,6 +872,10 @@ function computeBomTotals(state: any): BomTotals | null {
         let unit_price_gbp = roundToPence(rawUnit)
         let line_total_gbp = roundToPence(unit_price_gbp * qty)
         let contract_override_reason: string | null = null
+        // 2026-05-23 L23: this row defaults to honouring cost_repair's
+        // exclusion flag from partVerifications. If macro override fires
+        // below, it sets this to false (macro IS authoritative).
+        let cost_repair_excluded_from_subtotal_for_this_row = true
 
         // Build #4 (Tristan 2026-05-21, council unanimous): Engineering
         // Contract macro-assembly pricing override. Loop 9 evidence:
@@ -953,6 +957,17 @@ function computeBomTotals(state: any): BomTotals | null {
             contract_override_reason = `Contract macro-assembly (${bestScore >= 1 ? 'exact' : `${Math.round(bestScore * 100)}% token match`}): ${bestMatch.source_detail}`
             // Claim this macro so subsequent matching words don't double-count.
             claimedMacroAssemblies.add(bestMatch.word_name)
+            // 2026-05-23 (L23 post-mortem): when a macro override applies,
+            // CLEAR cost_repair_excluded_from_subtotal. Cost-repair earlier
+            // flagged this row as "way under corpus median" and excluded
+            // it from subtotal — but the macro override IS the authoritative
+            // engineering-contract price. The 4× UP-cap that triggered the
+            // exclusion was protecting against corpus-noise outliers; the
+            // macro override is not a corpus outlier, it's the design
+            // contract. Leaving the flag would make a £4.17M rotor blade
+            // visible in BoM but excluded from sub-total = the bug Tristan
+            // flagged on L20.
+            cost_repair_excluded_from_subtotal_for_this_row = false
           }
         }
         const row: BomPartRow = {
@@ -1010,7 +1025,11 @@ function computeBomTotals(state: any): BomTotals | null {
             ? v.cost_repair_confidence : undefined,
           cost_repair_corrected_price_gbp: typeof v?.cost_repair_corrected_price_gbp === 'number' ? v.cost_repair_corrected_price_gbp : undefined,
           cost_repair_previous_price_gbp: typeof v?.cost_repair_previous_price_gbp === 'number' ? v.cost_repair_previous_price_gbp : undefined,
-          cost_repair_excluded_from_subtotal: v?.cost_repair_excluded_from_subtotal === true ? true : undefined,
+          // 2026-05-23 L23 fix: macro override clears the excluded flag.
+          // cost_repair earlier excluded this row because corpus said £1.10
+          // and reference said £31.60 (way-under) — but if macro now says
+          // £4.17M, the macro IS authoritative and the exclusion is stale.
+          cost_repair_excluded_from_subtotal: cost_repair_excluded_from_subtotal_for_this_row && v?.cost_repair_excluded_from_subtotal === true ? true : undefined,
           // Build #4: Engineering Contract macro-assembly price override
           // (when the Contract has a size-aware price for this word).
           contract_override_reason: contract_override_reason ?? undefined,
