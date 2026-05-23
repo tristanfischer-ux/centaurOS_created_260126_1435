@@ -1094,14 +1094,26 @@ function computeBomTotals(state: any): BomTotals | null {
   }
   const orchMacros = state?.orchestratorContract?.macro_assembly_prices ?? []
   const engMacros = state?.engineeringContract?.macro_assembly_prices ?? []
-  const allMacros = [...orchMacros, ...engMacros]
-  let unmatchedMacroTotal_gbp = 0
-  const unmatchedMacros: Array<{ name: string; total: number }> = []
-  for (const macro of allMacros) {
+  // 2026-05-23 P2-6: dedup ACROSS sources. If both orchestrator + engineering
+  // contracts list the same macro name (which happens when a class has both an
+  // emitter AND a full archetype contract — e.g. BESS after P2-7), naive
+  // concat would double-count. Accumulate by name.toLowerCase() taking
+  // max(total) — the larger figure is the better-grounded estimate.
+  const dedupedMacros = new Map<string, { name: string; total_gbp: number }>()
+  for (const macro of [...orchMacros, ...engMacros]) {
     const name = String(macro?.word_name ?? '').toLowerCase()
     const total = Number(macro?.total_gbp ?? 0)
     if (!name || !Number.isFinite(total) || total <= 0) continue
-    if (claimedMacroAssemblies.has(name)) continue
+    const existing = dedupedMacros.get(name)
+    if (!existing || total > existing.total_gbp) {
+      dedupedMacros.set(name, { name: String(macro?.word_name ?? ''), total_gbp: total })
+    }
+  }
+  let unmatchedMacroTotal_gbp = 0
+  const unmatchedMacros: Array<{ name: string; total: number }> = []
+  for (const { name, total_gbp: total } of dedupedMacros.values()) {
+    const lowerName = name.toLowerCase()
+    if (claimedMacroAssemblies.has(lowerName)) continue
     // Match macro to a design word ONLY via exact name or `_word` suffix.
     // 2026-05-23-bugfix: dropped permissive reverse-substring check
     // (`name.includes(wn)`) which caused false-positive matches — wind
@@ -1109,10 +1121,10 @@ function computeBomTotals(state: any): BomTotals | null {
     // would substring-match macros like "planetary_gearbox", suppressing
     // £3.18M of cost. Strict match only via exact ID; the BESS pattern of
     // emitting word_id = `${macro_name}_word` is the supported mapping.
-    const matched = wordNames.has(name) || wordNames.has(`${name}_word`)
+    const matched = wordNames.has(lowerName) || wordNames.has(`${lowerName}_word`)
     if (!matched) {
       unmatchedMacroTotal_gbp = roundToPence(unmatchedMacroTotal_gbp + total)
-      unmatchedMacros.push({ name, total })
+      unmatchedMacros.push({ name: lowerName, total })
     }
   }
   if (unmatchedMacroTotal_gbp > 0) {
