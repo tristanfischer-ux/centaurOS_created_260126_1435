@@ -400,6 +400,46 @@ export const CO2_CAPTURE_TPY: UnitFamily = {
 }
 
 // ---------------------------------------------------------------------------
+// 2026-05-23 ADDITIONS (Task P1-3): families for envelope detectors that
+// classify by qubit count, cryogenic temperature, CubeSat U-size, or
+// phased-array element count. These are dimensionless counts plus one
+// temperature family (Kelvin / millikelvin); declared here so detectors stay
+// pure tier-mappers.
+// ---------------------------------------------------------------------------
+
+/** Dimensionless qubit count. Canonical = bare 'q' / 'qubit' / 'qubits'. */
+export const QUBIT_COUNT: UnitFamily = {
+  canonical: 'qubit',
+  aliases: ['qubit', 'qubits', 'q', 'physicalqubit', 'physicalqubits', 'logicalqubit', 'logicalqubits'],
+  conversions: {},
+}
+
+/** Cryogenic temperature in millikelvin (mK). Canonical = 'mk'. */
+export const TEMPERATURE_MK: UnitFamily = {
+  canonical: 'mk',
+  aliases: ['mk', 'millikelvin', 'millikelvins'],
+  conversions: {
+    'k': 1000,
+    'kelvin': 1000,
+    'kelvins': 1000,
+  },
+}
+
+/** CubeSat U-size unit. Canonical = 'u'. Dimensionless integer count. */
+export const CUBESAT_U: UnitFamily = {
+  canonical: 'u',
+  aliases: ['u', 'unit', 'units', 'cubesat-u', 'cubesatu'],
+  conversions: {},
+}
+
+/** Phased-array radiator count. Canonical = 'element'. Dimensionless. */
+export const ELEMENT_COUNT: UnitFamily = {
+  canonical: 'element',
+  aliases: ['element', 'elements', 'antenna', 'antennas', 'radiator', 'radiators', 'array-element'],
+  conversions: {},
+}
+
+// ---------------------------------------------------------------------------
 // RE-EXPORTS for ergonomic detector imports.
 // ---------------------------------------------------------------------------
 

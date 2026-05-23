@@ -29,6 +29,10 @@ import {
   AREA_M2,
   HYDROGEN_RATE,
   CO2_CAPTURE_TPY,
+  QUBIT_COUNT,
+  TEMPERATURE_MK,
+  CUBESAT_U,
+  ELEMENT_COUNT,
 } from './constraint-normaliser'
 
 // ---------------------------------------------------------------------------
@@ -259,14 +263,29 @@ function bessScaleTier(c: ParsedConstraints): string | null {
 }
 
 function hapsScaleTier(c: ParsedConstraints): string | null {
-  const desc = String(c.product_description ?? '').toLowerCase()
-  // Look for wingspan in metres
-  const m = desc.match(/(\d{1,3}(?:\.\d+)?)\s*[-\s]?\s*metres?[\s-]+wingspan/i)
-    ?? desc.match(/wingspan[\s:.\-of]{0,12}(\d{1,3}(?:\.\d+)?)\s*(?:m\b|metres?)/i)
-  const ws = m ? parseFloat(m[1]) : null
-  // Envelope dimensions fallback
-  const envW = c.max_dimensions_mm?.w ? c.max_dimensions_mm.w / 1000 : null
-  const span = ws ?? envW
+  // 2026-05-23 Normaliser refactor (P1-3): HAPS briefs occasionally pick
+  // endurance (hours), payload mass (kg), or service ceiling (m) as
+  // target_performance instead of wingspan. Normaliser falls back to
+  // "X-metre wingspan", "wingspan: X m". Each regex captures (value, unit).
+  const numPat = '(\\d{1,3}(?:,\\d{3})*|\\d{1,3}(?:\\.\\d+)?)'
+  const unitPat = '(m|metres?|meters?|ft|feet|km|kilometres?|kilometers?)'
+  const result = findScaleMetric(c, {
+    family: LENGTH_M,
+    desc_regexes: [
+      // Pattern 1: "60-metre wingspan", "60 m wingspan"
+      new RegExp(`${numPat}\\s*-?\\s*${unitPat}\\s*[-\\s]?\\s*wingspan`, 'i'),
+      // Pattern 2: "wingspan: 60 m", "wingspan of 60 metres"
+      new RegExp(`wingspan[\\s:.\\-of]{0,12}${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 3: "X metre span" (HAPS-context generic)
+      new RegExp(`${numPat}\\s*${unitPat}\\s+span\\b`, 'i'),
+    ],
+  })
+  let span: number | null = result.found ? result.value : null
+  // Envelope-dimensions fallback — width in mm → m
+  if (span == null) {
+    const envW = c.max_dimensions_mm?.w ? c.max_dimensions_mm.w / 1000 : null
+    span = envW
+  }
   if (!span) return null
   if (span < 25) return 'small'
   if (span <= 60) return 'medium'
@@ -301,19 +320,50 @@ function heatPumpScaleTier(c: ParsedConstraints): string | null {
 }
 
 function vfScaleTier(c: ParsedConstraints): string | null {
-  // Vertical farm scale: by canopy area or container count
-  const desc = String(c.product_description ?? '').toLowerCase()
-  const m = desc.match(/(\d{1,4})\s*m[2²]\s+canopy/i) ?? desc.match(/canopy[\s\w]{0,30}?(\d{1,4})\s*m[2²]/i)
-  const area = m ? parseFloat(m[1]) : null
-  if (!area) return 'commercial' // default container-scale
+  // 2026-05-23 Normaliser refactor (P1-3): Vertical-farm briefs may pick
+  // yield (kg/yr), light intensity (PPFD), or rack count as target_performance
+  // instead of canopy area. Normaliser falls back to "X m² canopy", "canopy
+  // area: X m²". Each regex captures (value, unit).
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,5}(?:\\.\\d+)?)'
+  const unitPat = '(m2|m²|sqm|squaremetres?|squaremeters?|ft2|ft²|sqft|hectare|hectares|ha)'
+  const result = findScaleMetric(c, {
+    family: AREA_M2,
+    desc_regexes: [
+      // Pattern 1: "200 m² canopy"
+      new RegExp(`${numPat}\\s*${unitPat}\\s+canopy`, 'i'),
+      // Pattern 2: "canopy area: 200 m²"
+      new RegExp(`canopy[\\s\\w]{0,30}?${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 3: "growing area X m²", "cultivation area X m²"
+      new RegExp(`(?:growing|cultivation|grow|farm)\\s+area[\\s:]{0,5}${numPat}\\s*${unitPat}\\b`, 'i'),
+    ],
+  })
+  if (!result.found) return 'commercial' // default container-scale
+  const area = result.value
   if (area < 30) return 'micro'
   if (area <= 300) return 'commercial'
   return 'industrial'
 }
 
 function droneScaleTier(c: ParsedConstraints): string | null {
-  const mass = c.max_mass_kg?.value
-  if (!mass) return null
+  // 2026-05-23 Normaliser refactor (P1-3): drone briefs may declare mass via
+  // target_performance ("payload 2 kg"), max_mass_kg, or prose ("25 kg MTOW").
+  // Normaliser scans all three. Each desc regex captures (value, unit).
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,5}(?:\\.\\d+)?)'
+  const unitPat = '(kg|kilogram[s]?|kilo[s]?|g|gram[s]?|lb|lbs|pound[s]?|t|ton[s]?|tonne[s]?)'
+  const result = findScaleMetric(c, {
+    family: MASS_KG,
+    extra_field_keys: ['max_mass_kg'],
+    desc_regexes: [
+      // Pattern 1: "MTOW: 25 kg", "max take-off weight: 25 kg"
+      new RegExp(`(?:mtow|max(?:imum)?[\\s-]?(?:take[\\s-]?off)?[\\s-]?(?:weight|mass)|all[\\s-]?up[\\s-]?weight|auw)[\\s:]{0,8}${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "25 kg drone/quadcopter/multirotor/UAS"
+      new RegExp(`${numPat}\\s*${unitPat}\\s+(?:drone|quadcopter|multirotor|hexacopter|octocopter|uas|uav|aircraft)`, 'i'),
+      // Pattern 3: "payload: 25 kg"
+      new RegExp(`payload[\\s:]{0,5}${numPat}\\s*${unitPat}\\b`, 'i'),
+    ],
+  })
+  if (!result.found) return null
+  const mass = result.value
   if (mass <= 2) return 'consumer'
   if (mass <= 25) return 'commercial'
   if (mass <= 150) return 'industrial'
@@ -321,29 +371,26 @@ function droneScaleTier(c: ParsedConstraints): string | null {
 }
 
 function auvScaleTier(c: ParsedConstraints): string | null {
-  // 2026-05-23: brief parsers emit commas in thousands ("1,500 m") and reorder
-  // text ("diving to 1,500 m" vs "1500 m depth"). Match all common phrasings
-  // + tolerate commas in the digit group. Pattern 1: depth-context before
-  // number ("depth: 1,500 m", "depth of 1500 m"). Pattern 2: number-then-m-
-  // then-depth ("1,500 m depth", "1500 m operating"). Pattern 3: "diving to
-  // N m" / "rated to N m" / "design to N m" / "down to N m" — the verb-then-
-  // depth idiom used in conversational briefs.
-  const desc = String(c.product_description ?? '').toLowerCase()
-  const numPat = '(\\d{1,3}(?:,\\d{3})*|\\d{1,5})'
-  const patterns = [
-    new RegExp(`depth[\\s:]{0,5}${numPat}\\s*m`, 'i'),
-    new RegExp(`${numPat}\\s*m\\s+(?:depth|operating|design|rating)`, 'i'),
-    new RegExp(`(?:diving|rated|design|down|going|operates?)\\s+to\\s+${numPat}\\s*m`, 'i'),
-  ]
-  let depth: number | null = null
-  for (const p of patterns) {
-    const m = desc.match(p)
-    if (m) {
-      depth = parseFloat(m[1].replace(/,/g, ''))
-      if (Number.isFinite(depth) && depth > 0) break
-    }
-  }
-  if (!depth) return null
+  // 2026-05-23 Normaliser refactor (P1-3): AUV briefs may pick endurance
+  // (hours), payload (kg), or vehicle length (m) as target_performance
+  // instead of operating depth. Normaliser scans for "depth: X m", "X m
+  // depth", "diving to X m" with comma-tolerant digit groups. Each regex
+  // captures (value, unit) so kilometre / feet briefs convert too.
+  const numPat = '(\\d{1,3}(?:,\\d{3})*|\\d{1,5}(?:\\.\\d+)?)'
+  const unitPat = '(m|metres?|meters?|ft|feet|km|kilometres?|kilometers?)'
+  const result = findScaleMetric(c, {
+    family: LENGTH_M,
+    desc_regexes: [
+      // Pattern 1: "depth: 1,500 m", "depth of 1500 metres"
+      new RegExp(`depth[\\s:of]{0,8}${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "1500 m depth", "1500 m operating"
+      new RegExp(`${numPat}\\s*${unitPat}\\s+(?:depth|operating|design|rating|rated)`, 'i'),
+      // Pattern 3: "diving to 1500 m", "rated to 1500 m"
+      new RegExp(`(?:diving|rated|design|down|going|operates?)\\s+to\\s+${numPat}\\s*${unitPat}\\b`, 'i'),
+    ],
+  })
+  if (!result.found) return null
+  const depth = result.value
   if (depth <= 100) return 'shallow'
   if (depth <= 1000) return 'mid_water'
   if (depth <= 3000) return 'deep'
@@ -933,16 +980,26 @@ function eBikeApplication(_: string | null, _c: ParsedConstraints): string {
 
 // satellite_cubesat -------------------------------------------
 function cubesatScaleTier(c: ParsedConstraints): string | null {
-  const desc = String(c.product_description ?? '').toLowerCase()
-  const m = desc.match(/(\d{1,3})\s*u\b/i)
-  if (m) {
-    const u = parseInt(m[1], 10)
-    if (u <= 1) return '1u'
-    if (u <= 3) return '3u'
-    if (u <= 6) return '6u'
-    return '12u'
-  }
-  return '3u'
+  // 2026-05-23 Normaliser refactor (P1-3): CubeSat U-size lives in
+  // target_performance (e.g. {value: 6, unit: 'u'}) or in prose. Each desc
+  // regex captures (value, unit). Family is dimensionless count (CUBESAT_U).
+  const numPat = '(\\d{1,3})'
+  const unitPat = '(u|unit|units|cubesat-u|cubesatu)'
+  const result = findScaleMetric(c, {
+    family: CUBESAT_U,
+    desc_regexes: [
+      // Pattern 1: "6U cubesat", "12-U platform"
+      new RegExp(`${numPat}\\s*-?\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "cubesat 6U", "platform: 12U"
+      new RegExp(`(?:cubesat|platform|spacecraft|bus)[\\s:]{0,5}${numPat}\\s*${unitPat}\\b`, 'i'),
+    ],
+  })
+  const u = result.found ? result.value : null
+  if (u === null) return '3u'
+  if (u <= 1) return '1u'
+  if (u <= 3) return '3u'
+  if (u <= 6) return '6u'
+  return '12u'
 }
 function cubesatVoltageTier(_: string | null, _c: ParsedConstraints): VoltageTier {
   return 'extra_low'
@@ -960,8 +1017,23 @@ function cubesatApplication(_: string | null, c: ParsedConstraints): string {
 
 // satellite_smallsat ------------------------------------------
 function smallsatScaleTier(c: ParsedConstraints): string | null {
-  const mass = c.max_mass_kg?.value
-  if (!mass) return 'smallsat'
+  // 2026-05-23 Normaliser refactor (P1-3): smallsat mass may live in
+  // max_mass_kg, target_performance, or prose ("X kg satellite"). Normaliser
+  // scans all sources. Each desc regex captures (value, unit).
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,5}(?:\\.\\d+)?)'
+  const unitPat = '(kg|kilogram[s]?|kilo[s]?|g|gram[s]?|lb|lbs|pound[s]?|t|ton[s]?|tonne[s]?)'
+  const result = findScaleMetric(c, {
+    family: MASS_KG,
+    extra_field_keys: ['max_mass_kg'],
+    desc_regexes: [
+      // Pattern 1: "wet mass: 80 kg", "dry mass: 50 kg"
+      new RegExp(`(?:wet|dry|launch|spacecraft|satellite)\\s+mass[\\s:]{0,5}${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "80 kg microsat / smallsat / spacecraft / satellite"
+      new RegExp(`${numPat}\\s*${unitPat}\\s+(?:microsat|smallsat|minisat|satellite|spacecraft|cubesat|payload)`, 'i'),
+    ],
+  })
+  if (!result.found) return 'smallsat'
+  const mass = result.value
   if (mass <= 10) return 'microsat'
   if (mass <= 100) return 'minisat'
   return 'smallsat'
@@ -982,8 +1054,23 @@ function smallsatApplication(_: string | null, c: ParsedConstraints): string {
 
 // satellite_geo_comsat ----------------------------------------
 function geoComsatScaleTier(c: ParsedConstraints): string | null {
-  const mass = c.max_mass_kg?.value
-  if (!mass) return 'geo_medium'
+  // 2026-05-23 Normaliser refactor (P1-3): GEO-comsat mass spans 1-7 tonnes;
+  // briefs may declare via max_mass_kg, target_performance ({value, unit:'kg'}),
+  // or prose ("4500 kg launch mass"). Each desc regex captures (value, unit).
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,6}(?:\\.\\d+)?)'
+  const unitPat = '(kg|kilogram[s]?|kilo[s]?|g|gram[s]?|lb|lbs|pound[s]?|t|ton[s]?|tonne[s]?)'
+  const result = findScaleMetric(c, {
+    family: MASS_KG,
+    extra_field_keys: ['max_mass_kg'],
+    desc_regexes: [
+      // Pattern 1: "launch mass: 4500 kg", "wet mass: 4500 kg"
+      new RegExp(`(?:wet|dry|launch|spacecraft|satellite|gtow|bol)\\s+mass[\\s:]{0,5}${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "4500 kg comsat / geo satellite / spacecraft"
+      new RegExp(`${numPat}\\s*${unitPat}\\s+(?:comsat|geo|satellite|spacecraft|payload|bus)`, 'i'),
+    ],
+  })
+  if (!result.found) return 'geo_medium'
+  const mass = result.value
   if (mass <= 1500) return 'geo_small'
   if (mass <= 4000) return 'geo_medium'
   return 'geo_heavy'
@@ -1109,13 +1196,29 @@ function dialysisApplication(_: string | null, c: ParsedConstraints): string {
 
 // evtol -------------------------------------------------------
 function evtolScaleTier(c: ParsedConstraints): string | null {
-  const mass = c.max_mass_kg?.value
-  if (!mass) {
+  // 2026-05-23 Normaliser refactor (P1-3): eVTOL briefs declare mass via
+  // max_mass_kg, target_performance ({value, unit:'kg'}), or prose ("2500 kg
+  // MTOW"). Normaliser scans all three. Each desc regex captures (value, unit).
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,5}(?:\\.\\d+)?)'
+  const unitPat = '(kg|kilogram[s]?|kilo[s]?|g|gram[s]?|lb|lbs|pound[s]?|t|ton[s]?|tonne[s]?)'
+  const result = findScaleMetric(c, {
+    family: MASS_KG,
+    extra_field_keys: ['max_mass_kg'],
+    desc_regexes: [
+      // Pattern 1: "MTOW: 2500 kg", "max take-off weight: 2500 kg"
+      new RegExp(`(?:mtow|max(?:imum)?[\\s-]?(?:take[\\s-]?off)?[\\s-]?(?:weight|mass)|all[\\s-]?up[\\s-]?weight|auw)[\\s:]{0,8}${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "2500 kg evtol / aircraft / tiltrotor"
+      new RegExp(`${numPat}\\s*${unitPat}\\s+(?:evtol|e-?vtol|aircraft|tiltrotor|multirotor|lift\\+cruise|air[\\s-]?taxi)`, 'i'),
+    ],
+  })
+  if (!result.found) {
+    // Fall back to seat-count heuristic when no mass anywhere.
     const desc = String(c.product_description ?? '').toLowerCase()
     if (/single[\s-]?seat|single[\s-]?pax/i.test(desc)) return 'single_pax'
     if (/4[\s-]?(?:seat|pax)|five[\s-]?seat/i.test(desc)) return 'four_pax'
     return 'four_pax'
   }
+  const mass = result.value
   if (mass <= 800) return 'single_pax'
   if (mass <= 2500) return 'two_to_four_pax'
   if (mass <= 7000) return 'four_to_six_pax'
@@ -1143,9 +1246,22 @@ function evtolApplication(_: string | null, c: ParsedConstraints): string {
 
 // quantum_computer -------------------------------------------
 function quantumComputerScaleTier(c: ParsedConstraints): string | null {
-  const desc = String(c.product_description ?? '').toLowerCase()
-  const m = desc.match(/(\d{1,5})\s*(?:physical\s+)?qubits?/i)
-  const n = m ? parseInt(m[1], 10) : null
+  // 2026-05-23 Normaliser refactor (P1-3): quantum-computer briefs typically
+  // declare qubit count in target_performance ({value, unit:'qubits'}) or
+  // prose. QUBIT_COUNT family is dimensionless. Each desc regex captures
+  // (value, unit).
+  const numPat = '(\\d{1,5}(?:,\\d{3})*|\\d{1,7})'
+  const unitPat = '(qubits?|physicalqubits?|logicalqubits?|q)'
+  const result = findScaleMetric(c, {
+    family: QUBIT_COUNT,
+    desc_regexes: [
+      // Pattern 1: "100 physical qubits", "1000 qubits"
+      new RegExp(`${numPat}\\s*(?:physical|logical)?\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "qubit count: 100", "register of 100 qubits"
+      new RegExp(`(?:qubit\\s+count|register|register\\s+of)[\\s:]{0,8}${numPat}\\s*${unitPat}?\\b`, 'i'),
+    ],
+  })
+  const n = result.found ? result.value : null
   if (n === null) return 'medium_scale'
   if (n <= 50) return 'noisy_intermediate_scale'
   if (n <= 1000) return 'medium_scale'
@@ -1172,9 +1288,23 @@ function quantumComputerApplication(_: string | null, c: ParsedConstraints): str
 
 // cryostat ---------------------------------------------------
 function cryostatScaleTier(c: ParsedConstraints): string | null {
-  const desc = String(c.product_description ?? '').toLowerCase()
-  const m = desc.match(/(\d+(?:\.\d+)?)\s*(?:m[KkA]|millikelvin)\b/i)
-  const t_mk = m ? parseFloat(m[1]) : null
+  // 2026-05-23 Normaliser refactor (P1-3): cryostat briefs may pick cooling
+  // power (μW @ T) instead of base temperature. Normaliser scans for "X mK
+  // base temperature", "down to X K". Each desc regex captures (value, unit).
+  // TEMPERATURE_MK family converts K → mK (×1000); millikelvin is canonical
+  // because that's the regime cryostats are tier-sorted in.
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,5}(?:\\.\\d+)?)'
+  const unitPat = '(mk|millikelvins?|k|kelvins?)'
+  const result = findScaleMetric(c, {
+    family: TEMPERATURE_MK,
+    desc_regexes: [
+      // Pattern 1: "20 mK", "10 millikelvin", "1 K"
+      new RegExp(`${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "base temperature: 20 mK", "down to 1 K"
+      new RegExp(`(?:base|operating|min(?:imum)?|down\\s+to)\\s*(?:temperature)?[\\s:]{0,8}${numPat}\\s*${unitPat}\\b`, 'i'),
+    ],
+  })
+  const t_mk = result.found ? result.value : null
   if (t_mk === null) return 'standard_20mK'
   if (t_mk <= 10) return 'ultra_low_temp'
   if (t_mk <= 30) return 'standard_20mK'
@@ -1197,13 +1327,27 @@ function cryostatApplication(_: string | null, c: ParsedConstraints): string {
 
 // fso --------------------------------------------------------
 function fsoScaleTier(c: ParsedConstraints): string | null {
-  const desc = String(c.product_description ?? '').toLowerCase()
-  const m = desc.match(/(\d+(?:\.\d+)?)\s*(?:km|kilometres?)/i)
-  const range_km = m ? parseFloat(m[1]) : null
-  if (range_km === null) return 'medium_range'
-  if (range_km <= 5) return 'short_range'
-  if (range_km <= 100) return 'medium_range'
-  if (range_km <= 5000) return 'satellite_to_ground'
+  // 2026-05-23 Normaliser refactor (P1-3): FSO briefs may pick data rate
+  // (Gbps) or wavelength (nm) as target_performance instead of link range.
+  // Normaliser falls back to "X km range", "range: X km". LENGTH_M family
+  // converts km→m (×1000); tier thresholds compare against metres.
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,7}(?:\\.\\d+)?)'
+  const unitPat = '(km|kilometres?|kilometers?|m|metres?|meters?)'
+  const result = findScaleMetric(c, {
+    family: LENGTH_M,
+    desc_regexes: [
+      // Pattern 1: "range: 5 km", "operating range: 100 km"
+      new RegExp(`(?:link|operating|optical)?\\s*range[\\s:]{0,8}${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "5 km range", "5 km link"
+      new RegExp(`${numPat}\\s*${unitPat}\\s+(?:range|link|reach)`, 'i'),
+    ],
+  })
+  const range_m = result.found ? result.value : null
+  if (range_m === null) return 'medium_range'
+  // Tier thresholds in metres (5 km / 100 km / 5000 km).
+  if (range_m <= 5000) return 'short_range'
+  if (range_m <= 100_000) return 'medium_range'
+  if (range_m <= 5_000_000) return 'satellite_to_ground'
   return 'inter_satellite'
 }
 function fsoVoltageTier(_: string | null, _c: ParsedConstraints): VoltageTier {
@@ -1226,9 +1370,22 @@ function fsoApplication(_: string | null, c: ParsedConstraints): string {
 
 // phased_array ----------------------------------------------
 function phasedArrayScaleTier(c: ParsedConstraints): string | null {
-  const desc = String(c.product_description ?? '').toLowerCase()
-  const m = desc.match(/(\d{1,5})\s*(?:elements?|antennas?)/i)
-  const n = m ? parseInt(m[1], 10) : null
+  // 2026-05-23 Normaliser refactor (P1-3): phased-array briefs may pick
+  // EIRP (dBW), G/T, or aperture area as target_performance instead of
+  // element count. ELEMENT_COUNT family is dimensionless. Each desc regex
+  // captures (value, unit).
+  const numPat = '(\\d{1,5}(?:,\\d{3})*|\\d{1,7})'
+  const unitPat = '(elements?|antennas?|radiators?|array-elements?)'
+  const result = findScaleMetric(c, {
+    family: ELEMENT_COUNT,
+    desc_regexes: [
+      // Pattern 1: "1024 elements", "256 antennas"
+      new RegExp(`${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "element count: 1024", "array of 1024 elements"
+      new RegExp(`(?:element\\s+count|array\\s+of|array)[\\s:]{0,8}${numPat}\\s*${unitPat}?\\b`, 'i'),
+    ],
+  })
+  const n = result.found ? result.value : null
   if (n === null) return 'medium'
   if (n <= 64) return 'small'
   if (n <= 1024) return 'medium'
@@ -1373,8 +1530,23 @@ function smrApplication(_: string | null, c: ParsedConstraints): string {
 
 // humanoid -------------------------------------------------
 function humanoidScaleTier(c: ParsedConstraints): string | null {
-  const mass = c.max_mass_kg?.value
-  if (!mass) return 'adult'
+  // 2026-05-23 Normaliser refactor (P1-3): humanoid mass may live in
+  // max_mass_kg, target_performance, or prose ("80 kg humanoid"). Normaliser
+  // scans all sources. Each desc regex captures (value, unit).
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,5}(?:\\.\\d+)?)'
+  const unitPat = '(kg|kilogram[s]?|kilo[s]?|g|gram[s]?|lb|lbs|pound[s]?|t|ton[s]?|tonne[s]?)'
+  const result = findScaleMetric(c, {
+    family: MASS_KG,
+    extra_field_keys: ['max_mass_kg'],
+    desc_regexes: [
+      // Pattern 1: "robot mass: 80 kg", "system weight: 80 kg"
+      new RegExp(`(?:robot|system|total|gross|net)\\s+(?:mass|weight)[\\s:]{0,5}${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "80 kg humanoid / biped / robot"
+      new RegExp(`${numPat}\\s*${unitPat}\\s+(?:humanoid|biped|robot|android)`, 'i'),
+    ],
+  })
+  if (!result.found) return 'adult'
+  const mass = result.value
   if (mass <= 30) return 'compact'
   if (mass <= 80) return 'adult'
   return 'heavy_duty'
