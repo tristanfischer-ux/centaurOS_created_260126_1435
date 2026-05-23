@@ -4073,6 +4073,26 @@ async function main() {
     console.error(`[chain] audit-pdf-run flagged issues (see AUDIT.md): ${(err as Error).message.slice(0, 80)}`)
   }
 
+  // 2026-05-23 Tristan-flagged: audit-pdf-run.ts measures DESIGN FIDELITY
+  // (Physics Critic dimensions, density, brief-vs-contract scale). It does
+  // NOT audit BoM LINE TOTALS or cost-stack reconciliation. A chain can
+  // pass audit-pdf-run with F-1 9/10 while shipping a £21M cover headline
+  // backed by a BoM table that sums to £6,615 (the wind L20 case).
+  // audit-pdf-bom.ts closes that gap: B-2..B-6 checks for macro→BoM
+  // propagation, cover-≡-table reconciliation, per-line industry-floor
+  // sanity, module proportion, and PDF text extraction.
+  // INFORMATIONAL ONLY in v1 — writes AUDIT-BOM.md but chain proceeds
+  // regardless. Hard-gate upgrade (exit code 10 on B-2..B-5 fail) is a
+  // pending architectural decision.
+  try {
+    execFileSync('npx', ['tsx', resolve(__dirname, 'audit-pdf-bom.ts'), outDir], {
+      stdio: 'inherit',
+      cwd: resolve(__dirname, '..'),
+    })
+  } catch (err) {
+    console.error(`[chain] audit-pdf-bom flagged issues (see AUDIT-BOM.md): ${(err as Error).message.slice(0, 80)}`)
+  }
+
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
   // try/catch. The renderer's own `open` was guarded; this one was not. In
   // the worker/LaunchAgent path, `open` can fail (no GUI session) and would
