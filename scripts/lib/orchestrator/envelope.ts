@@ -19,6 +19,17 @@
  */
 
 import type { BriefEnvelope, ParsedConstraints } from './types'
+import {
+  findScaleMetric,
+  POWER_KW,
+  ENERGY_KWH,
+  VOLUME_L,
+  MASS_KG,
+  LENGTH_M,
+  AREA_M2,
+  HYDROGEN_RATE,
+  CO2_CAPTURE_TPY,
+} from './constraint-normaliser'
 
 // ---------------------------------------------------------------------------
 // CLASS NORMALISATION — classifier slugs to orchestrator class IDs.
@@ -223,16 +234,22 @@ function normaliseClass(raw: string): string | null {
 // ---------------------------------------------------------------------------
 
 function bessScaleTier(c: ParsedConstraints): string | null {
-  const tp = c.target_performance
-  if (!tp) return null
-  // Normalise to kWh
-  let kwh = tp.value
-  const unit = String(tp.unit ?? '').toLowerCase()
-  if (unit === 'mwh') kwh = tp.value * 1000
-  else if (unit === 'gwh') kwh = tp.value * 1_000_000
-  else if (unit === 'wh') kwh = tp.value / 1000
-  else if (unit !== 'kwh') return null
-
+  // 2026-05-23 Normaliser refactor (Task #66): BESS briefs occasionally pick
+  // C-rate, cycle life, or power (kW) as target_performance instead of energy
+  // capacity. Normaliser falls back to "nameplate / usable / energy capacity"
+  // phrases. Each regex captures (value, unit).
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,7}(?:\\.\\d+)?)'
+  const unitPat = '(kwh|mwh|gwh|wh)'
+  const result = findScaleMetric(c, {
+    family: ENERGY_KWH,
+    desc_regexes: [
+      new RegExp(`(?:nameplate|usable|energy|rated)\\s+capacity[\\s:]{0,8}${numPat}\\s*${unitPat}\\b`, 'i'),
+      new RegExp(`${numPat}\\s*${unitPat}\\s*(?:bess|battery|energy\\s+storage|ess)`, 'i'),
+      new RegExp(`${numPat}\\s*${unitPat}\\b[^a-z]{0,30}(?:nameplate|usable|capacity)`, 'i'),
+    ],
+  })
+  if (!result.found) return null
+  const kwh = result.value
   if (kwh <= 30) return 'residential'
   if (kwh <= 200) return 'light_commercial'
   if (kwh <= 2000) return 'commercial'
@@ -257,14 +274,26 @@ function hapsScaleTier(c: ParsedConstraints): string | null {
 }
 
 function heatPumpScaleTier(c: ParsedConstraints): string | null {
-  const tp = c.target_performance
-  if (!tp) return null
-  let kw = tp.value
-  const unit = String(tp.unit ?? '').toLowerCase()
-  if (unit === 'w') kw = tp.value / 1000
-  else if (unit === 'mw') kw = tp.value * 1000
-  else if (unit !== 'kw') return null
-
+  // 2026-05-23 Normaliser refactor (Task #66): heat-pump briefs commonly
+  // compete kW heat output with SCOP/COP (dimensionless ratio) and refrigerant
+  // mass (kg). When parser picks SCOP/refrigerant as target_performance,
+  // single-field detectors fail. Normaliser scans for explicit heat-output
+  // phrases. Each regex has 2 capture groups: (value, unit).
+  const numPat = '(\\d{1,3}(?:,\\d{3})*|\\d{1,4}(?:\\.\\d+)?)'
+  const unitPat = '(kw|kilowatt[s]?|kwt|kwth|mw|megawatt[s]?|w|watt[s]?)'
+  const result = findScaleMetric(c, {
+    family: POWER_KW,
+    desc_regexes: [
+      // Pattern 1: "Heat output: 12 kW", "thermal capacity: 12 kW"
+      new RegExp(`(?:heat(?:ing)?\\s+output|thermal\\s+capacity|rated\\s+(?:heating\\s+)?capacity|nominal\\s+capacity)[\\s:]{0,8}${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "12 kW heat output"
+      new RegExp(`${numPat}\\s*${unitPat}\\s*(?:heat|thermal|heating|output)`, 'i'),
+      // Pattern 3: "12 kW air-source heat pump"
+      new RegExp(`${numPat}\\s*${unitPat}\\b[^a-z]{0,30}(?:heat[\\s-]?pump|monobloc|split|ashp|gshp)`, 'i'),
+    ],
+  })
+  if (!result.found) return null
+  const kw = result.value
   if (kw <= 12) return 'residential'
   if (kw <= 30) return 'light_commercial'
   if (kw <= 100) return 'commercial'
@@ -322,13 +351,30 @@ function auvScaleTier(c: ParsedConstraints): string | null {
 }
 
 function bioreactorScaleTier(c: ParsedConstraints): string | null {
-  const tp = c.target_performance
-  if (!tp) return null
-  let l = tp.value
-  const unit = String(tp.unit ?? '').toLowerCase()
-  if (unit === 'ml') l = tp.value / 1000
-  else if (unit === 'm3' || unit === 'm³') l = tp.value * 1000
-  else if (unit !== 'l' && unit !== 'litre' && unit !== 'liter') return null
+  // 2026-05-23 Normaliser refactor (Task #66): bioreactor brief parser
+  // routinely picks a non-volume metric (kLa hr⁻¹, ramp rate, etc.) as
+  // target_performance. The Normaliser scans target_performance, then
+  // additional_constraints, then product_description.
+  //
+  // Each desc regex has 2 capture groups: (value, unit). The Normaliser
+  // calls convertToCanonical on (value, unit) — so the regex can match
+  // across L / m³ / ml without the detector knowing the conversion.
+  const numPat = '(\\d{1,3}(?:,\\d{3})*|\\d{1,5}(?:\\.\\d+)?)'
+  const unitPat = '(l|litres?|liters?|ltr|ml|m3|m³)'
+  const result = findScaleMetric(c, {
+    family: VOLUME_L,
+    desc_regexes: [
+      // Pattern 1: "Nominal/working/rated volume: 200 L"
+      new RegExp(`(?:working|nominal|design|rated|reactor|fermenter)\\s+volume[\\s:]{0,5}${numPat}\\s*${unitPat}\\b`, 'i'),
+      // Pattern 2: "200 L bioreactor/fermenter/reactor" with up to 30 chars of
+      // padding between unit and keyword (handles "200 L production fermenter")
+      new RegExp(`${numPat}[\\s-]*${unitPat}\\b[^.,;]{0,30}(?:bioreactor|fermenter|sub|reactor|vessel|tank|sub[\\s-]?cultivation)`, 'i'),
+      // Pattern 3: "(numeric)-litre" hyphenated form ("200-litre reactor")
+      new RegExp(`${numPat}\\s*-\\s*(litres?|liters?|l|ltr|ml|m3|m³)\\b`, 'i'),
+    ],
+  })
+  if (!result.found) return null
+  const l = result.value
   if (l < 100) return 'bench'
   if (l < 1000) return 'pilot'
   if (l < 10000) return 'production'
@@ -353,13 +399,21 @@ function edgeAiScaleTier(c: ParsedConstraints): string | null {
 }
 
 function evChargerScaleTier(c: ParsedConstraints): string | null {
-  const tp = c.target_performance
-  if (!tp) return null
-  let kw = tp.value
-  const unit = String(tp.unit ?? '').toLowerCase()
-  if (unit === 'w') kw = tp.value / 1000
-  else if (unit === 'mw') kw = tp.value * 1000
-  else if (unit !== 'kw') return null
+  // 2026-05-23 Normaliser refactor (Task #66): EV charger briefs may pick
+  // efficiency, voltage, or current as target_performance. Normaliser falls
+  // back to "output power", "rated power", "350 kW DC fast charger" prose.
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,5}(?:\\.\\d+)?)'
+  const unitPat = '(kw|kilowatt[s]?|mw|megawatt[s]?|w|watt[s]?)'
+  const result = findScaleMetric(c, {
+    family: POWER_KW,
+    desc_regexes: [
+      new RegExp(`(?:output|rated|max(?:imum)?|peak|nominal)\\s+power[\\s:]{0,8}${numPat}\\s*${unitPat}\\b`, 'i'),
+      new RegExp(`${numPat}\\s*${unitPat}\\s+(?:dc\\s+fast|ultra[\\s-]?(?:rapid|fast)|charger|charge[\\s-]?point)`, 'i'),
+      new RegExp(`${numPat}\\s*${unitPat}\\b[^a-z]{0,30}(?:ev[\\s-]?charger|chargepoint|forecourt|kiosk|pedestal)`, 'i'),
+    ],
+  })
+  if (!result.found) return null
+  const kw = result.value
   if (kw <= 22) return 'ac_slow'
   if (kw <= 50) return 'dc_fast_low'
   if (kw <= 200) return 'dc_fast'
@@ -620,10 +674,42 @@ function powerKwFromTp(c: ParsedConstraints, dflt: number): number {
   return dflt
 }
 
+/**
+ * 2026-05-23 Normaliser refactor (Task #66): generic power-kW helper that
+ * uses the Normaliser to scan target_performance, additional_constraints,
+ * and product_description. Detector callers pass class-specific keyword
+ * patterns to bound the regex (e.g. 'turbine|generator' for wind,
+ * 'inverter|pv' for solar).
+ *
+ * Returns kW or null. Use for classes that MUST have a scale-determining
+ * power metric; for classes with a sensible default tier (e.g. 'commercial'),
+ * the caller can substitute the default when null is returned.
+ */
+function powerKwViaNormaliser(c: ParsedConstraints, classKeywordPat: string): number | null {
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,5}(?:\\.\\d+)?)'
+  const unitPat = '(kw|kilowatt[s]?|mw|megawatt[s]?|gw|gigawatt[s]?|w|watt[s]?)'
+  const result = findScaleMetric(c, {
+    family: POWER_KW,
+    desc_regexes: [
+      new RegExp(`(?:rated|nominal|output|peak|continuous|nameplate)\\s+(?:power|capacity)[\\s:]{0,8}${numPat}\\s*${unitPat}\\b`, 'i'),
+      new RegExp(`${numPat}\\s*${unitPat}\\s+(?:${classKeywordPat})`, 'i'),
+      new RegExp(`${numPat}\\s*${unitPat}\\b[^a-z]{0,30}(?:${classKeywordPat})`, 'i'),
+    ],
+  })
+  return result.found ? result.value : null
+}
+
 // solar_inverter ----------------------------------------------
 function solarInverterScaleTier(c: ParsedConstraints): string | null {
-  const kw = powerKwFromTp(c, NaN)
-  if (Number.isNaN(kw)) return 'commercial'
+  // 2026-05-23 Normaliser refactor (Task #66): solar-inverter briefs may pick
+  // efficiency (%), DC voltage, or string current as target_performance.
+  // Normaliser falls back to "rated AC output", "MVA", "inverter capacity".
+  let kw = powerKwFromTp(c, NaN)
+  if (Number.isNaN(kw)) {
+    const viaDesc = powerKwViaNormaliser(c, 'inverter|pv|photovoltaic|string|central|solar')
+    if (viaDesc !== null) kw = viaDesc
+  }
+  if (Number.isNaN(kw)) return 'commercial' // best-effort default kept for back-compat
   if (kw <= 10) return 'residential'
   if (kw <= 100) return 'commercial'
   if (kw <= 1000) return 'utility'
@@ -650,7 +736,14 @@ function solarInverterApplication(_: string | null, c: ParsedConstraints): strin
 
 // wind_turbine ------------------------------------------------
 function windTurbineScaleTier(c: ParsedConstraints): string | null {
-  const kw = powerKwFromTp(c, NaN)
+  // 2026-05-23 Normaliser refactor (Task #66): wind-turbine briefs may pick
+  // swept area (m²), rotor diameter (m), or capacity factor (%) as
+  // target_performance. Normaliser falls back to "rated power", "X MW turbine".
+  let kw = powerKwFromTp(c, NaN)
+  if (Number.isNaN(kw)) {
+    const viaDesc = powerKwViaNormaliser(c, 'turbine|wind|generator|nacelle|hawt|vawt')
+    if (viaDesc !== null) kw = viaDesc
+  }
   if (Number.isNaN(kw)) return 'onshore_medium'
   if (kw <= 10) return 'micro'
   if (kw <= 100) return 'small'
@@ -675,8 +768,50 @@ function windTurbineApplication(_: string | null, c: ParsedConstraints): string 
 
 // h2_electrolyser ---------------------------------------------
 function h2ElectrolyserScaleTier(c: ParsedConstraints): string | null {
-  const kw = powerKwFromTp(c, NaN)
-  if (Number.isNaN(kw)) return 'commercial'
+  // 2026-05-23 Normaliser refactor (Task #66): H2 electrolyser briefs compete
+  // electrical input (kW/MW) with hydrogen output rate (Nm³/hr, kg H2/hr,
+  // t/day). The Normaliser tries power first (2-capture group regex handles
+  // kW vs MW vs W via unit conversion), then hydrogen rate (converted to
+  // electrical kW at industry-typical 5.0 kWh/Nm³ for PEM/alkaline).
+  const numPat = '(\\d{1,3}(?:,\\d{3})*|\\d{1,5}(?:\\.\\d+)?)'
+  const powerUnitPat = '(kw|kilowatt[s]?|mw|megawatt[s]?|w|watt[s]?)'
+
+  // Try electrical input first (most common scale metric)
+  let result = findScaleMetric(c, {
+    family: POWER_KW,
+    desc_regexes: [
+      // Pattern 1: "Electrical input: 5 MW", "Rated power: 5 MW"
+      new RegExp(`(?:electrical|stack|rated|input)\\s+(?:input|power|capacity)[\\s:]{0,8}${numPat}\\s*${powerUnitPat}\\b`, 'i'),
+      // Pattern 2: "5 MW PEM electrolyser"
+      new RegExp(`${numPat}\\s*${powerUnitPat}\\s+(?:pem|alkaline|electrolyser|electrolyzer|stack|soec)`, 'i'),
+      // Pattern 3: "electrolyser of 5 MW" / "electrolyser (5 MW)"
+      new RegExp(`(?:electrolyser|electrolyzer)[\\s()of:]*${numPat}\\s*${powerUnitPat}`, 'i'),
+    ],
+  })
+
+  // Fall back to hydrogen production rate → derive kW at industry-typical
+  // 5.0 kWh/Nm³ H2 (PEM/alkaline benchmark, IEA 2023 Global H2 Review).
+  if (!result.found) {
+    const h2Result = findScaleMetric(c, {
+      family: HYDROGEN_RATE,
+      desc_regexes: [
+        // Pattern 1: "Hydrogen output: 1000 Nm³/hr"
+        new RegExp(`(?:hydrogen|h2)\\s+(?:production|output|rate|flow)[\\s:]{0,8}${numPat}\\s*(nm3\\s*\\/?\\s*hr?|nm³\\s*\\/?\\s*hr?)`, 'i'),
+        // Pattern 2: "1000 Nm³/hr PEM electrolyser"
+        new RegExp(`${numPat}\\s*(nm3\\s*\\/?\\s*hr?|nm³\\s*\\/?\\s*hr?)\\s*(?:pem|alkaline|electrolyser|electrolyzer)`, 'i'),
+        // Pattern 3: "Nm³/hr" with any context
+        new RegExp(`${numPat}\\s*(nm3\\s*\\/?\\s*hr?|nm³\\s*\\/?\\s*hr?)`, 'i'),
+      ],
+    })
+    if (h2Result.found) {
+      // Industry benchmark: PEM stack consumes ~5.0 kWh per Nm³ H2 produced
+      const kwEquivalent = h2Result.value * 5.0
+      result = { ...h2Result, value: kwEquivalent, canonical_unit: 'kw' }
+    }
+  }
+
+  if (!result.found) return null
+  const kw = result.value
   if (kw <= 100) return 'lab'
   if (kw <= 1000) return 'commercial'
   if (kw <= 10000) return 'industrial'
@@ -701,7 +836,14 @@ function h2ElectrolyserApplication(_: string | null, c: ParsedConstraints): stri
 
 // ups_inverter ------------------------------------------------
 function upsInverterScaleTier(c: ParsedConstraints): string | null {
-  const kw = powerKwFromTp(c, NaN)
+  // 2026-05-23 Normaliser refactor (Task #66): UPS briefs may pick autonomy
+  // time (minutes) or efficiency (%) as target_performance. Normaliser falls
+  // back to "rated power", "X kVA UPS".
+  let kw = powerKwFromTp(c, NaN)
+  if (Number.isNaN(kw)) {
+    const viaDesc = powerKwViaNormaliser(c, 'ups|uninterruptible|online|line[\\s-]?interactive|standby|battery[\\s-]?backup')
+    if (viaDesc !== null) kw = viaDesc
+  }
   if (Number.isNaN(kw)) return 'commercial'
   if (kw <= 3) return 'desktop'
   if (kw <= 20) return 'rack'
@@ -1114,12 +1256,25 @@ function phasedArrayApplication(_: string | null, c: ParsedConstraints): string 
 
 // solid_state_battery --------------------------------------
 function ssbScaleTier(c: ParsedConstraints): string | null {
-  const tp = c.target_performance
-  if (!tp) return 'pouch_cell'
-  let wh = tp.value
-  const u = String(tp.unit ?? '').toLowerCase()
-  if (u === 'kwh') wh = tp.value * 1000
-  else if (u === 'mwh') wh = tp.value * 1e6
+  // 2026-05-23 Normaliser refactor (Task #66): SSB briefs commonly compete
+  // energy density (Wh/kg), C-rate, and cycle life with absolute capacity.
+  // Normaliser scans for "X kWh pack", "energy capacity X Wh".
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,7}(?:\\.\\d+)?)'
+  const unitPat = '(wh|kwh|mwh)'
+  // Use a clone of ENERGY_KWH that also has 'wh' as alias for SSB sub-kWh cells
+  const result = findScaleMetric(c, {
+    family: {
+      canonical: 'wh',
+      aliases: ['wh'],
+      conversions: { kwh: 1000, mwh: 1_000_000 },
+    },
+    desc_regexes: [
+      new RegExp(`(?:energy|nameplate|cell|pack)\\s+capacity[\\s:]{0,8}${numPat}\\s*${unitPat}\\b`, 'i'),
+      new RegExp(`${numPat}\\s*${unitPat}\\s+(?:pack|cell|battery|pouch|prismatic|coin)`, 'i'),
+    ],
+  })
+  if (!result.found) return 'pouch_cell' // default kept for back-compat
+  const wh = result.value
   if (wh <= 100) return 'coin_cell'
   if (wh <= 1000) return 'pouch_cell'
   if (wh <= 100000) return 'ev_pack'
@@ -1147,12 +1302,15 @@ function ssbApplication(_: string | null, c: ParsedConstraints): string {
 
 // pemfc ----------------------------------------------------
 function pemfcScaleTier(c: ParsedConstraints): string | null {
-  const tp = c.target_performance
-  if (!tp) return 'transport'
-  let kw = tp.value
-  const u = String(tp.unit ?? '').toLowerCase()
-  if (u === 'w') kw = tp.value / 1000
-  else if (u === 'mw') kw = tp.value * 1000
+  // 2026-05-23 Normaliser refactor (Task #66): PEMFC briefs may pick power
+  // density, Pt loading, or stack efficiency as target_performance. Normaliser
+  // falls back to "rated power", "X kW fuel cell stack".
+  let kw = powerKwFromTp(c, NaN)
+  if (Number.isNaN(kw)) {
+    const viaDesc = powerKwViaNormaliser(c, 'fuel[\\s-]?cell|pemfc|stack|fcev|automotive|marine|forklift')
+    if (viaDesc !== null) kw = viaDesc
+  }
+  if (Number.isNaN(kw)) return 'transport'
   if (kw <= 10) return 'portable'
   if (kw <= 150) return 'transport'
   if (kw <= 1000) return 'heavy_duty'
@@ -1179,13 +1337,16 @@ function pemfcApplication(_: string | null, c: ParsedConstraints): string {
 
 // smr ------------------------------------------------------
 function smrScaleTier(c: ParsedConstraints): string | null {
-  const tp = c.target_performance
-  if (!tp) return 'medium_smr'
-  let mw = tp.value
-  const u = String(tp.unit ?? '').toLowerCase()
-  if (u === 'kw') mw = tp.value / 1000
-  else if (u === 'gw') mw = tp.value * 1000
-  else if (u === 'mwt' || u === 'mw') mw = tp.value
+  // 2026-05-23 Normaliser refactor (Task #66): SMR briefs may pick fuel
+  // enrichment, refuelling interval, or capacity factor as target_performance.
+  // Normaliser falls back to "rated thermal power MWt", "X MWe net output".
+  let kw = powerKwFromTp(c, NaN)
+  if (Number.isNaN(kw)) {
+    const viaDesc = powerKwViaNormaliser(c, 'smr|reactor|nuclear|module[\\s-]?reactor|micro[\\s-]?reactor|baseload')
+    if (viaDesc !== null) kw = viaDesc
+  }
+  if (Number.isNaN(kw)) return 'medium_smr'
+  const mw = kw / 1000
   if (mw <= 10) return 'micro_reactor'
   if (mw <= 50) return 'small_smr'
   if (mw <= 300) return 'medium_smr'
@@ -1238,13 +1399,38 @@ function humanoidApplication(_: string | null, c: ParsedConstraints): string {
 
 // dac ------------------------------------------------------
 function dacScaleTier(c: ParsedConstraints): string | null {
-  const tp = c.target_performance
-  if (!tp) return 'pilot'
-  let tons = tp.value
-  const u = String(tp.unit ?? '').toLowerCase()
-  if (u === 'kg' || u === 'kg_yr' || u === 'kg/yr') tons = tp.value / 1000
-  else if (u === 'ton_yr' || u === 'tons_yr' || u === 'tpy' || u === 't/yr') tons = tp.value
-  else if (u === 'mt_yr' || u === 'mt/yr') tons = tp.value * 1e6
+  // 2026-05-23 Normaliser refactor (Task #66): DAC briefs may pick sorbent
+  // regeneration energy (kWh/tCO2) or capture efficiency (%) as
+  // target_performance. Normaliser falls back to "X tonnes CO2 per year",
+  // "X tCO2/yr capture rate".
+  const numPat = '(\\d{1,4}(?:,\\d{3})*|\\d{1,8}(?:\\.\\d+)?)'
+  const result = findScaleMetric(c, {
+    family: CO2_CAPTURE_TPY,
+    desc_regexes: [
+      // "X tonnes CO2/year", "X tCO2/yr"
+      new RegExp(`${numPat}\\s*(t(?:onne)?s?\\s*(?:co2)?\\s*\\/?\\s*y(?:r|ear)?|tpy|tons?\\s*\\/?\\s*y(?:r|ear)?)`, 'i'),
+      // "capture rate: X tons/year"
+      new RegExp(`(?:capture|sequestration|removal)\\s+(?:rate|capacity)[\\s:]{0,8}${numPat}\\s*(t(?:onne)?s?\\s*\\/?\\s*y(?:r|ear)?|tpy)`, 'i'),
+      // "X Mt/yr DAC", "X megatonne per year"
+      new RegExp(`${numPat}\\s*(mt\\s*\\/?\\s*y(?:r|ear)?|megatonnes?\\s*\\/?\\s*y(?:r|ear)?)`, 'i'),
+    ],
+  })
+  let tons: number
+  if (result.found) {
+    tons = result.value
+  } else {
+    // Fall back to legacy direct read of target_performance — preserves
+    // back-compat for briefs whose parser-extracted unit is one we already
+    // handle (kg/yr, t/yr).
+    const tp = c.target_performance
+    if (!tp) return 'pilot'
+    tons = tp.value
+    const u = String(tp.unit ?? '').toLowerCase()
+    if (u === 'kg' || u === 'kg_yr' || u === 'kg/yr') tons = tp.value / 1000
+    else if (u === 'ton_yr' || u === 'tons_yr' || u === 'tpy' || u === 't/yr') tons = tp.value
+    else if (u === 'mt_yr' || u === 'mt/yr') tons = tp.value * 1e6
+    else return 'pilot' // unrecognised unit → default to pilot tier
+  }
   if (tons <= 100) return 'lab'
   if (tons <= 10000) return 'pilot'
   if (tons <= 1000000) return 'commercial'

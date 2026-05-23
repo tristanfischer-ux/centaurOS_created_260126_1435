@@ -2277,7 +2277,33 @@ async function main() {
         orchestrator_consistency_passed: orchResult.consistency_results.every(r => r.passed),
       })
     } else {
-      console.error(`[chain] Orchestrator failed (${orchResult.failures.length} failures); falling back to legacy path: ${orchResult.failures.slice(0, 3).join('; ')}`)
+      const isLoud = orchResult.failures.some(f => f.includes('[LOUD]'))
+      if (isLoud) {
+        // 2026-05-23 Task #66: ORCHESTRATOR=1 set without ALLOW_LLM_FALLBACK=1
+        // means the operator explicitly requested tool-grounded output. Silent
+        // degradation to LLM-only destroys product value. Surface loudly.
+        console.error('')
+        console.error('╔══════════════════════════════════════════════════════════════════════╗')
+        console.error('║  ORCHESTRATOR HARD-FAIL — silent LLM fallback BLOCKED               ║')
+        console.error('║  This PDF will NOT contain tool-grounded engineering content.       ║')
+        console.error('║  Set ALLOW_LLM_FALLBACK=1 to permit silent fallback, OR fix brief.  ║')
+        console.error('╚══════════════════════════════════════════════════════════════════════╝')
+        for (const f of orchResult.failures) console.error(`  ▸ ${f}`)
+        console.error('')
+        try {
+          writeFileSync(resolve(outDir, 'STAGE-4-ORCHESTRATOR-FALLBACK.txt'),
+            `ORCHESTRATOR HARD-FAIL @ ${new Date().toISOString()}\n\n` +
+            `Failures (${orchResult.failures.length}):\n` +
+            orchResult.failures.map((f, i) => `  ${i + 1}. ${f}`).join('\n') +
+            `\n\nThe chain proceeded to LLM Generator. Resulting PDF lacks tool narratives.\n` +
+            `To suppress this banner: set ALLOW_LLM_FALLBACK=1 (NOT recommended for production).\n` +
+            `To fix: ensure the brief contains a top-line scale metric in the unit family the\n` +
+            `class detector expects. See scripts/lib/orchestrator/envelope.ts for the detector\n` +
+            `function for this product class.\n`)
+        } catch { /* outDir may not exist yet */ }
+      } else {
+        console.error(`[chain] Orchestrator failed (${orchResult.failures.length} failures); falling back to legacy path: ${orchResult.failures.slice(0, 3).join('; ')}`)
+      }
     }
   }
   const useDeterministic = !orchestratorRan && process.env.DETERMINISTIC_EMITTER === '1' && engineeringContract && canEmitBess(engineeringContract)

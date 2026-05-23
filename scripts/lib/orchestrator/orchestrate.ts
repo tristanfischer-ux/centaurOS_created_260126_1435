@@ -47,6 +47,15 @@ export interface OrchestrateOptions {
  * Top-level orchestrator entry. Returns the final Contract +
  * design JSON + tools-used attribution page, OR signals fall-back
  * to the legacy LLM Generator path.
+ *
+ * 2026-05-23 (Task #66): when `ORCHESTRATOR=1` is set without
+ * `ALLOW_LLM_FALLBACK=1`, envelope-null produces a STRUCTURED LOUD
+ * failure rather than a silent LLM fallback. The chain caller is
+ * responsible for honouring the `fallback_to_llm` flag — but the
+ * `failures` array now carries a `[loud]` prefix that the chain
+ * surfaces in the operator log AND in a PDF banner. Per 5-seat
+ * council verdict 2026-05-23 (synthesised): silent degradation
+ * from tool-grounded to LLM-only path destroys product value.
  */
 export async function orchestrateDesign(
   parsedConstraints: ParsedConstraints,
@@ -54,13 +63,18 @@ export async function orchestrateDesign(
   opts: OrchestrateOptions = {},
 ): Promise<OrchestratorResult & { design: unknown; tools_used_page: unknown }> {
   const fallback_on_failure = opts.fallback_on_failure ?? true
+  const allow_silent_fallback = process.env.ALLOW_LLM_FALLBACK === '1'
+  const orchestrator_explicit = process.env.ORCHESTRATOR === '1'
+  const loud_failures = orchestrator_explicit && !allow_silent_fallback
 
   // ── Step 1: Detect envelope ────────────────────────────────────────────
   const envelope = detectEnvelope(parsedConstraints)
   if (!envelope) {
+    const detail = buildEnvelopeFailureDetail(parsedConstraints)
+    const prefix = loud_failures ? '[LOUD] ' : ''
     return failResult(
       initialContract,
-      ['envelope detection failed — no class detector matched parsedConstraints.product_class'],
+      [`${prefix}envelope detection failed for class="${parsedConstraints.product_class}" — ${detail}`],
       fallback_on_failure,
     )
   }
@@ -158,6 +172,33 @@ function failResult(
     design: null,
     tools_used_page: null,
   }
+}
+
+/**
+ * Build a structured diagnostic string explaining WHY envelope detection
+ * returned null. Operator-facing: tells them which field was missing or
+ * which unit family failed to match — so they can fix the brief instead
+ * of staring at "envelope detection failed".
+ */
+function buildEnvelopeFailureDetail(c: ParsedConstraints): string {
+  const parts: string[] = []
+  const tp = c.target_performance
+  if (!tp) {
+    parts.push('target_performance is undefined')
+  } else if (tp.value == null) {
+    parts.push('target_performance.value is null (brief parser found no extractable metric)')
+  } else if (!tp.unit) {
+    parts.push(`target_performance.value=${tp.value} but unit is missing`)
+  } else {
+    parts.push(`target_performance={value: ${tp.value}, unit: "${tp.unit}"} — unit not in any expected scale-metric family for class "${c.product_class}"`)
+  }
+
+  const desc = String(c.product_description ?? '').slice(0, 120)
+  if (desc) parts.push(`product_description first 120 chars: "${desc}${desc.length >= 120 ? '…' : ''}"`)
+
+  parts.push('FIX: ensure brief contains a top-line scale metric in the unit family the detector expects (e.g. bioreactor → litres, heat pump → kW heat output, electrolyser → kW or Nm³/hr). Or set ALLOW_LLM_FALLBACK=1 to permit silent LLM-only fallback.')
+
+  return parts.join(' | ')
 }
 
 // ---------------------------------------------------------------------------
