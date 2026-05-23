@@ -799,6 +799,10 @@ export function generateModuleSentence(moduleSpec: ModuleSpec): string {
 }
 
 function summariseMechanisms(links: ReadonlyArray<GrammarLink>): string {
+  // 2026-05-23: defensive Array.isArray guard — same bug family as
+  // renderLinkProse (drawer ae28f3ed8). Orchestrator-emitted designs
+  // occasionally pass undefined when grammar_links field is missing.
+  if (!Array.isArray(links)) links = []
   // Group by mechanism family for a compact summary.
   const counts = new Map<string, number>()
   for (const link of links) {
@@ -912,9 +916,12 @@ function renderLinkProse(moduleSpec: ModuleSpec, links: ReadonlyArray<GrammarLin
  * Returns an empty string when the ModuleSpec has no sub-modules.
  */
 export function generateGrammarTrace(moduleSpec: ModuleSpec): string {
-  const subs = moduleSpec.sub_modules ?? []
+  const subs = Array.isArray(moduleSpec.sub_modules) ? moduleSpec.sub_modules : []
   if (subs.length === 0) return ''
-  const links = moduleSpec.grammar_links ?? []
+  // 2026-05-23: Array.isArray guard for non-array truthy grammar_links
+  // (same fix as generateModuleRadParagraph).
+  const linksRaw = moduleSpec.grammar_links
+  const links: ReadonlyArray<GrammarLink> = Array.isArray(linksRaw) ? linksRaw : []
 
   // Pre-render each sub-module's clause from its words[]. Each word renders as
   // "char_id ⊕ mod1 ⊕ mod2"; words within a sub-module are joined by ⊕ as well.
@@ -1138,7 +1145,12 @@ function generateModuleRadParagraph(
   const radById = new Map<string, string>()
   for (const s of subSentences) radById.set(s.sub_module_id, s.sentence_rad)
 
-  const links = moduleSpec.grammar_links ?? []
+  // 2026-05-23 L19 crash post-mortem: `?? []` doesn't help when
+  // grammar_links is a non-array truthy value (e.g. {} from Phase 2
+  // repair patch that emitted the field as object not array). Need
+  // Array.isArray. Same bug family as renderLinkProse + summariseMechanisms.
+  const linksRaw = moduleSpec.grammar_links
+  const links: ReadonlyArray<GrammarLink> = Array.isArray(linksRaw) ? linksRaw : []
   const visited = new Set<string>()
   const segments: string[] = []
 
