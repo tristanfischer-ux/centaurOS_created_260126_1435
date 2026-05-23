@@ -2477,7 +2477,7 @@ async function main() {
   console.error(`\n[chain] PHASE 4 (Build #19b): physics critic on TOOL SKELETON (pre-reviewer)`)
   const tSkeletonCritic = Date.now()
   let skeletonCritique: CritiqueReport | null = null
-  let skeletonFailFast = false
+  let skeletonFailFastTriggered = false
   try {
     skeletonCritique = await runPhysicsCritic({
       modules: design.modules ?? [],
@@ -2497,7 +2497,7 @@ async function main() {
       // fundamentally inconsistent with each other or the brief — paying
       // for reviewer time won't fix that. Surface loudly.
       if (s.engineering_plausibility <= 2) {
-        skeletonFailFast = true
+        skeletonFailFastTriggered = true
         console.error(`[chain] PHASE 4 FAIL_FAST: plausibility ${s.engineering_plausibility}/10 — tool skeleton is unrecoverable; reviewer cascade will NOT fix this. Loop continues so PDF lands for diagnosis, but fix the orchestrator tool wiring first.`)
       }
     } else {
@@ -2506,7 +2506,7 @@ async function main() {
   } catch (err) {
     console.error(`[chain] PHASE 4 skeleton critic threw: ${(err as Error).message}; continuing`)
   }
-  logAction({ step: 'phase4_skeleton_critic', latency_ms: Date.now() - tSkeletonCritic, ok: skeletonCritique !== null, scores: skeletonCritique?.scores, issue_count: skeletonCritique?.issues.length ?? 0, fail_fast: skeletonFailFast })
+  logAction({ step: 'phase4_skeleton_critic', latency_ms: Date.now() - tSkeletonCritic, ok: skeletonCritique !== null, scores: skeletonCritique?.scores, issue_count: skeletonCritique?.issues.length ?? 0, fail_fast: skeletonFailFastTriggered })
 
   // Inject skeleton critic findings into reviewer prompt so the single
   // reviewer can specifically address them rather than re-discovering

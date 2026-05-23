@@ -51,6 +51,45 @@ const BODY = z.object({
     variations: z.array(VARIATION_SCHEMA).max(5).optional(),
 })
 
+/**
+ * P3-1 (2026-05-23): pre-parser brief sanitisation. The brief is forwarded
+ * verbatim into LLM prompts (Stage 1 parser, Stage 3 research, etc.). A
+ * malicious user could inject prompt-overriding markers like </SYSTEM>,
+ * [INST], <|im_start|> to break out of the wrapper prompt. Today the risk
+ * is theoretical (LLM-only consumption, no data exfiltration possible) but
+ * adding a defensive sanitiser is cheap insurance.
+ *
+ * Strategy: strip control characters (except \n \r \t), escape known
+ * prompt-control tokens by zero-width inserting a non-printing char, drop
+ * the trailing instruction-cancel patterns. We deliberately do NOT
+ * regex-strip because that would mangle legitimate engineering text that
+ * happens to use words like "system" or "instruction".
+ */
+function sanitiseBrief(s: string): string {
+    let out = s
+    // Strip control chars except \n \r \t
+    out = out.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
+    // Defang prompt-control tokens by inserting a zero-width-joiner so they
+    // don't tokenise as control markers in the LLM context, but the visible
+    // text remains intact for the reader.
+    const ZWJ = '‍'
+    const CONTROL_TOKENS = [
+        /<\/?\s*SYSTEM\s*>/gi,
+        /<\/?\s*ASSISTANT\s*>/gi,
+        /<\/?\s*USER\s*>/gi,
+        /\[\s*INST\s*\]/gi,
+        /\[\s*\/\s*INST\s*\]/gi,
+        /<\|im_start\|>/gi,
+        /<\|im_end\|>/gi,
+        /Ignore\s+(all\s+)?previous\s+instructions/gi,
+        /Disregard\s+(all\s+)?(prior|previous)\s+(instructions|context)/gi,
+    ]
+    for (const re of CONTROL_TOKENS) {
+        out = out.replace(re, (match) => match.split('').join(ZWJ))
+    }
+    return out
+}
+
 interface SubmitOk {
     job_id: string
     project_id: string
@@ -85,7 +124,10 @@ export async function POST(
             { status: 400 },
         )
     }
-    const { brief_text, project_id, project_name, variations } = parsed.data
+    const rawData = parsed.data
+    // P3-1: sanitise before insert (defang prompt-injection markers)
+    const brief_text = sanitiseBrief(rawData.brief_text)
+    const { project_id, project_name, variations } = rawData
 
     // Sanity-check label uniqueness when variations supplied. Duplicates make
     // the download UI ambiguous, and the worker uses label in its child brief.
@@ -113,6 +155,34 @@ export async function POST(
             return NextResponse.json(
                 { error: "User is not a member of any foundry" },
                 { status: 403 },
+            )
+        }
+
+        // P3-2 (2026-05-23): rate-limit briefs per founder per hour. Each
+        // chain takes 5-15 min and burns ~£0.30-£0.80 of LLM cost; flooding
+        // the queue from one founder would starve others + spike the bill.
+        // Cap at 12 briefs/hour/foundry (one every 5 min, generous for
+        // genuine iteration). Reads pdf_engine_runs.created_at directly to
+        // avoid maintaining a separate quota table.
+        const oneHourAgoIso = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+        const { count: recentRunCount, error: countErr } = await admin
+            .from('pdf_engine_runs')
+            .select('id', { count: 'exact', head: true })
+            .eq('foundry_id', foundryId)
+            .gte('created_at', oneHourAgoIso)
+        if (countErr) {
+            console.error('[submit] rate-limit count query failed:', countErr.message)
+            // Fail open — better to allow the brief through than block on a
+            // count query glitch. The rare flood case is bounded by the
+            // founder paying for it.
+        } else if ((recentRunCount ?? 0) >= 12) {
+            return NextResponse.json(
+                {
+                    error:
+                        `Brief rate limit reached for this foundry (12/hour). ` +
+                        `You have ${recentRunCount} runs in the last hour. Try again later.`,
+                },
+                { status: 429 },
             )
         }
 

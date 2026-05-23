@@ -21,7 +21,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js'
-import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, statSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, statSync, renameSync } from 'node:fs'
 import { resolve, join, dirname } from 'node:path'
 import { homedir, hostname } from 'node:os'
 import { spawn } from 'node:child_process'
@@ -124,17 +124,14 @@ function log(msg) {
     const line = `[${new Date().toISOString()}] [${WORKER_ID}] ${msg}\n`
     process.stdout.write(line)
     try {
-        // Rotate at 5 MB.
+        // Rotate at 5 MB. P3-6 fix (2026-05-23): renameSync is now imported
+        // at top of file, not require()'d inside the function (require fails
+        // in ESM contexts; before this fix rotation silently never ran).
         if (existsSync(LOG_PATH)) {
             const sz = statSync(LOG_PATH).size
             if (sz > 5 * 1024 * 1024) {
                 rmSync(LOG_PATH + '.1', { force: true })
-                try {
-                    const { renameSync } = require('node:fs')
-                    renameSync(LOG_PATH, LOG_PATH + '.1')
-                } catch {
-                    // best-effort
-                }
+                try { renameSync(LOG_PATH, LOG_PATH + '.1') } catch { /* best-effort */ }
             }
         }
         writeFileSync(LOG_PATH, line, { flag: 'a' })
@@ -310,7 +307,25 @@ async function processJob(job) {
 
     if (code !== 0) {
         const tail = readTail(jobLogPath, 4_000)
-        await failJob(job.id, `engine exited with code ${code}\n\n--- log tail ---\n${tail}`)
+        // P3-5 (2026-05-23): classify exit code for retry decision-making.
+        // Codes per CLAUDE.md canonical table. Schema doesn't yet track
+        // retry_count; this annotation lets a human/admin decide whether
+        // re-submitting the brief would help.
+        const EXIT_CODE_CLASSIFICATION = {
+            1: { class: 'unknown', retry: 'maybe', desc: 'Unexpected error or bad CLI args — investigate logs before re-submitting' },
+            2: { class: 'permanent', retry: 'no', desc: 'Brief refinement loop exhausted — original brief unfixable, founder must revise' },
+            3: { class: 'permanent', retry: 'no', desc: 'G0.5 reconciliation halt — design scale conflicts with brief, founder must clarify' },
+            5: { class: 'transient', retry: 'yes', desc: 'Render subprocess failed — likely OOM or react-pdf timeout, retry should help' },
+            6: { class: 'permanent', retry: 'no', desc: 'PDF integrity check failed — renderer produced garbage; bug needs code fix' },
+            7: { class: 'mixed', retry: 'maybe', desc: 'Orchestrator hard fail — could be transient tool timeout or permanent emitter bug; check tail' },
+        }
+        const cls = EXIT_CODE_CLASSIFICATION[code] || { class: 'unknown', retry: 'maybe', desc: 'Undocumented exit code' }
+        await failJob(
+            job.id,
+            `engine exited with code ${code} [${cls.class.toUpperCase()}, retry=${cls.retry}]\n` +
+            `${cls.desc}\n\n` +
+            `--- log tail ---\n${tail}`,
+        )
         return
     }
 
