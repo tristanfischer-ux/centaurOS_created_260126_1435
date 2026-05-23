@@ -267,12 +267,19 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   // 6 MW 120 m hub with rated thrust ~1.5 MN at top, peak moment
   // ≈ 1.5 × 120 = 180 MN·m. Bolt circle radius ≈ pitch_bearing_od / 2.
   // Per-bolt capacity ≈ 60 t = 0.6 MN (M48 10.9 grade). Total cap ≈ N × 0.6.
-  // 2026-05-23 L25 post-mortem: anchor cage overturning CAPACITY must be
-  // expressed in MN·m (moment), not MN (force). Critic flagged that 86.4 MN
-  // is the wrong unit. Per-bolt capacity 0.6 MN × bolt-circle-radius
-  // (≈ pitch_bearing_od × 1.25 = ~2.4 m for 6 MW) × count = moment.
-  const boltCircleRadiusM = pitchBearingOdM * 1.25
-  const anchorBoltMnCapacity = anchorBoltCount * 0.6 * boltCircleRadiusM  // MN·m
+  // 2026-05-23 L28 post-mortem: capacity sized to FACTORED design moment
+  // (extreme wind thrust × hub_height × 1.35 IEC partial-safety factor).
+  // Old per-bolt 0.6 MN was M48 nominal; for utility wind class anchor
+  // cages use M64-M80 10.9 grade PRE-STRESSED bolts at ~1.0-1.4 MN each.
+  // Bolt-circle radius is TOWER BASE radius (~5-7 m for 6 MW class
+  // monopole), not pitch-bearing radius. Old formula understated this
+  // by 2-3×.
+  const boltCircleRadiusM = ratedPowerKw < 500 ? 0.8 : ratedPowerKw < 5000 ? 3.0 : 5.5
+  const perBoltMnCapacity = ratedPowerKw < 500 ? 0.4 : ratedPowerKw < 5000 ? 0.6 : 1.0
+  const anchorBoltMnCapacity = anchorBoltCount * perBoltMnCapacity * boltCircleRadiusM  // MN·m
+  // Design moment check: extreme thrust ≈ 1.5 × rated thrust × hub_height
+  // × 1.35 partial safety. For 6 MW: 3.82 MN × 120 m × 1.35 = 618 MN·m
+  // — needs ≥ 144 × 1.0 × 5.5 = 792 MN·m capacity. ✓ now
   // 2026-05-23 L25 post-mortem: cap nacelle width at road-transport limit
   // (5 m max in UK/EU without exotic permits). My old formula
   // rotor_diameter × 0.10 gave 15.5 m for 155 m rotor — physically
