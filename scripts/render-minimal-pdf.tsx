@@ -876,6 +876,11 @@ function computeBomTotals(state: any): BomTotals | null {
         // exclusion flag from partVerifications. If macro override fires
         // below, it sets this to false (macro IS authoritative).
         let cost_repair_excluded_from_subtotal_for_this_row = true
+        // 2026-05-26 L26 post-mortem: when macro override fires, strip
+        // the corpus-picked manufacturer + part_number (often wrong for
+        // utility-class components — corpus mis-picks small IGBTs and
+        // spherical-roller bearings for slewing applications).
+        let macro_override_strip_corpus_partnum = false
 
         // Build #4 (Tristan 2026-05-21, council unanimous): Engineering
         // Contract macro-assembly pricing override. Loop 9 evidence:
@@ -968,13 +973,33 @@ function computeBomTotals(state: any): BomTotals | null {
             // visible in BoM but excluded from sub-total = the bug Tristan
             // flagged on L20.
             cost_repair_excluded_from_subtotal_for_this_row = false
+            // 2026-05-26 (L26 post-mortem): when macro override applies,
+            // ALSO strip the corpus-picked manufacturer + part_number.
+            // For utility wind: corpus might assign FF6000R17IP4 IGBT
+            // (1700V) to a converter word that needs 3300V+ blocking,
+            // OR SKF-232/600CA spherical roller bearing to a slewing
+            // bearing application. The CORPUS doesn't know the design
+            // context — it picks the nearest matching keyword. Macro
+            // override means the engineering contract claims this row;
+            // the specific part-number must come from a class-aware
+            // emitter convention OR be left blank for downstream
+            // procurement to fill. Leaving the wrong corpus part number
+            // ships a £4.17M line in the BoM with a £18 IGBT part
+            // number — the Physics Critic correctly flags as nonsensical.
+            macro_override_strip_corpus_partnum = true
           }
         }
         const row: BomPartRow = {
           word_name: w.name_human || humanise(w.id),
           word_id: w.id,
-          manufacturer: v?.manufacturer ?? (mfgMod ? String(mfgMod.value) : null),
-          part_number: v?.part_number ?? (pnMod ? String(pnMod.value) : null),
+          // 2026-05-26 L26 post-mortem: strip corpus mfg/part_number when
+          // macro override applied. Corpus picked wrong-class parts
+          // (small IGBT for 5kV converter; spherical roller for slewing
+          // bearing). Macro override = contract authoritative; the
+          // mfg/part chosen by corpus loses out. Leave nullable for
+          // downstream procurement to fill class-correct alternative.
+          manufacturer: macro_override_strip_corpus_partnum ? null : (v?.manufacturer ?? (mfgMod ? String(mfgMod.value) : null)),
+          part_number: macro_override_strip_corpus_partnum ? null : (v?.part_number ?? (pnMod ? String(pnMod.value) : null)),
           source_url: v?.source_url ?? null,
           source_method: v?.source_method ?? null,
           distributor_price_gbp: hasActual ? unit_price_gbp : null,
