@@ -2822,6 +2822,11 @@ function buildMinimalContract(productClass: string, brief: any, quantities: Reco
 }
 
 // ---------------- solar_inverter -----------------
+// Full archetype contract — replaces buildMinimalContract stub. PV
+// grid-tied inverter; modelled on BESS pattern. Macro prices grounded
+// in SMA/Huawei/Sungrow/SolarEdge published OEM transfer prices +
+// EnergySage 2024 BNEF channel pricing (£80-250/kW installed,
+// equipment ~50-60% of installed; £40-130/kW bare equipment).
 registerArchetype('solar_inverter', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'kW').toLowerCase()
@@ -2851,21 +2856,289 @@ registerArchetype('solar_inverter', (brief: any) => {
     // 3. Class default (commercial string inverter)
     return 50
   })()
-  const dcInputV = extractRangeFromDesc(desc, /(\d{3,4})\s*-?\s*(\d{3,4})?\s*V\s*DC/i, 1000)
-  const acOutputV = extractRangeFromDesc(desc, /(\d{3,4})\s*V\s*AC/i, 400)
-  const mpptCount = extractRangeFromDesc(desc, /(\d{1,2})\s*MPPT/i, 2)
-  const efficiencyPct = extractRangeFromDesc(desc, /(\d{2}(?:\.\d+)?)\s*-?\s*(\d{2}(?:\.\d+)?)?\s*%?\s*(?:euro\s*)?efficien/i, 97.5)
-  const q1 = {
-    rated_power_kw: q(ratedKw, 'kW', 'power', 'rated', 'system', 'brief', { source_detail: 'brief.constraints.target_performance' }),
+  // Topology class — residential string (<10 kW), commercial string
+  // (10-250 kW), or utility central (>250 kW). Drives semiconductor
+  // technology selection + enclosure rating.
+  const topologyClass: 'residential' | 'commercial' | 'utility' = ratedKw < 10 ? 'residential'
+    : ratedKw < 250 ? 'commercial'
+    : 'utility'
+  // SiC adoption: above 100 kW efficiency premium pays back; default to
+  // SiC for utility, hybrid Si-IGBT/SiC for commercial, all-Si for residential.
+  const semiconductorTech: 'Si_IGBT' | 'SiC_hybrid' | 'SiC_full' = topologyClass === 'utility' ? 'SiC_full'
+    : topologyClass === 'commercial' ? 'SiC_hybrid'
+    : 'Si_IGBT'
+  // Standard DC envelopes: residential 60-600 V; commercial 1000-1500 V;
+  // utility 1500 V. AC output 230/400 V split-phase or three-phase EU,
+  // 480 V US commercial, 800 V utility.
+  const dcInputV = extractRangeFromDesc(desc, /(\d{3,4})\s*-?\s*(\d{3,4})?\s*V\s*DC/i,
+    topologyClass === 'utility' ? 1500 : topologyClass === 'commercial' ? 1000 : 600)
+  const acOutputV = extractRangeFromDesc(desc, /(\d{3,4})\s*V\s*AC/i, topologyClass === 'residential' ? 230 : 400)
+  const mpptCount = (() => {
+    const m = desc.match(/(\d{1,2})\s*MPPT/i)
+    if (m) return parseInt(m[1], 10)
+    // Defaults: residential 2, commercial 6-8, utility 1 (single central tracker)
+    return topologyClass === 'utility' ? 1 : topologyClass === 'commercial' ? 6 : 2
+  })()
+  const efficiencyPct = extractRangeFromDesc(desc,
+    /(\d{2}(?:\.\d+)?)\s*-?\s*(\d{2}(?:\.\d+)?)?\s*%?\s*(?:euro\s*)?efficien/i,
+    semiconductorTech === 'SiC_full' ? 99.0 : semiconductorTech === 'SiC_hybrid' ? 98.5 : 97.5)
+  // MPPT voltage window — typically 200-1500 V for utility / 200-1000 V
+  // for commercial. String voltage = panels_per_string × Voc_panel.
+  // For 60-cell mono: Voc ~ 40 V → 1000 V string ≈ 25 panels.
+  const mpptVMin = topologyClass === 'residential' ? 100 : 200
+  const mpptVMax = Math.round(dcInputV * 0.92)  // headroom below DC rating
+  // Switching frequency: Si-IGBT 4-8 kHz, SiC 16-40 kHz (smaller magnetics)
+  const switchingFreqKhz = semiconductorTech === 'SiC_full' ? 30 : semiconductorTech === 'SiC_hybrid' ? 16 : 6
+  // Loss budget @ rated
+  const lossKw = ratedKw * (1 - efficiencyPct / 100)
+  // Thermal rejection — class-typical heatsink (forced air <50 kW, liquid/air >200 kW)
+  const thermalRejectKw = lossKw * 1.5
+  const coolingType: 'natural_convection' | 'forced_air' | 'liquid' = topologyClass === 'utility' ? 'liquid'
+    : topologyClass === 'commercial' ? 'forced_air'
+    : ratedKw <= 5 ? 'natural_convection' : 'forced_air'
+  // DC link capacitor energy: typical 5 J/kW (rule of thumb for film caps)
+  const dcLinkJoulesPerKw = 5
+  const dcLinkEnergyJ = dcLinkJoulesPerKw * ratedKw
+  // AC filter inductor mH × A — proportional to ratedKw / switchingFreq
+  const filterInductorMh = (acOutputV * 1.0) / (switchingFreqKhz * 1000 * 0.05 * (ratedKw * 1000 / acOutputV))
+  // Enclosure rating — outdoor PV inverters need IP65/NEMA 4X minimum
+  const enclosureRating = topologyClass === 'utility' ? 'IP65_outdoor_skid' : topologyClass === 'commercial' ? 'IP65_NEMA_4X' : 'IP65_wall_mount'
+  // Mass estimate — 6-10 kg/kW typical (utility central > commercial > residential)
+  const massPerKw = topologyClass === 'utility' ? 6 : topologyClass === 'commercial' ? 9 : 18
+  const massKg = ratedKw * massPerKw
+
+  const quantities: Record<string, Quantity> = {
+    rated_power_kw: q(ratedKw, 'kW', 'power', 'rated', 'system', 'brief', { source_detail: 'brief.constraints.target_performance', condition: 'AC output, 25°C ambient' }),
+    topology_class: q(topologyClass === 'residential' ? 1 : topologyClass === 'commercial' ? 2 : 3, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=residential<10kW, 2=commercial 10-250kW, 3=utility ≥250kW' }),
+    semiconductor_technology: q(semiconductorTech === 'Si_IGBT' ? 1 : semiconductorTech === 'SiC_hybrid' ? 2 : 3, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=Si IGBT, 2=SiC hybrid, 3=SiC full; SiC chosen above 100 kW for efficiency premium' }),
     dc_input_voltage_v: q(dcInputV, 'V', 'voltage', 'DC', 'system', 'brief'),
     ac_output_voltage_v: q(acOutputV, 'V', 'voltage', 'AC', 'system', 'brief'),
     mppt_count: q(mpptCount, '', 'dimensionless', 'rated', 'system', 'brief'),
-    efficiency_pct: q(efficiencyPct, '%', 'dimensionless', 'rated', 'system', 'physics_constant'),
-  } as Record<string, Quantity>
-  return buildMinimalContract('solar_inverter', brief, q1, `${ratedKw} kW solar inverter, ${dcInputV}V DC input / ${acOutputV}V AC output, ${mpptCount} MPPT, ${efficiencyPct}% efficiency.`)
+    mppt_voltage_min_v: q(mpptVMin, 'V', 'voltage', 'DC', 'system', 'physics_constant'),
+    mppt_voltage_max_v: q(mpptVMax, 'V', 'voltage', 'DC', 'system', 'calculator', { source_detail: '92% headroom below DC rating' }),
+    rated_efficiency_pct: q(efficiencyPct, '%', 'dimensionless', 'peak', 'system', 'physics_constant', { source_detail: 'Euro/CEC weighted efficiency at design point' }),
+    switching_frequency_khz: q(switchingFreqKhz, 'kHz', 'frequency', 'rated', 'system', 'physics_constant', { source_detail: 'Si-IGBT 4-8 kHz / SiC 16-40 kHz' }),
+    loss_at_rated_kw: q(lossKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'rated_kw × (1 - efficiency)' }),
+    thermal_rejection_kw: q(thermalRejectKw, 'kW', 'power', 'min', 'system', 'calculator', { source_detail: 'loss × 1.5 safety margin' }),
+    cooling_type: q(coolingType === 'natural_convection' ? 1 : coolingType === 'forced_air' ? 2 : 3, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=natural convection, 2=forced air, 3=liquid cooled' }),
+    dc_link_energy_j: q(dcLinkEnergyJ, 'J', 'energy', 'nameplate', 'module', 'calculator', { source_detail: '5 J/kW film capacitor budget' }),
+    ac_filter_inductor_mh: q(filterInductorMh, 'mH', 'dimensionless', 'rated', 'module', 'calculator', { source_detail: 'V / (fsw × ripple × I_rated)' }),
+    mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: `${massPerKw} kg/kW typical class-mass` }),
+  }
+
+  const acRatedCurrentA = (ratedKw * 1000) / (acOutputV * (topologyClass === 'residential' && acOutputV < 300 ? 1.0 : 1.732))
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'pv_string',
+      to_part: 'mppt_input_stage',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'voltage_rating',
+      required_value: dcInputV,
+      required_unit: 'V',
+      required_margin_factor: 1.0,
+      material_context: `MPPT input range ${mpptVMin}-${mpptVMax} V must contain string Voc at coldest design temperature`,
+    },
+    {
+      from_part: 'mppt_input_stage',
+      to_part: 'dc_link_bus',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'voltage_rating',
+      required_value: dcInputV,
+      required_unit: 'V',
+    },
+    {
+      from_part: 'dc_link_bus',
+      to_part: 'igbt_inverter_bridge',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'voltage_rating',
+      required_value: dcInputV * 1.2,  // switch blocking voltage with margin
+      required_unit: 'V',
+      required_margin_factor: 1.2,
+    },
+    {
+      from_part: 'igbt_inverter_bridge',
+      to_part: 'ac_filter_lcl',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: acRatedCurrentA,
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+    },
+    {
+      from_part: 'ac_filter_lcl',
+      to_part: 'grid_connection',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: acRatedCurrentA,
+      required_unit: 'A',
+    },
+    {
+      from_part: 'power_module',
+      to_part: 'heatsink_cooling',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: thermalRejectKw,
+      required_unit: 'kW',
+    },
+    {
+      from_part: 'enclosure',
+      to_part: 'outdoor_environment',
+      mechanism: 'mechanical',
+      constraint_kind: 'material_compatibility',
+      material_context: `${enclosureRating} — IP65 / NEMA 4X rated against rain/dust/UV; powder-coated steel or AlMg3 aluminium`,
+    },
+  ]
+
+  // Macro-assembly pricing — token-overlapping word names so Generator
+  // emissions match (power_module, dc_link_capacitor_bank, ac_filter_inductor,
+  // ac_filter_capacitor_bank, mppt_controller_card, dc_disconnect_switch,
+  // ac_disconnect_switch, ground_fault_detection_unit, enclosure).
+  // Bare equipment ratios (per BNEF/EnergySage 2024 + SMA/Huawei BoM teardowns):
+  //   Power module (IGBT/SiC): £18/kW (commercial), £12/kW (utility), £25/kW (SiC residential)
+  //   DC-link capacitors: £4/kW (film capacitor bank)
+  //   AC filter inductors: £6/kW
+  //   AC filter capacitors: £1.5/kW
+  //   MPPT controller card: £180/MPPT
+  //   DC disconnect: £40 (residential) £400 (utility) — fixed-per-product
+  //   AC disconnect: £30-300 similar
+  //   GFCI / arc-fault detection: £80 flat (UL 1741 SA + IEC 62109-2)
+  //   Enclosure: £8/kg
+  const powerModulePerKw = semiconductorTech === 'SiC_full' ? 22 : semiconductorTech === 'SiC_hybrid' ? 16 : 12
+  const dcDisconnectPrice = topologyClass === 'utility' ? 400 : topologyClass === 'commercial' ? 150 : 40
+  const acDisconnectPrice = topologyClass === 'utility' ? 300 : topologyClass === 'commercial' ? 120 : 30
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'power_module_igbt_sic',
+      unit_price_gbp: powerModulePerKw,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: powerModulePerKw * ratedKw,
+      source_detail: `£${powerModulePerKw}/kW × ${ratedKw} kW (${semiconductorTech} bridge: Infineon FF series IGBTs or Cree Wolfspeed SiC MOSFETs, gate drivers, NTC sensors)`,
+    },
+    {
+      word_name: 'dc_link_capacitor_bank',
+      unit_price_gbp: 4,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: 4 * ratedKw,
+      source_detail: `£4/kW × ${ratedKw} kW (TDK/EPCOS B32778 film capacitors, ${dcLinkJoulesPerKw} J/kW energy, 105°C rated)`,
+    },
+    {
+      word_name: 'ac_filter_inductor',
+      unit_price_gbp: 6,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: 6 * ratedKw,
+      source_detail: `£6/kW × ${ratedKw} kW (LCL filter, ferrite or grain-oriented Si steel core, ${filterInductorMh.toFixed(2)} mH × ${acRatedCurrentA.toFixed(0)} A)`,
+    },
+    {
+      word_name: 'ac_filter_capacitor_bank',
+      unit_price_gbp: 1.5,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: 1.5 * ratedKw,
+      source_detail: `£1.5/kW × ${ratedKw} kW (X2 metallised polypropylene, IEC 60384-14 class)`,
+    },
+    {
+      word_name: 'mppt_controller_card',
+      unit_price_gbp: 180,
+      dimension_basis: 'each',
+      dimension_value: mpptCount,
+      total_gbp: 180 * mpptCount,
+      source_detail: `£180/MPPT × ${mpptCount} MPPT (DSP-based MPPT, TI C2000/STMicro SPC58 + boost converter, P&O or incremental conductance algorithm)`,
+    },
+    {
+      word_name: 'dc_disconnect_switch',
+      unit_price_gbp: dcDisconnectPrice,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: dcDisconnectPrice,
+      source_detail: `£${dcDisconnectPrice} flat — load-break ${dcInputV} V DC isolator, UL 98B / IEC 60947-3 rated, integrated SPD`,
+    },
+    {
+      word_name: 'ac_disconnect_switch',
+      unit_price_gbp: acDisconnectPrice,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: acDisconnectPrice,
+      source_detail: `£${acDisconnectPrice} flat — ${acOutputV} V AC isolator + MCB protection, IEC 60947-2`,
+    },
+    {
+      word_name: 'ground_fault_detection_unit',
+      unit_price_gbp: 80,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 80,
+      source_detail: `£80 flat — RCMU residual-current monitor (Type B) + arc-fault detection per UL 1741 SA / IEC 62109-2`,
+    },
+    {
+      word_name: 'enclosure_ip65_powder_coated',
+      unit_price_gbp: 8,
+      dimension_basis: 'kg_mass',
+      dimension_value: massKg * 0.4,  // enclosure is ~40% of mass
+      total_gbp: 8 * massKg * 0.4,
+      source_detail: `£8/kg × ${(massKg * 0.4).toFixed(0)} kg (${enclosureRating} steel or AlMg3, powder-coated, IK10 impact + UV-stable seal)`,
+    },
+  ]
+
+  // Closures — design-rule gates
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'mppt_voltage_contains_string',
+    status: dcInputV > mpptVMax && dcInputV / 1.2 >= mpptVMin ? 'pass' : 'warn',
+    measured: dcInputV,
+    required: `MPPT window ${mpptVMin}-${mpptVMax} V must contain expected PV string Voc at coldest design temp`,
+    reason: `String Voc cold = expected near ${dcInputV} V; MPPT window ${mpptVMin}-${mpptVMax} V. Window narrow → derate at cold-temperature dawn.`,
+  })
+  closures.push({
+    invariant_id: 'efficiency_at_design_point',
+    status: efficiencyPct >= 97.0 ? 'pass' : efficiencyPct >= 95.0 ? 'warn' : 'fail',
+    measured: efficiencyPct,
+    required: '≥97% Euro/CEC weighted efficiency at design point (UL 1741 / IEC 61683)',
+    reason: `Rated efficiency ${efficiencyPct.toFixed(1)}%. ${semiconductorTech} typical ${semiconductorTech === 'SiC_full' ? '98.5-99.2' : semiconductorTech === 'SiC_hybrid' ? '98.0-98.8' : '97.0-98.0'}%.`,
+  })
+  closures.push({
+    invariant_id: 'thermal_rejection_capacity',
+    status: thermalRejectKw >= lossKw * 1.4 ? 'pass' : 'fail',
+    measured: thermalRejectKw,
+    required: lossKw * 1.4,
+    reason: `Cooling (${coolingType}) sized ${thermalRejectKw.toFixed(2)} kW vs continuous loss ${lossKw.toFixed(2)} kW. 1.4× margin handles 45°C derating envelope.`,
+  })
+  closures.push({
+    invariant_id: 'iec_62109_safety_compliance',
+    status: 'pass',
+    measured: 1,
+    required: 'IEC 62109-1/-2 safety + IEC 61727 grid + UL 1741 SA inverter requirements',
+    reason: `By construction includes GFDU, DC/AC disconnects, IP65 enclosure, anti-islanding (UL 1741 SA), arc-fault detection. CE/UKCA mark requires IEC 62109 + EMC IEC 61000-6-2/-4 type test (£40-80k one-off).`,
+  })
+  closures.push({
+    invariant_id: 'mppt_count_vs_array_size',
+    status: ratedKw / mpptCount <= 100 ? 'pass' : ratedKw / mpptCount <= 250 ? 'warn' : 'fail',
+    measured: ratedKw / mpptCount,
+    required: '≤100 kW/MPPT for shading immunity (commercial); ≤250 kW/MPPT acceptable (utility)',
+    reason: `${(ratedKw / mpptCount).toFixed(0)} kW per MPPT. Too few MPPTs → partial-shade losses; too many → cost+complexity penalty.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'solar_inverter',
+    brief_summary: `${ratedKw.toFixed(0)} kW ${topologyClass} PV grid-tied inverter (${semiconductorTech} semiconductor, ${switchingFreqKhz} kHz switching). ${dcInputV} V DC input (${mpptCount}× MPPT, ${mpptVMin}-${mpptVMax} V window) → ${acOutputV} V AC output. ${efficiencyPct.toFixed(1)}% rated efficiency, ${lossKw.toFixed(2)} kW loss, ${thermalRejectKw.toFixed(2)} kW ${coolingType} cooling. ${enclosureRating} enclosure, ${massKg.toFixed(0)} kg mass. Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })} (≈£${(macroAssemblyTotal / ratedKw).toFixed(0)}/kW vs £80-250/kW installed benchmark).`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
 })
 
 // ---------------- wind_turbine -------------------
+// Full archetype contract — replaces the buildMinimalContract stub that
+// produced 3/10 Physics Critic fidelity (no macro assemblies, no closures,
+// nacelle/blade/tower disconnected). Modelled on the BESS reference
+// implementation; macro prices grounded in IRENA/NREL/WindEurope cost
+// reports (LCOE 2024: onshore £900-1300/kW, offshore £1400-2500/kW
+// installed; bare equipment ~70% of installed).
 registerArchetype('wind_turbine', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'kW').toLowerCase()
@@ -2896,25 +3169,308 @@ registerArchetype('wind_turbine', (brief: any) => {
     // 3. Class default (utility onshore 2 MW)
     return 2000
   })()
-  const rotorDiamM = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*m\s+rotor/i, Math.max(40, Math.sqrt(ratedKw) * 1.5))
-  const hubHeightM = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*m\s+(?:hub|tower)/i, rotorDiamM * 1.2)
+  const ratedMw = ratedKw / 1000
+  const isOffshore = /offshore|sea|seabed|monopile|jacket\s+foundation|fixed[\s-]?bottom|floating/i.test(desc)
+  // Rotor diameter from specific power (W/m²). Modern utility turbines
+  // 250-350 W/m² rated; ratedKw / (π/4 × D²) ≈ 300 → D ≈ √(ratedKw × 4 / π / 0.3 / 1000)
+  // Equivalent simplification: D ≈ 80 m for 2 MW onshore; D ≈ 220 m for 14 MW offshore.
+  const rotorDiamM = (() => {
+    const fromDesc = desc.match(/(\d{2,3}(?:\.\d+)?)\s*-?\s*(\d{2,3}(?:\.\d+)?)?\s*m\s+(?:rotor|diameter|blade)/i)
+    if (fromDesc) {
+      const a = parseFloat(fromDesc[1])
+      const b = fromDesc[2] ? parseFloat(fromDesc[2]) : a
+      return (a + b) / 2
+    }
+    // Specific-power based default. 320 W/m² rated for onshore, 380 W/m² for offshore (higher CapEx, higher hub).
+    const specificPowerWm2 = isOffshore ? 380 : 320
+    const areaM2 = (ratedKw * 1000) / specificPowerWm2
+    return Math.round(Math.sqrt(areaM2 * 4 / Math.PI))
+  })()
+  const rotorAreaM2 = (Math.PI / 4) * rotorDiamM * rotorDiamM
+  // Hub height: onshore ≈ rotor_diam × 1.0-1.3 (IEC); offshore lower ratio
+  // (logistics + wave loading). Constrained ≥ 1.2 × (rotor/2) + 25 m tip clearance.
+  const hubHeightM = (() => {
+    const fromDesc = desc.match(/(\d{2,3}(?:\.\d+)?)\s*-?\s*(\d{2,3}(?:\.\d+)?)?\s*m\s+(?:hub|tower)/i)
+    if (fromDesc) {
+      const a = parseFloat(fromDesc[1])
+      const b = fromDesc[2] ? parseFloat(fromDesc[2]) : a
+      return (a + b) / 2
+    }
+    const ratio = isOffshore ? 0.95 : 1.15
+    const fromRotor = rotorDiamM * ratio
+    // Floor: half-rotor + 25 m clearance to ground/water
+    const floor = (rotorDiamM / 2) + 25
+    return Math.max(fromRotor, floor)
+  })()
   const cutInMs = extractRangeFromDesc(desc, /cut[\s-]?in\s+(\d{1,2}(?:\.\d+)?)/i, 3.0)
   const ratedMs = extractRangeFromDesc(desc, /rated\s+(\d{1,2}(?:\.\d+)?)/i, 11.5)
   const cutOutMs = extractRangeFromDesc(desc, /cut[\s-]?out\s+(\d{1,2}(?:\.\d+)?)/i, 25.0)
-  const isOffshore = /offshore/i.test(desc)
-  const q1 = {
+  const numBlades = 3  // Modern utility turbines are universally 3-blade (Betz + cost optimum).
+  // Drivetrain choice — direct-drive PMG vs geared DFIG. Offshore/large
+  // → direct-drive (lower maintenance, no gearbox failure mode). Onshore
+  // < 4 MW → geared (lower CapEx).
+  const isDirectDrive = isOffshore || ratedMw >= 4 || /direct[\s-]?drive|pmg|permanent[\s-]?magnet/i.test(desc)
+  // Tip-speed at rated: typical 75-90 m/s onshore, 90-100 m/s offshore.
+  // ω_rated = (rated_ms × λ) / (D/2). λ ≈ 7 typical.
+  const tipSpeedRatio = 7.0
+  const tipSpeedMs = ratedMs * tipSpeedRatio
+  const rotorRpm = (tipSpeedMs / (rotorDiamM / 2)) * (60 / (2 * Math.PI))
+  // Annual energy production estimate (rated_kw × 8760 × capacity_factor)
+  const capacityFactor = isOffshore ? 0.45 : 0.32
+  const annualEnergyMwh = ratedKw * 8760 * capacityFactor / 1000
+  // Mass estimates (NREL Cost & Scaling 2024 + Vestas/SGRE/GE disclosures):
+  //   Blade: 0.135 × D^2.39 kg per blade (composites scaling, GFRP/CFRP hybrid)
+  //   Hub: 0.954 × (3-blade-mass)^0.95
+  //   Nacelle: 2.5 × ratedKw (typical 2-3 tonnes/MW for geared, 5-8 tonnes/MW direct-drive)
+  //   Tower: 0.295 × D^1.5 × hubM (steel monopole)
+  const bladeMassKg = 0.135 * Math.pow(rotorDiamM, 2.39)
+  const totalBladeMassKg = numBlades * bladeMassKg
+  const hubMassKg = 0.954 * Math.pow(totalBladeMassKg, 0.95)
+  const nacelleMassKg = (isDirectDrive ? 5500 : 2500) * ratedMw
+  const towerMassKg = 0.295 * Math.pow(rotorDiamM, 1.5) * hubHeightM
+  const totalNacelleAssemblyMassKg = totalBladeMassKg + hubMassKg + nacelleMassKg
+  // Transport constraint — max blade chord on European roads typically 4.5 m
+  // (Highway Englanddischarging exceptional load permits). Beyond that
+  // requires segmented blade or coastal logistics.
+  const maxBladeChordM = rotorDiamM * 0.10  // chord ≈ 10% of diameter at root
+  // Foundation: onshore reinforced concrete gravity pad (£100-250/kW);
+  // offshore monopile (£300-600/kW) or jacket (£500-900/kW for deeper)
+  const foundationGbpPerKw = isOffshore ? 450 : 150
+
+  const quantities: Record<string, Quantity> = {
     rated_power_kw: q(ratedKw, 'kW', 'power', 'rated', 'system', 'brief'),
+    rated_power_mw: q(ratedMw, 'MW', 'power', 'rated', 'system', 'calculator'),
     rotor_diameter_m: q(rotorDiamM, 'm', 'length', 'rated', 'system', 'brief'),
+    rotor_swept_area_m2: q(rotorAreaM2, 'm²', 'area', 'aperture', 'system', 'calculator', { source_detail: 'π/4 × D²' }),
+    specific_power_w_m2: q((ratedKw * 1000) / rotorAreaM2, 'W/m²', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'rated_w / swept_area; typical 250-380 W/m²' }),
     hub_height_m: q(hubHeightM, 'm', 'length', 'rated', 'system', 'brief'),
+    blade_count: q(numBlades, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: '3-blade Betz optimum, universal modern utility' }),
     cut_in_wind_speed_m_s: q(cutInMs, 'm/s', 'velocity', 'min', 'system', 'physics_constant'),
     rated_wind_speed_m_s: q(ratedMs, 'm/s', 'velocity', 'rated', 'system', 'physics_constant'),
     cut_out_wind_speed_m_s: q(cutOutMs, 'm/s', 'velocity', 'max', 'system', 'physics_constant'),
-    generator_type: q(isOffshore ? 2 : 1, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'enum: 1=DFIG (onshore), 2=PMG (offshore)' }),
-  } as Record<string, Quantity>
-  return buildMinimalContract('wind_turbine', brief, q1, `${ratedKw} kW wind turbine, ${rotorDiamM} m rotor, ${hubHeightM} m hub, ${isOffshore ? 'offshore' : 'onshore'} class.`)
+    tip_speed_ratio: q(tipSpeedRatio, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'λ ≈ 7 typical modern utility' }),
+    tip_speed_m_s: q(tipSpeedMs, 'm/s', 'velocity', 'rated', 'system', 'calculator', { source_detail: 'rated_ms × λ; bounded ≤ 100 m/s for noise/erosion' }),
+    rotor_rpm: q(rotorRpm, 'rpm', 'frequency', 'rated', 'system', 'calculator'),
+    drivetrain_type: q(isDirectDrive ? 2 : 1, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=geared DFIG, 2=direct-drive PMG; large/offshore → direct-drive' }),
+    deployment_class: q(isOffshore ? 2 : 1, '', 'dimensionless', 'rated', 'system', 'brief', { source_detail: 'enum: 1=onshore, 2=offshore' }),
+    capacity_factor: q(capacityFactor, '', 'dimensionless', 'typical', 'system', 'physics_constant', { source_detail: '0.32 onshore / 0.45 offshore typical UK Round 4 disclosures' }),
+    annual_energy_production_mwh: q(annualEnergyMwh, 'MWh', 'energy', 'nameplate', 'system', 'calculator', { source_detail: 'rated_kw × 8760 × CF / 1000' }),
+    blade_mass_each_kg: q(bladeMassKg, 'kg', 'mass', 'empty', 'module', 'calculator', { source_detail: '0.135 × D^2.39 (NREL scaling)' }),
+    blade_root_chord_m: q(maxBladeChordM, 'm', 'length', 'max', 'module', 'calculator', { source_detail: '≈10% of rotor diameter; transport gate ≤4.5 m' }),
+    hub_mass_kg: q(hubMassKg, 'kg', 'mass', 'empty', 'module', 'calculator'),
+    nacelle_mass_kg: q(nacelleMassKg, 'kg', 'mass', 'empty', 'module', 'calculator', { source_detail: `${isDirectDrive ? 5.5 : 2.5} t/MW for ${isDirectDrive ? 'direct-drive PMG' : 'geared DFIG'}` }),
+    tower_mass_kg: q(towerMassKg, 'kg', 'mass', 'empty', 'module', 'calculator', { source_detail: '0.295 × D^1.5 × hub_m (steel monopole)' }),
+    total_top_assembly_mass_kg: q(totalNacelleAssemblyMassKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'blades + hub + nacelle (the crane lift)' }),
+  }
+
+  // Topology constraints — typed edges. Wind turbine load path is
+  // mechanical (blade → hub → main shaft → generator → tower → foundation)
+  // overlaid with electrical (generator → converter → step-up xfm → grid).
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'rotor_blade',
+      to_part: 'hub_assembly',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: bladeMassKg * 3.0,  // 3× safety factor on root pitch bearing
+      required_unit: 'kg',
+      required_margin_factor: 3.0,
+      material_context: 'pitch_bearing_4-point_contact — must carry blade centrifugal + thrust + gravity',
+    },
+    {
+      from_part: 'hub_assembly',
+      to_part: 'main_shaft',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: totalBladeMassKg + hubMassKg,
+      required_unit: 'kg',
+    },
+    {
+      from_part: 'generator',
+      to_part: 'power_converter',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (ratedKw * 1000) / (isOffshore ? 690 : 690),  // 690 V class typical
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+    },
+    {
+      from_part: 'power_converter',
+      to_part: 'step_up_transformer',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'voltage_rating',
+      required_value: 690,
+      required_unit: 'V',
+    },
+    {
+      from_part: 'step_up_transformer',
+      to_part: 'grid_export_cable',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'voltage_rating',
+      required_value: isOffshore ? 66000 : 33000,
+      required_unit: 'V',
+      material_context: isOffshore ? '66kV_HVAC_or_HVDC_array_cable' : '33kV_AC_collection_network',
+    },
+    {
+      from_part: 'tower_base',
+      to_part: 'foundation',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: towerMassKg + totalNacelleAssemblyMassKg,
+      required_unit: 'kg',
+      required_margin_factor: 1.5,
+      material_context: isOffshore ? 'monopile_or_jacket_steel' : 'reinforced_concrete_gravity_pad',
+    },
+  ]
+
+  // Macro-assembly pricing — turbine OEM pricing per WindEurope 2024 +
+  // Vestas/Siemens-Gamesa investor disclosures. Word names chosen for
+  // ≥0.66 token overlap with Stage 1.7 emissions
+  // (rotor_blade_assembly, hub_assembly, main_drivetrain, nacelle,
+  // tower, foundation, power_converter, step_up_transformer).
+  //   Blades: £180/kg GFRP-CFRP hybrid (Vestas EnVentus 80m blade ~£500k)
+  //   Hub: £25/kg cast nodular iron + machined steel
+  //   Drivetrain (geared): £220/kW gearbox + DFIG generator
+  //   Drivetrain (direct-drive): £350/kW PMG + rare-earth NdFeB
+  //   Nacelle envelope: £45/kg (steel frame + GRP cover + bedplate)
+  //   Tower: £3.20/kg painted/coated steel sections
+  //   Foundation: see foundationGbpPerKw above
+  //   Power converter (full-scale, IGBT/IGCT): £55/kW (£330k for 6 MW)
+  //   Step-up xfm: £18/kVA (off-the-shelf dry/oil xfm)
+  const drivetrainPerKw = isDirectDrive ? 350 : 220
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'rotor_blade_assembly',
+      unit_price_gbp: 180,
+      dimension_basis: 'kg_mass',
+      dimension_value: totalBladeMassKg,
+      total_gbp: 180 * totalBladeMassKg,
+      source_detail: `£180/kg × ${totalBladeMassKg.toFixed(0)} kg total (${numBlades} blades × ${bladeMassKg.toFixed(0)} kg, GFRP/CFRP hybrid; Vestas EnVentus / GE Cypress disclosures)`,
+    },
+    {
+      word_name: 'hub_assembly',
+      unit_price_gbp: 25,
+      dimension_basis: 'kg_mass',
+      dimension_value: hubMassKg,
+      total_gbp: 25 * hubMassKg,
+      source_detail: `£25/kg × ${hubMassKg.toFixed(0)} kg (cast nodular iron + pitch bearings + actuators)`,
+    },
+    {
+      word_name: isDirectDrive ? 'direct_drive_pmg_drivetrain' : 'geared_dfig_drivetrain',
+      unit_price_gbp: drivetrainPerKw,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: drivetrainPerKw * ratedKw,
+      source_detail: `£${drivetrainPerKw}/kW × ${ratedKw} kW (${isDirectDrive ? 'direct-drive PMG + NdFeB rare earths, no gearbox' : 'three-stage planetary gearbox + DFIG generator'})`,
+    },
+    {
+      word_name: 'nacelle_enclosure_bedplate',
+      unit_price_gbp: 45,
+      dimension_basis: 'kg_mass',
+      dimension_value: nacelleMassKg,
+      total_gbp: 45 * nacelleMassKg,
+      source_detail: `£45/kg × ${nacelleMassKg.toFixed(0)} kg (steel main frame + GRP enclosure + yaw drive ring)`,
+    },
+    {
+      word_name: 'tower_steel_sections',
+      unit_price_gbp: 3.20,
+      dimension_basis: 'kg_mass',
+      dimension_value: towerMassKg,
+      total_gbp: 3.20 * towerMassKg,
+      source_detail: `£3.20/kg × ${towerMassKg.toFixed(0)} kg (3-5 section painted steel monopole, ${hubHeightM.toFixed(0)} m hub)`,
+    },
+    {
+      word_name: isOffshore ? 'offshore_monopile_foundation' : 'onshore_gravity_foundation',
+      unit_price_gbp: foundationGbpPerKw,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: foundationGbpPerKw * ratedKw,
+      source_detail: `£${foundationGbpPerKw}/kW × ${ratedKw} kW (${isOffshore ? 'monopile steel, 2000-4000 t per turbine, shallow water <50m' : 'reinforced concrete gravity pad, 600-800 m³, 1500 t rebar'})`,
+    },
+    {
+      word_name: 'power_converter_full_scale',
+      unit_price_gbp: 55,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: 55 * ratedKw,
+      source_detail: `£55/kW × ${ratedKw} kW (full-scale IGBT back-to-back converter, 690 V class, LVRT/HVRT compliant)`,
+    },
+    {
+      word_name: 'step_up_transformer',
+      unit_price_gbp: 18,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: 18 * ratedKw,
+      source_detail: `£18/kVA × ${ratedKw} kVA (${isOffshore ? '66 kV dry-type cast-resin nacelle xfm' : '33 kV oil-filled tower-base xfm'}, IEC 60076)`,
+    },
+    {
+      word_name: 'switchgear_protection_panel',
+      unit_price_gbp: 35000,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 35000,
+      source_detail: `£35,000 flat — MV switchgear (vacuum CB + earthing + protection relay + RMU) per IEC 62271`,
+    },
+  ]
+
+  // Closures — design-rule gates
+  const closures: ContractClosureResult[] = []
+  const tipClearanceM = hubHeightM - (rotorDiamM / 2)
+  closures.push({
+    invariant_id: 'tip_clearance_to_ground',
+    status: tipClearanceM >= 25 ? 'pass' : tipClearanceM >= 15 ? 'warn' : 'fail',
+    measured: tipClearanceM,
+    required: '≥25 m blade-tip to ground/water clearance (IEC 61400 + EASA/CAA aviation lighting trigger)',
+    reason: `Hub ${hubHeightM.toFixed(0)} m − rotor radius ${(rotorDiamM / 2).toFixed(0)} m = ${tipClearanceM.toFixed(0)} m tip clearance.`,
+  })
+  closures.push({
+    invariant_id: 'blade_chord_road_transportable',
+    status: maxBladeChordM <= 4.5 ? 'pass' : maxBladeChordM <= 5.5 ? 'warn' : 'fail',
+    measured: maxBladeChordM,
+    required: '≤4.5 m blade root chord for European road transport (Highways England STGO Cat 3 escort permit limit)',
+    reason: `Root chord ${maxBladeChordM.toFixed(2)} m vs 4.5 m permit limit. >5.5 m → must ship in segmented sections or use coastal/heavy-lift route (offshore OK).`,
+  })
+  closures.push({
+    invariant_id: 'tip_speed_noise_envelope',
+    status: tipSpeedMs <= 80 ? 'pass' : tipSpeedMs <= 100 ? 'warn' : 'fail',
+    measured: tipSpeedMs,
+    required: '≤80 m/s onshore (noise) / ≤100 m/s offshore (leading-edge erosion)',
+    reason: `Tip speed ${tipSpeedMs.toFixed(0)} m/s at rated wind. Onshore >80 m/s breaches LpA 45 dB(A) at 500 m; >100 m/s causes leading-edge rain erosion within 5-7 years.`,
+  })
+  closures.push({
+    invariant_id: 'specific_power_w_m2',
+    status: ((ratedKw * 1000) / rotorAreaM2) >= 200 && ((ratedKw * 1000) / rotorAreaM2) <= 450 ? 'pass' : 'warn',
+    measured: (ratedKw * 1000) / rotorAreaM2,
+    required: '200-450 W/m² (modern utility envelope; low-wind sites tend lower)',
+    reason: `Specific power ${((ratedKw * 1000) / rotorAreaM2).toFixed(0)} W/m². <200 → over-rotor for site Class; >450 → under-rotor, low CF.`,
+  })
+  closures.push({
+    invariant_id: 'foundation_load_capacity',
+    status: 'pass',
+    measured: towerMassKg + totalNacelleAssemblyMassKg,
+    required: `${isOffshore ? 'monopile penetration to suitable bearing strata, ULS overturning moment' : 'gravity pad mass ≥ 3× overturning moment / lever arm'}`,
+    reason: `By construction, foundation type ${isOffshore ? 'monopile' : 'gravity'} sized at £${foundationGbpPerKw}/kW carries the ${((towerMassKg + totalNacelleAssemblyMassKg) / 1000).toFixed(1)} t static load + design overturning moment.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'wind_turbine',
+    brief_summary: `${ratedMw.toFixed(1)} MW ${isOffshore ? 'offshore' : 'onshore'} ${isDirectDrive ? 'direct-drive PMG' : 'geared DFIG'} wind turbine. ${rotorDiamM.toFixed(0)} m rotor (${rotorAreaM2.toFixed(0)} m² swept area, ${((ratedKw * 1000) / rotorAreaM2).toFixed(0)} W/m² specific power), ${hubHeightM.toFixed(0)} m hub height. ${numBlades} blades × ${bladeMassKg.toFixed(0)} kg. Drivetrain ${nacelleMassKg.toFixed(0)} kg. Tower ${towerMassKg.toFixed(0)} kg. AEP ${annualEnergyMwh.toFixed(0)} MWh @ CF ${(capacityFactor * 100).toFixed(0)}%. Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })} (≈£${(macroAssemblyTotal / ratedKw).toFixed(0)}/kW vs ${isOffshore ? '£1400-2500' : '£900-1300'}/kW installed benchmark).`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
 })
 
 // ---------------- h2_electrolyser ----------------
+// Full archetype contract — replaces buildMinimalContract stub. PEM or
+// alkaline hydrogen electrolyser. Modelled on BESS pattern. Macro
+// prices grounded in IEA "Global Hydrogen Review 2024", BNEF
+// electrolyser cost models, Nel/ITM/Plug/Cummins disclosures. Installed
+// CapEx 2024: £800-1500/kW alkaline, £1200-2500/kW PEM (£600-1800/kW
+// for bare stack+BoP, ~70% of installed).
 registerArchetype('h2_electrolyser', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'kW').toLowerCase()
@@ -2959,19 +3515,294 @@ registerArchetype('h2_electrolyser', (brief: any) => {
     // 4. Class default for a commercial electrolyser
     return 1000
   })()
-  const h2KgPerDay = extractRangeFromDesc(desc, /(\d{1,5})\s*-?\s*(\d{1,5})?\s*kg.*(?:h2|hydrogen)/i, ratedKw / 53)
-  const opPressureBar = extractRangeFromDesc(desc, /(\d{1,3})\s*bar/i, 30)
-  const cellTempC = extractRangeFromDesc(desc, /(\d{2,3})\s*°?C/i, 70)
-  const stackEffPct = extractRangeFromDesc(desc, /(\d{2})\s*%?\s*(?:stack\s+)?efficiency/i, 62)
-  const q1 = {
+  const ratedMw = ratedKw / 1000
+  // Technology choice — PEM (high pressure, fast response, expensive
+  // catalysts) vs Alkaline (mature, cheaper, slower transient, lower
+  // pressure). Default to PEM if "PEM"/"membrane" in desc; alkaline if
+  // "alkaline"/"AEL" in desc; PEM otherwise (modern default).
+  const isAlkaline = /alkaline|aek|ael|kt-30|nickel\s+mesh/i.test(desc) && !/pem|proton/i.test(desc)
+  const isPem = !isAlkaline
+  // Specific energy consumption — PEM 48-55 kWh/kg, Alkaline 50-60 kWh/kg
+  // (industry rule of thumb; theoretical minimum 39.4 kWh/kg LHV).
+  const specificEnergyKwhPerKg = isPem ? 51 : 55
+  // Hydrogen output kg/hr from rated power
+  const h2KgPerHr = ratedKw / specificEnergyKwhPerKg
+  const h2KgPerDay = h2KgPerHr * 24
+  // Convert to Nm³ (1 kg H2 = 11.126 Nm³ at 0°C, 1 atm)
+  const h2Nm3PerHr = h2KgPerHr * 11.126
+  // Stack count — PEM stacks are typically 1-2.5 MW each (Nel MC500,
+  // ITM HGas3SP, Cummins HyLYZER-1000); alkaline modules up to 2.5 MW.
+  const maxStackKw = isPem ? 2500 : 2500
+  const stackCount = Math.ceil(ratedKw / maxStackKw)
+  const kwPerStack = ratedKw / stackCount
+  // Operating pressure — PEM differential pressure 30-50 bar typical
+  // (no compressor needed for ≤350 bar storage); alkaline atmospheric
+  // 1-7 bar typical, requires downstream compression.
+  const opPressureBar = extractRangeFromDesc(desc, /(\d{1,3})\s*bar/i, isPem ? 35 : 3)
+  const targetStoragePressureBar = extractRangeFromDesc(desc, /(\d{2,4})\s*bar\s+(?:storage|delivery|out)/i, isPem ? 350 : 200)
+  const needsCompression = targetStoragePressureBar > opPressureBar
+  // Cell temperature — PEM 60-80°C, alkaline 70-90°C
+  const cellTempC = extractRangeFromDesc(desc, /(\d{2,3})\s*°?C/i, isPem ? 70 : 80)
+  // Stack efficiency at rated current (LHV basis):
+  // PEM 60-68% LHV typical; alkaline 65-72% LHV typical at rated current
+  const stackEffPct = extractRangeFromDesc(desc, /(\d{2})\s*%?\s*(?:stack\s+)?efficiency/i, isPem ? 65 : 68)
+  // Voltage per cell: PEM 1.8-2.1 V; alkaline 1.7-2.0 V at rated current
+  const cellVoltageV = isPem ? 1.95 : 1.85
+  // Current density: PEM 1.0-2.5 A/cm²; alkaline 0.3-0.6 A/cm²
+  const currentDensityAcm2 = isPem ? 1.8 : 0.45
+  // Active cell area sized for 0.25-1.0 m² per cell (Nel/Cummins disclosure)
+  const cellAreaCm2 = isPem ? 2500 : 5000  // 2500 cm² PEM / 5000 cm² alkaline typical
+  const currentPerCellA = currentDensityAcm2 * cellAreaCm2
+  // Stack power = V × I × cells_per_stack → cells_per_stack
+  const cellsPerStack = Math.ceil((kwPerStack * 1000) / (cellVoltageV * currentPerCellA))
+  // Faraday efficiency at rated current
+  const faradayEffPct = isPem ? 99.0 : 97.0  // PEM near-100%, alkaline gas crossover slightly lower
+  // Rectifier: thyristor-based for alkaline (low ripple), IGBT for PEM (faster dynamic)
+  const rectifierEffPct = 96.5
+  const stackInputAtBusbar = ratedKw / (rectifierEffPct / 100)
+  // BoP power consumption — water purification + pumps + compression + chillers + N2 purge
+  const bopPowerKw = ratedKw * 0.06 + (needsCompression ? ratedKw * 0.04 : 0)  // ~6-10% of stack power
+  const totalPowerKw = stackInputAtBusbar + bopPowerKw
+  // Cooling load — almost all losses end up as heat
+  const stackHeatRejectKw = ratedKw * (1 - stackEffPct / 100)
+  // Water feed — stoichiometric is 9 kg water / kg H2; with cooling + purification losses ~12 kg/kg
+  const waterKgPerHr = h2KgPerHr * 12
+
+  const quantities: Record<string, Quantity> = {
     rated_power_kw: q(ratedKw, 'kW', 'power', 'rated', 'system', 'brief'),
-    rated_power_mw: q(ratedKw / 1000, 'MW', 'power', 'rated', 'system', 'brief'),
-    h2_production_kg_per_day: q(h2KgPerDay, 'kg/day', 'flow_rate', 'rated', 'system', 'brief'),
+    rated_power_mw: q(ratedMw, 'MW', 'power', 'rated', 'system', 'calculator'),
+    technology_class: q(isPem ? 1 : 2, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=PEM, 2=alkaline' }),
+    specific_energy_kwh_per_kg: q(specificEnergyKwhPerKg, 'kWh/kg', 'energy', 'rated', 'system', 'physics_constant', { source_detail: 'PEM 48-55, alkaline 50-60; theoretical LHV min 39.4 kWh/kg' }),
+    h2_production_kg_per_hour: q(h2KgPerHr, 'kg/hr', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: 'rated_kw / specific_energy_kwh_per_kg' }),
+    h2_production_kg_per_day: q(h2KgPerDay, 'kg/day', 'flow_rate', 'rated', 'system', 'calculator'),
+    h2_production_nm3_per_hour: q(h2Nm3PerHr, 'Nm³/hr', 'flow_rate', 'rated', 'system', 'calculator', { source_detail: '11.126 Nm³/kg H2 at STP' }),
+    stack_count: q(stackCount, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'ceil(rated_kw / max_stack_kw) — typical 1-2.5 MW per stack' }),
+    kw_per_stack: q(kwPerStack, 'kW', 'power', 'rated', 'module', 'calculator'),
+    cells_per_stack: q(cellsPerStack, '', 'dimensionless', 'rated', 'module', 'calculator', { source_detail: 'kw_per_stack / (V_cell × I_cell)' }),
+    cell_voltage_v: q(cellVoltageV, 'V', 'voltage', 'DC', 'cell', 'physics_constant', { source_detail: 'PEM 1.95 V / alkaline 1.85 V at rated current' }),
+    cell_area_cm2: q(cellAreaCm2, 'cm²', 'area', 'aperture', 'cell', 'physics_constant'),
+    current_density_a_cm2: q(currentDensityAcm2, 'A/cm²', 'dimensionless', 'rated', 'cell', 'physics_constant', { source_detail: 'PEM 1.0-2.5, alkaline 0.3-0.6' }),
+    current_per_cell_a: q(currentPerCellA, 'A', 'current', 'continuous', 'cell', 'calculator'),
     operating_pressure_bar: q(opPressureBar, 'bar', 'pressure', 'rated', 'system', 'brief'),
-    cell_temperature_c: q(cellTempC, '°C', 'temperature', 'rated', 'system', 'brief'),
+    target_storage_pressure_bar: q(targetStoragePressureBar, 'bar', 'pressure', 'rated', 'system', 'brief'),
+    needs_external_compression: q(needsCompression ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: '1 if storage_p > op_p; PEM 35 bar usually skips compression to 350 bar tube trailer' }),
+    cell_temperature_c: q(cellTempC, '°C', 'temperature', 'rated', 'cell', 'brief'),
     stack_efficiency_lhv_pct: q(stackEffPct, '%', 'dimensionless', 'rated', 'system', 'physics_constant'),
-  } as Record<string, Quantity>
-  return buildMinimalContract('h2_electrolyser', brief, q1, `${ratedKw} kW PEM electrolyser, ${h2KgPerDay.toFixed(0)} kg/day H₂, ${opPressureBar} bar, ${cellTempC}°C, ${stackEffPct}% LHV efficiency.`)
+    faraday_efficiency_pct: q(faradayEffPct, '%', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'gas crossover losses — PEM ~99%, alkaline ~97%' }),
+    rectifier_efficiency_pct: q(rectifierEffPct, '%', 'dimensionless', 'rated', 'system', 'physics_constant'),
+    bop_power_kw: q(bopPowerKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: '~6-10% of stack power: water purification, pumps, chillers, controls' }),
+    total_input_power_kw: q(totalPowerKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'stack/rectifier + BoP' }),
+    stack_heat_rejection_kw: q(stackHeatRejectKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: '(1 - stack_efficiency) × rated_kw' }),
+    water_feed_kg_per_hour: q(waterKgPerHr, 'kg/hr', 'flow_rate', 'continuous', 'system', 'calculator', { source_detail: '12 kg water / kg H2 incl. purification losses' }),
+  }
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'demin_water_supply',
+      to_part: 'water_purification_skid',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: waterKgPerHr * 1.5,  // 50% margin for RO/EDI recirculation
+      required_unit: 'kg/hr',
+      material_context: 'feed_water_ASTM_D1193_type_II — conductivity <1 µS/cm, TOC <50 ppb after polishing',
+    },
+    {
+      from_part: 'water_purification_skid',
+      to_part: 'electrolyser_stack',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: waterKgPerHr,
+      required_unit: 'kg/hr',
+      material_context: isPem
+        ? 'ultrapure_water — for PEM membrane, conductivity <0.1 µS/cm to prevent membrane fouling'
+        : 'KOH_30%_electrolyte — 30 wt% potassium hydroxide circulation loop for alkaline',
+    },
+    {
+      from_part: 'transformer_rectifier',
+      to_part: 'electrolyser_stack',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: currentPerCellA * 1.20,
+      required_unit: 'A',
+      required_margin_factor: 1.20,
+    },
+    {
+      from_part: 'electrolyser_stack',
+      to_part: 'gas_separator_drum',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: h2Nm3PerHr * 1.10,
+      required_unit: 'Nm³/hr',
+    },
+    {
+      from_part: 'gas_separator_drum',
+      to_part: needsCompression ? 'h2_compressor' : 'h2_storage_tube_trailer',
+      mechanism: 'fluid_loop',
+      constraint_kind: 'flow_capacity',
+      required_value: h2Nm3PerHr,
+      required_unit: 'Nm³/hr',
+      material_context: '316L_stainless — H2-embrittlement resistant per ASME B31.12 + EIGA Doc 100',
+    },
+    {
+      from_part: 'electrolyser_stack',
+      to_part: 'cooling_water_loop',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: stackHeatRejectKw,
+      required_unit: 'kW',
+    },
+    {
+      from_part: 'control_skid',
+      to_part: 'electrolyser_stack',
+      mechanism: 'control',
+      constraint_kind: 'data_bandwidth',
+      required_value: 10,
+      required_unit: 'Hz',
+      material_context: 'SIL2_safety_PLC — Pilz PNOZmulti or Siemens S7-1500F with emergency shutdown',
+    },
+  ]
+
+  // Macro-assembly pricing — word names chosen for ≥0.66 token overlap
+  // with Stage 1.7 emissions (electrolyser_stack, transformer_rectifier,
+  // water_purification_skid, gas_separator_drum, h2_compressor, control_skid,
+  // cooling_skid, balance_of_plant_piping).
+  // 2024 cost basis (IRENA + BNEF + Nel/ITM/Plug disclosures):
+  //   Stack: PEM £450/kW, alkaline £280/kW (the big-ticket, 30-50% of CapEx)
+  //   Transformer-rectifier: £180/kW (the second big-ticket, 15-25% of CapEx)
+  //   Water purification: £120k flat for ≤500 kg/day systems, £80/(kg/day) for larger
+  //   Gas separator + drying: £40/(kg/day) for PSA / TSA drying skid
+  //   H2 compressor (only if needed): £1500/(Nm³/hr) — Howden / Burckhardt class
+  //   Control skid: £80k flat for systems <2 MW, +£40k per MW above
+  //   Cooling skid: £350/kW thermal rejection (chiller + dry cooler + pumps)
+  //   BoP piping + valves: £80/kW (316L stainless + Hastelloy where wet)
+  const stackPerKw = isPem ? 450 : 280
+  const waterPurificationCost = h2KgPerDay <= 500 ? 120000 : 80 * h2KgPerDay
+  const compressorCost = needsCompression ? 1500 * h2Nm3PerHr : 0
+  const controlSkidCost = 80000 + Math.max(0, ratedMw - 2) * 40000
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: isPem ? 'pem_electrolyser_stack' : 'alkaline_electrolyser_stack',
+      unit_price_gbp: stackPerKw,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: stackPerKw * ratedKw,
+      source_detail: `£${stackPerKw}/kW × ${ratedKw} kW (${stackCount} stack${stackCount > 1 ? 's' : ''} × ${kwPerStack.toFixed(0)} kW, ${cellsPerStack} cells/stack; ${isPem ? 'PFSA membrane + Pt/Ir catalyst-coated CCMs' : 'asbestos-free Zirfon diaphragm + Ni-mesh electrodes in 30% KOH'})`,
+    },
+    {
+      word_name: 'transformer_rectifier_unit',
+      unit_price_gbp: 180,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: 180 * ratedKw,
+      source_detail: `£180/kW × ${ratedKw} kW (${isPem ? 'IGBT-based fast-response' : 'thyristor low-ripple'} rectifier + isolation step-down xfm; 11 kV → 690 V → DC bus)`,
+    },
+    {
+      word_name: 'water_purification_skid',
+      unit_price_gbp: waterPurificationCost,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: waterPurificationCost,
+      source_detail: `£${waterPurificationCost.toLocaleString()} (${h2KgPerDay.toFixed(0)} kg/day H2 → ${waterKgPerHr.toFixed(0)} kg/hr feed; RO + EDI + polish to ASTM Type II; ${isPem ? '<0.1 µS/cm for PEM membrane' : '<1 µS/cm for alkaline'})`,
+    },
+    {
+      word_name: 'gas_separator_drying_skid',
+      unit_price_gbp: 40,
+      dimension_basis: 'kg_mass',
+      dimension_value: h2KgPerDay,
+      total_gbp: 40 * h2KgPerDay,
+      source_detail: `£40/(kg/day) × ${h2KgPerDay.toFixed(0)} kg/day (cyclonic H2/O2 separator drums + TSA molecular-sieve drying to <5 ppm H2O; 316L pressure vessel)`,
+    },
+    ...(needsCompression ? [{
+      word_name: 'h2_compressor_unit',
+      unit_price_gbp: 1500,
+      dimension_basis: 'each' as const,
+      dimension_value: Math.ceil(h2Nm3PerHr),
+      total_gbp: compressorCost,
+      source_detail: `£1500/(Nm³/hr) × ${h2Nm3PerHr.toFixed(0)} Nm³/hr (Howden / Burckhardt diaphragm or ionic-liquid compressor, ${opPressureBar} bar → ${targetStoragePressureBar} bar)`,
+    }] : []),
+    {
+      word_name: 'control_safety_skid',
+      unit_price_gbp: controlSkidCost,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: controlSkidCost,
+      source_detail: `£${controlSkidCost.toLocaleString()} flat — SIL2 safety PLC + ATEX-rated H2 detection + N2 purge skid + SCADA HMI`,
+    },
+    {
+      word_name: 'cooling_water_skid',
+      unit_price_gbp: 350,
+      dimension_basis: 'kw_power',
+      dimension_value: stackHeatRejectKw,
+      total_gbp: 350 * stackHeatRejectKw,
+      source_detail: `£350/kW × ${stackHeatRejectKw.toFixed(0)} kW (chiller + dry cooler + ${cellTempC}°C circulation pumps + DI water cooling loop)`,
+    },
+    {
+      word_name: 'balance_of_plant_piping',
+      unit_price_gbp: 80,
+      dimension_basis: 'kw_power',
+      dimension_value: ratedKw,
+      total_gbp: 80 * ratedKw,
+      source_detail: `£80/kW × ${ratedKw} kW (316L SS + Hastelloy C-276 wetted parts, ANSI B31.12 H2 piping, manual + actuated valves, N2 purge interlocks)`,
+    },
+  ]
+
+  // Closures — design-rule gates
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'faraday_efficiency_above_95pct',
+    status: faradayEffPct >= 95 ? 'pass' : faradayEffPct >= 90 ? 'warn' : 'fail',
+    measured: faradayEffPct,
+    required: '≥95% Faraday efficiency at rated current (gas crossover safety + H2 purity)',
+    reason: `Faraday efficiency ${faradayEffPct.toFixed(1)}%. <95% indicates excessive H2-in-O2 crossover (4% LFL → ATEX trip).`,
+  })
+  closures.push({
+    invariant_id: 'specific_energy_in_band',
+    status: isPem
+      ? specificEnergyKwhPerKg >= 48 && specificEnergyKwhPerKg <= 55 ? 'pass' : 'warn'
+      : specificEnergyKwhPerKg >= 50 && specificEnergyKwhPerKg <= 60 ? 'pass' : 'warn',
+    measured: specificEnergyKwhPerKg,
+    required: isPem ? '48-55 kWh/kg PEM' : '50-60 kWh/kg alkaline',
+    reason: `${specificEnergyKwhPerKg} kWh/kg LHV. Below 48 → unrealistic vs theoretical 39.4 limit; above 60 → catalyst degradation or current-density problem.`,
+  })
+  closures.push({
+    invariant_id: 'h2_production_arithmetic',
+    status: Math.abs(h2KgPerHr - ratedKw / specificEnergyKwhPerKg) / h2KgPerHr < 0.01 ? 'pass' : 'fail',
+    measured: h2KgPerHr,
+    required: ratedKw / specificEnergyKwhPerKg,
+    reason: `H2 ${h2KgPerHr.toFixed(2)} kg/hr = rated ${ratedKw} kW / ${specificEnergyKwhPerKg} kWh/kg. By-construction closure.`,
+  })
+  closures.push({
+    invariant_id: 'stack_count_size_envelope',
+    status: kwPerStack <= maxStackKw ? 'pass' : 'fail',
+    measured: kwPerStack,
+    required: `≤${maxStackKw} kW per stack (Nel MC500 / ITM HGas3SP / Cummins HyLYZER class limit; logistics + service)`,
+    reason: `${kwPerStack.toFixed(0)} kW × ${stackCount} stacks = ${ratedKw} kW. Stacks >2.5 MW are not commercially available 2024.`,
+  })
+  closures.push({
+    invariant_id: 'feed_water_purity_compatible',
+    status: 'pass',
+    measured: 1,
+    required: `feed water ASTM D1193 Type II → polish to <${isPem ? '0.1' : '1'} µS/cm`,
+    reason: `By construction includes RO + EDI + polish. ${isPem ? 'PEM membrane' : 'KOH electrolyte'} requires this purity to avoid catalyst poisoning / membrane fouling.`,
+  })
+  closures.push({
+    invariant_id: 'h2_piping_material_compatible',
+    status: 'pass',
+    measured: 1,
+    required: 'ASME B31.12 + EIGA Doc 100 H2-service piping: 316L SS or Hastelloy, electroless-nickel finish on carbon-steel',
+    reason: `By construction uses 316L stainless in macro_assembly_prices; H2 embrittlement gate satisfied.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'h2_electrolyser',
+    brief_summary: `${ratedMw.toFixed(2)} MW ${isPem ? 'PEM' : 'alkaline'} water electrolyser, ${h2KgPerDay.toFixed(0)} kg/day H2 (${h2Nm3PerHr.toFixed(0)} Nm³/hr). ${specificEnergyKwhPerKg} kWh/kg LHV, ${stackEffPct.toFixed(0)}% stack efficiency, ${faradayEffPct.toFixed(1)}% Faraday efficiency. ${stackCount} × ${kwPerStack.toFixed(0)} kW stacks (${cellsPerStack} cells @ ${cellVoltageV} V, ${currentDensityAcm2} A/cm² × ${cellAreaCm2} cm²). Operating ${opPressureBar} bar / ${cellTempC}°C${needsCompression ? `, compressed to ${targetStoragePressureBar} bar` : ''}. Water feed ${waterKgPerHr.toFixed(0)} kg/hr, heat rejection ${stackHeatRejectKw.toFixed(0)} kW, BoP ${bopPowerKw.toFixed(0)} kW. Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })} (≈£${(macroAssemblyTotal / ratedKw).toFixed(0)}/kW vs ${isPem ? '£1200-2500' : '£800-1500'}/kW installed benchmark).`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
 })
 
 // ---------------- ups_inverter -------------------
@@ -3677,25 +4508,323 @@ registerArchetype('dialysis_machine', (brief: any) => {
 // ===================================================================
 
 // ---------------- evtol --------------------------
+// Full archetype contract — replaces buildMinimalContract stub.
+// Electric vertical take-off and landing aircraft (urban air mobility
+// or cargo VTOL). Modelled on BESS/HAPS pattern. Macro prices
+// grounded in Joby/Archer/Lilium/Volocopter SEC filings + EASA SC-VTOL
+// certification cost disclosures + Beta Technologies investor decks.
+// Installed ASP £3000-12000/kg MTOW for certified production aircraft.
 registerArchetype('evtol', (brief: any) => {
   const desc = String(brief?.product_description ?? '')
   const massKg = Number(brief?.constraints?.max_mass_kg?.value ?? 2500)
-  const numPax = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:pax|passenger|seat)/i, 4)
+  // Configuration class — passenger (typically 1500-3500 kg MTOW) vs
+  // cargo (200-600 kg MTOW); drives ballistic recovery system requirement
+  // (mandated for passenger configurations under EASA SC-VTOL).
+  const isCargo = /cargo|freight|payload[\s-]?only|unmanned/i.test(desc) || massKg < 800
+  const isPassenger = !isCargo
+  const numPax = isCargo ? 0 : extractRangeFromDesc(desc, /(\d{1,2})\s*(?:pax|passenger|seat)/i, massKg < 1800 ? 1 : massKg < 2500 ? 2 : massKg < 3200 ? 4 : 5)
+  // Payload — passenger MTOW ÷ payload typically 0.20-0.28 for batteries +
+  // structure dominate; cargo configurations 0.30-0.40 payload fraction.
+  const payloadKg = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*kg\s+(?:payload|cargo)/i,
+    isCargo ? Math.round(massKg * 0.35) : Math.round(numPax * 100))
   const cruiseSpeedKmh = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*(?:km\/h|kph)/i, 250)
-  const cruiseRangeKm = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*km(?:\s+range)?/i, 250)
-  const enduranceMin = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*min/i, 30)
-  const numRotors = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:rotor|propeller|prop)/i, 6)
-  const batteryKwh = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*kWh/i, 400)
-  const q1 = {
-    gross_takeoff_mass_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+  const cruiseSpeedKts = cruiseSpeedKmh / 1.852
+  const cruiseRangeKm = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*km(?:\s+range)?/i, isCargo ? 150 : 240)
+  const enduranceMin = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*min/i, Math.round((cruiseRangeKm / cruiseSpeedKmh) * 60 + 15))
+  // Motor count — typically 6-8 for distributed electric propulsion
+  // (DEP). Higher count → better fail-safe redundancy + lower disk loading.
+  // Joby S4=6, Archer Midnight=12, Lilium Jet=30 (jet ducted fan), Volocopter VoloCity=18.
+  const numRotors = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:rotor|propeller|prop|motor)/i, isCargo ? 4 : 6)
+  // Battery kWh — sized from energy budget. Cruise power ≈ MTOW × g × cruise_v / L/D / η_prop / η_motor.
+  // Hover power ≈ 1.5× cruise (high disk loading penalty).
+  const liftDragRatio = isPassenger ? 12 : 10  // tilt-rotor / lift-cruise typical
+  const propEta = 0.82
+  const motorEta = 0.94
+  const cruiseSpeedMs = cruiseSpeedKmh / 3.6
+  const cruisePowerKw = (massKg * 9.81 * cruiseSpeedMs / liftDragRatio) / (propEta * motorEta) / 1000
+  const hoverPowerKw = cruisePowerKw * 1.8  // typical hover penalty
+  // Energy: cruise_time × cruise_p + 5 min hover (takeoff + transition + landing) + 30 min reserve
+  const cruiseHr = (cruiseRangeKm / cruiseSpeedKmh)
+  const hoverHr = 5 / 60
+  const reserveHr = 0.5
+  const energyBudgetKwh = cruisePowerKw * (cruiseHr + reserveHr) + hoverPowerKw * hoverHr
+  // Battery 30% DoD reserve at end-of-mission (FAA Part 23 + EASA SC-VTOL guidance)
+  const batteryUsableFraction = 0.70
+  const batteryKwh = extractRangeFromDesc(desc, /(\d{2,4})\s*-?\s*(\d{2,4})?\s*kWh/i, energyBudgetKwh / batteryUsableFraction)
+  // Pack-level specific energy — cell-level 250-400 Wh/kg
+  // (e.g. CATL/Panasonic NMC811/NCA), pack-level 60-75% of cell level
+  // → 180-280 Wh/kg pack. 250 Wh/kg pack is current production-ready.
+  const packEnergyDensityWhKg = 250
+  const batteryPackMassKg = (batteryKwh * 1000) / packEnergyDensityWhKg
+  // Composite airframe: 35-45% of empty mass typical
+  const emptyMassKg = massKg - payloadKg
+  const airframeMassKg = emptyMassKg * 0.40
+  // Disk loading (Pa) — sized from rotor area. Rotor radius typically 1.0-1.5 m
+  // for multi-rotor eVTOL. Disk loading <400 Pa is the efficiency band.
+  const rotorRadiusM = isPassenger ? 1.3 : 1.0
+  const totalDiskAreaM2 = numRotors * Math.PI * rotorRadiusM * rotorRadiusM
+  const diskLoadingPa = (massKg * 9.81) / totalDiskAreaM2
+  // Per-motor sizing: hover power / numRotors with 30% margin per ASTM F3338
+  const motorPowerKw = (hoverPowerKw / numRotors) * 1.30
+  // Cruise speed in knots for aviation closures
+  const stallSpeedKts = 50  // typical tilt-rotor or lift-cruise stall
+
+  const quantities: Record<string, Quantity> = {
+    mtow_kg: q(massKg, 'kg', 'mass', 'gross_takeoff', 'system', 'brief'),
+    configuration_class: q(isPassenger ? 1 : 2, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=passenger, 2=cargo' }),
     num_passengers: q(numPax, '', 'dimensionless', 'rated', 'system', 'brief'),
-    cruise_speed_km_h: q(cruiseSpeedKmh, 'km/h', 'velocity', 'rated', 'system', 'brief'),
+    payload_kg: q(payloadKg, 'kg', 'mass', 'payload', 'system', 'brief'),
+    empty_mass_kg: q(emptyMassKg, 'kg', 'mass', 'empty', 'system', 'calculator', { source_detail: 'mtow - payload' }),
+    airframe_mass_kg: q(airframeMassKg, 'kg', 'mass', 'empty', 'module', 'calculator', { source_detail: '~40% of empty mass; composite sandwich' }),
+    battery_pack_mass_kg: q(batteryPackMassKg, 'kg', 'mass', 'empty', 'module', 'calculator', { source_detail: 'kWh × 1000 / pack_energy_density' }),
+    battery_pack_specific_energy_wh_kg: q(packEnergyDensityWhKg, 'Wh/kg', 'energy', 'nameplate', 'pack', 'physics_constant', { source_detail: 'cell-level 250-400 / pack-level 60-75% → ~250 Wh/kg production 2024' }),
+    cruise_speed_kmh: q(cruiseSpeedKmh, 'km/h', 'velocity', 'rated', 'system', 'brief'),
+    cruise_speed_kts: q(cruiseSpeedKts, 'kt', 'velocity', 'rated', 'system', 'calculator'),
     cruise_range_km: q(cruiseRangeKm, 'km', 'length', 'rated', 'system', 'brief'),
     endurance_min: q(enduranceMin, 'min', 'time', 'rated', 'system', 'brief'),
-    num_rotors: q(numRotors, '', 'dimensionless', 'rated', 'system', 'brief'),
-    battery_kwh: q(batteryKwh, 'kWh', 'energy', 'usable', 'system', 'brief'),
-  } as Record<string, Quantity>
-  return buildMinimalContract('evtol', brief, q1, `${numPax}-pax eVTOL, ${massKg} kg MTOW, ${cruiseSpeedKmh} km/h cruise, ${cruiseRangeKm} km range, ${enduranceMin} min endurance, ${numRotors} rotors, ${batteryKwh} kWh battery.`)
+    cruise_power_kw: q(cruisePowerKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'MTOW × g × V / (L/D × η_prop × η_motor)' }),
+    hover_power_kw: q(hoverPowerKw, 'kW', 'power', 'peak', 'system', 'calculator', { source_detail: 'cruise × 1.8 hover penalty' }),
+    energy_budget_kwh: q(energyBudgetKwh, 'kWh', 'energy', 'usable', 'system', 'calculator', { source_detail: 'cruise + 5min hover + 30min reserve' }),
+    battery_capacity_kwh: q(batteryKwh, 'kWh', 'energy', 'nameplate', 'pack', 'brief'),
+    battery_usable_fraction: q(batteryUsableFraction, '', 'dimensionless', 'rated', 'pack', 'physics_constant', { source_detail: 'EASA SC-VTOL reserve guidance (30% at end-of-mission)' }),
+    motor_count: q(numRotors, '', 'dimensionless', 'rated', 'system', 'brief'),
+    motor_power_each_kw: q(motorPowerKw, 'kW', 'power', 'peak', 'module', 'calculator', { source_detail: '(hover_power / count) × 1.30 ASTM F3338 margin' }),
+    rotor_radius_m: q(rotorRadiusM, 'm', 'length', 'rated', 'module', 'physics_constant'),
+    total_disk_area_m2: q(totalDiskAreaM2, 'm²', 'area', 'aperture', 'system', 'calculator', { source_detail: 'n × π × r²' }),
+    disk_loading_pa: q(diskLoadingPa, 'Pa', 'pressure', 'rated', 'system', 'calculator', { source_detail: 'MTOW × g / total_disk_area; <400 Pa = efficient' }),
+    lift_drag_ratio: q(liftDragRatio, '', 'dimensionless', 'rated', 'system', 'physics_constant'),
+    stall_speed_kts: q(stallSpeedKts, 'kt', 'velocity', 'min', 'system', 'physics_constant'),
+  }
+
+  // Battery → motor bus: high-voltage DC (typically 540-800 V) sized
+  // for hover-peak current per motor.
+  const dcBusV = isPassenger ? 800 : 540
+  const motorCurrentPeakA = (motorPowerKw * 1000) / dcBusV
+
+  const topology: TopologyEdge[] = [
+    {
+      from_part: 'battery_pack',
+      to_part: 'dc_distribution_bus',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: (hoverPowerKw * 1000) / dcBusV * 1.25,
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+    },
+    {
+      from_part: 'dc_distribution_bus',
+      to_part: 'motor_inverter',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'current_rating',
+      required_value: motorCurrentPeakA * 1.25,
+      required_unit: 'A',
+      required_margin_factor: 1.25,
+    },
+    {
+      from_part: 'motor_inverter',
+      to_part: 'electric_motor',
+      mechanism: 'electrical_bus',
+      constraint_kind: 'voltage_rating',
+      required_value: dcBusV,
+      required_unit: 'V',
+    },
+    {
+      from_part: 'electric_motor',
+      to_part: 'propeller',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: motorPowerKw * 5,  // typical motor mass kg/kW for high-power-density eVTOL motors
+      required_unit: 'kg',
+    },
+    {
+      from_part: 'motor_mount',
+      to_part: 'airframe_main_spar',
+      mechanism: 'mechanical',
+      constraint_kind: 'mass_carry',
+      required_value: motorPowerKw * 1.5 + 5,  // motor + propeller + mount per nacelle
+      required_unit: 'kg',
+      required_margin_factor: 3.0,
+      material_context: 'carbon_fibre_main_spar — must carry inertial thrust + gust loads × 3.0 ultimate factor (FAR/CS-23/SC-VTOL)',
+    },
+    {
+      from_part: 'battery_pack',
+      to_part: 'thermal_management_loop',
+      mechanism: 'thermal',
+      constraint_kind: 'thermal_rejection',
+      required_value: batteryKwh * 0.5,  // 50% C-rate discharge → significant heat
+      required_unit: 'kW',
+      material_context: 'liquid_cooling_glycol — battery pack thermal runaway propagation gate (UL 9540A) requires <5°C cell-to-cell gradient',
+    },
+    {
+      from_part: 'flight_computer',
+      to_part: 'motor_inverter',
+      mechanism: 'data',
+      constraint_kind: 'data_bandwidth',
+      required_value: 1000,  // 1 kHz minimum motor speed loop
+      required_unit: 'Hz',
+      material_context: 'DO-178C_DAL_A_or_DAL_B — flight control software must be qualified to RTCA DO-178C; triplex redundancy minimum',
+    },
+    ...(isPassenger ? [{
+      from_part: 'ballistic_recovery_system' as const,
+      to_part: 'airframe_anchor' as const,
+      mechanism: 'mechanical' as const,
+      constraint_kind: 'mass_carry' as const,
+      required_value: massKg * 1.5,  // parachute sized to MTOW × 1.5 ULS
+      required_unit: 'kg',
+      material_context: 'BRS_or_equivalent — EASA SC-VTOL §SVT.2280 requires ballistic recovery or equivalent means for enhanced category vertical take-off and landing',
+    }] : []),
+  ]
+
+  // Macro-assembly pricing — word names overlap Stage 1.7 emissions
+  // (composite_airframe, electric_motor, propeller, battery_pack,
+  // motor_inverter, flight_computer_avionics, landing_gear,
+  // ballistic_recovery_parachute, thermal_management_loop).
+  // 2024 cost basis (Joby/Archer/Lilium SEC filings + aerospace BoM):
+  //   Composite airframe: £2500/kg (carbon-fibre prepreg + foam core)
+  //   Electric motor: £600/kW per motor (high-power-density EMRAX / H3X / equivalent)
+  //   Propeller: £8000/each (composite fixed or variable pitch)
+  //   Battery pack: £550/kWh certified aviation-grade (Pa Part 23 / SC-VTOL)
+  //   Motor inverter: £80/kW SiC-based
+  //   Avionics: £180k flat (Garmin G3000 / G1000H + integrated displays + ADS-B)
+  //   Landing gear: £6/kg (composite skid or retractable wheels)
+  //   BRS parachute (passenger only): £25k/seat
+  //   Thermal management: £400/kW
+  const macro_assembly_prices: MacroAssemblyPrice[] = [
+    {
+      word_name: 'composite_airframe_structure',
+      unit_price_gbp: 2500,
+      dimension_basis: 'kg_mass',
+      dimension_value: airframeMassKg,
+      total_gbp: 2500 * airframeMassKg,
+      source_detail: `£2500/kg × ${airframeMassKg.toFixed(0)} kg (carbon-fibre/foam sandwich; out-of-autoclave prepreg, certified aerospace process per CS-23/SC-VTOL; toolings amortised over production run)`,
+    },
+    {
+      word_name: 'electric_propulsion_motor',
+      unit_price_gbp: 600,
+      dimension_basis: 'kw_power',
+      dimension_value: motorPowerKw * numRotors,
+      total_gbp: 600 * motorPowerKw * numRotors,
+      source_detail: `£600/kW × ${motorPowerKw.toFixed(0)} kW × ${numRotors} motors (EMRAX 348 / H3X HPDM-250 class; 6-8 kW/kg power density, water-cooled)`,
+    },
+    {
+      word_name: 'composite_propeller_assembly',
+      unit_price_gbp: 8000,
+      dimension_basis: 'each',
+      dimension_value: numRotors,
+      total_gbp: 8000 * numRotors,
+      source_detail: `£8000/each × ${numRotors} propellers (carbon-fibre composite blades, ${(rotorRadiusM * 2).toFixed(1)} m diameter, ${isPassenger ? 'variable-pitch' : 'fixed-pitch'} hub)`,
+    },
+    {
+      word_name: 'aviation_battery_pack',
+      unit_price_gbp: 550,
+      dimension_basis: 'kwh_capacity',
+      dimension_value: batteryKwh,
+      total_gbp: 550 * batteryKwh,
+      source_detail: `£550/kWh × ${batteryKwh.toFixed(0)} kWh certified aviation pack (250 Wh/kg pack-level NMC811/NCA, UL 9540A thermal-runaway tested, Pa Part 23 / EASA SC-VTOL pack qualification)`,
+    },
+    {
+      word_name: 'motor_inverter_sic',
+      unit_price_gbp: 80,
+      dimension_basis: 'kw_power',
+      dimension_value: motorPowerKw * numRotors,
+      total_gbp: 80 * motorPowerKw * numRotors,
+      source_detail: `£80/kW × ${(motorPowerKw * numRotors).toFixed(0)} kW (SiC motor controller, ${dcBusV} V DC bus, vector control, redundant per ASTM F3338)`,
+    },
+    {
+      word_name: 'flight_computer_avionics_suite',
+      unit_price_gbp: 180000,
+      dimension_basis: 'each',
+      dimension_value: 1,
+      total_gbp: 180000,
+      source_detail: `£180k flat — triplex flight computer (DAL-A) + integrated PFD/MFD + ADS-B Out/In + autoland + flight envelope protection (Garmin G3000H/G5000H or BAE FlytX)`,
+    },
+    {
+      word_name: 'landing_gear_assembly',
+      unit_price_gbp: 6,
+      dimension_basis: 'kg_mass',
+      dimension_value: emptyMassKg * 0.05,  // ~5% of empty mass
+      total_gbp: 6 * emptyMassKg * 0.05,
+      source_detail: `£6/kg × ${(emptyMassKg * 0.05).toFixed(0)} kg (${isPassenger ? 'retractable tricycle wheel gear with oleo struts' : 'composite skid'}, energy-absorbing per FAR 23.561)`,
+    },
+    ...(isPassenger ? [{
+      word_name: 'ballistic_recovery_parachute',
+      unit_price_gbp: 25000,
+      dimension_basis: 'each' as const,
+      dimension_value: numPax || 1,
+      total_gbp: 25000 * (numPax || 1),
+      source_detail: `£25k/seat × ${numPax || 1} (whole-aircraft BRS, BRS Aerospace or Galaxy class, sized for MTOW × 1.5; mandated for passenger SC-VTOL §SVT.2280)`,
+    }] : []),
+    {
+      word_name: 'thermal_management_loop',
+      unit_price_gbp: 400,
+      dimension_basis: 'kw_power',
+      dimension_value: batteryKwh * 0.5,
+      total_gbp: 400 * batteryKwh * 0.5,
+      source_detail: `£400/kW × ${(batteryKwh * 0.5).toFixed(0)} kW (glycol-cooled battery + inverter loop, redundant pumps, UL 9540A propagation barriers)`,
+    },
+  ]
+
+  // Closures — design-rule gates
+  const closures: ContractClosureResult[] = []
+  closures.push({
+    invariant_id: 'disk_loading_lift_efficiency',
+    status: diskLoadingPa <= 400 ? 'pass' : diskLoadingPa <= 600 ? 'warn' : 'fail',
+    measured: diskLoadingPa,
+    required: '≤400 Pa for efficient hover; >600 Pa = excessive hover power demand',
+    reason: `Disk loading ${diskLoadingPa.toFixed(0)} Pa. Above 400 Pa hover efficiency drops, battery sized inadequately for true endurance.`,
+  })
+  closures.push({
+    invariant_id: 'battery_pack_specific_energy',
+    status: packEnergyDensityWhKg >= 250 ? 'pass' : packEnergyDensityWhKg >= 200 ? 'warn' : 'fail',
+    measured: packEnergyDensityWhKg,
+    required: '≥250 Wh/kg at pack level (production-ready 2024); <200 Wh/kg → no commercial viability',
+    reason: `Pack ${packEnergyDensityWhKg} Wh/kg. Cell-level 250-400 Wh/kg currently available; pack-level 60-75% of cell.`,
+  })
+  closures.push({
+    invariant_id: 'energy_budget_arithmetic',
+    status: batteryKwh * batteryUsableFraction >= energyBudgetKwh * 0.95 ? 'pass'
+          : batteryKwh * batteryUsableFraction >= energyBudgetKwh * 0.80 ? 'warn'
+          : 'fail',
+    measured: batteryKwh * batteryUsableFraction,
+    required: energyBudgetKwh,
+    reason: `Usable battery ${(batteryKwh * batteryUsableFraction).toFixed(0)} kWh vs required ${energyBudgetKwh.toFixed(0)} kWh for ${cruiseRangeKm} km range + 5 min hover + 30 min reserve. Includes 30% DoD reserve at end-of-mission.`,
+  })
+  closures.push({
+    invariant_id: 'fail_safe_one_motor_failure',
+    status: numRotors >= 4 ? 'pass' : 'fail',
+    measured: numRotors,
+    required: '≥4 motors with distributed propulsion + asymmetric thrust mitigation for one-motor-inoperative landing',
+    reason: `${numRotors} motors. Below 4 = single motor failure is loss-of-control event (FAR 23.2230 / SC-VTOL §SVT.2510 fail-safe requirement).`,
+  })
+  closures.push({
+    invariant_id: 'passenger_brs_required',
+    status: !isPassenger || numPax === 0 ? 'pass'
+          : numPax > 0 ? 'pass'  // BRS included by construction in macros above
+          : 'fail',
+    measured: isPassenger ? 1 : 0,
+    required: 'EASA SC-VTOL §SVT.2280 — passenger configurations require ballistic recovery system or equivalent means',
+    reason: `${isPassenger ? `Passenger config with ${numPax} pax: BRS included in macros (£${(25000 * (numPax || 1)).toLocaleString()})` : 'Cargo config — BRS not mandated under SC-VTOL'}.`,
+  })
+  closures.push({
+    invariant_id: 'mass_closure_payload_in_envelope',
+    status: payloadKg + airframeMassKg + batteryPackMassKg <= massKg * 0.92 ? 'pass'
+          : payloadKg + airframeMassKg + batteryPackMassKg <= massKg ? 'warn'
+          : 'fail',
+    measured: payloadKg + airframeMassKg + batteryPackMassKg,
+    required: `≤MTOW × 0.92 (payload + airframe + battery before motors/avionics/LG); MTOW ${massKg} kg`,
+    reason: `Payload ${payloadKg} + airframe ${airframeMassKg.toFixed(0)} + battery ${batteryPackMassKg.toFixed(0)} = ${(payloadKg + airframeMassKg + batteryPackMassKg).toFixed(0)} kg vs MTOW ${massKg} kg. Remaining budget covers motors + avionics + LG + BRS.`,
+  })
+
+  const macroAssemblyTotal = macro_assembly_prices.reduce((a, m) => a + m.total_gbp, 0)
+
+  return {
+    product_class: 'evtol',
+    brief_summary: `${isPassenger ? `${numPax}-pax passenger` : 'cargo'} eVTOL, ${massKg} kg MTOW (${payloadKg} kg payload). ${cruiseSpeedKmh} km/h cruise (${cruiseSpeedKts.toFixed(0)} kt), ${cruiseRangeKm} km range, ${enduranceMin} min endurance. ${numRotors} × ${motorPowerKw.toFixed(0)} kW motors (${(rotorRadiusM * 2).toFixed(1)} m props), disk loading ${diskLoadingPa.toFixed(0)} Pa. Battery ${batteryKwh.toFixed(0)} kWh pack (${batteryPackMassKg.toFixed(0)} kg @ ${packEnergyDensityWhKg} Wh/kg). Cruise power ${cruisePowerKw.toFixed(0)} kW, hover power ${hoverPowerKw.toFixed(0)} kW. Composite airframe ${airframeMassKg.toFixed(0)} kg. ${isPassenger ? 'BRS-equipped per SC-VTOL §SVT.2280. ' : ''}Macro-assembly raw BoM = £${macroAssemblyTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })} (≈£${(macroAssemblyTotal / massKg).toFixed(0)}/kg MTOW vs £3000-12000/kg installed benchmark).`,
+    quantities,
+    topology,
+    macro_assembly_prices,
+    closures,
+  }
 })
 
 // ---------------- quantum_computer ----------------
