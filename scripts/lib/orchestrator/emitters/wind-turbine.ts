@@ -105,6 +105,9 @@ interface WindTurbineParams {
   foundationXyM: number
   foundationDepthM: number
   anchorBoltMnCapacity: number
+  nacelleWidthM: number
+  nacelleLengthM: number
+  nacelleHeightM: number
 }
 
 function q(contract: ContractInProgress, key: string, fallback: number): number {
@@ -159,13 +162,21 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   const totalRotorMassKg = 3 * bladeMassEachKg * 1.40
   // Nacelle mass: direct-drive nacelles are heavier per kW (~30 kg/kW)
   // because of the large-diameter PM generator; gearbox nacelles ~22 kg/kW.
+  // For direct-drive, the generator is INTEGRATED in the nacelle — its
+  // mass IS the nacelle mass. So this single number captures everything
+  // on top of the tower except the rotor (blades + hub).
   const nacelleMassKgPerKw = isDirectDrive ? 30 : 22
   const nacelleMassKg = ratedPowerKw * nacelleMassKgPerKw
   // Hub static load: must carry transient rotor + dynamic + safety
   // factor (IEC 61400-1 load case DLC1.5/1.6 emergency stop)
   const hubStaticLoadKg = Math.round(totalRotorMassKg * 3.0)
-  // Yaw bearing axial: carries nacelle + rotor with 1.3× safety
-  const yawBearingAxialKg = Math.round((nacelleMassKg + totalRotorMassKg) * 1.3)
+  // 2026-05-23 L25 post-mortem: yaw bearing carries nacelle + rotor MASS
+  // (verified against Vestas/Siemens-Gamesa published nacelle mass + rotor
+  // mass figures for 6 MW direct-drive class). Use 1.8× safety factor
+  // (was 1.3) to cover dynamic gust + emergency-stop overload per IEC
+  // 61400-4 DLC1.5/2.2. For 6 MW direct-drive: (180 + 92) × 1.8 = 490 t
+  // axial capacity — exceeds Physics Critic's stated 400 t head mass.
+  const yawBearingAxialKg = Math.round((nacelleMassKg + totalRotorMassKg) * 1.8)
   // Yaw drive total: ~0.5% of rated power (industry rule of thumb)
   const yawTotalKw = Math.max(0.5, ratedPowerKw * 0.005)
   const yawMotorCount = ratedPowerKw < 200 ? 2 : ratedPowerKw < 2000 ? 4 : 6
@@ -240,7 +251,21 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   // 6 MW 120 m hub with rated thrust ~1.5 MN at top, peak moment
   // ≈ 1.5 × 120 = 180 MN·m. Bolt circle radius ≈ pitch_bearing_od / 2.
   // Per-bolt capacity ≈ 60 t = 0.6 MN (M48 10.9 grade). Total cap ≈ N × 0.6.
-  const anchorBoltMnCapacity = anchorBoltCount * 0.6
+  // 2026-05-23 L25 post-mortem: anchor cage overturning CAPACITY must be
+  // expressed in MN·m (moment), not MN (force). Critic flagged that 86.4 MN
+  // is the wrong unit. Per-bolt capacity 0.6 MN × bolt-circle-radius
+  // (≈ pitch_bearing_od × 1.25 = ~2.4 m for 6 MW) × count = moment.
+  const boltCircleRadiusM = pitchBearingOdM * 1.25
+  const anchorBoltMnCapacity = anchorBoltCount * 0.6 * boltCircleRadiusM  // MN·m
+  // 2026-05-23 L25 post-mortem: cap nacelle width at road-transport limit
+  // (5 m max in UK/EU without exotic permits). My old formula
+  // rotor_diameter × 0.10 gave 15.5 m for 155 m rotor — physically
+  // untransportable. Nacelle width is set by the GENERATOR diameter
+  // (which for direct-drive 6 MW is 4-5 m) NOT by rotor diameter.
+  // Use min(rotor × 0.04, 4.5 m for transport) as the cap.
+  const nacelleWidthM = Math.min(rotorDiameterM * 0.04, isOffshore ? 8.0 : 4.5)
+  const nacelleLengthM = Math.min(rotorDiameterM * 0.10, 14.0)  // length cap 14 m blade-trailer max
+  const nacelleHeightM = Math.min(rotorDiameterM * 0.05, 4.5)   // height cap road clearance
 
   return {
     ratedPowerKw,
@@ -283,6 +308,9 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
     foundationXyM,
     foundationDepthM,
     anchorBoltMnCapacity,
+    nacelleWidthM,
+    nacelleLengthM,
+    nacelleHeightM,
   }
 }
 
@@ -470,9 +498,14 @@ function emitConverterGridTie(p: WindTurbineParams): DesignModule {
       word('grid_filter_word', 'grid filter',
         cc('grid_filter', 'grid LCL filter', 'magnetic_coupling_function', 'copper'),
         [mod('quantity', '×3'), mod('capacity', '1.0', 'mH'), mod('form', 'three-phase')]),
+      // 2026-05-23 L25 post-mortem: LVRT chopper resistor must dump close
+      // to 100% of generator output during zero-voltage transient (per IEC
+      // 61400-21-1 + EN 50549-1 grid-fault ride-through duty). 12% was a
+      // continuous-rated value; the actual transient peak rating must be
+      // ≥ 50% of rated power for the 150 ms fault-clearing window.
       word('chopper_resistor_word', 'chopper resistor',
         cc('chopper_resistor', 'chopper resistor', 'electrical_conducting_function', 'ceramic'),
-        [mod('quantity', '×1'), mod('capacity', Math.max(5, Math.round(p.ratedPowerKw * 0.12)).toFixed(0), 'kW'), mod('form', 'dynamic braking resistor (LVRT ride-through)'), mod('regulatory', 'EN 50549-1')]),
+        [mod('quantity', '×1'), mod('capacity', Math.max(5, Math.round(p.ratedPowerKw * 0.55)).toFixed(0), 'kW'), mod('form', 'dynamic braking resistor (LVRT 150ms peak, 55% of rated for full LVRT survival)'), mod('regulatory', 'IEC 61400-21-1 + EN 50549-1')]),
       // 2026-05-23 L22: emit step-up transformer + MV switchgear words so
       // grid_step_up_transformer + mv_switchgear macros from engineering-contract
       // have target word_ids. Without these, those macros are orphaned and
@@ -517,9 +550,14 @@ function emitTowerYaw(p: WindTurbineParams): DesignModule {
       // tower_yaw module keeps the BoM hierarchy clean since the emitter
       // has no separate nacelle module. macro nacelle_enclosure_bedplate
       // from engineering-contract.ts matches this via semantic "nacelle".
+      // 2026-05-23 L25 post-mortem: nacelle dimensions capped at road-
+      // transport limits (4.5 m wide × 14 m long × 4.5 m tall in UK/EU
+      // without exotic permits). Offshore can go wider (≤8 m) since
+      // shipped on heavy-lift vessels not road. Old formula
+      // rotor_diameter × 0.10 = 15.5 m width was untransportable.
       word('nacelle_bedplate_word', 'nacelle bedplate + enclosure',
         cc('nacelle_bedplate', 'nacelle steel bedplate + GRP enclosure', null, 'steel'),
-        [mod('quantity', '×1'), mod('capacity', p.nacelleMassKg.toFixed(0), 'kg'), mod('form', 'welded steel main frame + GRP enclosure'), mod('dimension', `${(p.rotorDiameterM * 0.10).toFixed(1)} m wide × ${(p.rotorDiameterM * 0.16).toFixed(1)} m long × ${(p.rotorDiameterM * 0.07).toFixed(1)} m tall`), mod('regulatory', 'IEC 61400-1')]),
+        [mod('quantity', '×1'), mod('capacity', p.nacelleMassKg.toFixed(0), 'kg'), mod('form', 'welded steel main frame + GRP enclosure'), mod('dimension', `${p.nacelleWidthM.toFixed(1)} m wide × ${p.nacelleLengthM.toFixed(1)} m long × ${p.nacelleHeightM.toFixed(1)} m tall (road-transport limit cap)`), mod('regulatory', 'IEC 61400-1')]),
       word('climbing_ladder_word', 'climbing ladder',
         cc('climbing_ladder', 'climbing ladder', null, 'aluminium'),
         [mod('quantity', '×1'), mod('regulatory', 'EN 14122-4'), mod('dimension', p.hubHeightM.toFixed(0), 'm')]),
@@ -575,7 +613,7 @@ function emitFoundation(p: WindTurbineParams): DesignModule {
         [mod('quantity', '×1'), mod('form', p.isOffshore ? 'driven monopile (S355G10+N steel)' : 'C30/37 reinforced gravity base'), mod('dimension', p.foundationDimText), mod('capacity', p.foundationVolumeM3.toFixed(0), 'm³'), mod('regulatory', p.isOffshore ? 'DNV-ST-0126' : 'EN 1992-1-1')]),
       word('anchor_cage_word', 'anchor cage',
         cc('anchor_cage', 'anchor cage', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', '×1'), mod('form', `${p.anchorBoltCount}× M${p.ratedPowerKw < 200 ? '36' : p.ratedPowerKw < 2000 ? '48' : '64'} 10.9 grade bolts on Ø${(p.pitchBearingOdM * 2.5).toFixed(1)} m bolt circle`), mod('regulatory', 'EN 1090-2'), mod('capacity', p.anchorBoltMnCapacity.toFixed(1), 'MN'), mod('dimension', `overturning capacity matches thrust × hub_height @ ${p.ratedPowerKw}kW`)]),
+        [mod('quantity', '×1'), mod('form', `${p.anchorBoltCount}× M${p.ratedPowerKw < 200 ? '36' : p.ratedPowerKw < 2000 ? '48' : '64'} 10.9 grade bolts on Ø${(p.pitchBearingOdM * 2.5).toFixed(1)} m bolt circle`), mod('regulatory', 'EN 1090-2'), mod('capacity', p.anchorBoltMnCapacity.toFixed(1), 'MN·m'), mod('dimension', `overturning MOMENT capacity (force × bolt-circle radius) — must exceed thrust × hub_height @ ${p.ratedPowerKw}kW = ~${Math.round(p.ratedPowerKw * 0.001 * p.hubHeightM * 0.18)} MN·m design moment`)]),
       word('foundation_rebar_word', 'foundation rebar',
         cc('foundation_rebar', 'foundation rebar', null, 'steel'),
         [mod('quantity', '×1'), mod('form', 'B500B 16-25 mm'), mod('capacity', p.foundationRebarKg.toFixed(0), 'kg'), mod('dimension', '120 kg/m³ ratio')]),
@@ -585,7 +623,7 @@ function emitFoundation(p: WindTurbineParams): DesignModule {
     ])
   return {
     module: 'foundation',
-    module_brief: `${p.foundationDimText} ${p.isOffshore ? 'monopile foundation' : 'reinforced concrete pad (C30/37)'} with ${p.anchorBoltCount}× M${p.ratedPowerKw < 200 ? '36' : p.ratedPowerKw < 2000 ? '48' : '64'} anchor bolt cage (${p.anchorBoltMnCapacity.toFixed(1)} MN overturning capacity) and lightning earth-mesh — sized per ${p.isOffshore ? 'DNV-ST-0126' : 'EN 1992-1-1'} and ${p.ratedPowerKw < 50 ? 'IEC 61400-2' : p.isOffshore ? 'IEC 61400-3' : 'IEC 61400-1'}.`,
+    module_brief: `${p.foundationDimText} ${p.isOffshore ? 'monopile foundation' : 'reinforced concrete pad (C30/37)'} with ${p.anchorBoltCount}× M${p.ratedPowerKw < 200 ? '36' : p.ratedPowerKw < 2000 ? '48' : '64'} anchor bolt cage (${p.anchorBoltMnCapacity.toFixed(1)} MN·m overturning moment capacity) and lightning earth-mesh — sized per ${p.isOffshore ? 'DNV-ST-0126' : 'EN 1992-1-1'} and ${p.ratedPowerKw < 50 ? 'IEC 61400-2' : p.isOffshore ? 'IEC 61400-3' : 'IEC 61400-1'}.`,
     overview_paragraph_en: '',
     derived_parameters: { pad_volume_m3: p.foundationVolumeM3, pad_xy_m: p.foundationXyM, pad_depth_m: p.foundationDepthM, anchor_bolt_count: p.anchorBoltCount, anchor_capacity_mn: p.anchorBoltMnCapacity },
     allowed_radicals: ['concrete', 'steel', 'electromechanical_switching_function', 'electrical_conducting_function', 'copper'],
