@@ -270,31 +270,93 @@ async function audit(): Promise<AuditReport> {
   }
 
   // ── V-1 visual PDF text-overlap check via pdftotext ──
+  // 2026-05-23: refined to filter known table patterns. Previous version
+  // flagged 136 false-positives on wind L13 — all legitimate BoM/compliance
+  // rows. The real wrap={false} overlap bug surfaces as REPEATED tokens on
+  // a single Y position (two text blocks stacked → same word visible twice)
+  // OR mixed prose + table on the same line. Strict filter list below.
   const pdfPath = join(outDir, 'chain-v2.pdf')
   if (existsSync(pdfPath)) {
     try {
       const txt = execFileSync('pdftotext', ['-layout', pdfPath, '-'], { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }).toString()
       const lines = txt.split('\n')
+
+      // Known table-row patterns that flatten to 4+ fragments under pdftotext -layout.
+      // Adding a table here when a new table type appears is cheaper than blacklisting
+      // individual columns. Each pattern MUST be specific to a header or unambiguous
+      // data-row signature.
+      const KNOWN_TABLE_PATTERNS: Array<{ name: string; test: (s: string) => boolean }> = [
+        { name: 'bom_header',         test: s => /PART NUMBER|MANUFAC-|LINE \(£\)|UNIT \(£\)/i.test(s) },
+        { name: 'bom_data',           test: s => /×\d+\s+~?£|Est\.\s+(OK|<\.5x|>2x|-)\s*$|\sgrade_[a-d]\s/i.test(s) },
+        { name: 'compliance_header',  test: s => /\bCODE\b.*\bSTANDARD\b.*\b(JURIS|STATUS)\b/i.test(s) },
+        { name: 'compliance_data',    test: s => /\b(IEC|ISO|EN|DNV|ANSI|ASTM|UL|IEEE)\s+[0-9-]+:\d{4}/i.test(s) && /(Mandatory|Recommended|industry|optional)/i.test(s) },
+        { name: 'fmea_header',        test: s => /SEVERITY.*LIKELIHOOD|RISK PRIORITY/i.test(s) },
+        { name: 'pending_parts_card', test: s => /LOW CONFIDENCE|UNCERTAIN|Plausible but Unverified/i.test(s) },
+        { name: 'tools_used',         test: s => /reference_paper|underlying_math|results_interpretation/i.test(s) },
+      ]
+      const matchesKnownTable = (line: string): string | null => {
+        for (const p of KNOWN_TABLE_PATTERNS) if (p.test(line)) return p.name
+        return null
+      }
+
+      // Real overlap signal: 4+ disparate fragments AND either (a) a token
+      // appears 2+ times on the same line (indicates two text blocks landed
+      // at the same Y with overlapping content) OR (b) the line mixes
+      // lowercase prose words with all-caps table headers.
+      const hasRepeatedToken = (line: string): boolean => {
+        const tokens = line.trim().split(/\s+/).filter(t => t.length >= 4 && /^[A-Za-z]+$/.test(t))
+        const seen = new Map<string, number>()
+        for (const t of tokens) seen.set(t.toLowerCase(), (seen.get(t.toLowerCase()) ?? 0) + 1)
+        for (const [tok, n] of seen) {
+          // Words like 'and' 'the' 'for' under length-4 filter, so any repeat is suspect
+          if (n >= 2) return true
+        }
+        return false
+      }
+      const hasMixedProseAndCaps = (line: string): boolean => {
+        const tokens = line.trim().split(/\s+/).filter(t => t.length >= 4)
+        if (tokens.length < 5) return false
+        const allCaps = tokens.filter(t => /^[A-Z]+$/.test(t)).length
+        const lower = tokens.filter(t => /^[a-z]/.test(t) && t.length > 4).length
+        return allCaps >= 2 && lower >= 3
+      }
+
       let overlapLines = 0
+      let tableLines = 0
       const overlapSamples: string[] = []
+      const tablesByType = new Map<string, number>()
       for (const line of lines) {
         const fragments = line.split(/\s{4,}/).filter(s => /[A-Za-z]{3,}/.test(s) && s.length > 3)
-        if (fragments.length >= 4) {
+        if (fragments.length < 4) continue
+        const tableName = matchesKnownTable(line)
+        if (tableName) {
+          tableLines++
+          tablesByType.set(tableName, (tablesByType.get(tableName) ?? 0) + 1)
+          continue
+        }
+        // Apply positive-overlap signal
+        if (hasRepeatedToken(line) || hasMixedProseAndCaps(line)) {
           overlapLines++
-          if (overlapSamples.length < 3) overlapSamples.push(line.slice(0, 200))
+          if (overlapSamples.length < 3) overlapSamples.push(line.trim().slice(0, 200))
         }
       }
       if (overlapLines > 5) {
         findings.push({
           severity: 'HIGH',
           check_id: 'V-1',
-          detail: `Detected ${overlapLines} lines with overlapping-text patterns (4+ word fragments at same Y). React-pdf wrap={false} blocks exceeding page-remaining height stack on existing content. First sample: "${overlapSamples[0]?.slice(0, 150)}". Fix area: scripts/render-minimal-pdf.tsx sub-module render block.`,
+          detail: `Detected ${overlapLines} lines with TRUE overlap signal (repeated token or mixed prose+caps on same Y). Excluded ${tableLines} known-table rows. React-pdf wrap={false} blocks exceeding page-remaining height stack on existing content. First sample: "${overlapSamples[0]?.slice(0, 150)}". Fix area: scripts/render-minimal-pdf.tsx sub-module render block.`,
         })
       } else if (overlapLines > 0) {
         findings.push({
           severity: 'MED',
           check_id: 'V-1',
-          detail: `${overlapLines} suspect overlap line(s) (under HIGH threshold). May be table false positives. First: "${overlapSamples[0]?.slice(0, 120)}".`,
+          detail: `${overlapLines} suspect overlap line(s) (under HIGH threshold). Excluded ${tableLines} table rows. First: "${overlapSamples[0]?.slice(0, 120)}".`,
+        })
+      } else if (tableLines > 0) {
+        findings.push({
+          severity: 'LOW',
+          check_id: 'V-1',
+          detail: `No overlap detected. Skipped ${tableLines} table rows (BoM/compliance/FMEA/pending).`,
         })
       }
     } catch (err) {
