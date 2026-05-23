@@ -292,45 +292,82 @@ export async function runBriefParsing(
   console.log(`[brief-parse] Input: ${rawBriefText.length} chars`)
 
   const MODEL = 'google/gemini-3.1-pro-preview'
+  // 2026-05-23 (L31 wind chain blew up on Gemini empty response from this
+  // exact stage): add transient-error retry with exponential backoff. Same
+  // pattern as scripts/serial-design-chain-v2.tsx callLLM. Without this,
+  // ONE empty-response from Gemini fatals the entire chain.
   const t0 = Date.now()
-  try {
-    const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+  const MAX_RETRIES = 3
+  const BACKOFF_MS = [3_000, 9_000, 27_000]
+  let raw = ''
+  let json: any = null
+  let lastErr: Error | null = null
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
+          max_tokens: 150_000,
+          temperature: 0.1,
+          messages: [
+            { role: 'system', content: BRIEF_PARSING_SYSTEM_PROMPT },
+            { role: 'user', content: rawBriefText },
+          ],
+        }),
+      }, 120000)
+      if (!response.ok) {
+        const status = response.status
+        // 4xx are structural (bad request, model not found) — don't retry.
+        if (status >= 400 && status < 500) {
+          logger.logLlm({ step_name: 'brief_parsing', model: MODEL, latency_ms: Date.now() - t0, ok: false, error: `OpenRouter ${status} (structural — no retry)` })
+          throw new Error(`OpenRouter API ${status}: ${await response.text()}`)
+        }
+        // 5xx are transient — retry
+        throw new Error(`OpenRouter API ${status} transient`)
+      }
+      json = await response.json()
+      raw = json.choices?.[0]?.message?.content || ''
+      if (!raw) {
+        // Empty content — treat as transient
+        throw new Error('Empty response from LLM (transient)')
+      }
+      // Success — log and proceed
+      logger.logLlm({
+        step_name: 'brief_parsing',
         model: MODEL,
-        // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
-        max_tokens: 150_000,
-        temperature: 0.1,
-        messages: [
-          { role: 'system', content: BRIEF_PARSING_SYSTEM_PROMPT },
-          { role: 'user', content: rawBriefText },
-        ],
-      }),
-    }, 120000)
-
-    if (!response.ok) {
-      logger.logLlm({ step_name: 'brief_parsing', model: MODEL, latency_ms: Date.now() - t0, ok: false, error: `OpenRouter ${response.status}` })
-      throw new Error(`OpenRouter API ${response.status}: ${await response.text()}`)
+        prompt_tokens: json?.usage?.prompt_tokens,
+        completion_tokens: json?.usage?.completion_tokens,
+        latency_ms: Date.now() - t0,
+        finish_reason: json?.choices?.[0]?.finish_reason,
+        ok: true,
+        attempt,
+      })
+      break
+    } catch (err) {
+      lastErr = err as Error
+      const msg = (err as Error).message
+      // Don't retry structural errors (4xx)
+      if (/4\d{2}/.test(msg) && !/transient/.test(msg)) throw err
+      if (attempt < MAX_RETRIES) {
+        console.error(`[brief-parse] attempt ${attempt} failed: ${msg.slice(0, 100)} — retrying in ${BACKOFF_MS[attempt - 1] / 1000}s`)
+        await new Promise(r => setTimeout(r, BACKOFF_MS[attempt - 1]))
+        continue
+      }
+      logger.logLlm({ step_name: 'brief_parsing', model: MODEL, latency_ms: Date.now() - t0, ok: false, error: msg.slice(0, 200), final_attempt: attempt })
+      throw err
     }
-
-    const json = await response.json()
-    logger.logLlm({
-      step_name: 'brief_parsing',
-      model: MODEL,
-      prompt_tokens: json?.usage?.prompt_tokens,
-      completion_tokens: json?.usage?.completion_tokens,
-      latency_ms: Date.now() - t0,
-      finish_reason: json?.choices?.[0]?.finish_reason,
-      ok: true,
-    })
-    const raw = json.choices?.[0]?.message?.content || ''
-
+  }
+  // POST-RETRY: we have `raw` (the response content) populated on success.
+  try {
     if (!raw) {
-      throw new Error('Empty response from LLM')
+      // Should not be possible — retry loop above breaks only on success
+      throw lastErr ?? new Error('Brief parser retry loop exited without raw content')
     }
 
     // Strip markdown fences if model ignores the instruction
