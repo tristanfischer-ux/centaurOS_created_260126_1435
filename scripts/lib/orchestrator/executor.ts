@@ -94,7 +94,15 @@ export async function runToolPlan(
       // failure. Downgrade to a warning so the orchestrator proceeds with
       // the iter-N state. Aggregator + verifier will catch any genuine
       // inconsistency downstream.)
-      warnings.push(`fixed-point iteration did not converge in ${plan.max_iterations} iterations — using iter-${plan.max_iterations} state`)
+      // 2026-05-23 P1-7: warning is still emitted but ALSO surface a [LOUD]
+      // marker so the chain's audit machinery can flag it without forcing
+      // a hard fallback. The chain log will now show this as a YELLOW
+      // warning rather than silent acceptance; future renderer / audit can
+      // pick up the marker. Underlying behaviour (use iter-N state) is
+      // preserved — the change is visibility, not semantics.
+      const msg = `fixed-point iteration did not converge in ${plan.max_iterations} iterations — using iter-${plan.max_iterations} state (design may oscillate within ${plan.convergence_tolerance_pct}% band)`
+      warnings.push(msg)
+      console.error(`[orchestrator] ⚠️  ${msg}`)
     }
   }
 

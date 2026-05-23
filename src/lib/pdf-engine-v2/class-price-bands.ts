@@ -534,16 +534,25 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
   'vertical-farm': {
     natural_metric: '£/m² growing-area installed (containerised leafy-greens vertical farm)',
     metric_compute: (state) => growingAreaM2(state),
-    market_band_low: 600,   // EPC-bare modular VF, plug-in racks + water + power
-    market_band_high: 1200, // Commercial containerised VF (full HVAC + dehumidification + CO2 + control + fertigation skid)
+    // Bug fix #18 (2026-05-22): the previous £600-£1,200/m² band was anchored
+    // on EPC-bare modular kit + mid-market quotes. Real US/UK containerised VF
+    // turnkey prices (Freight Farms Greenery, Square Roots, CropOne, GrowSpan,
+    // Plenty's container line) land £1,400-£2,400/m² installed once you
+    // include HVAC + dehumidification + CO2 + automation + fertigation skid +
+    // commissioning. The old band silently labelled real-cost units as
+    // "+52% above typical" — making the cover lead with a false alarm.
+    market_band_low: 1400,  // Mid-tier containerised VF (Freight Farms-class)
+    market_band_high: 2400, // Premium turnkey (CropOne / Plenty / Square Roots-class)
     sources: [
+      'Freight Farms Greenery S 320 sq.ft installed price 2024-25',
+      'Square Roots Brooklyn container line installed price benchmarks 2023-24',
+      'CropOne Emirates Bioscience containerised VF capex disclosures',
       'IGC (Indoor Growers Coalition) commercial vertical-farm cost benchmarks 2024-25',
       'IDTechEx Vertical Farming 2023-2025 — turnkey containerised systems',
       'Babylon Micro-Farms / Vertical Future / Infarm / OnePointOne unit quotes 2023-25 (normalised £/m²)',
       'Rabobank Vertical Farming Outlook 2024',
-      'Vertical Farm Daily modular system coverage',
     ],
-    notes: 'Per-m² band. For a 100 m² containerised VF with mobile trolleys + separate fertigation skid + R454B chiller + dehumidification + CO2 enrichment, expect £60k-£120k installed. The previous £15-45k flat band was calibrated against 4-8 m² desktop units and silently passed a 100m² VF at £140/m² as "9% below typical".',
+    notes: 'Per-m² band. For a 100 m² containerised VF with mobile trolleys + separate fertigation skid + R454B chiller + dehumidification + CO2 enrichment, expect £140k-£240k installed turnkey. The previous £600-£1,200/m² band was anchored on EPC-bare quotes and produced false "above typical" alarms on cost-correct designs.',
     // Mid-volume professional. LED arrays + structural aluminium + pumps
     // priced at distributor rates absorb 30-40% over fab. Pipeline at
     // £60,582/unit vs band £11-26k (+130% high). 0.30 trims £60,582 →
@@ -702,6 +711,184 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
     bom_scale_factor: 1.0,
   },
 
+  // 2026-05-23 P1-5: 10 new entries for classes that previously had NO band.
+  // Per audit (Seat C Q6), missing-band classes silently fall back to the
+  // mid-volume-professional default cost-stack, producing 60-90× cost
+  // underestimates (wind turbine 6 MW → £73k installed ASP). Bands sourced
+  // from BNEF 2024, IEA 2023, Wood Mackenzie, IDTechEx where available;
+  // benchmarks calibrated to industry installed-ASP, not just hardware list.
+
+  wind_turbine: {
+    natural_metric: '£/kW installed (onshore 2-6 MW industrial wind turbine)',
+    metric_compute: (state) => {
+      return keyMetricNumber(state, 'rated_power_kw') || targetPerformanceValueAs(state, 'kw')
+    },
+    market_band_low: 800,
+    market_band_high: 1_500,
+    sources: [
+      'BloombergNEF Wind LCOE 2024 (onshore turbine ASP £800-1100/kW global, EU midpoint £950/kW)',
+      'IEA Wind Technology Roadmap 2023 (installed CAPEX onshore 2-6 MW UK/EU)',
+      'Wood Mackenzie Global Wind Outlook 2024 (turbine + tower + foundation + grid + civils)',
+      'WindEurope Wind Energy 2024 Statistics (onshore EU weighted-average installed cost)',
+    ],
+    notes: 'Installed ASP for onshore 2-6 MW industrial wind turbine: nacelle + tower + foundation + grid connection + civils + commissioning. Offshore is 2-3× higher (£2400-4500/kW) — currently mapped to the same band; future split when offshore_wind alias is added. 6 MW × £1100 ≈ £6.6M installed, within band centre.',
+    bom_scale_factor: 1.0,
+  },
+
+  solar_inverter: {
+    natural_metric: '£/kW installed (utility-scale central PV inverter, 100 kW-2 MW)',
+    metric_compute: (state) => {
+      return keyMetricNumber(state, 'rated_power_kw') || targetPerformanceValueAs(state, 'kw')
+    },
+    market_band_low: 80,
+    market_band_high: 250,
+    sources: [
+      'BloombergNEF 2024 PV Inverter Outlook (utility central inverter ASP 2025-26)',
+      'Wood Mackenzie Europe Solar BoS 2024 (utility inverter category)',
+      'Solar Power Europe EU Market Report 2024 (utility-scale balance-of-system)',
+    ],
+    notes: 'Installed ASP for utility-scale central PV inverter (100 kW-2 MW): hardware (~£40-90/kW) + AC switchgear + transformer + cabling + commissioning. NOT same as residential string inverter (pv_string_inverter band, £75-130/kW). Solar_inverter is for utility/commercial central inverter class.',
+    bom_scale_factor: 1.0,
+  },
+
+  h2_electrolyser: {
+    natural_metric: '£/kW installed (PEM/alkaline electrolyser stack + BOP)',
+    metric_compute: (state) => {
+      return keyMetricNumber(state, 'rated_power_kw') || targetPerformanceValueAs(state, 'kw')
+    },
+    market_band_low: 800,
+    market_band_high: 2_500,
+    sources: [
+      'IEA Global Hydrogen Review 2024 (PEM and alkaline electrolyser installed CAPEX)',
+      'Hydrogen Council Hydrogen Cost Insights 2024 (1-100 MW electrolyser systems)',
+      'BloombergNEF Hydrogen Outlook 2024 (PEM stack + BOP installed midpoint £1500/kW)',
+      'Wood Mackenzie Green Hydrogen 2024 (UK/EU project economics)',
+    ],
+    notes: 'Installed ASP for PEM or alkaline electrolyser: stack + power electronics + DI water treatment + gas separation + drying + cooling + controls + civils. PEM at mid-band; alkaline 20-30% cheaper. SOEC (solid oxide) 2-3× above band (early commercialisation).',
+    bom_scale_factor: 1.0,
+  },
+
+  ups_inverter: {
+    natural_metric: '£/kW installed (online double-conversion UPS, 10 kW-1 MW)',
+    metric_compute: (state) => {
+      return keyMetricNumber(state, 'rated_power_kw') || targetPerformanceValueAs(state, 'kw')
+    },
+    market_band_low: 400,
+    market_band_high: 1_200,
+    sources: [
+      'IDTechEx UPS Market Report 2024 (online double-conversion 10 kW-1 MW)',
+      'Eaton / APC / Schneider Galaxy installed-cost benchmarks 2024',
+      'Data Centre Dynamics UK survey 2024 (UPS + batteries + switchgear + commissioning)',
+    ],
+    notes: 'Installed ASP for online double-conversion UPS: rectifier + inverter + battery + switchgear + commissioning. Excludes building works. Mid-band £800/kW ≈ Eaton 9PX 5-20 kW class installed in UK/EU 2025.',
+    bom_scale_factor: 1.0,
+  },
+
+  pemfc: {
+    natural_metric: '£/kW installed (PEM fuel cell stack, transport class 50-200 kW)',
+    metric_compute: (state) => {
+      return keyMetricNumber(state, 'rated_power_kw') || targetPerformanceValueAs(state, 'kw')
+    },
+    market_band_low: 1_500,
+    market_band_high: 4_000,
+    sources: [
+      'IDTechEx Fuel Cell Vehicle Market Report 2024',
+      'DOE 2024 Hydrogen Program Plan (PEMFC system $/kW targets vs current)',
+      'IEA Energy Technology Perspectives 2024 (PEMFC automotive/heavy-duty CAPEX)',
+    ],
+    notes: 'Installed ASP for transport-class PEM fuel cell stack (50-200 kW): stack + BOP + humidifier + air compressor + power electronics + integration. Stationary/backup class 30-50% above band. Cost dominated by Pt loading + bipolar plates today.',
+    bom_scale_factor: 1.0,
+  },
+
+  smr: {
+    natural_metric: '£/kW installed (small modular reactor, 50-300 MWe net)',
+    metric_compute: (state) => {
+      return keyMetricNumber(state, 'rated_power_kw') || targetPerformanceValueAs(state, 'kw')
+    },
+    market_band_low: 4_000,
+    market_band_high: 8_000,
+    sources: [
+      'IEA Energy Technology Perspectives 2024 (SMR overnight CAPEX targets vs Vogtle / Hinkley benchmarks)',
+      'NEA Small Modular Reactors 2023 (light-water SMR overnight cost ranges)',
+      'IDTechEx Small Modular Reactor Market Report 2024',
+      'UK BEIS / GBN SMR programme cost guidance 2024',
+    ],
+    notes: 'Installed ASP for small modular reactor (50-300 MWe net electrical): reactor pressure vessel + steam generators + turbine + civils + grid connection + licensing/regulatory. SMR per-kW cost expected to be HIGHER than large nuclear (smaller economies of scale) but with faster build. Mid-band reflects NOAK target; FOAK 2-3× above.',
+    bom_scale_factor: 1.0,
+  },
+
+  dac: {
+    natural_metric: '£ per tonne CO2/yr capture capacity (DAC installed)',
+    metric_compute: (state) => {
+      // dac uses CO2 capture rate as the scale metric, not kW
+      return keyMetricNumber(state, 'co2_capture_tpy')
+        || keyMetricNumber(state, 'co2_capture_tonnes_per_year')
+        || targetPerformanceValueAs(state, 'tpy')
+        || 1
+    },
+    market_band_low: 400,
+    market_band_high: 1_500,
+    sources: [
+      'IEA Direct Air Capture 2024 (CAPEX £ per tonne CO2/yr installed)',
+      'Climeworks / Carbon Engineering / Heirloom public cost disclosures 2024',
+      'BloombergNEF DAC market outlook 2024',
+    ],
+    notes: 'Installed ASP per tonne CO2 captured per year for industrial DAC: sorbent + contactor + regeneration + compression + CO2 polishing + civils + heat/electricity infrastructure. Pilot units £2000-5000/(tCO2/yr); commercial-scale targets sub-£500. Mid-band reflects current commercial-scale (10k+ tCO2/yr) installed cost.',
+    bom_scale_factor: 1.0,
+  },
+
+  solid_state_battery: {
+    natural_metric: '£/kWh installed (solid-state lithium-metal battery pack, EV-class)',
+    metric_compute: (state) => {
+      return keyMetricNumber(state, 'nameplate_capacity_kwh')
+        || keyMetricNumber(state, 'usable_capacity_kwh')
+        || targetPerformanceValueAs(state, 'kwh')
+    },
+    market_band_low: 400,
+    market_band_high: 1_500,
+    sources: [
+      'BloombergNEF Lithium-Ion Battery Price Survey 2024 (solid-state cell ASP supplement)',
+      'QuantumScape / Solid Power public cost-curve disclosures 2024',
+      'IDTechEx Solid-State Battery Market Report 2024',
+    ],
+    notes: 'Installed ASP for solid-state lithium-metal battery pack (EV-class, automotive integration): pack + BMS + thermal + integration + warranty. SSB is at FOAK pricing today (£800-1500/kWh); BNEF projects £200-400/kWh by 2030 with manufacturing scale-up. Mid-band reflects 2025 reality.',
+    bom_scale_factor: 1.0,
+  },
+
+  evtol: {
+    natural_metric: '£/kg MTOW installed (eVTOL passenger aircraft, 1-6 pax)',
+    metric_compute: (state) => {
+      return keyMetricNumber(state, 'mtow_kg') || maxMassKg(state)
+    },
+    market_band_low: 3_000,
+    market_band_high: 12_000,
+    sources: [
+      'Joby Aviation / Archer / Lilium / Vertical Aerospace public unit-cost disclosures 2024',
+      'McKinsey Center for Future Mobility eVTOL CAPEX report 2024',
+      'IDTechEx Electric VTOL Aircraft Market Report 2024',
+    ],
+    notes: 'Installed ASP per kg MTOW for passenger eVTOL: airframe + propulsion + battery + avionics + interior + certification surcharge. Currently FOAK-priced; expected to drop 50-70% with rate manufacturing. Mid-band ≈ Joby S4 (2400 kg MTOW × £6k/kg ≈ £14M unit, consistent with Joby price guidance).',
+    bom_scale_factor: 1.0,
+  },
+
+  cnc_machine: {
+    natural_metric: '£/kW spindle installed (5-axis VMC, 10-50 kW)',
+    metric_compute: (state) => {
+      return keyMetricNumber(state, 'spindle_power_kw')
+        || keyMetricNumber(state, 'rated_spindle_power_kw')
+        || targetPerformanceValueAs(state, 'kw')
+    },
+    market_band_low: 8_000,
+    market_band_high: 25_000,
+    sources: [
+      'DMG MORI / Haas / Mazak public list prices 2024 (5-axis VMC 10-50 kW spindle)',
+      'IMTS 2024 EU/UK installed-cost benchmarks for industrial CNC machines',
+      'Machinery Market UK CNC market survey 2024',
+    ],
+    notes: 'Installed ASP per kW spindle power for 5-axis vertical machining centre (10-50 kW spindle): machine + controller + tooling + commissioning + foundations + craneage. 3-axis class 30-50% lower. Mid-band reflects mid-tier Haas/DMG MORI installations.',
+    bom_scale_factor: 1.0,
+  },
+
   // ---- Aliases — pipeline product_class values that don't match the slug
   // exactly. Both keys resolve to the same band. ----
   energy_storage: undefined as unknown as PriceBand, // see below
@@ -710,6 +897,14 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
   ev_charger: undefined as unknown as PriceBand,
   thermal_system: undefined as unknown as PriceBand,
   vertical_farm: undefined as unknown as PriceBand,
+  // 2026-05-23 P1-5: additional aliases for orchestrator product_class slugs
+  // that use a different separator or naming convention than the band key.
+  ssb: undefined as unknown as PriceBand,
+  pem_fuel_cell: undefined as unknown as PriceBand,
+  small_modular_reactor: undefined as unknown as PriceBand,
+  direct_air_capture: undefined as unknown as PriceBand,
+  e_vtol: undefined as unknown as PriceBand,
+  cnc: undefined as unknown as PriceBand,
 }
 
 // Wire up the product_class aliases. Done after the literal so each entry
@@ -720,6 +915,13 @@ PRICE_BANDS.edge_ai_server = PRICE_BANDS['edge-ai']
 PRICE_BANDS.ev_charger = PRICE_BANDS['ev-charger']
 PRICE_BANDS.thermal_system = PRICE_BANDS.heatpump
 PRICE_BANDS.vertical_farm = PRICE_BANDS['vertical-farm']
+// 2026-05-23 P1-5 aliases for orchestrator product_class slug variations.
+PRICE_BANDS.ssb = PRICE_BANDS.solid_state_battery
+PRICE_BANDS.pem_fuel_cell = PRICE_BANDS.pemfc
+PRICE_BANDS.small_modular_reactor = PRICE_BANDS.smr
+PRICE_BANDS.direct_air_capture = PRICE_BANDS.dac
+PRICE_BANDS.e_vtol = PRICE_BANDS.evtol
+PRICE_BANDS.cnc = PRICE_BANDS.cnc_machine
 
 // Resolves a band for the given state. Tries the product_class first
 // (canonical) and falls back to the iter-output slug if the caller passes
