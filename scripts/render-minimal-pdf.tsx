@@ -896,22 +896,49 @@ function computeBomTotals(state: any): BomTotals | null {
             if (ccid) candidates.push(ccid)
           }
 
+          // 2026-05-23 (post wind L20 BoM audit): the previous 66%
+          // token-match rule failed for macros laden with QUALIFIER
+          // tokens like "onshore_gravity_foundation" (3 qualifiers
+          // + 1 noun) vs word_id "concrete_foundation_pad". Stripping
+          // qualifier tokens BEFORE the match lets the semantic-noun
+          // tokens (the only ones a word_id would carry) score on equal
+          // ground. This added £900k foundation, £2.1M drivetrain,
+          // £950k hub, £1.5M nacelle, £330k converter, £108k transformer,
+          // £35k switchgear back into the BoM table line items, vs the
+          // previous "orphaned" path where they got added silently to
+          // the grand total but were invisible per-module.
+          const QUALIFIER_TOKENS = new Set([
+            'assembly', 'drivetrain', 'full', 'scale', 'panel', 'kit',
+            'pack', 'system', 'unit', 'module', 'bedplate', 'enclosure',
+            'onshore', 'offshore', 'gravity', 'large', 'small', 'medium',
+            'primary', 'secondary', 'main', 'rated', 'nominal', 'standard',
+            'sections', 'pmg', 'pmsg', 'reinforced', 'steel', 'iron',
+            'concrete', 'foundation_pad',  // last is special — handled below
+          ])
           let bestMatch: typeof macroPrices[number] | null = null
           let bestScore = 0
           for (const mp of macroPrices) {
             // Build #4b single-fire guard: skip macros already claimed
             // by a prior word in this BoM pass.
             if (claimedMacroAssemblies.has(mp.word_name)) continue
-            const tokens = mp.word_name.split('_').filter(t => t.length >= 3)
-            if (tokens.length === 0) continue
+            const allTokens = mp.word_name.split('_').filter(t => t.length >= 3)
+            // Semantic tokens = non-qualifier tokens (the nouns that
+            // word_ids actually carry).
+            const semanticTokens = allTokens.filter(t => !QUALIFIER_TOKENS.has(t))
+            const matchTokens = semanticTokens.length > 0 ? semanticTokens : allTokens
+            if (matchTokens.length === 0) continue
             for (const cand of candidates) {
               if (!cand) continue
               if (cand === mp.word_name) {
                 bestMatch = mp; bestScore = 1.0; break  // exact wins
               }
-              const matched = tokens.filter(t => cand.includes(t)).length
-              const score = matched / tokens.length
-              if (score >= 0.66 && score > bestScore) {
+              const matched = matchTokens.filter(t => cand.includes(t)).length
+              const score = matched / matchTokens.length
+              // Lowered threshold to 0.50 since semantic tokens are
+              // higher-signal — even matching 1 of 2 semantic tokens
+              // (e.g. "foundation" of ["foundation"] is a clean match
+              // for "concrete_foundation_pad").
+              if (score >= 0.50 && score > bestScore) {
                 bestMatch = mp; bestScore = score
               }
             }

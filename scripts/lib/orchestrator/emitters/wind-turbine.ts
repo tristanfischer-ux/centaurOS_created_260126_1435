@@ -293,15 +293,22 @@ function emitRotorBlades(p: WindTurbineParams): DesignModule {
       word('rotor_blade_word', 'rotor blade',
         cc('rotor_blade', 'rotor blade', 'aero_lift_function', 'composite_glass_epoxy'),
         [mod('quantity', fmtQty(p.bladeCount)), mod('dimension', `${(p.rotorDiameterM / 2).toFixed(1)} m length, ${p.bladeRootDiameterM.toFixed(2)} m root`), mod('form', 'twist-tapered, structural foam + glass + carbon-spar'), mod('capacity', p.bladeMassEachKg.toFixed(0), 'kg each'), mod('regulatory', 'IEC 61400-23')]),
-      // 2026-05-23 L18 post-fix: bolt count scales with FLANGE CIRCUMFERENCE
-      // at ~80 mm bolt pitch (industry minimum for M30+ bolts on root flange).
-      // Previous formula (×120 for utility) gave 360 bolts on 12.2 m
-      // circumference = impossible 33 mm pitch. Now: count = floor(π × D / 0.08).
-      // 100 kW: π × 0.4 / 0.08 = 16 → 16 bolts per blade.
-      // 6 MW: π × 3.88 / 0.08 = 152 → 152 bolts per blade (utility scale).
-      word('blade_root_bolt_word', 'blade root bolt',
-        cc('blade_root_bolt', 'blade root bolt', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', fmtQty(p.bladeCount * Math.max(16, Math.floor(Math.PI * p.bladeRootDiameterM / 0.08)))), mod('form', p.ratedPowerKw < 500 ? 'M30 10.9 grade' : p.ratedPowerKw < 2000 ? 'M36 10.9 grade' : 'M42 10.9 grade'), mod('dimension', `${(Math.PI * p.bladeRootDiameterM * 1000 / Math.max(16, Math.floor(Math.PI * p.bladeRootDiameterM / 0.08))).toFixed(0)} mm pitch on Ø${p.bladeRootDiameterM.toFixed(2)} m flange`)]),
+      // 2026-05-23 L20 post-fix: emit per-blade bolt count (×N per blade),
+      // not the misleading "total bolts" that reads as if all bolts are on
+      // one flange. Physics Critic correctly flagged 456 bolts on 12.19 m
+      // circumference as too dense — it was actually 152 per blade × 3 blades.
+      // Now display: ×152 per blade × 3 blades = 456 total / 80 mm pitch.
+      (() => {
+        const boltsPerBlade = Math.max(16, Math.floor(Math.PI * p.bladeRootDiameterM / 0.08))
+        const boltPitchMm = Math.round(Math.PI * p.bladeRootDiameterM * 1000 / boltsPerBlade)
+        return word('blade_root_bolt_word', 'blade root bolt',
+          cc('blade_root_bolt', 'blade root bolt', 'electromechanical_switching_function', 'steel'),
+          [
+            mod('quantity', `×${boltsPerBlade} per blade (×${boltsPerBlade * p.bladeCount} total)`),
+            mod('form', p.ratedPowerKw < 500 ? 'M30 10.9 grade' : p.ratedPowerKw < 2000 ? 'M36 10.9 grade' : 'M42 10.9 grade'),
+            mod('dimension', `${boltPitchMm} mm pitch on Ø${p.bladeRootDiameterM.toFixed(2)} m flange`),
+          ])
+      })(),
       word('lightning_receptor_word', 'lightning receptor',
         cc('lightning_receptor', 'lightning receptor', 'electrical_conducting_function', 'copper'),
         [mod('quantity', fmtQty(p.bladeCount)), mod('regulatory', 'IEC 61400-24'), mod('form', 'tip-mounted brass')]),
@@ -416,9 +423,16 @@ function emitGenerator(p: WindTurbineParams): DesignModule {
   const generator = makeSubModule('pm_generator', 'PM generator', 'converts',
     `mechanical input (${p.generatorRpm} rpm, ${(p.ratedPowerKw * 9550 / p.generatorRpm).toFixed(0)} N·m) into 690 V AC electrical at η≥94%`,
     [
-      word('pmsg_stator_word', 'PMSG stator',
-        cc('pmsg_stator', 'PMSG stator', 'magnetic_coupling_function', 'copper'),
-        [mod('quantity', '×1'), mod('capacity', p.ratedPowerKw.toFixed(0), 'kW'), mod('form', p.isDirectDrive ? `direct-drive multi-pole (${Math.max(48, Math.round(60 * 50 / Math.max(1, p.rotorRpm)))}-pole)` : '3-phase 4-pole'), mod('dimension', `${p.generatorAcV} V`)]),
+      // 2026-05-23 L20 post-fix: pole count must be EVEN (electromagnetic
+      // synchronous generators have complete N-S pole pairs). Round to
+      // nearest even number ≥ 48 (minimum for direct-drive low-RPM).
+      (() => {
+        const polesRaw = Math.max(48, Math.round(60 * 50 / Math.max(1, p.rotorRpm)))
+        const polesEven = polesRaw % 2 === 0 ? polesRaw : polesRaw + 1
+        return word('pmsg_stator_word', 'PMSG stator',
+          cc('pmsg_stator', 'PMSG stator', 'magnetic_coupling_function', 'copper'),
+          [mod('quantity', '×1'), mod('capacity', p.ratedPowerKw.toFixed(0), 'kW'), mod('form', p.isDirectDrive ? `direct-drive multi-pole (${polesEven}-pole)` : '3-phase 4-pole'), mod('dimension', `${p.generatorAcV} V`)])
+      })(),
       word('pm_rotor_word', 'PM rotor',
         cc('pm_rotor', 'permanent magnet rotor', 'magnetic_coupling_function', 'ndfeb_magnet'),
         [mod('quantity', '×1'), mod('form', 'surface-mounted NdFeB N42'), mod('regulatory', 'IEC 60404-5')]),
@@ -643,7 +657,18 @@ function emitTransportLogistics(p: WindTurbineParams): DesignModule {
   }
 }
 
-function emitMonitoringScada(_p: WindTurbineParams): DesignModule {
+function emitMonitoringScada(p: WindTurbineParams): DesignModule {
+  // 2026-05-23 L20 post-fix: condition-monitoring sensors are
+  // configuration-dependent. Direct-drive has NO gearbox so no gearbox
+  // accelerometers — only main-bearing + generator-bearing pickups
+  // (typically 3 sensors). Geared turbines need 6+ pickups
+  // (gearbox 3 stages + main bearing + generator). Physics Critic L20
+  // correctly flagged 6× "gearbox + bearing accelerometers" on a
+  // direct-drive design that has no gearbox.
+  const conditionMonitoringCount = p.isDirectDrive ? 3 : 6
+  const conditionMonitoringForm = p.isDirectDrive
+    ? 'main bearing + generator-rotor accelerometers'
+    : 'gearbox + main-bearing + generator-bearing accelerometers'
   const monitoring = makeSubModule('scada_telemetry', 'SCADA telemetry', 'reports',
     'operational + meteorological + grid data to remote O&M via IEC 61400-25 SCADA protocol',
     [
@@ -658,13 +683,13 @@ function emitMonitoringScada(_p: WindTurbineParams): DesignModule {
         [mod('quantity', '×1'), mod('form', 'temperature/humidity/pressure'), mod('regulatory', 'WMO 8')]),
       word('condition_monitoring_pickup_word', 'condition monitoring pickup',
         cc('condition_monitoring_pickup', 'condition monitoring pickup', 'electromechanical_switching_function', 'ceramic'),
-        [mod('quantity', fmtQty(6)), mod('form', 'gearbox + bearing accelerometers'), mod('regulatory', 'ISO 10816-21')]),
+        [mod('quantity', fmtQty(conditionMonitoringCount)), mod('form', conditionMonitoringForm), mod('regulatory', 'ISO 10816-21')]),
     ])
   return {
     module: 'monitoring_SCADA',
-    module_brief: 'IEC 61400-25 SCADA via Beckhoff IPC and 4G CAT-M1 modem; 6× ISO 10816-21 condition-monitoring accelerometers + met station for predictive maintenance.',
+    module_brief: `IEC 61400-25 SCADA via Beckhoff IPC and 4G CAT-M1 modem; ${conditionMonitoringCount}× ISO 10816-21 condition-monitoring accelerometers (${conditionMonitoringForm}) + met station for predictive maintenance.`,
     overview_paragraph_en: '',
-    derived_parameters: { condition_monitoring_sensors: 6 },
+    derived_parameters: { condition_monitoring_sensors: conditionMonitoringCount, is_direct_drive: p.isDirectDrive ? 1 : 0 },
     allowed_radicals: ['silicon_semiconductor_function', 'electromechanical_switching_function', 'polymer_thermoplastic', 'ceramic'],
     applicability_confidence: 'high',
     sub_modules: [monitoring],
@@ -672,19 +697,27 @@ function emitMonitoringScada(_p: WindTurbineParams): DesignModule {
 }
 
 function emitCrossModuleGrammarLinks(p: WindTurbineParams) {
-  return [
-    { from_module: 'rotor_blades', to_module: 'hub_pitch', mechanism: 'mechanical', type: 'mutual' as const, detail: 'blade root bolted to hub flange' },
-    { from_module: 'hub_pitch', to_module: 'gearbox_drivetrain', mechanism: 'mechanical', type: 'directional' as const, detail: `low-speed shaft at ${p.rotorRpm} rpm` },
-    { from_module: 'gearbox_drivetrain', to_module: 'generator', mechanism: 'mechanical', type: 'directional' as const, detail: `high-speed shaft at ${p.generatorRpm} rpm` },
-    { from_module: 'generator', to_module: 'converter_grid_tie', mechanism: 'electrical_bus', type: 'mutual' as const, detail: `${p.ratedPowerKw} kW variable-frequency` },
+  // 2026-05-23 L20 post-fix: drivetrain link details vary by direct-drive
+  // vs geared, AND SCADA→drivetrain link only meaningful when there's a
+  // gearbox to monitor.
+  const links = [
+    { from_module: 'rotor_blades', to_module: 'hub_pitch', mechanism: 'mechanical', type: 'mutual' as const, detail: `blade root Ø${p.bladeRootDiameterM.toFixed(2)} m bolted to hub flange` },
+    { from_module: 'hub_pitch', to_module: 'gearbox_drivetrain', mechanism: 'mechanical', type: 'directional' as const, detail: p.isDirectDrive ? `direct-drive shaft at ${p.rotorRpm} rpm` : `low-speed shaft at ${p.rotorRpm} rpm` },
+    { from_module: 'gearbox_drivetrain', to_module: 'generator', mechanism: 'mechanical', type: 'directional' as const, detail: p.isDirectDrive ? `direct coupling at ${p.rotorRpm} rpm (no high-speed stage)` : `high-speed shaft at ${p.generatorRpm} rpm` },
+    { from_module: 'generator', to_module: 'converter_grid_tie', mechanism: 'electrical_bus', type: 'mutual' as const, detail: `${p.ratedPowerKw} kW variable-frequency at ${p.generatorAcV} V` },
     { from_module: 'converter_grid_tie', to_module: 'tower_yaw', mechanism: 'electrical_bus', type: 'directional' as const, detail: `${p.acContinuousA.toFixed(0)} A AC down-tower` },
     { from_module: 'control_avionics', to_module: 'hub_pitch', mechanism: 'control', type: 'directional' as const, detail: 'pitch command via slip rings' },
     { from_module: 'control_avionics', to_module: 'tower_yaw', mechanism: 'control', type: 'directional' as const, detail: 'yaw command' },
     { from_module: 'control_avionics', to_module: 'converter_grid_tie', mechanism: 'control', type: 'mutual' as const, detail: 'torque + grid sync' },
-    { from_module: 'foundation', to_module: 'tower_yaw', mechanism: 'mechanical', type: 'mutual' as const, detail: 'M48 anchor cage at base flange' },
+    { from_module: 'foundation', to_module: 'tower_yaw', mechanism: 'mechanical', type: 'mutual' as const, detail: `${p.anchorBoltCount}× anchor cage at base flange (${p.anchorBoltMnCapacity.toFixed(1)} MN)` },
     { from_module: 'monitoring_SCADA', to_module: 'control_avionics', mechanism: 'data', type: 'mutual' as const, detail: 'IEC 61400-25 OPC-UA' },
-    { from_module: 'monitoring_SCADA', to_module: 'gearbox_drivetrain', mechanism: 'data', type: 'directional' as const, detail: 'condition-monitoring accelerometers' },
   ]
+  // Only add the SCADA→drivetrain link for geared turbines where there's a
+  // gearbox to monitor. Direct-drive doesn't have gearbox-stage accelerometers.
+  if (!p.isDirectDrive) {
+    links.push({ from_module: 'monitoring_SCADA', to_module: 'gearbox_drivetrain', mechanism: 'data', type: 'directional' as const, detail: 'gearbox + bearing condition-monitoring accelerometers' })
+  }
+  return links
 }
 
 export const windTurbineEmitter: ClassEmitter = (contract, _brief, _envelope): DesignJSON => {
