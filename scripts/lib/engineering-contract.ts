@@ -2819,8 +2819,32 @@ function buildMinimalContract(productClass: string, brief: any, quantities: Reco
 registerArchetype('solar_inverter', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'kW').toLowerCase()
-  const ratedKw = u === 'mw' ? Number(tp.value ?? 0) * 1000 : u === 'w' ? Number(tp.value ?? 0) / 1000 : Number(tp.value ?? 50)
   const desc = String(brief?.product_description ?? '')
+  // 2026-05-23 PRUNE: fixed fallthrough-to-assume-unit. Old code at this
+  // line was `u === 'mw' ? × 1000 : u === 'w' ? / 1000 : Number(tp.value ?? 50)`
+  // — any non-MW/non-W unit (e.g. efficiency %, DC voltage) silently became
+  // kW. Same pattern as bess/bioreactor/h2/heat_pump/ssb fixes today.
+  const ratedKw = (() => {
+    // 1. desc regex first
+    const descPower = desc.match(/(?:rated|nominal|output|peak|continuous)\s+(?:ac\s+)?power[\s:]{0,8}(\d{1,5}(?:,\d{3})*|\d{1,5}(?:\.\d+)?)\s*(kw|mw|w|kilowatt[s]?|megawatt[s]?|watt[s]?)\b/i)
+      ?? desc.match(/(\d{1,5}(?:,\d{3})*|\d{1,5}(?:\.\d+)?)\s*(kw|mw|w)\s+(?:string\s+inverter|central\s+inverter|microinverter|solar\s+inverter|pv\s+inverter)/i)
+    if (descPower) {
+      const v = parseFloat(descPower[1].replace(/,/g, ''))
+      const unit = descPower[2].toLowerCase()
+      if (unit === 'mw' || unit === 'megawatt' || unit === 'megawatts') return v * 1000
+      if (unit === 'w' || unit === 'watt' || unit === 'watts') return v / 1000
+      return v
+    }
+    // 2. target_performance ONLY if unit in power family
+    if (Number(tp.value ?? 0) > 0) {
+      if (u === 'kw' || u === 'kilowatt' || u === 'kilowatts') return Number(tp.value)
+      if (u === 'mw' || u === 'megawatt' || u === 'megawatts') return Number(tp.value) * 1000
+      if (u === 'w' || u === 'watt' || u === 'watts') return Number(tp.value) / 1000
+      // Wrong unit (efficiency %, DC volts) → fall to default
+    }
+    // 3. Class default (commercial string inverter)
+    return 50
+  })()
   const dcInputV = extractRangeFromDesc(desc, /(\d{3,4})\s*-?\s*(\d{3,4})?\s*V\s*DC/i, 1000)
   const acOutputV = extractRangeFromDesc(desc, /(\d{3,4})\s*V\s*AC/i, 400)
   const mpptCount = extractRangeFromDesc(desc, /(\d{1,2})\s*MPPT/i, 2)
@@ -2839,8 +2863,33 @@ registerArchetype('solar_inverter', (brief: any) => {
 registerArchetype('wind_turbine', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'kW').toLowerCase()
-  const ratedKw = u === 'mw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 2000)
   const desc = String(brief?.product_description ?? '')
+  // 2026-05-23 PRUNE: fixed fallthrough-to-assume-unit. Old code at this
+  // line was `u === 'mw' ? × 1000 : Number(tp.value ?? 2000)` — any non-MW
+  // unit (e.g. rotor diameter m, capacity factor %) silently became kW.
+  // For 6 MW brief misread as 6 kW, downstream sizes/costs were 1000× wrong.
+  const ratedKw = (() => {
+    // 1. desc regex first (matches "6 MW turbine" or "Rated power: 6 MW")
+    const descPower = desc.match(/(?:rated|nominal|peak|continuous)\s+power[\s:]{0,8}(\d{1,4}(?:\.\d+)?)\s*(kw|mw|gw|kilowatt[s]?|megawatt[s]?|gigawatt[s]?)\b/i)
+      ?? desc.match(/(\d{1,4}(?:\.\d+)?)\s*(mw|kw|gw|megawatt[s]?|gigawatt[s]?|kilowatt[s]?)\s+(?:wind\s+turbine|turbine|generator|nacelle|hawt|vawt|onshore|offshore)/i)
+    if (descPower) {
+      const v = parseFloat(descPower[1])
+      const unit = descPower[2].toLowerCase()
+      if (unit === 'gw' || unit === 'gigawatt' || unit === 'gigawatts') return v * 1_000_000
+      if (unit === 'mw' || unit === 'megawatt' || unit === 'megawatts') return v * 1000
+      return v
+    }
+    // 2. target_performance ONLY if unit in power family
+    if (Number(tp.value ?? 0) > 0) {
+      if (u === 'mw' || u === 'megawatt' || u === 'megawatts') return Number(tp.value) * 1000
+      if (u === 'kw' || u === 'kilowatt' || u === 'kilowatts') return Number(tp.value)
+      if (u === 'gw' || u === 'gigawatt' || u === 'gigawatts') return Number(tp.value) * 1_000_000
+      if (u === 'w' || u === 'watt' || u === 'watts') return Number(tp.value) / 1000
+      // Wrong unit (rotor m, cap factor %) → fall to default
+    }
+    // 3. Class default (utility onshore 2 MW)
+    return 2000
+  })()
   const rotorDiamM = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*m\s+rotor/i, Math.max(40, Math.sqrt(ratedKw) * 1.5))
   const hubHeightM = extractRangeFromDesc(desc, /(\d{1,3})\s*-?\s*(\d{1,3})?\s*m\s+(?:hub|tower)/i, rotorDiamM * 1.2)
   const cutInMs = extractRangeFromDesc(desc, /cut[\s-]?in\s+(\d{1,2}(?:\.\d+)?)/i, 3.0)
@@ -2923,8 +2972,28 @@ registerArchetype('h2_electrolyser', (brief: any) => {
 registerArchetype('ups_inverter', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'kVA').toLowerCase()
-  const ratedKw = u === 'kva' ? Number(tp.value ?? 100) * 0.9 : u === 'mw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 100)
   const desc = String(brief?.product_description ?? '')
+  // 2026-05-23 PRUNE: fixed fallthrough-to-assume-unit. Old code:
+  // `u === 'kva' ? × 0.9 : u === 'mw' ? × 1000 : Number(tp.value ?? 100)`.
+  // Non-kVA/non-MW unit (e.g. runtime minutes) silently became kW.
+  const ratedKw = (() => {
+    const descPower = desc.match(/(?:rated|nominal|output|peak|continuous)\s+power[\s:]{0,8}(\d{1,4}(?:\.\d+)?)\s*(kw|mw|kva|kilowatt[s]?|megawatt[s]?)\b/i)
+      ?? desc.match(/(\d{1,4}(?:\.\d+)?)\s*(kva|kw|mw)\s+(?:ups|uninterruptible|online|line[\s-]?interactive|double[\s-]?conversion)/i)
+    if (descPower) {
+      const v = parseFloat(descPower[1])
+      const unit = descPower[2].toLowerCase()
+      if (unit === 'mw' || unit === 'megawatt' || unit === 'megawatts') return v * 1000
+      if (unit === 'kva') return v * 0.9  // PF ≈ 0.9 for UPS-class loads
+      return v
+    }
+    if (Number(tp.value ?? 0) > 0) {
+      if (u === 'kva') return Number(tp.value) * 0.9
+      if (u === 'kw' || u === 'kilowatt' || u === 'kilowatts') return Number(tp.value)
+      if (u === 'mw' || u === 'megawatt' || u === 'megawatts') return Number(tp.value) * 1000
+      // Wrong unit (minutes, %) → fall to default
+    }
+    return 100  // class default: rack-scale UPS
+  })()
   const runtimeMin = extractRangeFromDesc(desc, /(\d{1,4})\s*-?\s*(\d{1,4})?\s*min(?:utes?)?/i, 15)
   const efficiencyPct = extractRangeFromDesc(desc, /(\d{2}(?:\.\d+)?)\s*%?\s*(?:double[\s-]?conversion\s+)?efficiency/i, 96)
   const batteryKwh = extractRangeFromDesc(desc, /(\d{1,4})\s*-?\s*(\d{1,4})?\s*kWh/i, ratedKw * (runtimeMin / 60))
@@ -2959,8 +3028,28 @@ registerArchetype('3d_printer_fdm', (brief: any) => {
 registerArchetype('cnc_machine', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'kW').toLowerCase()
-  const spindleKw = u === 'w' ? Number(tp.value ?? 0) / 1000 : Number(tp.value ?? 15)
   const desc = String(brief?.product_description ?? '')
+  // 2026-05-23 PRUNE: fixed fallthrough-to-assume-unit. Old code:
+  // `u === 'w' ? / 1000 : Number(tp.value ?? 15)`. Brief target_performance
+  // in rpm or mm/min silently became kW.
+  const spindleKw = (() => {
+    const descPower = desc.match(/(?:spindle|main|drive)\s+(?:rated\s+)?power[\s:]{0,8}(\d{1,4}(?:\.\d+)?)\s*(kw|w|hp|kilowatt[s]?|horsepower)\b/i)
+      ?? desc.match(/(\d{1,4}(?:\.\d+)?)\s*(kw|w|hp)\s+(?:spindle|motor|main\s+drive)/i)
+    if (descPower) {
+      const v = parseFloat(descPower[1])
+      const unit = descPower[2].toLowerCase()
+      if (unit === 'w' || unit === 'watt' || unit === 'watts') return v / 1000
+      if (unit === 'hp' || unit === 'horsepower') return v * 0.7457
+      return v
+    }
+    if (Number(tp.value ?? 0) > 0) {
+      if (u === 'kw' || u === 'kilowatt' || u === 'kilowatts') return Number(tp.value)
+      if (u === 'w' || u === 'watt' || u === 'watts') return Number(tp.value) / 1000
+      if (u === 'hp' || u === 'horsepower') return Number(tp.value) * 0.7457
+      // Wrong unit (rpm, mm/min) → fall to default
+    }
+    return 15  // class default: vertical machining centre 15 kW spindle
+  })()
   const maxSpindleRpm = extractRangeFromDesc(desc, /(\d{4,6})\s*-?\s*(\d{4,6})?\s*rpm/i, 18000)
   const traverseMmMin = extractRangeFromDesc(desc, /(\d{4,6})\s*-?\s*(\d{4,6})?\s*mm\/min/i, 30000)
   const isFiveAxis = /5[\s-]?axis/i.test(desc)
@@ -2977,8 +3066,26 @@ registerArchetype('cnc_machine', (brief: any) => {
 registerArchetype('e_bike', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'W').toLowerCase()
-  const motorW = u === 'kw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 250)
   const desc = String(brief?.product_description ?? '')
+  // 2026-05-23 PRUNE: fixed fallthrough-to-assume-unit. Old code:
+  // `u === 'kw' ? × 1000 : Number(tp.value ?? 250)`. Brief in km range or
+  // mph silently became watts.
+  const motorW = (() => {
+    const descPower = desc.match(/(?:rated|nominal|peak|motor)\s+power[\s:]{0,8}(\d{1,4}(?:\.\d+)?)\s*(w|kw|watt[s]?|kilowatt[s]?)\b/i)
+      ?? desc.match(/(\d{1,4}(?:\.\d+)?)\s*(w|kw|watt[s]?|kilowatt[s]?)\s+(?:mid[\s-]?drive|hub[\s-]?motor|motor|pedelec)/i)
+    if (descPower) {
+      const v = parseFloat(descPower[1])
+      const unit = descPower[2].toLowerCase()
+      if (unit === 'kw' || unit === 'kilowatt' || unit === 'kilowatts') return v * 1000
+      return v
+    }
+    if (Number(tp.value ?? 0) > 0) {
+      if (u === 'w' || u === 'watt' || u === 'watts') return Number(tp.value)
+      if (u === 'kw' || u === 'kilowatt' || u === 'kilowatts') return Number(tp.value) * 1000
+      // Wrong unit (km, mph, kg) → fall to default
+    }
+    return 250  // class default: EU legal-pedelec limit
+  })()
   const batteryKwh = extractRangeFromDesc(desc, /(\d\.\d|\d)\s*-?\s*(\d\.\d|\d)?\s*kWh/i, 0.5)
   const rangeKm = extractRangeFromDesc(desc, /(\d{2,3})\s*-?\s*(\d{2,3})?\s*km/i, 80)
   const massKg = Number(brief?.constraints?.max_mass_kg?.value ?? 25)
@@ -3694,8 +3801,28 @@ registerArchetype('solid_state_battery', (brief: any) => {
 registerArchetype('pemfc', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'kW').toLowerCase()
-  const ratedKw = u === 'mw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 100)
   const desc = String(brief?.product_description ?? '')
+  // 2026-05-23 PRUNE: fixed fallthrough-to-assume-unit. Old code:
+  // `u === 'mw' ? × 1000 : Number(tp.value ?? 100)`. Brief in W/cm² power
+  // density or % efficiency silently became kW.
+  const ratedKw = (() => {
+    const descPower = desc.match(/(?:rated|nominal|stack|gross|net)\s+power[\s:]{0,8}(\d{1,4}(?:\.\d+)?)\s*(kw|mw|w|kilowatt[s]?|megawatt[s]?)\b/i)
+      ?? desc.match(/(\d{1,4}(?:\.\d+)?)\s*(kw|mw|w)\s+(?:pemfc|fuel\s+cell|stack|fcev)/i)
+    if (descPower) {
+      const v = parseFloat(descPower[1])
+      const unit = descPower[2].toLowerCase()
+      if (unit === 'mw' || unit === 'megawatt' || unit === 'megawatts') return v * 1000
+      if (unit === 'w' || unit === 'watt' || unit === 'watts') return v / 1000
+      return v
+    }
+    if (Number(tp.value ?? 0) > 0) {
+      if (u === 'kw' || u === 'kilowatt' || u === 'kilowatts') return Number(tp.value)
+      if (u === 'mw' || u === 'megawatt' || u === 'megawatts') return Number(tp.value) * 1000
+      if (u === 'w' || u === 'watt' || u === 'watts') return Number(tp.value) / 1000
+      // Wrong unit (W/cm², %, mg/cm²) → fall to default
+    }
+    return 100  // class default: transport-class stack
+  })()
   const ptLoadingMgCm2 = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*mg.*cm[²2]/i, 0.4)
   const tempC = extractRangeFromDesc(desc, /(\d{2,3})\s*°?C\s+(?:stack|cell)/i, 80)
   const pressureBar = extractRangeFromDesc(desc, /(\d(?:\.\d+)?)\s*bar/i, 2.5)
@@ -3714,8 +3841,28 @@ registerArchetype('pemfc', (brief: any) => {
 registerArchetype('smr', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'MWt').toLowerCase()
-  const ratedMwt = u === 'mwt' || u === 'mw' ? Number(tp.value ?? 0) : u === 'gw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 50)
   const desc = String(brief?.product_description ?? '')
+  // 2026-05-23 PRUNE: fixed fallthrough-to-assume-unit. Old code:
+  // `u === 'mwt' || u === 'mw' ? value : u === 'gw' ? × 1000 : Number(tp.value ?? 50)`.
+  // Brief with % enrichment (e.g. 4.95) silently became 4.95 MWt.
+  const ratedMwt = (() => {
+    const descPower = desc.match(/(?:rated|nominal|thermal|net|gross)\s+(?:thermal\s+)?(?:power|capacity)[\s:]{0,8}(\d{1,4}(?:\.\d+)?)\s*(mwt|mwe|mw|gw|kw|megawatt[s]?|gigawatt[s]?)\b/i)
+      ?? desc.match(/(\d{1,4}(?:\.\d+)?)\s*(mwt|mwe|mw|gw)\s+(?:smr|reactor|nuclear|module[\s-]?reactor|micro[\s-]?reactor|baseload)/i)
+    if (descPower) {
+      const v = parseFloat(descPower[1])
+      const unit = descPower[2].toLowerCase()
+      if (unit === 'gw' || unit === 'gigawatt' || unit === 'gigawatts') return v * 1000
+      if (unit === 'kw') return v / 1000
+      return v  // mwt/mwe/mw all map to MWt
+    }
+    if (Number(tp.value ?? 0) > 0) {
+      if (u === 'mwt' || u === 'mwe' || u === 'mw' || u === 'megawatt' || u === 'megawatts') return Number(tp.value)
+      if (u === 'gw' || u === 'gigawatt' || u === 'gigawatts') return Number(tp.value) * 1000
+      if (u === 'kw' || u === 'kilowatt' || u === 'kilowatts') return Number(tp.value) / 1000
+      // Wrong unit (% enrichment, years) → fall to default
+    }
+    return 50  // class default: small-SMR thermal output
+  })()
   const enrichmentPct = extractRangeFromDesc(desc, /(\d+(?:\.\d+)?)\s*%\s+enrich/i, 4.95)
   const refuellingYears = extractRangeFromDesc(desc, /(\d{1,2})\s*(?:year|yr)\s+(?:refuel|fuel)/i, 5)
   const fuelType = /haleu/i.test(desc) ? 2 : /trisostructural|triso/i.test(desc) ? 3 : 1
