@@ -6,8 +6,9 @@ Target customer: UK and EU academic biomanufacturing centres (Cell and Gene Ther
 
 Key constraints:
 - Unit cost ceiling: £180,000 ex-works for the stainless-steel containment hardware + base instrumentation (excluding consumable bag, advanced sensors, and validation services). Single-use bag price tracked separately at £1,200 per bag.
-- Working volume: 120-180 L (60-90% of nominal 200 L), with hardware envelope sized for 200 L head-space
-- Mixing: single three-blade impeller, top-driven via magnetic coupling (sterility-preserving), tip-speed 0.8-2.0 m/s, kLa ≥ 8 hr⁻¹ at 1 vvm air sparging
+- Nominal working volume: 200 L (sized for 120-180 L process inventory at 60-90% of nominal)
+- Mixing: single three-blade impeller, top-driven via magnetic coupling (sterility-preserving), tip-speed 0.8-2.0 m/s
+- Mass transfer coefficient: kLa ≥ 8 hr⁻¹ at 1 vvm air sparging
 - Gas exchange: 4-gas mass-flow controllers (air, oxygen, nitrogen, carbon dioxide), micro-sparger, dissolved-oxygen setpoint 30-60% saturation
 - Temperature control: heating/cooling jacket loop (5-45 °C controllable, ±0.2 °C stability at 37 °C); resistance-element heater + chiller circulator
 - Process analytical: pH, dissolved oxygen, dissolved carbon dioxide, temperature, biomass capacitance, optical-density turbidity, Raman spectroscopy port (optional)
