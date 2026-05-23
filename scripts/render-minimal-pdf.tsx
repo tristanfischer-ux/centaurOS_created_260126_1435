@@ -3651,6 +3651,14 @@ function SubModuleBomBlock({
   // which prevents both the original orphan-header bug AND the overlap.
   // Estimate ~12pt per row + 18pt for header/separator/subtotal.
   const minPresenceAheadPt = Math.min(28 + bomLines.length * 12, 600)
+  // 2026-05-23 P2-3: count excluded rows so sub-total label can flag them.
+  // Tristan flagged "96 + 8 ≠ 0" bug: the table showed line totals (96 and
+  // 8) but the sub-total summed to a different number because rows with
+  // cost_repair_excluded_from_subtotal were silently skipped from the math
+  // while still displayed normally. Fix surfaces this in the sub-total label
+  // + visually strikethrough excluded rows so the reader knows why the
+  // arithmetic looks "wrong".
+  const excludedCount = bomLines.filter(r => r.cost_repair_excluded_from_subtotal === true).length
   return (
     <View style={{ marginTop: 8, marginBottom: 6, marginLeft: 36 }} minPresenceAhead={minPresenceAheadPt}>
       {/* See 2026-05-23 bugfix comment above. Old "wrap={false}" approach
@@ -3682,13 +3690,23 @@ function SubModuleBomBlock({
         const src = srcLabelForRow(row)
         const ref = priceRealityRefForRow(row)
         const refColor = ref === '>2x' ? '#b91c1c' : ref === '<.5x' ? '#1d4ed8' : ref === 'OK' ? '#15803d' : MUTED
+        // 2026-05-23 P2-3: visually strikethrough excluded rows + tag them.
+        // The math now reconciles for the reader: the row shows £96 but
+        // strikethrough indicates it isn't in the sub-total.
+        const isExcluded = row.cost_repair_excluded_from_subtotal === true
+        const partTextStyle = isExcluded
+          ? { flex: 2.6, fontSize: 9, color: MUTED, textDecoration: 'line-through' as const }
+          : { flex: 2.6, fontSize: 9, color: INK }
+        const lineTextStyle = isExcluded
+          ? { width: 55, fontSize: 9, color: MUTED, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold', textDecoration: 'line-through' as const }
+          : { width: 55, fontSize: 9, color: INK, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold' }
         return (
           <View
             key={`bom-${ri}`}
             wrap={false}
             style={{ flexDirection: 'row', paddingVertical: 4.5, borderBottomWidth: 0.25, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }}
           >
-            <Text style={{ flex: 2.6, fontSize: 9, color: INK }}>
+            <Text style={partTextStyle}>
               {row.word_name ? toTitleCaseEng(normalise_unicode(row.word_name)) : '—'}
               {noteIdx ? <Text style={NOTE_MARK_STYLE}> {noteIdx}</Text> : null}
             </Text>
@@ -3717,10 +3735,16 @@ function SubModuleBomBlock({
             })()}
             <Text style={{ width: 30, fontSize: 9, color: INK, textAlign: 'right' }}>×{row.quantity ?? 1}</Text>
             <Text style={{ width: 50, fontSize: 9, color: INK, textAlign: 'right' }}>{unitPriceCell}</Text>
-            <Text style={{ width: 55, fontSize: 9, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>{lineCell}</Text>
+            <Text style={lineTextStyle}>{lineCell}</Text>
             <View style={{ width: 60, paddingLeft: 6, flexDirection: 'row', alignItems: 'baseline' }}>
-              <Text style={{ fontSize: 8, color: MUTED }}>{src}</Text>
-              <Text style={{ fontSize: 8, color: refColor, fontFamily: 'Helvetica-Bold', marginLeft: 4 }}>{ref}</Text>
+              {isExcluded ? (
+                <Text style={{ fontSize: 7.5, color: '#b45309', fontFamily: 'Helvetica-Bold' }}>EXCLUDED</Text>
+              ) : (
+                <>
+                  <Text style={{ fontSize: 8, color: MUTED }}>{src}</Text>
+                  <Text style={{ fontSize: 8, color: refColor, fontFamily: 'Helvetica-Bold', marginLeft: 4 }}>{ref}</Text>
+                </>
+              )}
             </View>
           </View>
         )
@@ -3729,6 +3753,7 @@ function SubModuleBomBlock({
       <View style={{ flexDirection: 'row', paddingTop: 5, paddingBottom: 3, borderTopWidth: 0.6, borderTopColor: RULE }}>
         <Text style={{ flex: 7.6, fontSize: 8.5, color: INK_SOFT, fontStyle: 'italic' }}>
           Sub-total — {subModuleName}
+          {excludedCount > 0 ? ` (excl. ${excludedCount} item${excludedCount === 1 ? '' : 's'} pending review)` : ''}
         </Text>
         <Text style={{ width: 55, fontSize: 9.5, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>
           £{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
