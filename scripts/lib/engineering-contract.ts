@@ -552,7 +552,7 @@ registerArchetype('bess', (brief: any) => {
   const slaveCount = Math.ceil(cellCount / 24)  // 24-channel BMS slave boards
   const macro_assembly_prices: MacroAssemblyPrice[] = [
     {
-      word_name: 'lfp_cell_string',
+      word_name: 'lfp_prismatic_cell',
       unit_price_gbp: 100,
       dimension_basis: 'cell_count',
       dimension_value: cellCount,
@@ -592,7 +592,7 @@ registerArchetype('bess', (brief: any) => {
       source_detail: `£400/slave × ${slaveCount} slaves (24-channel each; ceil(${cellCount} cells / 24))`,
     },
     {
-      word_name: 'liquid_cooling_loop',
+      word_name: 'liquid_cooling_chiller',
       unit_price_gbp: 600,
       dimension_basis: 'kw_power',
       dimension_value: thermalRejectionMinKw,
