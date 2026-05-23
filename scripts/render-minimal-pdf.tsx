@@ -20,7 +20,7 @@
 import React from 'react'
 import { Document, Page, Text, View, Svg, Line, Circle, Link, Image, pdf } from '@react-pdf/renderer'
 import { readFileSync, writeFileSync, existsSync } from 'fs'
-import { resolve, dirname } from 'path'
+import { resolve, dirname, join } from 'path'
 import { execFileSync } from 'child_process'
 import { generateSubmoduleParagraph } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { getClassStandards, mergeBriefAndClassStandards, type RegulatoryStandard } from '../src/lib/pdf-engine-v2/class-standards'
@@ -6524,6 +6524,62 @@ async function main() {
   writeFileSync(outPath, buffer)
   const sizeKb = (buffer.length / 1024).toFixed(1)
   console.error(`[render-minimal-pdf] written ${outPath} (${sizeKb} KB)`)
+
+  // 2026-05-23 (post-L30): persist macro-claim decisions alongside the PDF
+  // so audit-pdf-bom.ts (and other downstream verifiers) can read which
+  // macro claimed which word, what the per-row macro-override price was,
+  // and which rows had their corpus part_number stripped. This closes the
+  // audit-can't-verify gap: previously contract_override_reason existed
+  // only inside the BomPartRow construction and was never persisted —
+  // audit had to guess at claims via name-token matching which produced
+  // false positives.
+  try {
+    const outDir = dirname(outPath)
+    // Recompute BoM totals here (idempotent) since the version computed
+    // inside MinimalDocument is scoped to the React component.
+    const slugHint2 = String(state.projectId || '').split('-')[0]?.toLowerCase() || undefined
+    const bomTotalsForClaims = applyBatchEconomics(state, computeBomTotals(state), slugHint2)
+    const macroClaims: Array<{ module: string; sub_module: string; word_id: string; word_name: string; macro_word_name: string; macro_total_gbp: number; unit_price_gbp: number; line_total_gbp: number; quantity: number; source_detail: string }> = []
+    for (const mod of bomTotalsForClaims?.allMods ?? []) {
+      for (const sub of mod.subs ?? []) {
+        for (const part of sub.parts ?? []) {
+          if (part.contract_override_reason) {
+            // Parse the source_detail back out of contract_override_reason
+            // Format: "Contract macro-assembly (...): <source_detail>"
+            const sd = (part.contract_override_reason as string).replace(/^Contract macro-assembly \([^)]*\): /, '')
+            macroClaims.push({
+              module: mod.module,
+              sub_module: sub.id,
+              word_id: part.word_id,
+              word_name: part.word_name,
+              macro_word_name: '', // will fill below by matching source_detail
+              macro_total_gbp: part.line_total_gbp,
+              unit_price_gbp: part.unit_price_gbp,
+              line_total_gbp: part.line_total_gbp,
+              quantity: part.quantity,
+              source_detail: sd,
+            })
+          }
+        }
+      }
+    }
+    // Match each claim's source_detail back to the originating macro name
+    // (state.engineeringContract.macro_assembly_prices) for the audit's
+    // convenience. Bonus: total claimed money + count.
+    const macros: Array<{ word_name: string; source_detail?: string; total_gbp: number }> = (state?.engineeringContract?.macro_assembly_prices ?? []) as any[]
+    for (const c of macroClaims) {
+      const m = macros.find(mm => (mm.source_detail ?? '').slice(0, 60) === c.source_detail.slice(0, 60))
+      if (m) c.macro_word_name = m.word_name
+    }
+    writeFileSync(join(outDir, 'macro-claims.json'), JSON.stringify({
+      total_claims: macroClaims.length,
+      total_claimed_gbp: macroClaims.reduce((a, c) => a + c.line_total_gbp, 0),
+      claims: macroClaims,
+    }, null, 2))
+    console.error(`[render-minimal-pdf] persisted ${macroClaims.length} macro claims to ${outDir}/macro-claims.json`)
+  } catch (err) {
+    console.error(`[render-minimal-pdf] macro-claims.json write failed (non-fatal): ${(err as Error).message.slice(0, 100)}`)
+  }
 
   // Open in Preview — execFileSync (no shell interpolation, safe path).
   // Suppress via RENDER_NO_OPEN=1 for batch / audit runs.

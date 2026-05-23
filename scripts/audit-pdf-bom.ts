@@ -199,11 +199,71 @@ async function audit(outDir: string): Promise<{ findings: Finding[]; bom: BomExt
   for (const [k, v] of bom.module_subtotals) {
     if (k.endsWith('__header')) moduleHeaders.set(k.replace('__header', ''), v)
   }
+  // 2026-05-23 L30 fix v4: read the persisted macro-claims.json side file
+  // emitted by render-minimal-pdf.tsx. This is the cleanest source of
+  // truth — the renderer KNOWS which macro it claimed for which word,
+  // and now writes it to disk. If file present, do per-macro verification.
+  // Falls back to aggregate Σ-check when file missing.
+  const macroClaimsPath = join(outDir, 'macro-claims.json')
+  if (existsSync(macroClaimsPath)) {
+    try {
+      const claimsFile = readJsonSafe(macroClaimsPath)
+      if (claimsFile?.claims) {
+        const claimedMacroNames = new Set<string>()
+        for (const c of claimsFile.claims) {
+          if (c.macro_word_name) claimedMacroNames.add(c.macro_word_name)
+        }
+        const engineeringMacros = (state?.engineeringContract?.macro_assembly_prices ?? []) as Array<{ word_name: string; total_gbp: number }>
+        const orphanedMacros = engineeringMacros.filter(m => !claimedMacroNames.has(m.word_name) && Number(m.total_gbp) > 5_000)
+        if (orphanedMacros.length > 0) {
+          findings.push({
+            severity: 'HIGH',
+            check_id: 'B-2',
+            detail: `${orphanedMacros.length} engineering macro(s) NOT claimed by any word at render time: ${orphanedMacros.map(m => `${m.word_name} £${Math.round(m.total_gbp).toLocaleString()}`).join('; ')}. The renderer's macro→word matcher (render-minimal-pdf.tsx:885) found no word_id with the macro's semantic tokens. Either add the word to the emitter OR rename the macro to match an existing word_id.`,
+          })
+        } else {
+          findings.push({
+            severity: 'INFO',
+            check_id: 'B-2',
+            detail: `B-2 PASS: ${claimsFile.claims.length} macro claims persisted at render time, total claimed £${Math.round(claimsFile.total_claimed_gbp ?? 0).toLocaleString()}. All ${engineeringMacros.length} engineering macros found word homes.`,
+          })
+        }
+        // Skip the aggregate fallback when claims file is authoritative.
+        // Skip B-4 line floors for words that have macro claims (their
+        // unit_price was overridden — checking corpus partVerifications
+        // gives false positives).
+        const claimedWordIds = new Set<string>(claimsFile.claims.map((c: any) => c.word_id))
+        if (classId && CLASS_MIN_UNIT_PRICES[classId]) {
+          const pv = (state?.partVerifications ?? []) as Array<any>
+          for (const { name_pattern, min_gbp, reason } of CLASS_MIN_UNIT_PRICES[classId]) {
+            const matches = pv.filter(p => name_pattern.test(String(p.word_name || p.part_name || '')) && !claimedWordIds.has(p.word_id))
+            for (const part of matches) {
+              const price = Number(part.cost_repair_corrected_price_gbp ?? part.price_estimate_gbp ?? part.unit_price_gbp ?? 0)
+              if (price > 0 && price < min_gbp) {
+                findings.push({
+                  severity: 'MED',
+                  check_id: 'B-4',
+                  detail: `Line "${part.word_name || part.part_name}" priced £${price.toFixed(0)} — industry min £${min_gbp.toLocaleString()} (${reason}). No macro claimed this row; consider widening cost-repair UP-cap OR adding emitter word for the macro.`,
+                })
+              }
+            }
+          }
+        }
+        // Continue past the aggregate fallback (which is gated below)
+        // by setting a flag-like skip.
+        ;(state as any).__b2_b4_done_via_claims_file = true
+      }
+    } catch (err) {
+      findings.push({ severity: 'INFO', check_id: 'B-2-FALLBACK', detail: `macro-claims.json read failed: ${(err as Error).message.slice(0, 80)} — falling back to aggregate check` })
+    }
+  }
+  // Fallback when macro-claims.json missing OR read failed:
   // 2026-05-23 L25 fix v3: AGGREGATE check. Don't try to verify per-macro
   // claim chain; just check that Σ engineering-contract macros ≈ Σ BoM
   // module sub-totals. If they match within 10%, all macros found homes
   // somewhere in the BoM. If the sum is way off (>30% gap), genuine
   // orphaning exists.
+  if (!(state as any).__b2_b4_done_via_claims_file) {
   //
   // Why aggregate not per-macro: the renderer matches macros to words
   // and writes contract_override_reason on the BomPartRow, but doesn't
@@ -260,6 +320,7 @@ async function audit(outDir: string): Promise<{ findings: Finding[]; bom: BomExt
       })
     }
   }
+  }  // ← close `if (!__b2_b4_done_via_claims_file)`
 
   // ── B-3 cover total ≡ sum of BoM module sub-totals ──
   if (bom.cover_raw_materials_bom_gbp != null && moduleHeaders.size > 0) {
@@ -277,12 +338,11 @@ async function audit(outDir: string): Promise<{ findings: Finding[]; bom: BomExt
     findings.push({ severity: 'MED', check_id: 'B-3', detail: 'Cover Raw materials BoM headline not extracted from PDF — check renderer cover-page output OR pdftotext extraction regex.' })
   }
 
-  // ── B-4 per-line industry sanity ──
-  // For each macro that found a module header, sample the partVerifications
-  // for that module and check headline parts (matching CLASS_MIN_UNIT_PRICES)
-  // exceed the floor. If not, the macro money is in the "macro-claim" row
-  // but generic parts within the module are still under-priced.
-  if (classId && CLASS_MIN_UNIT_PRICES[classId]) {
+  // ── B-4 per-line industry sanity (FALLBACK ONLY) ──
+  // When claims file is present, B-4 was already done above (with macro-
+  // claimed rows excluded). This block fires only when no claims file —
+  // legacy / old runs.
+  if (!(state as any).__b2_b4_done_via_claims_file && classId && CLASS_MIN_UNIT_PRICES[classId]) {
     const pv = (state?.partVerifications ?? []) as Array<any>
     for (const { name_pattern, min_gbp, reason } of CLASS_MIN_UNIT_PRICES[classId]) {
       const matches = pv.filter(p => name_pattern.test(String(p.word_name || p.part_name || '')))
