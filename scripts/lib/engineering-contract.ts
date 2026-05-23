@@ -1071,12 +1071,33 @@ registerArchetype('heat_pump_residential', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const briefValue = Number(tp.value ?? 0)
   const briefUnit = String(tp.unit ?? 'kW').toLowerCase()
-  // Normalise to kW THERMAL. Brief may use kW, W, or BTU/h.
-  const thermalKw = briefUnit === 'w' ? briefValue / 1000
-    : briefUnit === 'mw' ? briefValue * 1000
-    : briefUnit === 'btu/h' || briefUnit === 'btu_h' || briefUnit === 'btuh' ? briefValue / 3412.142
-    : briefValue > 0 ? briefValue
-    : 12  // class default 12 kW (mid-range residential)
+  // 2026-05-23 (Task #69) — fixed brief-fidelity bug. Brief parser may pick
+  // SCOP (dimensionless), refrigerant fill (kg), or COP as target_performance
+  // when the brief has multiple metrics. Old code's "briefValue > 0 ? briefValue
+  // : 12" branch would treat 4.2 (SCOP) as 4.2 kW. Same pattern as bioreactor.
+  const thermalKw = (() => {
+    const descStr = String(brief?.product_description ?? '')
+    // 1. Try desc regex for "Heat output: X kW"
+    const descPower = descStr.match(/(?:heat(?:ing)?\s+output|thermal\s+capacity|rated\s+(?:heating\s+)?capacity|nominal\s+capacity)[\s:]{0,8}(\d{1,4}(?:\.\d+)?)\s*(kw|w|mw)\b/i)
+      ?? descStr.match(/(\d{1,4}(?:\.\d+)?)\s*(kw|w|mw)\s+(?:heat[\s-]?pump|monobloc|split|ashp|heating)/i)
+    if (descPower) {
+      const v = parseFloat(descPower[1])
+      const u2 = descPower[2].toLowerCase()
+      if (u2 === 'mw') return v * 1000
+      if (u2 === 'w') return v / 1000
+      return v
+    }
+    // 2. target_performance.value if unit in power family
+    if (briefValue > 0) {
+      if (briefUnit === 'kw') return briefValue
+      if (briefUnit === 'mw') return briefValue * 1000
+      if (briefUnit === 'w') return briefValue / 1000
+      if (briefUnit === 'btu/h' || briefUnit === 'btu_h' || briefUnit === 'btuh') return briefValue / 3412.142
+      // Wrong unit (SCOP, kg, etc.) → fall to default
+    }
+    // 3. Class default
+    return 12
+  })()
   const desc = String(brief?.product_description ?? brief?.brief?.original_text ?? '')
   const extractRange = (pat: RegExp, dflt: number): number => {
     const m = desc.match(pat)
@@ -2816,8 +2837,47 @@ registerArchetype('wind_turbine', (brief: any) => {
 registerArchetype('h2_electrolyser', (brief: any) => {
   const tp = brief?.constraints?.target_performance ?? {}
   const u = String(tp.unit ?? 'kW').toLowerCase()
-  const ratedKw = u === 'mw' ? Number(tp.value ?? 0) * 1000 : Number(tp.value ?? 1000)
   const desc = String(brief?.product_description ?? '')
+  // 2026-05-23 (Task #69) — fixed brief-fidelity bug: brief parser commonly
+  // picks H2 production rate (kg/hr, Nm³/hr) as target_performance instead of
+  // electrical input (kW/MW). Old code fell through to "treat as kW" → 90 kg/hr
+  // became 90 kW → 0.09 MW instead of 5 MW (Physics Critic fidelity=1/10).
+  // FIX: scan desc for "5 MW" first; accept target_performance only if unit
+  // in power family; convert H2 rate to power via 5.0 kWh/Nm³ if rate-given.
+  const ratedKw = (() => {
+    // 1. Try desc regex for explicit electrical power
+    const descPower = desc.match(/(?:electrical|stack|rated|input)\s+(?:input|power|capacity)[\s:]{0,8}(\d{1,5}(?:,\d{3})*|\d{1,5}(?:\.\d+)?)\s*(kw|mw|w)\b/i)
+      ?? desc.match(/(\d{1,5}(?:,\d{3})*|\d{1,5}(?:\.\d+)?)\s*(mw|kw|w)\s+(?:pem|alkaline|electrolyser|electrolyzer|stack)/i)
+    if (descPower) {
+      const v = parseFloat(descPower[1].replace(/,/g, ''))
+      const unit = descPower[2].toLowerCase()
+      if (unit === 'mw') return v * 1000
+      if (unit === 'w') return v / 1000
+      return v
+    }
+    // 2. target_performance.value if unit in power family
+    if (Number(tp.value ?? 0) > 0) {
+      if (u === 'mw') return Number(tp.value) * 1000
+      if (u === 'kw') return Number(tp.value)
+      if (u === 'w') return Number(tp.value) / 1000
+      // 3. If unit is H2 production rate, convert to electrical kW
+      if (u === 'kg/hour' || u === 'kg/hr' || u === 'kghour' || u === 'kghr') {
+        // 1 kg H2 = 11.126 Nm³ × 5 kWh/Nm³ = 55.6 kWh/kg (PEM stack benchmark)
+        return Number(tp.value) * 55.6
+      }
+      if (u === 'nm3/hr' || u === 'nm³/hr' || u === 'nm3hr') {
+        // 5 kWh/Nm³ benchmark for PEM/alkaline
+        return Number(tp.value) * 5.0
+      }
+      if (u === 't/day' || u === 'tpd') {
+        // tonnes/day → kg/day → kg/hr → kWh
+        return (Number(tp.value) * 1000 / 24) * 55.6
+      }
+      // Unknown unit — fall through to default below
+    }
+    // 4. Class default for a commercial electrolyser
+    return 1000
+  })()
   const h2KgPerDay = extractRangeFromDesc(desc, /(\d{1,5})\s*-?\s*(\d{1,5})?\s*kg.*(?:h2|hydrogen)/i, ratedKw / 53)
   const opPressureBar = extractRangeFromDesc(desc, /(\d{1,3})\s*bar/i, 30)
   const cellTempC = extractRangeFromDesc(desc, /(\d{2,3})\s*°?C/i, 70)
@@ -3578,7 +3638,21 @@ registerArchetype('solid_state_battery', (brief: any) => {
   const cycleLifeCount = extractRangeFromDesc(desc, /(\d{3,5})\s*cycles?/i, 2000)
   const operatingTempC = extractRangeFromDesc(desc, /(\d{1,3})\s*°?C/i, 25)
   const tp = brief?.constraints?.target_performance ?? {}
-  const energyWh = (String(tp.unit ?? '').toLowerCase() === 'kwh') ? Number(tp.value ?? 1) * 1000 : Number(tp.value ?? 100)
+  // 2026-05-23 (Task #69) — fixed brief-fidelity bug. Old code's `else
+  // Number(tp.value ?? 100)` treats ANY non-kWh value as Wh — e.g. if parser
+  // picks "0.5 C-rate" the contract gets 0.5 Wh pack. Fix: accept value only
+  // if unit in energy family; else use class default.
+  const energyWh = (() => {
+    const u = String(tp.unit ?? '').toLowerCase()
+    const v = Number(tp.value ?? 0)
+    if (v > 0) {
+      if (u === 'kwh') return v * 1000
+      if (u === 'mwh') return v * 1_000_000
+      if (u === 'wh') return v
+      // Wrong unit → fall to default
+    }
+    return 100  // class default 100 Wh for pouch-cell-scale SSB
+  })()
   const q1 = {
     energy_density_wh_kg: q(energyDensWhKg, 'Wh/kg', 'energy', 'rated', 'cell', 'brief'),
     cell_capacity_ah: q(cellCapacityAh, 'Ah', 'energy', 'nameplate', 'cell', 'brief'),

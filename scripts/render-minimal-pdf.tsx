@@ -670,6 +670,12 @@ type BomTotals = {
   actualPriced: number
   estimatePriced: number
   tbdRows: number
+  // 2026-05-23: orchestrator macro_assembly_prices that have no matching word
+  // in the design (e.g. wind turbine gearbox £1.08M, PM generator £1.32M).
+  // Added to grandTotal_gbp so the BoM reflects big-ticket items the per-class
+  // emitter didn't explicitly create words for.
+  unmatchedMacroTotal_gbp?: number
+  unmatchedMacros?: Array<{ name: string; total: number }>
   // Set by applyBatchEconomics() when a per-class scale factor < 1.0 is
   // applied. 1.0 (or undefined) means BoM values are raw distributor pricing.
   // Renderer surfaces this on the cover/grand-total card so the reader knows.
@@ -1067,6 +1073,48 @@ function computeBomTotals(state: any): BomTotals | null {
       }
     }
   }
+  // 2026-05-23 fix: include orchestrator macro_assembly_prices that are NOT
+  // already represented as words in the design. Wind/h2/solar/ups emitters
+  // use `buildMinimalContract` which leaves engineeringContract.macros empty;
+  // the orchestratorContract has macros (£3.18M for a 6 MW wind turbine —
+  // gearbox £1.08M, PM generator £1.32M, converter £780k) but the emitter
+  // doesn't create matching words. Previously bomTotals captured ONLY the
+  // small word-level parts (£28k for wind), missing the big-ticket macros
+  // entirely → 6 MW wind shipped as £73k installed ASP (60-90× too low).
+  // BESS isn't affected: its emitter creates lfp_prismatic_cell_word etc.
+  // that map to macros, so the dedupe-by-name guard below avoids double-count.
+  const wordNames = new Set<string>()
+  for (const m of allMods) {
+    for (const sub of m.subs) {
+      for (const p of sub.parts) {
+        wordNames.add(String(p.word_id ?? '').toLowerCase())
+        wordNames.add(String((p as any).name ?? '').toLowerCase().replace(/\s+/g, '_'))
+      }
+    }
+  }
+  const orchMacros = state?.orchestratorContract?.macro_assembly_prices ?? []
+  const engMacros = state?.engineeringContract?.macro_assembly_prices ?? []
+  const allMacros = [...orchMacros, ...engMacros]
+  let unmatchedMacroTotal_gbp = 0
+  const unmatchedMacros: Array<{ name: string; total: number }> = []
+  for (const macro of allMacros) {
+    const name = String(macro?.word_name ?? '').toLowerCase()
+    const total = Number(macro?.total_gbp ?? 0)
+    if (!name || !Number.isFinite(total) || total <= 0) continue
+    if (claimedMacroAssemblies.has(name)) continue
+    // Match macro name against any word_id or word name in the design
+    const matched = wordNames.has(name)
+      || wordNames.has(`${name}_word`)
+      || Array.from(wordNames).some(wn => wn.includes(name) || name.includes(wn))
+    if (!matched) {
+      unmatchedMacroTotal_gbp = roundToPence(unmatchedMacroTotal_gbp + total)
+      unmatchedMacros.push({ name, total })
+    }
+  }
+  if (unmatchedMacroTotal_gbp > 0) {
+    grandTotal_gbp = roundToPence(grandTotal_gbp + unmatchedMacroTotal_gbp)
+  }
+
   return {
     allMods,
     grandTotal_gbp,
@@ -1075,6 +1123,8 @@ function computeBomTotals(state: any): BomTotals | null {
     estimatePriced,
     tbdRows,
     engine_b_by_class,
+    unmatchedMacroTotal_gbp,
+    unmatchedMacros,
   }
 }
 
@@ -3937,13 +3987,19 @@ function ModuleSection({
               key={sm.id}
               style={{ paddingVertical: 11, borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT }}
             >
-              {/* Bug fix (2026-05-22 Tristan): wrap title-row PLUS the first prose
-                  chunk together so the sub-module title never splits from its
-                  first paragraph at a page break. Earlier wrap={false} on the
-                  title alone allowed the prose to render onto the previous
-                  page after the title moved — producing the overlapping-text
-                  smear seen on Module 3.1 Fertigation skid. */}
-              <View wrap={false}>
+              {/* 2026-05-23 fix (user-reported on windturbine-l5 page 18):
+                  Earlier "wrap={false} around title + full first prose chunk"
+                  caused overlapping-text smear when proseChunks[0] was 3+
+                  sentences (~400+ chars). react-pdf's known behaviour for an
+                  un-fittable wrap={false} block is to draw at the same Y as
+                  existing content rather than pushing a new page — producing
+                  the multi-layer text overlap. Fix: drop wrap={false} entirely
+                  and use `minPresenceAhead` on the title block to keep the
+                  title together with at least 80pt of follow-on content
+                  (~3 prose lines). This prevents BOTH orphaned titles AND
+                  the overlap smear, because react-pdf flows normally and only
+                  the minPresenceAhead constraint forces page-break alignment. */}
+              <View minPresenceAhead={80}>
                 <View style={{ flexDirection: 'row', marginBottom: 5, alignItems: 'baseline' }}>
                   <Text style={{ width: 36, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT_SOFT }}>
                     {index}.{sm.idx}
@@ -3952,17 +4008,10 @@ function ModuleSection({
                     {britishise(sm.name.charAt(0).toUpperCase() + sm.name.slice(1))}
                   </Text>
                 </View>
-                {proseChunks.length > 0 ? (
-                  <Text
-                    style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.6, paddingLeft: 36, marginBottom: 5, textAlign: 'justify' }}
-                  >
-                    {partLinkMap && partLinkMap.size > 0 ? renderProseWithLinks(proseChunks[0], partLinkMap) : proseChunks[0]}
-                  </Text>
-                ) : null}
               </View>
-              {proseChunks.slice(1).map((chunk, ci) => (
+              {proseChunks.map((chunk, ci) => (
                 <Text
-                  key={ci + 1}
+                  key={ci}
                   style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.6, paddingLeft: 36, marginBottom: 5, textAlign: 'justify' }}
                 >
                   {partLinkMap && partLinkMap.size > 0 ? renderProseWithLinks(chunk, partLinkMap) : chunk}

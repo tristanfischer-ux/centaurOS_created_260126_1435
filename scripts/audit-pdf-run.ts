@@ -38,7 +38,24 @@
  */
 
 import { readFileSync, existsSync, writeFileSync, readdirSync, statSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { join, basename, dirname } from 'node:path'
+
+// Industry-typical installed ASP per unit of rated capacity, GBP. Used to
+// flag cost models that are >3× under or over benchmark.
+// Sources: BNEF 2024, IEA 2023, Bioplan 2023, Wood Mackenzie 2024.
+const INSTALLED_ASP_BENCHMARKS: Record<string, { unit: 'mw' | 'kwh' | 'l' | 'kw_thermal' | 'kw_charge'; gbp_per_unit_low: number; gbp_per_unit_high: number; capacity_key: string }> = {
+  wind_turbine:         { unit: 'mw',         gbp_per_unit_low:    800_000, gbp_per_unit_high: 1_500_000, capacity_key: 'rated_power_kw' },
+  solar_inverter:       { unit: 'kw_charge',  gbp_per_unit_low:         80, gbp_per_unit_high:       250, capacity_key: 'rated_power_kw' },
+  h2_electrolyser:      { unit: 'kw_charge',  gbp_per_unit_low:        800, gbp_per_unit_high:     2_500, capacity_key: 'rated_power_kw' },
+  bess:                 { unit: 'kwh',        gbp_per_unit_low:        200, gbp_per_unit_high:       400, capacity_key: 'nameplate_capacity_kwh' },
+  bioreactor:           { unit: 'l',          gbp_per_unit_low:        500, gbp_per_unit_high:     2_000, capacity_key: 'working_volume_l' },
+  heat_pump_residential:{ unit: 'kw_thermal', gbp_per_unit_low:        600, gbp_per_unit_high:     1_200, capacity_key: 'rated_thermal_kw' },
+  ev_charger:           { unit: 'kw_charge',  gbp_per_unit_low:        300, gbp_per_unit_high:     1_000, capacity_key: 'rated_power_kw' },
+  ups_inverter:         { unit: 'kw_charge',  gbp_per_unit_low:        400, gbp_per_unit_high:     1_200, capacity_key: 'rated_power_kw' },
+  pemfc:                { unit: 'kw_charge',  gbp_per_unit_low:      1_500, gbp_per_unit_high:     4_000, capacity_key: 'rated_power_kw' },
+  smr:                  { unit: 'mw',         gbp_per_unit_low:  4_000_000, gbp_per_unit_high: 8_000_000, capacity_key: 'rated_power_kw' },
+}
 
 interface AuditFinding {
   severity: 'HIGH' | 'MED' | 'LOW'
@@ -225,6 +242,64 @@ async function audit(): Promise<AuditReport> {
   const orchRan = !!state?.orchestratorContract
   if (!orchRan) {
     findings.push({ severity: 'HIGH', check_id: 'G-2', detail: 'Orchestrator did NOT run (no state.orchestratorContract). Chain fell back to LLM Generator path silently. Set ORCHESTRATOR=1 and ensure ALLOW_LLM_FALLBACK is not set.' })
+  }
+
+  // ── C-1 cost benchmark vs industry £/unit-capacity ──
+  // Catches the wind-turbine bug class: 6 MW reported as £73k installed (60-90× too low).
+  if (classId && INSTALLED_ASP_BENCHMARKS[classId]) {
+    const benchmark = INSTALLED_ASP_BENCHMARKS[classId]
+    const capQ = state?.orchestratorContract?.quantities?.[benchmark.capacity_key]
+      ?? state?.engineeringContract?.quantities?.[benchmark.capacity_key]
+    const capacityRaw = Number(capQ?.value)
+    let capacityInBenchmarkUnit = capacityRaw
+    if (benchmark.unit === 'mw' && benchmark.capacity_key.endsWith('_kw')) capacityInBenchmarkUnit = capacityRaw / 1000
+    const installedAsp = Number(state?.headlineDerived?.installedAsp ?? state?.performanceCard?.installed_asp_gbp ?? 0)
+    if (Number.isFinite(capacityInBenchmarkUnit) && capacityInBenchmarkUnit > 0 && installedAsp > 0) {
+      const aspPerUnit = installedAsp / capacityInBenchmarkUnit
+      const tooLow = aspPerUnit < benchmark.gbp_per_unit_low / 3
+      const tooHigh = aspPerUnit > benchmark.gbp_per_unit_high * 3
+      if (tooLow || tooHigh) {
+        const ratio = tooLow ? (benchmark.gbp_per_unit_low / aspPerUnit) : (aspPerUnit / benchmark.gbp_per_unit_high)
+        findings.push({
+          severity: 'HIGH',
+          check_id: 'C-1',
+          detail: `Installed ASP £${installedAsp.toLocaleString()} for ${capacityInBenchmarkUnit.toFixed(2)} ${benchmark.unit} = £${Math.round(aspPerUnit).toLocaleString()}/${benchmark.unit}. Industry benchmark £${benchmark.gbp_per_unit_low.toLocaleString()}-${benchmark.gbp_per_unit_high.toLocaleString()}/${benchmark.unit}. Off by ${ratio.toFixed(1)}× (${tooLow ? 'under' : 'over'}). Likely: emitter uses buildMinimalContract (empty macro_assembly_prices) so cost-stack only sums word-level part prices, missing big-ticket items. Fix: have emitter create words mirroring macros, OR include unmatched macros in BoM total.`,
+        })
+      }
+    }
+  }
+
+  // ── V-1 visual PDF text-overlap check via pdftotext ──
+  const pdfPath = join(outDir, 'chain-v2.pdf')
+  if (existsSync(pdfPath)) {
+    try {
+      const txt = execFileSync('pdftotext', ['-layout', pdfPath, '-'], { encoding: 'utf-8', maxBuffer: 50 * 1024 * 1024 }).toString()
+      const lines = txt.split('\n')
+      let overlapLines = 0
+      const overlapSamples: string[] = []
+      for (const line of lines) {
+        const fragments = line.split(/\s{4,}/).filter(s => /[A-Za-z]{3,}/.test(s) && s.length > 3)
+        if (fragments.length >= 4) {
+          overlapLines++
+          if (overlapSamples.length < 3) overlapSamples.push(line.slice(0, 200))
+        }
+      }
+      if (overlapLines > 5) {
+        findings.push({
+          severity: 'HIGH',
+          check_id: 'V-1',
+          detail: `Detected ${overlapLines} lines with overlapping-text patterns (4+ word fragments at same Y). React-pdf wrap={false} blocks exceeding page-remaining height stack on existing content. First sample: "${overlapSamples[0]?.slice(0, 150)}". Fix area: scripts/render-minimal-pdf.tsx sub-module render block.`,
+        })
+      } else if (overlapLines > 0) {
+        findings.push({
+          severity: 'MED',
+          check_id: 'V-1',
+          detail: `${overlapLines} suspect overlap line(s) (under HIGH threshold). May be table false positives. First: "${overlapSamples[0]?.slice(0, 120)}".`,
+        })
+      }
+    } catch (err) {
+      findings.push({ severity: 'LOW', check_id: 'V-1', detail: `pdftotext failed: ${(err as Error).message.slice(0, 80)}` })
+    }
   }
 
   const passed = !findings.some(f => f.severity === 'HIGH')
