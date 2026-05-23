@@ -896,24 +896,25 @@ function computeBomTotals(state: any): BomTotals | null {
             if (ccid) candidates.push(ccid)
           }
 
-          // 2026-05-23 (post wind L20 BoM audit): the previous 66%
-          // token-match rule failed for macros laden with QUALIFIER
-          // tokens like "onshore_gravity_foundation" (3 qualifiers
-          // + 1 noun) vs word_id "concrete_foundation_pad". Stripping
-          // qualifier tokens BEFORE the match lets the semantic-noun
-          // tokens (the only ones a word_id would carry) score on equal
-          // ground. This added £900k foundation, £2.1M drivetrain,
-          // £950k hub, £1.5M nacelle, £330k converter, £108k transformer,
-          // £35k switchgear back into the BoM table line items, vs the
-          // previous "orphaned" path where they got added silently to
-          // the grand total but were invisible per-module.
+          // 2026-05-23 v3 (post wind L21 BoM audit revealed false-match
+          // regression): require ALL semantic tokens to match the candidate,
+          // not partial. The 0.50 threshold from v2 caused rotor_blade_
+          // assembly £12.5M to FALSELY match pm_rotor_word because both
+          // share "rotor" (score 1/2 = 0.50). With strict all-semantic-
+          // tokens match, rotor_blade_assembly requires BOTH "rotor" AND
+          // "blade" in candidate; only rotor_blade_word matches that.
+          //
+          // QUALIFIER_TOKENS still stripped first so macros like
+          // onshore_gravity_foundation (semantic = ["foundation"]) just
+          // need "foundation" in candidate — same effect as before for
+          // single-semantic-token macros.
           const QUALIFIER_TOKENS = new Set([
             'assembly', 'drivetrain', 'full', 'scale', 'panel', 'kit',
             'pack', 'system', 'unit', 'module', 'bedplate', 'enclosure',
             'onshore', 'offshore', 'gravity', 'large', 'small', 'medium',
             'primary', 'secondary', 'main', 'rated', 'nominal', 'standard',
             'sections', 'pmg', 'pmsg', 'reinforced', 'steel', 'iron',
-            'concrete', 'foundation_pad',  // last is special — handled below
+            'concrete',
           ])
           let bestMatch: typeof macroPrices[number] | null = null
           let bestScore = 0
@@ -922,8 +923,7 @@ function computeBomTotals(state: any): BomTotals | null {
             // by a prior word in this BoM pass.
             if (claimedMacroAssemblies.has(mp.word_name)) continue
             const allTokens = mp.word_name.split('_').filter(t => t.length >= 3)
-            // Semantic tokens = non-qualifier tokens (the nouns that
-            // word_ids actually carry).
+            // Semantic tokens = non-qualifier tokens.
             const semanticTokens = allTokens.filter(t => !QUALIFIER_TOKENS.has(t))
             const matchTokens = semanticTokens.length > 0 ? semanticTokens : allTokens
             if (matchTokens.length === 0) continue
@@ -932,14 +932,17 @@ function computeBomTotals(state: any): BomTotals | null {
               if (cand === mp.word_name) {
                 bestMatch = mp; bestScore = 1.0; break  // exact wins
               }
-              const matched = matchTokens.filter(t => cand.includes(t)).length
-              const score = matched / matchTokens.length
-              // Lowered threshold to 0.50 since semantic tokens are
-              // higher-signal — even matching 1 of 2 semantic tokens
-              // (e.g. "foundation" of ["foundation"] is a clean match
-              // for "concrete_foundation_pad").
-              if (score >= 0.50 && score > bestScore) {
-                bestMatch = mp; bestScore = score
+              // STRICT: require ALL semantic tokens to appear in candidate.
+              // This prevents rotor_blade_assembly from matching pm_rotor_word
+              // (would need both "rotor" AND "blade" in word_id).
+              const allMatch = matchTokens.every(t => cand.includes(t))
+              if (allMatch) {
+                // Score by inverse candidate length — prefer specific words
+                // (rotor_blade_word) over generic (rotor_word_assembly_aux).
+                const score = matchTokens.length / Math.max(cand.split('_').length, matchTokens.length)
+                if (score > bestScore) {
+                  bestMatch = mp; bestScore = score
+                }
               }
             }
             if (bestScore >= 1.0) break

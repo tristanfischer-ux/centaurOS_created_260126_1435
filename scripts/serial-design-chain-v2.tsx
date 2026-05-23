@@ -4093,10 +4093,14 @@ async function main() {
       cwd: resolve(__dirname, '..'),
     })
   } catch (err) {
-    const errMsg = (err as Error).message
-    // execFileSync throws when subprocess exits non-zero. Check if exit 10
-    // (BoM-quality FAIL) — propagate that to the chain so operator must fix.
-    if (/status\s*:?\s*10/.test(errMsg) || /code\s*:?\s*10/.test(errMsg) || /exited with code 10/.test(errMsg)) {
+    // execFileSync throws on non-zero exit; the SpawnSyncReturns object on
+    // the error carries the actual exit code in err.status. Check that
+    // directly rather than parsing the error message string.
+    // L21 post-mortem: the previous string-match-on-errMsg approach
+    // missed the exit 10 signal because execFileSync's error.message is
+    // generic "Command failed: ..." — the actual status is on err.status.
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 10) {
       console.error('')
       console.error('╔══════════════════════════════════════════════════════════════════════╗')
       console.error('║  CHAIN HARD-EXIT — BoM-quality audit FAILED (code 10)               ║')
@@ -4106,10 +4110,10 @@ async function main() {
       console.error('║  threshold; widen cost-repair UP-cap for class; force macro         ║')
       console.error('║  override on emitter\'s headline word.                              ║')
       console.error('╚══════════════════════════════════════════════════════════════════════╝')
-      logAction({ step: 'fatal_bom_audit', reason: 'audit-pdf-bom exit 10', error: errMsg.slice(0, 200) })
+      logAction({ step: 'fatal_bom_audit', reason: 'audit-pdf-bom exit 10', status: 10 })
       process.exit(10)
     }
-    console.error(`[chain] audit-pdf-bom flagged issues (see AUDIT-BOM.md): ${errMsg.slice(0, 80)}`)
+    console.error(`[chain] audit-pdf-bom flagged issues (see AUDIT-BOM.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
 
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
