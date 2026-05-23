@@ -848,6 +848,11 @@ export function generateModuleParagraph(
 }
 
 function renderLinkProse(moduleSpec: ModuleSpec, links: ReadonlyArray<GrammarLink>): string {
+  // 2026-05-23: orchestrator-emitted designs occasionally pass undefined or
+  // null for links when grammar_links is empty (Phase 2 repair can leave the
+  // field unset on rewritten sub-modules). Defensive guard — same family of
+  // bug as the sentence-generator.ts:776/777 fix earlier this session.
+  if (!Array.isArray(links)) links = []
   if (links.length === 0) return ''
   const subById = new Map<string, SubModuleSpec>()
   for (const sub of moduleSpec.sub_modules ?? []) {
