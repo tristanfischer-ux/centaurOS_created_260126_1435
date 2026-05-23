@@ -3252,7 +3252,16 @@ registerArchetype('wind_turbine', (brief: any) => {
   const totalBladeMassKg = numBlades * bladeMassKg
   const hubMassKg = 0.954 * Math.pow(totalBladeMassKg, 0.95)
   const nacelleMassKg = (isDirectDrive ? 5500 : 2500) * ratedMw
-  const towerMassKg = 0.295 * Math.pow(rotorDiamM, 1.5) * hubHeightM
+  // 2026-05-23 L27 post-mortem: NREL/Fingersh scaling 0.295×D^1.5×H gives
+  // 68 t for 6 MW 155m/120m, but industry actual (Vestas EnVentus 6 MW
+  // tubular tower) is 250-350 t. Apply empirical floor of 2500 kg per
+  // meter of hub height for utility class (≥5 MW), 1500 kg/m for mid
+  // (0.5-5 MW), 500 kg/m for small wind. NREL formula was calibrated
+  // for the pre-2010 generation of smaller-rotor utility turbines.
+  const towerMassKg = Math.max(
+    0.295 * Math.pow(rotorDiamM, 1.5) * hubHeightM,
+    hubHeightM * (ratedMw < 0.5 ? 500 : ratedMw < 5 ? 1500 : 2500),
+  )
   const totalNacelleAssemblyMassKg = totalBladeMassKg + hubMassKg + nacelleMassKg
   // Transport constraint — max blade chord on European roads typically 4.5 m
   // (Highway Englanddischarging exceptional load permits). Beyond that

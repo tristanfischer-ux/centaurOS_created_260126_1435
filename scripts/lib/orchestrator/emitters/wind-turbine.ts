@@ -141,7 +141,15 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   // voltage class is determined HERE from rated power.
   const genVForCurrent = ratedPowerKw < 500 ? 400 : ratedPowerKw < 5000 ? 690 : 3300
   const acContinuousA = (ratedPowerKw * 1000) / (genVForCurrent * Math.sqrt(3) * 0.95)
-  const totalMassKg = q(contract, 'total_system_mass_kg', ratedPowerKw * 25 + ratedPowerKw * 18 + hubHeightM * 150)
+  // 2026-05-23 L27 post-mortem: old formula 25 kg/kW nacelle + 18 kg/kW
+  // rotor + 150 kg/m tower gave 276 t for 6 MW 120m. Critic correctly
+  // flagged "should be 600-800 t" (industry actual for 6 MW direct-drive
+  // tubular tower 120m hub: nacelle 180t + rotor 90t + tower 300t = 570t).
+  // Recompute totalMassKg below from explicit nacelle + rotor + tower
+  // values after they're scaled. Default formula here is a placeholder;
+  // actual totalMassKg is overwritten by the scale-aware computation
+  // a few lines down.
+  let totalMassKg = q(contract, 'total_system_mass_kg', ratedPowerKw * 100 + hubHeightM * 2500)
   // 2026-05-23 (post-L16): use deployment_class enum (1=onshore, 2=offshore)
   // emitted by engineering-contract.ts:3280 wind builder. Falls back to
   // generator_type for any callers still on the older convention.
@@ -212,6 +220,13 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   const foundationRebarKg = Math.round(foundationVolumeM3 * 120)
   // Anchor bolts: scale with rotor diameter / overturning moment
   const anchorBoltCount = ratedPowerKw < 200 ? 24 : ratedPowerKw < 2000 ? 72 : 144
+
+  // 2026-05-23 L27 post-mortem: recompute totalMassKg from actual scaled
+  // component masses now that all inputs are known. Tower mass per
+  // engineering contract empirical scaling: ratedKw ≥ 5000 → 2500 kg/m
+  // of hub height. nacelleMassKg + totalRotorMassKg already scaled above.
+  const towerMassKg = hubHeightM * (ratedPowerKw < 500 ? 500 : ratedPowerKw < 5000 ? 1500 : 2500)
+  totalMassKg = Math.round(nacelleMassKg + totalRotorMassKg + towerMassKg)
 
   // 2026-05-23 L17 follow-up — additional scaling for the 5 remaining HIGH
   // physics issues flagged by Physics Critic on L17.
@@ -398,9 +413,13 @@ function emitGearboxDrivetrain(p: WindTurbineParams): DesignModule {
     const drivetrain = makeSubModule('drivetrain_assembly', 'direct-drive shaft + main bearing', 'transmits',
       `direct-drive low-speed rotor torque (${torqueNm.toFixed(0)} N·m at ${p.rotorRpm} rpm) into PM generator at same shaft RPM`,
       [
+        // 2026-05-23 L27 post-mortem: shaft capacity must include IEC
+        // 61400-1/4 safety factor 1.75× over nominal to handle DLC1.5
+        // extreme-gust + DLC2.2 emergency-stop + fatigue. Previous
+        // capacity = nominal torque only (1.0× safety) → critic flagged.
         word('low_speed_shaft_word', 'low speed shaft',
           cc('low_speed_shaft', 'low-speed shaft', 'electromechanical_switching_function', 'steel'),
-          [mod('quantity', '×1'), mod('dimension', lowSpeedShaftMm.toFixed(0), 'mm'), mod('form', '42CrMo4 forged'), mod('capacity', torqueNm.toFixed(0), 'N·m')]),
+          [mod('quantity', '×1'), mod('dimension', lowSpeedShaftMm.toFixed(0), 'mm'), mod('form', '42CrMo4 forged'), mod('capacity', (torqueNm * 1.75).toFixed(0), 'N·m peak'), mod('regulatory', 'IEC 61400-4 DLC1.5/2.2 safety factor 1.75')]),
         word('main_bearing_word', 'main bearing',
           cc('main_bearing', 'main rotor bearing', 'electromechanical_switching_function', 'steel'),
           [mod('quantity', '×2'), mod('form', 'double-row tapered roller'), mod('capacity', p.hubStaticLoadKg.toFixed(0), 'kg axial'), mod('regulatory', 'IEC 61400-4')]),
