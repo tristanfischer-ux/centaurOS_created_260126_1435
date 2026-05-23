@@ -16,7 +16,7 @@
  * Usage:
  *   npx tsx scripts/serial-design-chain-v2.tsx <brief.md> <out-dir>
  */
-import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync } from 'fs'
+import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync, statSync } from 'fs'
 import { resolve } from 'path'
 import { homedir } from 'os'
 import { execFileSync } from 'child_process'
@@ -2432,6 +2432,24 @@ async function main() {
     ;(design.modules as any).__contractMisses = macroAssemblyMisses
   }
 
+  // 2026-05-23 P0-1 fix: EARLY headline derivation. Was originally only called
+  // AFTER Phase 2 (around line 3012 below) — meant every reviewer + critic
+  // (skeleton critic, R1, R4, specialist, physics repair) received
+  // keyMetrics=null. They couldn't ground critique on the cover-page numbers
+  // because the cover-page numbers didn't exist yet. Now: compute the headline
+  // here so the reviewer cascade can see it. The post-Phase-2 re-derive below
+  // refreshes with any Phase 2 mutations. WIRING_GAPS cross-cut #10.
+  try {
+    const earlyDerived = deriveHeadlineFromModules(design.modules ?? [], parsedResult.data, productClass, currentBriefText)
+    keyMetrics = earlyDerived as KeyMetrics
+    const ho = earlyDerived.headline_output
+    console.error(`[chain] keyMetrics seeded early (pre-reviewer): ${ho ? `${ho.label}=${ho.value} ${ho.unit ?? ''}` : '(no headline yet)'}`)
+    logAction({ step: 'derive_headline_early', ok: true, headline: ho ?? null })
+  } catch (err) {
+    console.error(`[chain] early headline derivation threw: ${(err as Error).message}; reviewers will see keyMetrics=null (pre-fix behaviour)`)
+    logAction({ step: 'derive_headline_early', ok: false, error: String(err) })
+  }
+
   // ── Build #19b (2026-05-22): PHASE 4 — physics critic on skeleton + fail-fast.
   // Per Tristan's plan: run physics critic on the tool-derived skeleton BEFORE
   // the expensive reviewer cascade. If plausibility is unrecoverable (<3/10),
@@ -3967,6 +3985,57 @@ async function main() {
     cwd: resolve(__dirname, '..'),
     env: renderEnv,
   })
+
+  // 2026-05-23 P0-2: post-render PDF integrity check. Catches catastrophic
+  // render failures (0-byte file, JSON-serialised-as-PDF, missing PDF header)
+  // BEFORE the founder receives a "ready" status. Hard-exit code 8 on fail.
+  try {
+    const pdfStat = statSync(pdfPath)
+    if (pdfStat.size < 1024) {
+      console.error('')
+      console.error('╔══════════════════════════════════════════════════════════════════════╗')
+      console.error('║  POST-RENDER INTEGRITY FAIL — PDF size < 1 KB                       ║')
+      console.error(`║  File: ${pdfPath.slice(-50).padEnd(60)} ║`)
+      console.error(`║  Size: ${String(pdfStat.size).padEnd(60)} ║`)
+      console.error('╚══════════════════════════════════════════════════════════════════════╝')
+      logAction({ step: 'integrity_check', ok: false, reason: 'pdf_size_too_small', size: pdfStat.size })
+      process.exit(8)
+    }
+    const headerBuf = readFileSync(pdfPath).slice(0, 8).toString('utf-8')
+    if (!headerBuf.startsWith('%PDF-')) {
+      console.error('')
+      console.error('╔══════════════════════════════════════════════════════════════════════╗')
+      console.error('║  POST-RENDER INTEGRITY FAIL — file is not a PDF                     ║')
+      console.error(`║  Header (first 8 bytes): ${headerBuf.padEnd(46)} ║`)
+      console.error('╚══════════════════════════════════════════════════════════════════════╝')
+      logAction({ step: 'integrity_check', ok: false, reason: 'pdf_header_missing', header: headerBuf })
+      process.exit(8)
+    }
+    console.error(`[chain] integrity check: PDF ${pdfStat.size} bytes, %PDF header OK`)
+    logAction({ step: 'integrity_check', ok: true, size: pdfStat.size })
+  } catch (err) {
+    console.error(`[chain] integrity check threw: ${(err as Error).message}`)
+    logAction({ step: 'integrity_check', ok: false, error: String(err) })
+    process.exit(8)
+  }
+
+  // 2026-05-23 P0-5: auto-audit every chain run via the 5-axis audit script.
+  // Writes AUDIT.md to outDir, exits 1 on HIGH findings. We don't propagate
+  // its exit code — the audit is informational; chain success is defined by
+  // the PDF actually being produced (above integrity check). But the audit
+  // log line gives the operator immediate visibility into density / fidelity
+  // / cost-benchmark / visual-overlap regressions.
+  try {
+    execFileSync('npx', ['tsx', resolve(__dirname, 'audit-pdf-run.ts'), outDir], {
+      stdio: 'inherit',
+      cwd: resolve(__dirname, '..'),
+    })
+  } catch (err) {
+    // exit 1 from audit means HIGH findings present — chain doesn't fail
+    // on it, but the AUDIT.md file + stdout already showed the findings.
+    console.error(`[chain] audit-pdf-run flagged issues (see AUDIT.md): ${(err as Error).message.slice(0, 80)}`)
+  }
+
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
   // try/catch. The renderer's own `open` was guarded; this one was not. In
   // the worker/LaunchAgent path, `open` can fail (no GUI session) and would

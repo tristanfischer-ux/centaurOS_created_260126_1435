@@ -1134,9 +1134,15 @@ registerArchetype('heat_pump_residential', (brief: any) => {
   const briefMassCapKg = Number(brief?.constraints?.max_mass_kg?.value ?? 250)
   // Sound power dBA: empirical 50 + log2(thermal_kw) × 3
   const soundPowerDba = 50 + Math.log2(Math.max(thermalKw, 1)) * 3
-  // Ambient envelope (EN 14511 / EN 14825): brief may override
-  const minAmbientC = Number(brief?.constraints?.min_ambient_c?.value ?? -20)
-  const maxAmbientC = Number(brief?.constraints?.max_ambient_c?.value ?? 35)
+  // Ambient envelope (EN 14511 / EN 14825): brief may override.
+  // 2026-05-23 P0-3 fix: was reading `min_ambient_c.value` and
+  // `max_ambient_c.value` — these keys DON'T EXIST in StructuredBriefJSON
+  // schema (the real key is `operating_environment.temp_min_c` /
+  // `temp_max_c` per src/lib/pdf-engine-v2/types.ts:34-38). Result: brief's
+  // stated operating envelope was ALWAYS silently discarded for heat pump.
+  // Cold-climate briefs (-25°C ambient) shipped designs sized for -20°C.
+  const minAmbientC = Number(brief?.constraints?.operating_environment?.temp_min_c ?? -20)
+  const maxAmbientC = Number(brief?.constraints?.operating_environment?.temp_max_c ?? 35)
   // Refrigeration cycle saturation at A2/W35
   const evapSatC = -12
   const condSatC = 50

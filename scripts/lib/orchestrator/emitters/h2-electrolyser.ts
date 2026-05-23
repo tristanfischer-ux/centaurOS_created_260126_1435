@@ -140,7 +140,15 @@ function emitPowerElectronicsDc(p: Params): DesignModule {
     module: 'power_electronics_DC',
     module_brief: `12-pulse thyristor rectifier (£65/kW class) delivers low-ripple DC to the stack via 5 mH smoothing inductor and water-cooled manganin shunt.`,
     overview_paragraph_en: '',
-    derived_parameters: { rectifier_efficiency_pct: q({ quantities: {} } as any, 'rectifier_efficiency_pct', 97) },
+    // 2026-05-23 P0-4 fix: was `q({ quantities: {} } as any, 'rectifier_efficiency_pct', 97)`
+    // — a paste error that wrapped 97 in a q() call against an EMPTY
+    // quantities object, so 97 was always returned. The wrapper pretended
+    // to be dynamic but couldn't be. emitPowerElectronicsDc only receives
+    // `Params`, not the orchestrator contract. Honest fix: literal 97 with
+    // a comment that this is a class anchor (12-pulse SCR rectifier typical
+    // efficiency, IEC 60146-1-1). To make this truly contract-driven later,
+    // pass the contract through Params or change the emitter signature.
+    derived_parameters: { rectifier_efficiency_pct: 97 },
     allowed_radicals: ['silicon_semiconductor_function', 'magnetic_coupling_function', 'electrical_conducting_function', 'copper'],
     applicability_confidence: 'high',
     sub_modules: [dcPower],
