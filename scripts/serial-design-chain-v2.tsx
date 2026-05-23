@@ -41,6 +41,7 @@ for (const envPath of [
 
 import { runBriefParsing } from '../src/lib/pdf-engine-v2/stages/0-brief-generation'
 import { runResearchSynthesis } from '../src/lib/pdf-engine-v2/stages/1-research'
+import { LLM_CONFIG } from '../src/lib/pdf-engine-v2/llm-config'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { buildContractForChain, type EngineeringContract } from './lib/engineering-contract'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
@@ -309,6 +310,11 @@ async function callLlm(opts: {
   thinkingLevel?: 'minimal' | 'low' | 'medium' | 'high'
   groundWithGoogleSearch?: boolean
   timeoutMs?: number
+  /** Stage name selects sampling config from src/lib/pdf-engine-v2/llm-config.ts.
+   *  Defaults to brief_parser (greedy + seeded) when unset. P2-2 (2026-05-23). */
+  stage?: keyof typeof LLM_CONFIG
+  /** Optional explicit temperature override — wins over stage default. */
+  temperature?: number
 }): Promise<{ text: string; latency_ms: number; tokens_in?: number; tokens_out?: number }> {
   // Retry policy (Tristan 2026-05-15, council-driven):
   //   • TRANSIENT (3 retries with 5s / 15s / 45s exponential backoff):
@@ -333,7 +339,12 @@ async function callLlm(opts: {
     const body: any = {
       model: opts.model,
       messages: [{ role: 'system', content: opts.system }, { role: 'user', content: opts.user }],
-      temperature: 0,
+      // 2026-05-23 P2-2: stage-specific config via LLM_CONFIG. callLLM is
+      // used by many stages — opts.stage selects which config to use; default
+      // brief_parser (greedy, seeded) since most callers want determinism.
+      // Override sampling per-call via opts.temperature when needed.
+      temperature: opts.temperature ?? LLM_CONFIG[opts.stage ?? 'brief_parser'].temperature,
+      ...(LLM_CONFIG[opts.stage ?? 'brief_parser'].seed !== null ? { seed: LLM_CONFIG[opts.stage ?? 'brief_parser'].seed } : {}),
       max_tokens: opts.maxTokens ?? 150_000,
     }
     if (opts.model === FLASH_LITE) {
@@ -1227,7 +1238,9 @@ Run the feasibility check. Return the JSON verdict.`
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
-        temperature: 0,
+        // P2-2: brief-plausibility critic = reviewer-style stage. Greedy
+        // + fixed seed for stable gate signal across runs.
+        ...LLM_CONFIG.physics_critic,
         max_tokens: 8000,
         thinking_level: 'high',
         // ⚠️ Removed google_search_grounding 2026-05-16 — verified that
@@ -1393,7 +1406,9 @@ Return the revised brief markdown now.`
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
-        temperature: 0.1,
+        // P2-2: brief-rewriter stage. Low variation acceptable for the JSON
+        // edit emit; no seed (each iteration should explore slightly).
+        ...LLM_CONFIG.brief_rewriter,
         max_tokens: 8000,
         thinking_level: 'low',
       }),
@@ -1482,7 +1497,9 @@ Emit the KeyMetrics JSON now.`
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
-        temperature: 0.1,
+        // P2-2: brief-reconciliation stage. Same config as brief_rewriter
+        // (low variation, no seed) — emits a structured JSON brief edit.
+        ...LLM_CONFIG.brief_reconciliation,
         max_tokens: 3000,
         thinking_level: 'high',
         // ⚠️ google_search_grounding removed 2026-05-16 — OpenRouter no-op for
