@@ -336,8 +336,22 @@ async function main() {
   for (const f of findings.filter(x => x.severity === 'HIGH')) {
     console.log(`  ✗ [${f.check_id}] ${f.detail.slice(0, 240)}`)
   }
-  // Informational mode: always exit 0 so chain proceeds. Hard-gate upgrade
-  // (exit code 10 on B-2..B-5 fail) is a separate decision pending approval.
+  // 2026-05-23 HARD-GATE UPGRADE (Tristan-approved): chain exits code 10
+  // when BoM quality fails. Physics Critic gate alone is insufficient —
+  // a chain that ships absurd BoM line totals while Physics Critic scores
+  // 9/10 fidelity is not acceptable. Both audits must pass.
+  // Exit 0 only when zero HIGH findings; exit 10 otherwise so the chain
+  // propagates failure and the operator MUST fix BoM issues before
+  // shipping. Codified in mempalace drawer_forgeos_decisions_219fa79b7ec290b7.
+  if (highCount > 0) {
+    console.log('')
+    console.log('╔══════════════════════════════════════════════════════════════════════╗')
+    console.log('║  BOM-QUALITY GATE FAIL — chain exits code 10                        ║')
+    console.log('║  Physics Critic alone is insufficient. BoM line totals + cover     ║')
+    console.log('║  reconciliation must pass. Fix the issues above and re-run.        ║')
+    console.log('╚══════════════════════════════════════════════════════════════════════╝')
+    process.exit(10)
+  }
   process.exit(0)
 }
 

@@ -4081,16 +4081,35 @@ async function main() {
   // audit-pdf-bom.ts closes that gap: B-2..B-6 checks for macro→BoM
   // propagation, cover-≡-table reconciliation, per-line industry-floor
   // sanity, module proportion, and PDF text extraction.
-  // INFORMATIONAL ONLY in v1 — writes AUDIT-BOM.md but chain proceeds
-  // regardless. Hard-gate upgrade (exit code 10 on B-2..B-5 fail) is a
-  // pending architectural decision.
+  //
+  // HARD GATE (2026-05-23 Tristan-approved): audit-pdf-bom exits 10 on
+  // BoM-quality FAIL. Chain HARD-EXITS code 10 — the PDF + state.json
+  // remain on disk for the operator to inspect (status='blocked') but
+  // the chain MUST NOT declare success. Physics Critic alone is not a
+  // sufficient quality signal.
   try {
     execFileSync('npx', ['tsx', resolve(__dirname, 'audit-pdf-bom.ts'), outDir], {
       stdio: 'inherit',
       cwd: resolve(__dirname, '..'),
     })
   } catch (err) {
-    console.error(`[chain] audit-pdf-bom flagged issues (see AUDIT-BOM.md): ${(err as Error).message.slice(0, 80)}`)
+    const errMsg = (err as Error).message
+    // execFileSync throws when subprocess exits non-zero. Check if exit 10
+    // (BoM-quality FAIL) — propagate that to the chain so operator must fix.
+    if (/status\s*:?\s*10/.test(errMsg) || /code\s*:?\s*10/.test(errMsg) || /exited with code 10/.test(errMsg)) {
+      console.error('')
+      console.error('╔══════════════════════════════════════════════════════════════════════╗')
+      console.error('║  CHAIN HARD-EXIT — BoM-quality audit FAILED (code 10)               ║')
+      console.error('║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║')
+      console.error('║  Fix the BoM issues flagged above (AUDIT-BOM.md) and re-run.        ║')
+      console.error('║  Common fixes: rename macro to match word_id; lower matcher         ║')
+      console.error('║  threshold; widen cost-repair UP-cap for class; force macro         ║')
+      console.error('║  override on emitter\'s headline word.                              ║')
+      console.error('╚══════════════════════════════════════════════════════════════════════╝')
+      logAction({ step: 'fatal_bom_audit', reason: 'audit-pdf-bom exit 10', error: errMsg.slice(0, 200) })
+      process.exit(10)
+    }
+    console.error(`[chain] audit-pdf-bom flagged issues (see AUDIT-BOM.md): ${errMsg.slice(0, 80)}`)
   }
 
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in

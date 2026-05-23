@@ -45,17 +45,47 @@ eventually differ per code (currently uniform: no retry).
 
 | Code | Meaning | Source |
 |---|---|---|
-| 0 | Success — PDF rendered + integrity-verified | normal completion |
+| 0 | Success — PDF rendered + integrity-verified + BoM-quality passed | normal completion |
 | 1 | Unexpected error (catch-all + bad CLI args) | `main().catch` or `process.argv` |
 | 2 | Brief refinement loop exhausted — original brief unfixable | Stage 2.6, line ~1992 |
 | 3 | G0.5 reconciliation halt — brief-vs-design scale mismatch | Stage 7.5, line ~2778 |
 | 5 | Render subprocess failed — react-pdf crashed | Stage 48, line ~3983 |
 | 6 | PDF integrity check failed (size < 1 KB OR header ≠ %PDF-) | Stage 48.5, lines ~4002/4012/4019 |
 | 7 | Orchestrator hard fail (when engineeringContract present but tool plan crashed) | Stage 17.5, line ~2360 |
+| 10 | BoM-quality audit FAILED — macros orphaned, line totals absurd, cover ≠ sub-totals | Stage 49b (audit-pdf-bom.ts), Tristan-driven 2026-05-23 |
 
 Codes 4, 8, 9 are reserved (4: brief-rewrite unfixable distinct from refinement halt; 8 was used pre-P2-5 for integrity, now mapped to 6).
 
 When adding a new fatal exit, allocate the next free code AND update this table.
+
+---
+
+## Self-reinforcing PDF-quality loop (CANONICAL — codified 2026-05-23 after Tristan-flagged wind L20)
+
+**The chain is not acceptable until BOTH of these audits PASS:**
+
+1. `scripts/audit-pdf-run.ts` — measures **DESIGN FIDELITY** (Physics Critic dimensions, density, brief-vs-contract scale, visual overlap). Threshold: F-1 brief_to_design_fidelity ≥ 6, no HIGH-severity engineering issues.
+
+2. `scripts/audit-pdf-bom.ts` — measures **BoM QUALITY** + **cost-stack reconciliation**. Threshold: zero HIGH findings on B-2..B-5.
+   - B-2 macro → BoM module sub-total propagation (orphaned macro = FAIL)
+   - B-3 cover total ≡ Σ module sub-totals (within 10%)
+   - B-4 per-line industry-floor sanity per class (`CLASS_MIN_UNIT_PRICES`)
+   - B-5 module proportion vs class industry shares (`CLASS_MODULE_SHARES`)
+   - B-6 PDF text extraction sanity (informational)
+
+**Why both are required**: Physics Critic measures _design fidelity to brief_ — does the design honour stated rated_power, voltage, geometry? It does NOT audit BoM LINE TOTALS or whether cover-page total reconciles with the BoM section. The wind L20 chain scored F-1 9/10 on fidelity while shipping foundation £24k for a 6 MW gravity base, blade £15, hub £45. Two independent quality dimensions; both must gate.
+
+**The agent must NEVER trust chain stdout logs alone**. Every chain run:
+
+1. Open the resulting `chain-v2.pdf` (via pdftotext extraction of cover lines + BoM sub-totals + sample line items per module).
+2. Verify cover Raw materials BoM ≈ Σ of module sub-totals shown in the BoM table.
+3. Verify per-line items pass class-specific industry floors (e.g. utility wind blade ≥ £100k each — anything 1000× under is wrong).
+4. Confirm BOTH `audit-pdf-run.ts` AND `audit-pdf-bom.ts` exit 0.
+5. Only THEN declare the chain validated.
+
+When `audit-pdf-bom` reports orphaned macros, the macro→word matcher in `scripts/render-minimal-pdf.tsx:885-927` is the first suspect — it uses fuzzy token-matching that fails when macro names contain qualifier tokens (assembly, drivetrain, gravity, onshore, bedplate, scale, panel). Fix paths: (a) lower matcher threshold + strip qualifier tokens, (b) rename macros in engineering-contract.ts to match word_ids exactly, (c) widen cost-repair UP-cap for the class.
+
+Drawer: `drawer_forgeos_decisions_219fa79b7ec290b7` — the workflow rule that drove this codification.
 
 ---
 
