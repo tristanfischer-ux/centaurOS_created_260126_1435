@@ -473,6 +473,16 @@ function emitConverterGridTie(p: WindTurbineParams): DesignModule {
       word('chopper_resistor_word', 'chopper resistor',
         cc('chopper_resistor', 'chopper resistor', 'electrical_conducting_function', 'ceramic'),
         [mod('quantity', '×1'), mod('capacity', Math.max(5, Math.round(p.ratedPowerKw * 0.12)).toFixed(0), 'kW'), mod('form', 'dynamic braking resistor (LVRT ride-through)'), mod('regulatory', 'EN 50549-1')]),
+      // 2026-05-23 L22: emit step-up transformer + MV switchgear words so
+      // grid_step_up_transformer + mv_switchgear macros from engineering-contract
+      // have target word_ids. Without these, those macros are orphaned and
+      // their £108k + £35k vanish from per-module BoM totals.
+      word('step_up_transformer_word', 'step-up transformer',
+        cc('step_up_transformer', 'step-up transformer', 'magnetic_coupling_function', 'copper'),
+        [mod('quantity', '×1'), mod('capacity', p.ratedPowerKw.toFixed(0), 'kVA'), mod('dimension', `${p.transformerLvV}/${p.transformerHvKv}000 V`), mod('form', p.isOffshore ? 'dry-type cast-resin nacelle xfm' : 'oil-filled tower-base xfm'), mod('regulatory', 'IEC 60076')]),
+      word('mv_switchgear_word', 'MV switchgear',
+        cc('mv_switchgear', 'medium voltage switchgear', 'electrical_conducting_function', 'aluminium'),
+        [mod('quantity', '×1'), mod('form', 'vacuum CB + earthing switch + protection relay + RMU'), mod('dimension', `${p.transformerHvKv} kV class`), mod('regulatory', 'IEC 62271')]),
     ])
   return {
     module: 'converter_grid_tie',
@@ -501,6 +511,15 @@ function emitTowerYaw(p: WindTurbineParams): DesignModule {
       word('tower_door_word', 'tower door',
         cc('tower_door', 'tower door', null, 'steel'),
         [mod('quantity', '×1'), mod('regulatory', 'IP54'), mod('form', '600×1800 mm')]),
+      // 2026-05-23 L22: nacelle bedplate is the steel main frame that
+      // carries the rotor + drivetrain + generator. Structurally it sits
+      // on top of the tower (between tower and rotor) — emitting it in
+      // tower_yaw module keeps the BoM hierarchy clean since the emitter
+      // has no separate nacelle module. macro nacelle_enclosure_bedplate
+      // from engineering-contract.ts matches this via semantic "nacelle".
+      word('nacelle_bedplate_word', 'nacelle bedplate + enclosure',
+        cc('nacelle_bedplate', 'nacelle steel bedplate + GRP enclosure', null, 'steel'),
+        [mod('quantity', '×1'), mod('capacity', p.nacelleMassKg.toFixed(0), 'kg'), mod('form', 'welded steel main frame + GRP enclosure'), mod('dimension', `${(p.rotorDiameterM * 0.10).toFixed(1)} m wide × ${(p.rotorDiameterM * 0.16).toFixed(1)} m long × ${(p.rotorDiameterM * 0.07).toFixed(1)} m tall`), mod('regulatory', 'IEC 61400-1')]),
       word('climbing_ladder_word', 'climbing ladder',
         cc('climbing_ladder', 'climbing ladder', null, 'aluminium'),
         [mod('quantity', '×1'), mod('regulatory', 'EN 14122-4'), mod('dimension', p.hubHeightM.toFixed(0), 'm')]),

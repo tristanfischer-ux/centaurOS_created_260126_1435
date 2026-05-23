@@ -3413,7 +3413,12 @@ registerArchetype('wind_turbine', (brief: any) => {
       source_detail: `£${foundationGbpPerKw}/kW × ${ratedKw} kW (${isOffshore ? 'monopile steel, 2000-4000 t per turbine, shallow water <50m' : 'reinforced concrete gravity pad, 600-800 m³, 1500 t rebar'})`,
     },
     {
-      word_name: 'power_converter_full_scale',
+      // 2026-05-23 L22: renamed from power_converter_full_scale → generator_side_converter
+      // to match the emitter's word_id (scripts/lib/orchestrator/emitters/
+      // wind-turbine.ts emits generator_side_converter_word in converter_grid_tie
+      // module). Strict matcher now finds "converter" + "side" + "generator"
+      // semantic tokens in the candidate; macro lands on that word's BoM line.
+      word_name: 'generator_side_converter',
       unit_price_gbp: 55,
       dimension_basis: 'kw_power',
       dimension_value: ratedKw,
@@ -3421,7 +3426,10 @@ registerArchetype('wind_turbine', (brief: any) => {
       source_detail: `£55/kW × ${ratedKw} kW (full-scale IGBT back-to-back converter, 690 V class, LVRT/HVRT compliant)`,
     },
     {
-      word_name: 'step_up_transformer',
+      // 2026-05-23 L22: renamed step_up_transformer → grid_step_up_transformer to
+      // match the new step_up_transformer_word added to wind-turbine.ts emitter.
+      // Both semantic tokens "step" + "transformer" appear in candidate.
+      word_name: 'grid_step_up_transformer',
       unit_price_gbp: 18,
       dimension_basis: 'kw_power',
       dimension_value: ratedKw,
@@ -3429,7 +3437,9 @@ registerArchetype('wind_turbine', (brief: any) => {
       source_detail: `£18/kVA × ${ratedKw} kVA (${isOffshore ? '66 kV dry-type cast-resin nacelle xfm' : '33 kV oil-filled tower-base xfm'}, IEC 60076)`,
     },
     {
-      word_name: 'switchgear_protection_panel',
+      // 2026-05-23 L22: renamed switchgear_protection_panel → mv_switchgear to
+      // match the new mv_switchgear_word added to wind-turbine.ts emitter.
+      word_name: 'mv_switchgear',
       unit_price_gbp: 35000,
       dimension_basis: 'each',
       dimension_value: 1,
