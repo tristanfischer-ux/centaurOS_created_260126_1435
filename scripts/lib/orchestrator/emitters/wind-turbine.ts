@@ -111,16 +111,23 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   const cpMax = q(contract, 'rotor_cp_max', 0.45)
   const tsr = q(contract, 'tip_speed_ratio_optimal', 6.5)
   const rotorRpm = Math.round((ratedMs * tsr * 60) / (Math.PI * rotorDiameterM))
-  // 2026-05-23: direct-drive detection — read from contract OR brief
-  // description. Direct-drive eliminates the gearbox; generator runs at
-  // rotor RPM directly. Common at utility scale (Enercon, Siemens-Gamesa
-  // DD, GE Cypress, MingYang) because gearboxes are #1 failure source.
-  const ddFlag = q(contract, 'direct_drive', 0)
-  const briefDesc = String((contract as any)?.brief?.product_description ?? '')
-  const isDirectDrive = ddFlag >= 1 || /direct[\s-]?drive|gearless|no\s+gearbox|enercon|siemens[\s-]?gamesa\s+dd|ge\s+cypress|mingyang/i.test(briefDesc)
+  // 2026-05-23 (post-L15 audit): direct-drive detection — read from
+  // contract.quantities.drivetrain_type (1=geared, 2=direct-drive) emitted
+  // by engineering-contract.ts wind builder. ContractInProgress doesn't
+  // carry the brief field at orchestrator time, so we can't regex the
+  // description here — must read from quantities. The contract builder
+  // already does the regex detection upstream and emits the enum.
+  const drivetrainType = q(contract, 'drivetrain_type', 1)
+  const isDirectDrive = drivetrainType >= 2
   const generatorRpm = isDirectDrive ? rotorRpm : 1500
   const gearboxRatio = isDirectDrive ? 1 : q(contract, 'gearbox_ratio', 1500 / Math.max(1, rotorRpm))
-  const acContinuousA = q(contract, 'ac_continuous_current_a', (ratedPowerKw * 1000) / (400 * Math.sqrt(3) * 0.95))
+  // 2026-05-23 (post-L15): use generator AC voltage, not hardcoded 400 V.
+  // generatorAcV is computed below from ratedPowerKw class — but we need
+  // it here, so compute it inline. ratedPowerKw < 500 → 400 V; 500-5000 →
+  // 690 V; ≥5000 → 3300 V. Wrong denominator = oversized cable: at 6 MW
+  // 3300 V the actual current is ~1100 A, not 8661 A.
+  const genVForCurrent = ratedPowerKw < 500 ? 400 : ratedPowerKw < 5000 ? 690 : 3300
+  const acContinuousA = q(contract, 'ac_continuous_current_a', (ratedPowerKw * 1000) / (genVForCurrent * Math.sqrt(3) * 0.95))
   const totalMassKg = q(contract, 'total_system_mass_kg', ratedPowerKw * 25 + ratedPowerKw * 18 + hubHeightM * 150)
   const generatorType = q(contract, 'generator_type', 1)
   const isOffshore = generatorType >= 2 || /offshore|monopile|jacket|floating|sea/i.test(briefDesc)
@@ -338,7 +345,7 @@ function emitGenerator(p: WindTurbineParams): DesignModule {
     ])
   return {
     module: 'generator',
-    module_brief: `Direct-drive ${p.ratedPowerKw} kW PMSG with NdFeB rotor, 690 V AC stator at η≥94%, slip rings + encoder for control feedback.`,
+    module_brief: `${p.isDirectDrive ? 'Direct-drive' : 'Geared'} ${p.ratedPowerKw} kW PMSG with NdFeB rotor, ${p.generatorAcV} V AC stator at η≥94%, slip rings + encoder for control feedback.`,
     overview_paragraph_en: '',
     derived_parameters: { rated_power_kw: p.ratedPowerKw, generator_rpm: p.generatorRpm },
     allowed_radicals: ['magnetic_coupling_function', 'electrical_conducting_function', 'optical_sensing_function', 'copper', 'ndfeb_magnet', 'polymer_thermoplastic'],
@@ -349,7 +356,7 @@ function emitGenerator(p: WindTurbineParams): DesignModule {
 
 function emitConverterGridTie(p: WindTurbineParams): DesignModule {
   const converter = makeSubModule('grid_tie_converter', 'grid-tie converter', 'rectifies',
-    `${p.ratedPowerKw} kW PMSG variable-frequency output via back-to-back IGBT to ${p.acContinuousA.toFixed(0)} A at 400 V grid`,
+    `${p.ratedPowerKw} kW PMSG ${p.generatorAcV} V variable-frequency output via back-to-back IGBT, ${p.acContinuousA.toFixed(0)} A at generator side, stepped up by transformer to grid (33 kV at utility scale, ${p.ratedPowerKw < 500 ? '400 V' : '690 V'} at smaller scale)`,
     [
       word('generator_side_converter_word', 'generator-side converter',
         cc('generator_side_converter', 'generator-side converter', 'silicon_semiconductor_function', 'silicon_semiconductor_function'),
@@ -365,7 +372,7 @@ function emitConverterGridTie(p: WindTurbineParams): DesignModule {
         [mod('quantity', '×3'), mod('capacity', '1.0', 'mH'), mod('form', 'three-phase')]),
       word('chopper_resistor_word', 'chopper resistor',
         cc('chopper_resistor', 'chopper resistor', 'electrical_conducting_function', 'ceramic'),
-        [mod('quantity', '×1'), mod('capacity', '50', 'kW'), mod('form', 'braking resistor')]),
+        [mod('quantity', '×1'), mod('capacity', Math.max(5, Math.round(p.ratedPowerKw * 0.12)).toFixed(0), 'kW'), mod('form', 'dynamic braking resistor (LVRT ride-through)'), mod('regulatory', 'EN 50549-1')]),
     ])
   return {
     module: 'converter_grid_tie',
