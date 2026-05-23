@@ -773,8 +773,15 @@ export function generateSubmoduleParagraph(subModule: SubModuleSpec): string {
  */
 export function generateModuleSentence(moduleSpec: ModuleSpec): string {
   const label = MODULE_LABELS[moduleSpec.module] || humaniseId(moduleSpec.module)
-  const subs = moduleSpec.sub_modules ?? []
-  const links = moduleSpec.grammar_links ?? []
+  const subs = Array.isArray(moduleSpec.sub_modules) ? moduleSpec.sub_modules : []
+  // 2026-05-23 defensive guard: orchestrator-emitted designs may carry
+  // grammar_links at the top level (design.cross_module_grammar_links) but
+  // not per-module. The post-Phase-2 splitter / repair patches can also
+  // attach a non-array value here (object literal from LLM patch). The
+  // crash "links is not iterable" surfaced via wind-turbine L11 chain.
+  // Universal — any consumer of moduleSpec.grammar_links needs the same
+  // Array.isArray() guard.
+  const links = Array.isArray(moduleSpec.grammar_links) ? moduleSpec.grammar_links : []
   if (subs.length === 0) {
     // No sub-modules declared — fall back to module_brief verbatim, which is
     // always populated. Keeps the sentence honest about data availability.
