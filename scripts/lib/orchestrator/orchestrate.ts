@@ -63,9 +63,16 @@ export async function orchestrateDesign(
   opts: OrchestrateOptions = {},
 ): Promise<OrchestratorResult & { design: unknown; tools_used_page: unknown }> {
   const fallback_on_failure = opts.fallback_on_failure ?? true
+  // 2026-05-23 PRUNE: the chain script now invokes the orchestrator
+  // unconditionally (no more `ORCHESTRATOR=1` gate) and hard-exits on
+  // failure (no more LLM Generator fallback). The previous gate
+  // `orchestrator_explicit = process.env.ORCHESTRATOR === '1'` is removed.
+  // Loud failures are emitted whenever the caller asked for a Contract
+  // result (fallback_on_failure=true). ALLOW_LLM_FALLBACK=1 remains as a
+  // diagnostic-only opt-out — it suppresses the [LOUD] prefix so legacy
+  // tooling that grepped for "[LOUD]" can still distinguish silent vs loud.
   const allow_silent_fallback = process.env.ALLOW_LLM_FALLBACK === '1'
-  const orchestrator_explicit = process.env.ORCHESTRATOR === '1'
-  const loud_failures = orchestrator_explicit && !allow_silent_fallback
+  const loud_failures = !allow_silent_fallback
 
   // ── Step 1: Detect envelope ────────────────────────────────────────────
   const envelope = detectEnvelope(parsedConstraints)

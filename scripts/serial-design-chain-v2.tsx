@@ -43,7 +43,12 @@ import { runBriefParsing } from '../src/lib/pdf-engine-v2/stages/0-brief-generat
 import { runResearchSynthesis } from '../src/lib/pdf-engine-v2/stages/1-research'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { buildContractForChain, type EngineeringContract } from './lib/engineering-contract'
-import { canEmitBess, emitBessDesign } from './lib/deterministic-emitter'
+// 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
+// The orchestrator's assembler.ts lazy-loads emitBessDesign internally via
+// `await import('../deterministic-emitter')` at assembler.ts:130 — that path
+// remains and is the only place that should reach the BESS deterministic
+// emitter. Removing the standalone import prevents the chain script from
+// silently bypassing the orchestrator with a separate BESS path.
 // Universal Engineering Orchestrator (Build #18 — Phase 1+2). Importing
 // register-all triggers auto-registration of every shipped tool wrapper
 // + every class plan into the orchestrator's global registry + planner.
@@ -2145,8 +2150,16 @@ async function main() {
   // state.engineeringContract (per-module callout).
   let orchToolsUsedPage: unknown = null
   let orchEngineeringContract: unknown = null
-  if (process.env.ORCHESTRATOR === '1' && engineeringContract) {
-    console.error(`\n[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — attempting universal engineering orchestrator`)
+  // 2026-05-23 PRUNE: orchestrator is now the UNCONDITIONAL design path.
+  // The old `if (process.env.ORCHESTRATOR === '1' && engineeringContract)`
+  // gate let production silently fall through to the LLM Generator because
+  // the worker (pdf-engine-worker.mjs) never set ORCHESTRATOR=1 — every
+  // production PDF was being made by the LLM with no tool grounding.
+  // The orchestrator now runs by default. Hard-throw on failure (no LLM
+  // fallback) unless ALLOW_LLM_FALLBACK=1 is explicitly set as the escape
+  // valve. See AUDIT_TRACE.md + IMPROVEMENT_PLAN.md.
+  if (engineeringContract) {
+    console.error(`\n[chain] STEP 4: Orchestrator (Build #18 — Phase 1+2) — running universal engineering orchestrator`)
     const tOrch = Date.now()
     const initialOrchContract: OrchestratorContract = {
       product_class: engineeringContract.product_class,
@@ -2277,159 +2290,75 @@ async function main() {
         orchestrator_consistency_passed: orchResult.consistency_results.every(r => r.passed),
       })
     } else {
-      const isLoud = orchResult.failures.some(f => f.includes('[LOUD]'))
-      if (isLoud) {
-        // 2026-05-23 Task #66: ORCHESTRATOR=1 set without ALLOW_LLM_FALLBACK=1
-        // means the operator explicitly requested tool-grounded output. Silent
-        // degradation to LLM-only destroys product value. Surface loudly.
-        console.error('')
-        console.error('╔══════════════════════════════════════════════════════════════════════╗')
-        console.error('║  ORCHESTRATOR HARD-FAIL — silent LLM fallback BLOCKED               ║')
-        console.error('║  This PDF will NOT contain tool-grounded engineering content.       ║')
-        console.error('║  Set ALLOW_LLM_FALLBACK=1 to permit silent fallback, OR fix brief.  ║')
-        console.error('╚══════════════════════════════════════════════════════════════════════╝')
-        for (const f of orchResult.failures) console.error(`  ▸ ${f}`)
-        console.error('')
-        try {
-          writeFileSync(resolve(outDir, 'STAGE-4-ORCHESTRATOR-FALLBACK.txt'),
-            `ORCHESTRATOR HARD-FAIL @ ${new Date().toISOString()}\n\n` +
-            `Failures (${orchResult.failures.length}):\n` +
-            orchResult.failures.map((f, i) => `  ${i + 1}. ${f}`).join('\n') +
-            `\n\nThe chain proceeded to LLM Generator. Resulting PDF lacks tool narratives.\n` +
-            `To suppress this banner: set ALLOW_LLM_FALLBACK=1 (NOT recommended for production).\n` +
-            `To fix: ensure the brief contains a top-line scale metric in the unit family the\n` +
-            `class detector expects. See scripts/lib/orchestrator/envelope.ts for the detector\n` +
-            `function for this product class.\n`)
-        } catch { /* outDir may not exist yet */ }
-      } else {
-        console.error(`[chain] Orchestrator failed (${orchResult.failures.length} failures); falling back to legacy path: ${orchResult.failures.slice(0, 3).join('; ')}`)
-      }
+      // 2026-05-23 PRUNE: there is no LLM Generator fallback any more. Every
+      // orchestrator failure flows into the hard-exit block at the bottom of
+      // this section. The banner here just surfaces the orchestrator's failure
+      // detail; the hard-exit block does the actual process.exit(7).
+      console.error('')
+      console.error('╔══════════════════════════════════════════════════════════════════════╗')
+      console.error('║  ORCHESTRATOR FAILED — chain will hard-exit (code 7)                ║')
+      console.error('║  See failures below + STAGE-4-ORCHESTRATOR-FALLBACK.txt             ║')
+      console.error('╚══════════════════════════════════════════════════════════════════════╝')
+      for (const f of orchResult.failures) console.error(`  ▸ ${f}`)
+      console.error('')
+      try {
+        writeFileSync(resolve(outDir, 'STAGE-4-ORCHESTRATOR-FALLBACK.txt'),
+          `ORCHESTRATOR FAILED @ ${new Date().toISOString()}\n\n` +
+          `Failures (${orchResult.failures.length}):\n` +
+          orchResult.failures.map((f, i) => `  ${i + 1}. ${f}`).join('\n') +
+          `\n\nThe LLM Generator fallback was removed on 2026-05-23. The chain will\n` +
+          `hard-exit with code 7. To fix: ensure the brief contains a top-line\n` +
+          `scale metric in the unit family the class detector expects, OR fix\n` +
+          `the offending orchestrator stage (envelope detector, archetype\n` +
+          `builder, emitter, plan). See scripts/lib/orchestrator/envelope.ts\n` +
+          `for the detector function for this product class.\n`)
+      } catch { /* outDir may not exist yet */ }
     }
   }
-  const useDeterministic = !orchestratorRan && process.env.DETERMINISTIC_EMITTER === '1' && engineeringContract && canEmitBess(engineeringContract)
-  if (useDeterministic) {
-    console.error(`\n[chain] STEP 4: Deterministic emitter (Build #17b — council d, BESS utility envelope ${(engineeringContract!.quantities.nameplate_capacity_kwh?.value / 1000).toFixed(1)} MWh nameplate) — bypassing LLM Generator`)
-    const tDet = Date.now()
-    design = emitBessDesign(engineeringContract as any, parsedResult.data)
-    const detLatencyMs = Date.now() - tDet
-    const sumDet = summarise(design.modules)
-    const detReasons = [`deterministic_emitter=bess`, `modules=${sumDet.modules}`, `sub_modules=${sumDet.sub_modules}`, `words=${sumDet.words}`]
-    console.error(`[chain] Deterministic emitter: ${sumDet.modules} modules, ${sumDet.sub_modules} sub-modules, ${sumDet.words} words, ${sumDet.grammar_links} grammar_links (${detLatencyMs}ms, byte-deterministic)`)
-    writeFileSync(resolve(outDir, '4-generator.json'), JSON.stringify(design, null, 2))
-    writeFileSync(resolve(outDir, '4-generator-candidates.json'), JSON.stringify([{ score: 1.0, reasons: detReasons, summary: sumDet }], null, 2))
-    logAction({
-      step: 'generator',
-      model: 'deterministic_emitter_bess',
-      latency_ms: detLatencyMs,
-      tokens_in: 0,
-      tokens_out: 0,
-      summary: sumDet,
-      best_of_n: 1,
-      best_score: 1.0,
-      best_reasons: detReasons,
-      all_scores: [1.0],
-      cost_usd: 0,
-    })
-  } else if (!orchestratorRan) {
-  console.error(`\n[chain] STEP 4: Generator (Gemini 3.1 Pro) — best-of-N ...`)
-  const keyMetricsBlock = formatKeyMetricsBlock(keyMetrics)
-  const N_CANDIDATES = Number(process.env.GENERATOR_BEST_OF_N ?? 3)
-  const genUser = `PRODUCT BRIEF:
-${currentBriefText}
-
-PARSED CONSTRAINTS:
-${JSON.stringify(parsedResult.data)}
-
-RESEARCH SYNTHESIS:
-${research ? JSON.stringify(research) : '(not available)'}
-${keyMetricsBlock}
-Generate the full engineering decomposition (brief_overview_prose + modules + sub-modules + cross_module_grammar_links + excluded_modules + rationale_excluded). Return ONLY JSON.`
-  const candidateResults = await Promise.all(
-    Array.from({ length: N_CANDIDATES }, (_, i) => callLlm({
-      model: GEMINI_3_1_PRO,
-      system: generatorSystem(engineeringContract),
-      user: genUser,
-      maxTokens: 150_000,
-      timeoutMs: 1_500_000,
-      temperature: i === 0 ? 0.2 : 0.4 + i * 0.1,  // first candidate low-T, others higher-T for diversity
-    } as any)),
-  )
-  // Score each candidate against the Contract (deterministic, no LLM).
-  type ScoredCandidate = { design: any; score: number; reasons: string[]; sumGen: ReturnType<typeof summarise>; raw: string; latency_ms: number; tokens_in: number; tokens_out: number }
-  const scored: ScoredCandidate[] = []
-  for (let i = 0; i < candidateResults.length; i++) {
-    const r = candidateResults[i]
-    let parsedDesign: any
+  // 2026-05-23 PRUNE: hard-throw if the orchestrator didn't run successfully.
+  // Previously this branch held:
+  //   - A standalone BESS deterministic emitter path (env: DETERMINISTIC_EMITTER=1)
+  //   - An LLM Generator best-of-N fallback (Gemini 3.1 Pro × 3 candidates)
+  // Both were DEFAULTS that bypassed the orchestrator. The LLM Generator path
+  // produced PDFs with no tool grounding — that's what production was shipping
+  // because the worker never set ORCHESTRATOR=1 (see commit message). The
+  // standalone BESS path is redundant: assembler.ts:128-138 already lazy-loads
+  // emitBessDesign as the orchestrator's per-class emitter.
+  //
+  // After prune: orchestrator is the only design path. If it failed:
+  //   - Default: hard-throw with exit code 7, no PDF produced.
+  //   - Escape valve: ALLOW_LLM_FALLBACK=1 prints a one-line warning and exits
+  //     with code 7 anyway — the LLM Generator code is GONE; the only fix
+  //     when orchestrator fails is to fix the orchestrator (envelope detector,
+  //     archetype builder, emitter, etc.) and re-run.
+  if (!orchestratorRan) {
+    const failureDetail = engineeringContract === null
+      ? 'engineeringContract is null — Stage 8 (buildContractForChain) threw or returned null'
+      : 'orchestrator returned ok=false; see [LOUD] banner above + STAGE-4-ORCHESTRATOR-FALLBACK.txt for details'
+    console.error('')
+    console.error('╔══════════════════════════════════════════════════════════════════════╗')
+    console.error('║  CHAIN HARD-EXIT — orchestrator did not produce a design            ║')
+    console.error('║  The LLM Generator fallback was REMOVED on 2026-05-23 because       ║')
+    console.error('║  production was silently shipping ungrounded PDFs via that path.    ║')
+    console.error('║  Fix the orchestrator failure (see banner above), do not re-add a   ║')
+    console.error('║  fallback. Exit code 7.                                             ║')
+    console.error('╚══════════════════════════════════════════════════════════════════════╝')
+    console.error(`  ▸ ${failureDetail}`)
     try {
-      parsedDesign = await parseJson(r.text, { stage: `generator-cand-${i}`, model: GEMINI_3_1_PRO })
-    } catch (err) {
-      console.error(`[chain] candidate ${i + 1}/${N_CANDIDATES} parse failed: ${(err as Error).message}; skipping`)
-      continue
-    }
-    if (!parsedDesign || !Array.isArray(parsedDesign?.modules)) {
-      console.error(`[chain] candidate ${i + 1}/${N_CANDIDATES} missing modules array; skipping`)
-      continue
-    }
-    const sumGen = summarise(parsedDesign.modules)
-    // Build #8 score: macro-assembly match count (the more Contract
-    // macro-assemblies the candidate's word names cover, the better)
-    // + module density (more modules / sub-modules / words = richer
-    // first-cut, easier for reviewers to enrich vs build from scratch).
-    let macroMatches = 0
-    const contractMacros = (engineeringContract?.macro_assembly_prices ?? []) as Array<{ word_name: string }>
-    if (contractMacros.length > 0) {
-      const candidateWords: string[] = []
-      for (const m of parsedDesign.modules) {
-        for (const sm of (m?.sub_modules ?? [])) {
-          for (const w of (sm?.words ?? [])) {
-            const nh = String(w?.name_human || '').toLowerCase().replace(/[-\s]+/g, '_')
-            const wid = String(w?.id || '').toLowerCase().replace(/[-\s]+/g, '_')
-            const ccid = String(w?.content_character?.character_id || '').toLowerCase().replace(/[-\s]+/g, '_')
-            if (nh) candidateWords.push(nh)
-            if (wid) candidateWords.push(wid)
-            if (ccid) candidateWords.push(ccid)
-          }
-        }
-      }
-      for (const mp of contractMacros) {
-        const tokens = mp.word_name.split('_').filter(t => t.length >= 3)
-        if (tokens.length === 0) continue
-        const hit = candidateWords.some(cw => cw === mp.word_name || tokens.filter(t => cw.includes(t)).length / tokens.length >= 0.66)
-        if (hit) macroMatches += 1
-      }
-    }
-    // Density score normalised. Weights tunable.
-    const densityScore = Math.min(sumGen.modules / 10, 1) * 0.1 + Math.min(sumGen.sub_modules / 50, 1) * 0.3 + Math.min(sumGen.words / 150, 1) * 0.6
-    const macroScore = contractMacros.length > 0 ? (macroMatches / contractMacros.length) : 0.5  // no Contract macros = neutral
-    const score = macroScore * 0.7 + densityScore * 0.3
-    scored.push({ design: parsedDesign, score, reasons: [`macro_matches=${macroMatches}/${contractMacros.length}`, `modules=${sumGen.modules}`, `sub_modules=${sumGen.sub_modules}`, `words=${sumGen.words}`], sumGen, raw: r.text, latency_ms: r.latency_ms, tokens_in: r.tokens_in ?? 0, tokens_out: r.tokens_out ?? 0 })
-    console.error(`[chain]   candidate ${i + 1}/${N_CANDIDATES}: score=${score.toFixed(3)} (macro=${macroScore.toFixed(2)}, density=${densityScore.toFixed(2)}; ${sumGen.modules} mods, ${sumGen.words} words, ${macroMatches}/${contractMacros.length} macros)`)
+      writeFileSync(resolve(outDir, 'STAGE-4-CHAIN-HARD-EXIT.txt'),
+        `CHAIN HARD-EXIT @ ${new Date().toISOString()}\n\n` +
+        `Reason: ${failureDetail}\n\n` +
+        `The LLM Generator + standalone BESS-deterministic paths were removed on\n` +
+        `2026-05-23 to prevent production silently shipping ungrounded PDFs.\n` +
+        `The orchestrator is now the only design path. To restore the LLM\n` +
+        `Generator code: revert the corresponding commit. To fix the issue: see\n` +
+        `STAGE-4-ORCHESTRATOR-FALLBACK.txt (if it exists) for the orchestrator's\n` +
+        `failure detail, then fix the offending stage (envelope detector,\n` +
+        `archetype builder, emitter, plan, etc.) and re-run.\n`)
+    } catch { /* outDir may not exist yet */ }
+    logAction({ step: 'generator', model: 'NONE', latency_ms: 0, tokens_in: 0, tokens_out: 0, summary: { modules: 0, sub_modules: 0, words: 0, grammar_links: 0 }, best_of_n: 0, best_score: 0, best_reasons: ['orchestrator_failed_chain_hard_exit'], all_scores: [], cost_usd: 0 })
+    process.exit(7)
   }
-  if (scored.length === 0) throw new Error('All Generator candidates failed parsing')
-  scored.sort((a, b) => b.score - a.score)
-  const best = scored[0]
-  design = best.design
-  stripWordSuffixFromDesign(design)
-  console.error(`[chain] Generator best-of-${N_CANDIDATES}: picked candidate with score ${best.score.toFixed(3)} (${best.reasons.join(', ')})`)
-  writeFileSync(resolve(outDir, '4-generator.raw.txt'), best.raw)
-  writeFileSync(resolve(outDir, '4-generator.json'), JSON.stringify(design, null, 2))
-  // Persist all candidate scores for audit
-  writeFileSync(resolve(outDir, '4-generator-candidates.json'), JSON.stringify(scored.map(s => ({ score: s.score, reasons: s.reasons, summary: s.sumGen })), null, 2))
-  const sumGen = best.sumGen
-  console.error(`[chain] Generator: ${sumGen.modules} modules, ${sumGen.sub_modules} sub-modules, ${sumGen.words} words, ${sumGen.grammar_links} grammar_links, ${sumGen.overview_chars} chars (${(best.latency_ms/1000).toFixed(1)}s)`)
-  logAction({
-    step: 'generator',
-    model: GEMINI_3_1_PRO,
-    latency_ms: best.latency_ms,
-    tokens_in: best.tokens_in,
-    tokens_out: best.tokens_out,
-    summary: sumGen,
-    best_of_n: N_CANDIDATES,
-    best_score: best.score,
-    best_reasons: best.reasons,
-    all_scores: scored.map(s => s.score),
-  })
-  }  // end Path B (LLM Generator best-of-N) — Path A (deterministic) handled above
 
   // ── Propagate brief constraints into design derived_parameters
   // (Tristan directive 2026-05-15): gates need anchors. Without this, the

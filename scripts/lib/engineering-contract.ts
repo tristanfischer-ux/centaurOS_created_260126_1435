@@ -2778,7 +2778,29 @@ function extractRangeFromDesc(desc: string, pat: RegExp, dflt: number): number {
   return (a + b) / 2
 }
 
+/**
+ * 2026-05-23 PRUNE: buildMinimalContract is the inert stub used by 23 of 35
+ * archetypes (per 5-seat audit). It returns empty macros + topology +
+ * closures — the Contract is essentially useless for cost reality / physics
+ * critic / closure validation. Without a real per-class implementation, the
+ * orchestrator's downstream stages (G2 cost-reality, G3 review-completeness,
+ * cost-stack) silently default to a class-archetype that may be wrong by
+ * 10-100× (wind turbine confirmed: 6 MW shipped at £73k vs industry £4-7M
+ * because wind has no PRICE_BANDS entry AND uses this stub).
+ *
+ * Until each minimal-stub archetype is rewritten with a full contract
+ * (per `bess` / `bioreactor` / `heat_pump_residential` pattern), this
+ * function logs a HIGH-SEVERITY warning every time it fires so the
+ * operator + chain log shows which class is silently inert. The returned
+ * contract carries a `_is_minimal_stub: true` marker so downstream tools
+ * (audit-pdf-run.ts, future regression harness) can flag it without
+ * re-deriving the class name. Do NOT add new archetypes that call this
+ * function — write a full builder modelled on `registerArchetype('bess', ...)`.
+ *
+ * See IMPROVEMENT_PLAN.md P2-7 for the per-class rewrite plan.
+ */
 function buildMinimalContract(productClass: string, brief: any, quantities: Record<string, Quantity>, briefSummary: string): EngineeringContract {
+  console.error(`[contract] ⚠️  HIGH SEVERITY: archetype "${productClass}" uses buildMinimalContract stub — empty macros/topology/closures. Cost-stack + G2 cost-reality + physics critic will operate on class-default fallbacks. See IMPROVEMENT_PLAN.md P2-7.`)
   return {
     product_class: productClass,
     brief_summary: briefSummary,
@@ -2786,7 +2808,11 @@ function buildMinimalContract(productClass: string, brief: any, quantities: Reco
     topology: [],
     macro_assembly_prices: [],
     closures: [],
-  }
+    // Marker for downstream auditors. The EngineeringContract type doesn't
+    // declare this field; consumers reading state.engineeringContract that
+    // type-check should still see it via `(contract as any)._is_minimal_stub`.
+    _is_minimal_stub: true,
+  } as EngineeringContract & { _is_minimal_stub: boolean }
 }
 
 // ---------------- solar_inverter -----------------
