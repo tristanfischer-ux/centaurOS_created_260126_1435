@@ -382,9 +382,16 @@ function emitHubPitch(p: WindTurbineParams): DesignModule {
   const hub = makeSubModule('hub_assembly', 'hub assembly', 'mounts',
     `${p.bladeCount} blades to the low-speed shaft with synchronised pitch actuation`,
     [
+      // 2026-05-23 L29 post-mortem: hub modifier was emitting only
+      // hubStaticLoadKg (peak load capacity in force-equivalent kg)
+      // which the critic read as "hub mass" — actual hub mass for
+      // 6 MW class is 45-70 t (industry data: GE Cypress, Vestas
+      // EnVentus, Siemens-Gamesa SG 14-222). Now emits BOTH mass
+      // and load capacity as separate modifiers so reader can
+      // distinguish physical mass from peak design load.
       word('cast_iron_hub_word', 'cast iron hub',
         cc('cast_iron_hub', 'cast iron hub', null, 'cast_iron'),
-        [mod('quantity', '×1'), mod('form', 'GJS-400-18 cast'), mod('capacity', p.hubStaticLoadKg.toFixed(0), 'kg load'), mod('dimension', p.hubBoreM.toFixed(2), 'm bore')]),
+        [mod('quantity', '×1'), mod('form', 'GJS-400-18 cast'), mod('capacity', (0.954 * Math.pow(p.totalRotorMassKg, 0.95)).toFixed(0), 'kg mass'), mod('regulatory', `${p.hubStaticLoadKg.toFixed(0)} kg static load capacity (3× rotor mass safety factor per IEC 61400-1 DLC1.5)`), mod('dimension', p.hubBoreM.toFixed(2), 'm bore')]),
       word('pitch_bearing_word', 'pitch bearing',
         cc('pitch_bearing', 'pitch bearing', 'electromechanical_switching_function', 'steel'),
         [mod('quantity', fmtQty(p.bladeCount)), mod('form', p.ratedPowerKw < 500 ? 'four-point contact ball, double-row' : 'three-row roller slewing'), mod('dimension', p.pitchBearingOdM.toFixed(2), 'm OD'), mod('regulatory', 'IEC 61400-4')]),
