@@ -94,6 +94,17 @@ interface WindTurbineParams {
   foundationDimText: string
   foundationRebarKg: number
   anchorBoltCount: number
+  // 2026-05-23 L17 follow-up additions
+  pitchMotorEachKw: number
+  pitchBatteryKwh: number
+  bladeRootDiameterM: number
+  pitchBearingOdM: number
+  hubBoreM: number
+  transformerLvV: number
+  transformerHvKv: number
+  foundationXyM: number
+  foundationDepthM: number
+  anchorBoltMnCapacity: number
 }
 
 function q(contract: ContractInProgress, key: string, fallback: number): number {
@@ -164,18 +175,72 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   const generatorAcV = ratedPowerKw < 500 ? 400 : ratedPowerKw < 5000 ? 690 : 3300
   // DC link voltage: must clear peak AC by ~13% margin
   const dcLinkV = Math.max(800, Math.round(generatorAcV * Math.SQRT2 * 1.13))
-  // Foundation: onshore gravity vs offshore monopile sizing
+  // Foundation: sized for overturning moment ≈ thrust × hub_height.
+  // 2026-05-23 L17 post-fix: compute XY first (from hub_height × 0.30
+  // for gravity, rotor_D × 0.10 for monopile diameter), then derive
+  // volume from XY × XY × depth so cube-root volume formula no longer
+  // produces 14.9 m squares for 6 MW briefs (Physics Critic failed L17
+  // on tipping moment).
+  const _fXy = isOffshore ? rotorDiameterM * 0.10 : Math.max(7, hubHeightM * 0.30)
+  const _fDepth = isOffshore ? hubHeightM * 0.30 + rotorDiameterM * 0.40 : Math.max(1.5, ratedPowerKw * 0.0003)
   const foundationVolumeM3 = isOffshore
-    ? Math.max(120, rotorDiameterM * 2)  // monopile section ≥ 120 m³ for utility
-    : Math.max(50, ratedPowerKw * 0.25)  // onshore gravity
+    ? Math.max(120, Math.PI * (_fXy / 2) * (_fXy / 2) * _fDepth)  // monopile cylinder
+    : Math.max(50, _fXy * _fXy * _fDepth)  // gravity base XY × XY × depth
   // Foundation dimensions: text representation for the modifier
+  // 2026-05-23 L17 post-fix: foundation dim text now uses proper
+  // overturning-moment scaling computed below (foundationXyM /
+  // foundationDepthM). Old cube-root formula sized 14.9 m square for
+  // 1500 m³ which fails tip-over at 120 m hub.
+  // Reuse the post-deriveParams values to ensure consistency.
+  const _foundationXyMTmp = isOffshore ? rotorDiameterM * 0.10 : Math.max(7, hubHeightM * 0.30)
+  const _foundationDepthMTmp = isOffshore ? hubHeightM * 0.30 + rotorDiameterM * 0.40 : Math.max(1.5, foundationVolumeM3 / Math.max(50, _foundationXyMTmp * _foundationXyMTmp))
   const foundationDimText = isOffshore
-    ? `monopile Ø${(rotorDiameterM * 0.07).toFixed(1)} m × ${(rotorDiameterM * 0.5 + hubHeightM * 0.3).toFixed(0)} m penetration`
-    : `${(Math.max(7, Math.cbrt(foundationVolumeM3) * 1.3)).toFixed(1)}×${(Math.max(7, Math.cbrt(foundationVolumeM3) * 1.3)).toFixed(1)}×${(Math.max(1.5, foundationVolumeM3 / Math.pow(Math.max(7, Math.cbrt(foundationVolumeM3) * 1.3), 2))).toFixed(1)} m`
+    ? `monopile Ø${_foundationXyMTmp.toFixed(2)} m × ${_foundationDepthMTmp.toFixed(0)} m penetration`
+    : `${_foundationXyMTmp.toFixed(1)}×${_foundationXyMTmp.toFixed(1)}×${_foundationDepthMTmp.toFixed(1)} m gravity base`
   // Foundation rebar: ~120 kg/m³ concrete reinforcement ratio
   const foundationRebarKg = Math.round(foundationVolumeM3 * 120)
   // Anchor bolts: scale with rotor diameter / overturning moment
   const anchorBoltCount = ratedPowerKw < 200 ? 24 : ratedPowerKw < 2000 ? 72 : 144
+
+  // 2026-05-23 L17 follow-up — additional scaling for the 5 remaining HIGH
+  // physics issues flagged by Physics Critic on L17.
+
+  // Pitch motor: ≈ 0.5% of rated power per blade for utility scale (6 MW
+  // class needs 20-40 kW/blade per Bosch Rexroth + Moog pitch system specs).
+  // Small wind uses 1-2 kW. Scaling: max(2, ratedPowerKw × 0.005).
+  const pitchMotorEachKw = Math.max(2.0, ratedPowerKw * 0.005)
+  // Pitch battery sized for 1 emergency-feather event (~30 s at peak draw)
+  // plus 50% reserve. Energy = motor_kw × 3 blades × 0.5 hr × 0.5 reserve.
+  const pitchBatteryKwh = Math.max(2, pitchMotorEachKw * 3 * 0.5 * 0.5)
+
+  // Geometric chain — blade root → pitch bearing → hub bore MUST be
+  // concentric and sized for physical load path. Industry typical:
+  // blade root diameter ≈ 0.025 × rotor diameter; pitch bearing OD ≈
+  // root × 1.6 (carries 24-bolt flange); hub bore ≈ pitch bearing OD ×
+  // 1.1 (mounting flange clearance).
+  const bladeRootDiameterM = rotorDiameterM * 0.025
+  const pitchBearingOdM = bladeRootDiameterM * 1.6
+  const hubBoreM = pitchBearingOdM * 1.1
+
+  // Transformer voltage class: LV side = generator AC voltage (single
+  // source of truth); HV side = grid connection voltage (33 kV for
+  // utility-scale UK + EU offshore, 66 kV becoming standard for new
+  // ≥10 MW; 11 kV onshore distribution for <2 MW).
+  const transformerLvV = generatorAcV
+  const transformerHvKv = ratedPowerKw < 2000 ? 11 : ratedPowerKw < 8000 ? 33 : 66
+
+  // Foundation: rectangular footprint sized for overturning moment.
+  // Industry rule: side length ≥ 0.30 × hub_height for gravity base
+  // (covers tip-over at design wind + 1.5 safety factor). Onshore 6 MW
+  // 120 m hub → 36 m × 36 m × 3 m base ≈ 3900 m³. Monopile differs.
+  const foundationXyM = _foundationXyMTmp
+  const foundationDepthM = _foundationDepthMTmp
+  // Anchor bolt capacity: must exceed peak overturning moment.
+  // F_total = nominal_axial × 1.0 + overturning ÷ moment_arm. For
+  // 6 MW 120 m hub with rated thrust ~1.5 MN at top, peak moment
+  // ≈ 1.5 × 120 = 180 MN·m. Bolt circle radius ≈ pitch_bearing_od / 2.
+  // Per-bolt capacity ≈ 60 t = 0.6 MN (M48 10.9 grade). Total cap ≈ N × 0.6.
+  const anchorBoltMnCapacity = anchorBoltCount * 0.6
 
   return {
     ratedPowerKw,
@@ -208,6 +273,16 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
     foundationDimText,
     foundationRebarKg,
     anchorBoltCount,
+    pitchMotorEachKw,
+    pitchBatteryKwh,
+    bladeRootDiameterM,
+    pitchBearingOdM,
+    hubBoreM,
+    transformerLvV,
+    transformerHvKv,
+    foundationXyM,
+    foundationDepthM,
+    anchorBoltMnCapacity,
   }
 }
 
@@ -217,10 +292,10 @@ function emitRotorBlades(p: WindTurbineParams): DesignModule {
     [
       word('rotor_blade_word', 'rotor blade',
         cc('rotor_blade', 'rotor blade', 'aero_lift_function', 'composite_glass_epoxy'),
-        [mod('quantity', fmtQty(p.bladeCount)), mod('dimension', (p.rotorDiameterM / 2).toFixed(1), 'm'), mod('form', 'twist-tapered'), mod('regulatory', 'IEC 61400-23')]),
+        [mod('quantity', fmtQty(p.bladeCount)), mod('dimension', `${(p.rotorDiameterM / 2).toFixed(1)} m length, ${p.bladeRootDiameterM.toFixed(2)} m root`), mod('form', 'twist-tapered, structural foam + glass + carbon-spar'), mod('capacity', p.bladeMassEachKg.toFixed(0), 'kg each'), mod('regulatory', 'IEC 61400-23')]),
       word('blade_root_bolt_word', 'blade root bolt',
         cc('blade_root_bolt', 'blade root bolt', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', fmtQty(p.bladeCount * 24)), mod('form', 'M30 10.9 grade')]),
+        [mod('quantity', fmtQty(p.bladeCount * (p.ratedPowerKw < 500 ? 24 : p.ratedPowerKw < 2000 ? 60 : 120))), mod('form', p.ratedPowerKw < 500 ? 'M30 10.9 grade' : p.ratedPowerKw < 2000 ? 'M36 10.9 grade' : 'M42 10.9 grade'), mod('dimension', `bolted on ${p.bladeRootDiameterM.toFixed(2)} m root flange`)]),
       word('lightning_receptor_word', 'lightning receptor',
         cc('lightning_receptor', 'lightning receptor', 'electrical_conducting_function', 'copper'),
         [mod('quantity', fmtQty(p.bladeCount)), mod('regulatory', 'IEC 61400-24'), mod('form', 'tip-mounted brass')]),
@@ -245,22 +320,22 @@ function emitHubPitch(p: WindTurbineParams): DesignModule {
     [
       word('cast_iron_hub_word', 'cast iron hub',
         cc('cast_iron_hub', 'cast iron hub', null, 'cast_iron'),
-        [mod('quantity', '×1'), mod('form', 'GJS-400-18 cast'), mod('capacity', p.hubStaticLoadKg.toFixed(0), 'kg load'), mod('dimension', (p.rotorDiameterM * 0.025).toFixed(2), 'm bore')]),
+        [mod('quantity', '×1'), mod('form', 'GJS-400-18 cast'), mod('capacity', p.hubStaticLoadKg.toFixed(0), 'kg load'), mod('dimension', p.hubBoreM.toFixed(2), 'm bore')]),
       word('pitch_bearing_word', 'pitch bearing',
         cc('pitch_bearing', 'pitch bearing', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', fmtQty(p.bladeCount)), mod('form', 'four-point contact double-row'), mod('regulatory', 'IEC 61400-4')]),
+        [mod('quantity', fmtQty(p.bladeCount)), mod('form', p.ratedPowerKw < 500 ? 'four-point contact ball, double-row' : 'three-row roller slewing'), mod('dimension', p.pitchBearingOdM.toFixed(2), 'm OD'), mod('regulatory', 'IEC 61400-4')]),
       word('pitch_motor_word', 'pitch motor',
         cc('pitch_motor', 'pitch motor', 'silicon_semiconductor_function', 'copper'),
-        [mod('quantity', fmtQty(p.bladeCount)), mod('capacity', '5.5', 'kW'), mod('form', 'permanent-magnet servo')]),
+        [mod('quantity', fmtQty(p.bladeCount)), mod('capacity', p.pitchMotorEachKw.toFixed(1), 'kW'), mod('form', p.ratedPowerKw < 500 ? 'permanent-magnet servo' : 'PMSM + planetary gearbox + electromagnetic brake')]),
       word('pitch_battery_word', 'pitch battery',
         cc('pitch_battery', 'pitch backup battery', 'electrochemical_energy_function', 'lithium_iron_phosphate_chemistry'),
-        [mod('quantity', '×1'), mod('capacity', '5', 'kWh'), mod('regulatory', 'IEC 62619')]),
+        [mod('quantity', '×1'), mod('capacity', p.pitchBatteryKwh.toFixed(1), 'kWh'), mod('regulatory', 'IEC 62619'), mod('form', '30 s emergency-feather + 50% reserve')]),
     ])
   return {
     module: 'hub_pitch',
-    module_brief: `Cast iron hub with ${p.bladeCount}× four-point pitch bearings driven by 5.5 kW PM servos, backed by 5 kWh LFP battery for safe feathering on grid loss.`,
+    module_brief: `Cast iron hub (${p.hubBoreM.toFixed(2)} m bore, ${p.hubStaticLoadKg.toFixed(0)} kg static load) with ${p.bladeCount}× ${p.pitchBearingOdM.toFixed(2)} m OD pitch bearings driven by ${p.pitchMotorEachKw.toFixed(1)} kW PMSM-with-gearbox pitch motors, backed by ${p.pitchBatteryKwh.toFixed(1)} kWh LFP battery for safe feathering on grid loss.`,
     overview_paragraph_en: '',
-    derived_parameters: { pitch_motor_kw: 5.5, pitch_battery_kwh: 5 },
+    derived_parameters: { pitch_motor_kw: p.pitchMotorEachKw, pitch_battery_kwh: p.pitchBatteryKwh, hub_bore_m: p.hubBoreM, pitch_bearing_od_m: p.pitchBearingOdM, hub_static_load_kg: p.hubStaticLoadKg },
     allowed_radicals: ['cast_iron', 'electromechanical_switching_function', 'silicon_semiconductor_function', 'electrochemical_energy_function', 'lithium_iron_phosphate_chemistry', 'steel', 'copper'],
     applicability_confidence: 'high',
     sub_modules: [hub],
@@ -361,7 +436,7 @@ function emitGenerator(p: WindTurbineParams): DesignModule {
 
 function emitConverterGridTie(p: WindTurbineParams): DesignModule {
   const converter = makeSubModule('grid_tie_converter', 'grid-tie converter', 'rectifies',
-    `${p.ratedPowerKw} kW PMSG ${p.generatorAcV} V variable-frequency output via back-to-back IGBT, ${p.acContinuousA.toFixed(0)} A at generator side, stepped up by transformer to grid (33 kV at utility scale, ${p.ratedPowerKw < 500 ? '400 V' : '690 V'} at smaller scale)`,
+    `${p.ratedPowerKw} kW PMSG ${p.generatorAcV} V variable-frequency output via back-to-back IGBT, ${p.acContinuousA.toFixed(0)} A at generator side, stepped up by transformer ${p.transformerLvV} V → ${p.transformerHvKv} kV grid`,
     [
       word('generator_side_converter_word', 'generator-side converter',
         cc('generator_side_converter', 'generator-side converter', 'silicon_semiconductor_function', 'silicon_semiconductor_function'),
@@ -461,7 +536,7 @@ function emitFoundation(p: WindTurbineParams): DesignModule {
         [mod('quantity', '×1'), mod('form', p.isOffshore ? 'driven monopile (S355G10+N steel)' : 'C30/37 reinforced gravity base'), mod('dimension', p.foundationDimText), mod('capacity', p.foundationVolumeM3.toFixed(0), 'm³'), mod('regulatory', p.isOffshore ? 'DNV-ST-0126' : 'EN 1992-1-1')]),
       word('anchor_cage_word', 'anchor cage',
         cc('anchor_cage', 'anchor cage', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', '×1'), mod('form', `${p.anchorBoltCount}× M${p.ratedPowerKw < 200 ? '36' : p.ratedPowerKw < 2000 ? '48' : '64'} 10.9 grade bolts`), mod('regulatory', 'EN 1090-2'), mod('capacity', (p.totalRotorMassKg + p.nacelleMassKg).toFixed(0), 'kg static + overturning')]),
+        [mod('quantity', '×1'), mod('form', `${p.anchorBoltCount}× M${p.ratedPowerKw < 200 ? '36' : p.ratedPowerKw < 2000 ? '48' : '64'} 10.9 grade bolts on Ø${(p.pitchBearingOdM * 2.5).toFixed(1)} m bolt circle`), mod('regulatory', 'EN 1090-2'), mod('capacity', p.anchorBoltMnCapacity.toFixed(1), 'MN'), mod('dimension', `overturning capacity matches thrust × hub_height @ ${p.ratedPowerKw}kW`)]),
       word('foundation_rebar_word', 'foundation rebar',
         cc('foundation_rebar', 'foundation rebar', null, 'steel'),
         [mod('quantity', '×1'), mod('form', 'B500B 16-25 mm'), mod('capacity', p.foundationRebarKg.toFixed(0), 'kg'), mod('dimension', '120 kg/m³ ratio')]),
