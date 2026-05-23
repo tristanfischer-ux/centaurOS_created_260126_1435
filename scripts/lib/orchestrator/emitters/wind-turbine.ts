@@ -1,8 +1,15 @@
 /**
  * scripts/lib/orchestrator/emitters/wind-turbine.ts
  *
- * WIND TURBINE DETERMINISTIC EMITTER — small/medium horizontal-axis (5-100 kW),
- * targeting Northern Power 100 / EWT DW54 / Vestas V20 class onshore turbines.
+ * WIND TURBINE DETERMINISTIC EMITTER — horizontal-axis 5 kW to 15 MW.
+ *
+ * 2026-05-23: expanded from "small/medium 5-100 kW" to full utility-scale
+ * range (15 MW class offshore — GE Haliade-X, Vestas V236, SG 14-222 DD).
+ * All physics modifiers now SCALE with rated_power_kw, rotor_diameter_m,
+ * hub_height_m, total_system_mass_kg rather than being hardcoded for 100 kW
+ * small wind. Previously a 6 MW brief shipped with 15000 kg hub load
+ * (correct for 100 kW, undersized 4× for 6 MW) and 6 kW yaw drive (correct
+ * for 100 kW, undersized 5× for 6 MW).
  *
  * Modules (11):
  *   1. rotor_blades              — 3 epoxy-glass blades + pitch hub
@@ -71,6 +78,22 @@ interface WindTurbineParams {
   acContinuousA: number
   totalMassKg: number
   isOffshore: boolean
+  // 2026-05-23 scale-aware physics (P2-7 follow-on)
+  isDirectDrive: boolean
+  bladeMassEachKg: number
+  totalRotorMassKg: number
+  nacelleMassKg: number
+  hubStaticLoadKg: number
+  yawBearingAxialKg: number
+  yawTotalKw: number
+  yawMotorCount: number
+  yawMotorEachKw: number
+  generatorAcV: number
+  dcLinkV: number
+  foundationVolumeM3: number
+  foundationDimText: string
+  foundationRebarKg: number
+  anchorBoltCount: number
 }
 
 function q(contract: ContractInProgress, key: string, fallback: number): number {
@@ -88,11 +111,60 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
   const cpMax = q(contract, 'rotor_cp_max', 0.45)
   const tsr = q(contract, 'tip_speed_ratio_optimal', 6.5)
   const rotorRpm = Math.round((ratedMs * tsr * 60) / (Math.PI * rotorDiameterM))
-  const generatorRpm = 1500
-  const gearboxRatio = q(contract, 'gearbox_ratio', generatorRpm / Math.max(1, rotorRpm))
+  // 2026-05-23: direct-drive detection — read from contract OR brief
+  // description. Direct-drive eliminates the gearbox; generator runs at
+  // rotor RPM directly. Common at utility scale (Enercon, Siemens-Gamesa
+  // DD, GE Cypress, MingYang) because gearboxes are #1 failure source.
+  const ddFlag = q(contract, 'direct_drive', 0)
+  const briefDesc = String((contract as any)?.brief?.product_description ?? '')
+  const isDirectDrive = ddFlag >= 1 || /direct[\s-]?drive|gearless|no\s+gearbox|enercon|siemens[\s-]?gamesa\s+dd|ge\s+cypress|mingyang/i.test(briefDesc)
+  const generatorRpm = isDirectDrive ? rotorRpm : 1500
+  const gearboxRatio = isDirectDrive ? 1 : q(contract, 'gearbox_ratio', 1500 / Math.max(1, rotorRpm))
   const acContinuousA = q(contract, 'ac_continuous_current_a', (ratedPowerKw * 1000) / (400 * Math.sqrt(3) * 0.95))
   const totalMassKg = q(contract, 'total_system_mass_kg', ratedPowerKw * 25 + ratedPowerKw * 18 + hubHeightM * 150)
   const generatorType = q(contract, 'generator_type', 1)
+  const isOffshore = generatorType >= 2 || /offshore|monopile|jacket|floating|sea/i.test(briefDesc)
+
+  // ── 2026-05-23 SCALE-AWARE PHYSICS — Physics Critic-driven additions ──
+  // These propagate brief-driven physics into the word modifiers rather
+  // than hardcoding 100 kW values that fail at 1+ MW.
+
+  // Blade mass: NREL Fingersh/Hand/Laxson 2006 scaling with segmented
+  // discount at >180 m diameter (modular blade designs for >12 MW class).
+  const isSegmentedClass = rotorDiameterM >= 180
+  const bladeMassEachKg = 0.135 * Math.pow(rotorDiameterM, 2.39) * (isSegmentedClass ? 0.90 : 1.00)
+  // Total rotor mass = 3 × blade + ~40% for hub + flanges
+  const totalRotorMassKg = 3 * bladeMassEachKg * 1.40
+  // Nacelle mass: direct-drive nacelles are heavier per kW (~30 kg/kW)
+  // because of the large-diameter PM generator; gearbox nacelles ~22 kg/kW.
+  const nacelleMassKgPerKw = isDirectDrive ? 30 : 22
+  const nacelleMassKg = ratedPowerKw * nacelleMassKgPerKw
+  // Hub static load: must carry transient rotor + dynamic + safety
+  // factor (IEC 61400-1 load case DLC1.5/1.6 emergency stop)
+  const hubStaticLoadKg = Math.round(totalRotorMassKg * 3.0)
+  // Yaw bearing axial: carries nacelle + rotor with 1.3× safety
+  const yawBearingAxialKg = Math.round((nacelleMassKg + totalRotorMassKg) * 1.3)
+  // Yaw drive total: ~0.5% of rated power (industry rule of thumb)
+  const yawTotalKw = Math.max(0.5, ratedPowerKw * 0.005)
+  const yawMotorCount = ratedPowerKw < 200 ? 2 : ratedPowerKw < 2000 ? 4 : 6
+  const yawMotorEachKw = Math.max(0.25, yawTotalKw / yawMotorCount)
+  // Generator AC voltage: small wind ≤400 V; utility scale ≥690 V
+  const generatorAcV = ratedPowerKw < 500 ? 400 : ratedPowerKw < 5000 ? 690 : 3300
+  // DC link voltage: must clear peak AC by ~13% margin
+  const dcLinkV = Math.max(800, Math.round(generatorAcV * Math.SQRT2 * 1.13))
+  // Foundation: onshore gravity vs offshore monopile sizing
+  const foundationVolumeM3 = isOffshore
+    ? Math.max(120, rotorDiameterM * 2)  // monopile section ≥ 120 m³ for utility
+    : Math.max(50, ratedPowerKw * 0.25)  // onshore gravity
+  // Foundation dimensions: text representation for the modifier
+  const foundationDimText = isOffshore
+    ? `monopile Ø${(rotorDiameterM * 0.07).toFixed(1)} m × ${(rotorDiameterM * 0.5 + hubHeightM * 0.3).toFixed(0)} m penetration`
+    : `${(Math.max(7, Math.cbrt(foundationVolumeM3) * 1.3)).toFixed(1)}×${(Math.max(7, Math.cbrt(foundationVolumeM3) * 1.3)).toFixed(1)}×${(Math.max(1.5, foundationVolumeM3 / Math.pow(Math.max(7, Math.cbrt(foundationVolumeM3) * 1.3), 2))).toFixed(1)} m`
+  // Foundation rebar: ~120 kg/m³ concrete reinforcement ratio
+  const foundationRebarKg = Math.round(foundationVolumeM3 * 120)
+  // Anchor bolts: scale with rotor diameter / overturning moment
+  const anchorBoltCount = ratedPowerKw < 200 ? 24 : ratedPowerKw < 2000 ? 72 : 144
+
   return {
     ratedPowerKw,
     rotorDiameterM,
@@ -108,7 +180,22 @@ function deriveParams(contract: ContractInProgress): WindTurbineParams {
     tsr,
     acContinuousA,
     totalMassKg,
-    isOffshore: generatorType >= 2,
+    isOffshore,
+    isDirectDrive,
+    bladeMassEachKg,
+    totalRotorMassKg,
+    nacelleMassKg,
+    hubStaticLoadKg,
+    yawBearingAxialKg,
+    yawTotalKw,
+    yawMotorCount,
+    yawMotorEachKw,
+    generatorAcV,
+    dcLinkV,
+    foundationVolumeM3,
+    foundationDimText,
+    foundationRebarKg,
+    anchorBoltCount,
   }
 }
 
@@ -146,7 +233,7 @@ function emitHubPitch(p: WindTurbineParams): DesignModule {
     [
       word('cast_iron_hub_word', 'cast iron hub',
         cc('cast_iron_hub', 'cast iron hub', null, 'cast_iron'),
-        [mod('quantity', '×1'), mod('form', 'GJS-400-18 cast'), mod('capacity', '15000', 'kg load')]),
+        [mod('quantity', '×1'), mod('form', 'GJS-400-18 cast'), mod('capacity', p.hubStaticLoadKg.toFixed(0), 'kg load'), mod('dimension', (p.rotorDiameterM * 0.025).toFixed(2), 'm bore')]),
       word('pitch_bearing_word', 'pitch bearing',
         cc('pitch_bearing', 'pitch bearing', 'electromechanical_switching_function', 'steel'),
         [mod('quantity', fmtQty(p.bladeCount)), mod('form', 'four-point contact double-row'), mod('regulatory', 'IEC 61400-4')]),
@@ -169,30 +256,63 @@ function emitHubPitch(p: WindTurbineParams): DesignModule {
 }
 
 function emitGearboxDrivetrain(p: WindTurbineParams): DesignModule {
-  const drivetrain = makeSubModule('drivetrain_assembly', 'drivetrain assembly', 'transmits',
-    `low-speed rotor torque (${(p.ratedPowerKw * 9550 / Math.max(1, p.rotorRpm)).toFixed(0)} N·m at ${p.rotorRpm} rpm) up to ${p.generatorRpm} rpm generator shaft via ${p.gearboxRatio.toFixed(0)}:1 planetary gearbox`,
+  const torqueNm = p.ratedPowerKw * 9550 / Math.max(1, p.rotorRpm)
+  // Shaft diameter scales with cube root of torque (τ = T r / J, simple beam scaling)
+  const lowSpeedShaftMm = Math.round(80 + Math.pow(torqueNm / 10_000, 1 / 3) * 90)
+  const highSpeedShaftMm = Math.max(40, Math.round(lowSpeedShaftMm / Math.max(1, Math.pow(p.gearboxRatio, 0.5))))
+  // Lubrication pump scales with gearbox heat dissipation ≈ 2% of rated power
+  const lubePumpKw = Math.max(0.25, p.ratedPowerKw * 0.0005)
+  // 2026-05-23 fix: when brief says direct-drive, emit a SHORT drivetrain
+  // with just the low-speed shaft + main bearing — no gearbox, no
+  // high-speed shaft, no mechanical brake (rotor brake separate).
+  if (p.isDirectDrive) {
+    const drivetrain = makeSubModule('drivetrain_assembly', 'direct-drive shaft + main bearing', 'transmits',
+      `direct-drive low-speed rotor torque (${torqueNm.toFixed(0)} N·m at ${p.rotorRpm} rpm) into PM generator at same shaft RPM`,
+      [
+        word('low_speed_shaft_word', 'low speed shaft',
+          cc('low_speed_shaft', 'low-speed shaft', 'electromechanical_switching_function', 'steel'),
+          [mod('quantity', '×1'), mod('dimension', lowSpeedShaftMm.toFixed(0), 'mm'), mod('form', '42CrMo4 forged'), mod('capacity', torqueNm.toFixed(0), 'N·m')]),
+        word('main_bearing_word', 'main bearing',
+          cc('main_bearing', 'main rotor bearing', 'electromechanical_switching_function', 'steel'),
+          [mod('quantity', '×2'), mod('form', 'double-row tapered roller'), mod('capacity', p.hubStaticLoadKg.toFixed(0), 'kg axial'), mod('regulatory', 'IEC 61400-4')]),
+        word('main_shaft_seal_word', 'main shaft seal',
+          cc('main_shaft_seal', 'main shaft labyrinth seal', null, 'steel'),
+          [mod('quantity', '×1'), mod('form', 'labyrinth + grease purge'), mod('regulatory', 'IP67')]),
+      ])
+    return {
+      module: 'gearbox_drivetrain',
+      module_brief: `Direct-drive — no gearbox. ${lowSpeedShaftMm} mm forged 42CrMo4 shaft transmits ${torqueNm.toFixed(0)} N·m at ${p.rotorRpm} rpm directly into the PM generator. Double-row tapered roller main bearings carry rotor axial + radial loads per IEC 61400-4.`,
+      overview_paragraph_en: '',
+      derived_parameters: { is_direct_drive: 1, low_speed_shaft_mm: lowSpeedShaftMm, rotor_rpm: p.rotorRpm, torque_nm: torqueNm, hub_static_load_kg: p.hubStaticLoadKg },
+      allowed_radicals: ['electromechanical_switching_function', 'steel'],
+      applicability_confidence: 'high',
+      sub_modules: [drivetrain],
+    }
+  }
+  const drivetrain = makeSubModule('drivetrain_assembly', 'gearbox drivetrain assembly', 'transmits',
+    `low-speed rotor torque (${torqueNm.toFixed(0)} N·m at ${p.rotorRpm} rpm) up to ${p.generatorRpm} rpm generator shaft via ${p.gearboxRatio.toFixed(0)}:1 planetary gearbox`,
     [
       word('low_speed_shaft_word', 'low speed shaft',
         cc('low_speed_shaft', 'low-speed shaft', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', '×1'), mod('dimension', '300', 'mm'), mod('form', '42CrMo4 forged'), mod('capacity', (p.ratedPowerKw * 9550 / Math.max(1, p.rotorRpm)).toFixed(0), 'N·m')]),
+        [mod('quantity', '×1'), mod('dimension', lowSpeedShaftMm.toFixed(0), 'mm'), mod('form', '42CrMo4 forged'), mod('capacity', torqueNm.toFixed(0), 'N·m')]),
       word('planetary_gearbox_word', 'planetary gearbox',
         cc('planetary_gearbox', 'planetary gearbox', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', '×1'), mod('form', '2-stage planetary'), mod('capacity', String(Math.round(p.gearboxRatio)), ':1'), mod('regulatory', 'IEC 61400-4')]),
+        [mod('quantity', '×1'), mod('form', p.ratedPowerKw < 1000 ? '2-stage planetary' : '3-stage planetary + helical'), mod('capacity', String(Math.round(p.gearboxRatio)), ':1'), mod('regulatory', 'IEC 61400-4')]),
       word('high_speed_shaft_word', 'high speed shaft',
         cc('high_speed_shaft', 'high-speed shaft', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', '×1'), mod('dimension', '80', 'mm'), mod('form', '42CrMo4')]),
+        [mod('quantity', '×1'), mod('dimension', highSpeedShaftMm.toFixed(0), 'mm'), mod('form', '42CrMo4'), mod('capacity', (torqueNm / p.gearboxRatio).toFixed(0), 'N·m')]),
       word('mechanical_brake_word', 'mechanical brake',
         cc('mechanical_brake', 'mechanical brake', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', '×1'), mod('form', 'disc + caliper'), mod('regulatory', 'IEC 61400-2')]),
+        [mod('quantity', '×1'), mod('form', 'disc + caliper'), mod('capacity', (torqueNm * 1.5).toFixed(0), 'N·m'), mod('regulatory', 'IEC 61400-2')]),
       word('lubrication_pump_word', 'lubrication pump',
         cc('lubrication_pump', 'lubrication pump', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', '×1'), mod('capacity', '0.5', 'kW'), mod('form', 'gear pump')]),
+        [mod('quantity', '×1'), mod('capacity', lubePumpKw.toFixed(2), 'kW'), mod('form', 'gear pump'), mod('dimension', '40', 'L/min')]),
     ])
   return {
     module: 'gearbox_drivetrain',
-    module_brief: `Bonfiglioli 2-stage planetary gearbox at ${p.gearboxRatio.toFixed(0)}:1 ratio with disc brake, lubrication pump and forged 42CrMo4 shafts (low/high-speed).`,
+    module_brief: `${p.ratedPowerKw < 1000 ? '2-stage' : '3-stage'} planetary gearbox at ${p.gearboxRatio.toFixed(0)}:1 ratio (Bonfiglioli/Winergy class) with disc brake (${(torqueNm * 1.5).toFixed(0)} N·m), ${lubePumpKw.toFixed(2)} kW gear-pump lubrication, and forged 42CrMo4 shafts (low-speed Ø${lowSpeedShaftMm} mm carrying ${torqueNm.toFixed(0)} N·m, high-speed Ø${highSpeedShaftMm} mm).`,
     overview_paragraph_en: '',
-    derived_parameters: { gearbox_ratio: p.gearboxRatio, rotor_rpm: p.rotorRpm, generator_rpm: p.generatorRpm },
+    derived_parameters: { gearbox_ratio: p.gearboxRatio, rotor_rpm: p.rotorRpm, generator_rpm: p.generatorRpm, torque_nm: torqueNm },
     allowed_radicals: ['electromechanical_switching_function', 'steel'],
     applicability_confidence: 'high',
     sub_modules: [drivetrain],
@@ -205,7 +325,7 @@ function emitGenerator(p: WindTurbineParams): DesignModule {
     [
       word('pmsg_stator_word', 'PMSG stator',
         cc('pmsg_stator', 'PMSG stator', 'magnetic_coupling_function', 'copper'),
-        [mod('quantity', '×1'), mod('capacity', p.ratedPowerKw.toFixed(0), 'kW'), mod('form', '3-phase 4-pole'), mod('dimension', '690', 'V')]),
+        [mod('quantity', '×1'), mod('capacity', p.ratedPowerKw.toFixed(0), 'kW'), mod('form', p.isDirectDrive ? `direct-drive multi-pole (${Math.max(48, Math.round(60 * 50 / Math.max(1, p.rotorRpm)))}-pole)` : '3-phase 4-pole'), mod('dimension', `${p.generatorAcV} V`)]),
       word('pm_rotor_word', 'PM rotor',
         cc('pm_rotor', 'permanent magnet rotor', 'magnetic_coupling_function', 'ndfeb_magnet'),
         [mod('quantity', '×1'), mod('form', 'surface-mounted NdFeB N42'), mod('regulatory', 'IEC 60404-5')]),
@@ -239,7 +359,7 @@ function emitConverterGridTie(p: WindTurbineParams): DesignModule {
         [mod('quantity', '×1'), mod('capacity', p.ratedPowerKw.toFixed(0), 'kW'), mod('form', 'IGBT 3-level')]),
       word('dc_link_capacitor_word', 'DC link capacitor',
         cc('dc_link_capacitor', 'DC link capacitor bank', 'electrical_conducting_function', 'aluminium'),
-        [mod('quantity', '×1'), mod('capacity', '5000', 'µF'), mod('dimension', '900', 'V')]),
+        [mod('quantity', '×1'), mod('capacity', Math.round(p.ratedPowerKw * 0.8).toFixed(0), 'µF'), mod('dimension', `${p.dcLinkV}`, 'V'), mod('form', 'film capacitor bank, water-cooled')]),
       word('grid_filter_word', 'grid filter',
         cc('grid_filter', 'grid LCL filter', 'magnetic_coupling_function', 'copper'),
         [mod('quantity', '×3'), mod('capacity', '1.0', 'mH'), mod('form', 'three-phase')]),
@@ -267,10 +387,10 @@ function emitTowerYaw(p: WindTurbineParams): DesignModule {
         [mod('quantity', '×1'), mod('dimension', p.hubHeightM.toFixed(0), 'm'), mod('form', 'tubular galvanised S355JR'), mod('regulatory', 'IEC 61400-2')]),
       word('yaw_bearing_word', 'yaw bearing',
         cc('yaw_bearing', 'yaw bearing', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', '×1'), mod('form', 'four-point contact'), mod('capacity', '10000', 'kg axial')]),
+        [mod('quantity', '×1'), mod('form', p.ratedPowerKw < 500 ? 'four-point contact ball' : 'three-row roller slewing'), mod('capacity', p.yawBearingAxialKg.toFixed(0), 'kg axial'), mod('regulatory', 'IEC 61400-4')]),
       word('yaw_drive_motor_word', 'yaw drive motor',
         cc('yaw_drive_motor', 'yaw drive motor', 'silicon_semiconductor_function', 'copper'),
-        [mod('quantity', fmtQty(2)), mod('capacity', '3', 'kW'), mod('form', 'planetary gear motor')]),
+        [mod('quantity', fmtQty(p.yawMotorCount)), mod('capacity', p.yawMotorEachKw.toFixed(2), 'kW'), mod('form', 'planetary gear motor + electromagnetic brake'), mod('dimension', (p.yawTotalKw).toFixed(1) + ' kW total')]),
       word('tower_door_word', 'tower door',
         cc('tower_door', 'tower door', null, 'steel'),
         [mod('quantity', '×1'), mod('regulatory', 'IP54'), mod('form', '600×1800 mm')]),
@@ -280,9 +400,9 @@ function emitTowerYaw(p: WindTurbineParams): DesignModule {
     ])
   return {
     module: 'tower_yaw',
-    module_brief: `${p.hubHeightM.toFixed(0)} m tubular galvanised steel tower with four-point yaw bearing driven by 2× 3 kW planetary gear motors; access via internal aluminium climbing ladder.`,
+    module_brief: `${p.hubHeightM.toFixed(0)} m tubular galvanised S355JR steel tower with ${p.ratedPowerKw < 500 ? 'four-point contact ball' : 'three-row roller slewing'} yaw bearing rated ${p.yawBearingAxialKg.toFixed(0)} kg axial, driven by ${p.yawMotorCount}× ${p.yawMotorEachKw.toFixed(2)} kW planetary gear motors (${p.yawTotalKw.toFixed(1)} kW total); access via internal aluminium climbing ladder per EN 14122-4.`,
     overview_paragraph_en: '',
-    derived_parameters: { hub_height_m: p.hubHeightM, yaw_motor_count: 2, yaw_motor_kw_each: 3 },
+    derived_parameters: { hub_height_m: p.hubHeightM, yaw_motor_count: p.yawMotorCount, yaw_motor_kw_each: p.yawMotorEachKw, yaw_bearing_axial_kg: p.yawBearingAxialKg, yaw_total_kw: p.yawTotalKw },
     allowed_radicals: ['steel', 'electromechanical_switching_function', 'silicon_semiconductor_function', 'aluminium', 'copper'],
     applicability_confidence: 'high',
     sub_modules: [tower],
@@ -324,15 +444,15 @@ function emitFoundation(p: WindTurbineParams): DesignModule {
   const foundation = makeSubModule('reinforced_foundation', 'reinforced foundation', 'anchors',
     `${p.totalMassKg.toFixed(0)} kg turbine + overturning moment to ground via reinforced concrete pad`,
     [
-      word('concrete_foundation_pad_word', 'concrete foundation pad',
-        cc('concrete_foundation_pad', 'concrete foundation pad', null, 'concrete'),
-        [mod('quantity', '×1'), mod('form', 'C30/37 reinforced'), mod('dimension', '7×7×1.5', 'm'), mod('regulatory', 'EN 1992-1-1')]),
+      word('concrete_foundation_pad_word', p.isOffshore ? 'monopile foundation' : 'concrete foundation pad',
+        cc('concrete_foundation_pad', p.isOffshore ? 'monopile foundation' : 'concrete foundation pad', null, p.isOffshore ? 'steel' : 'concrete'),
+        [mod('quantity', '×1'), mod('form', p.isOffshore ? 'driven monopile (S355G10+N steel)' : 'C30/37 reinforced gravity base'), mod('dimension', p.foundationDimText), mod('capacity', p.foundationVolumeM3.toFixed(0), 'm³'), mod('regulatory', p.isOffshore ? 'DNV-ST-0126' : 'EN 1992-1-1')]),
       word('anchor_cage_word', 'anchor cage',
         cc('anchor_cage', 'anchor cage', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', '×1'), mod('form', '48× M48 bolts'), mod('regulatory', 'EN 1090-2')]),
+        [mod('quantity', '×1'), mod('form', `${p.anchorBoltCount}× M${p.ratedPowerKw < 200 ? '36' : p.ratedPowerKw < 2000 ? '48' : '64'} 10.9 grade bolts`), mod('regulatory', 'EN 1090-2'), mod('capacity', (p.totalRotorMassKg + p.nacelleMassKg).toFixed(0), 'kg static + overturning')]),
       word('foundation_rebar_word', 'foundation rebar',
         cc('foundation_rebar', 'foundation rebar', null, 'steel'),
-        [mod('quantity', '×1'), mod('form', 'B500B 16mm'), mod('capacity', '3500', 'kg')]),
+        [mod('quantity', '×1'), mod('form', 'B500B 16-25 mm'), mod('capacity', p.foundationRebarKg.toFixed(0), 'kg'), mod('dimension', '120 kg/m³ ratio')]),
       word('ground_grid_word', 'ground grid',
         cc('ground_grid', 'ground grid', 'electrical_conducting_function', 'copper'),
         [mod('quantity', '×1'), mod('form', 'copper mesh 35 mm²'), mod('regulatory', 'IEC 62305')]),
