@@ -396,7 +396,7 @@ function emitGearboxDrivetrain(p: WindTurbineParams): DesignModule {
         [mod('quantity', '×1'), mod('dimension', highSpeedShaftMm.toFixed(0), 'mm'), mod('form', '42CrMo4'), mod('capacity', (torqueNm / p.gearboxRatio).toFixed(0), 'N·m')]),
       word('mechanical_brake_word', 'mechanical brake',
         cc('mechanical_brake', 'mechanical brake', 'electromechanical_switching_function', 'steel'),
-        [mod('quantity', '×1'), mod('form', 'disc + caliper'), mod('capacity', (torqueNm * 1.5).toFixed(0), 'N·m'), mod('regulatory', 'IEC 61400-2')]),
+        [mod('quantity', '×1'), mod('form', 'disc + caliper'), mod('capacity', (torqueNm * 1.5).toFixed(0), 'N·m'), mod('regulatory', p.ratedPowerKw < 50 ? 'IEC 61400-2' : p.isOffshore ? 'IEC 61400-3' : 'IEC 61400-1')]),
       word('lubrication_pump_word', 'lubrication pump',
         cc('lubrication_pump', 'lubrication pump', 'electromechanical_switching_function', 'steel'),
         [mod('quantity', '×1'), mod('capacity', lubePumpKw.toFixed(2), 'kW'), mod('form', 'gear pump'), mod('dimension', '40', 'L/min')]),
@@ -477,7 +477,7 @@ function emitTowerYaw(p: WindTurbineParams): DesignModule {
     [
       word('steel_tower_word', 'steel tower',
         cc('steel_tower', 'steel tower', null, 'steel'),
-        [mod('quantity', '×1'), mod('dimension', p.hubHeightM.toFixed(0), 'm'), mod('form', 'tubular galvanised S355JR'), mod('regulatory', 'IEC 61400-2')]),
+        [mod('quantity', '×1'), mod('dimension', p.hubHeightM.toFixed(0), 'm'), mod('form', 'tubular galvanised S355JR'), mod('regulatory', p.ratedPowerKw < 50 ? 'IEC 61400-2' : p.isOffshore ? 'IEC 61400-3' : 'IEC 61400-1')]),
       word('yaw_bearing_word', 'yaw bearing',
         cc('yaw_bearing', 'yaw bearing', 'electromechanical_switching_function', 'steel'),
         [mod('quantity', '×1'), mod('form', p.ratedPowerKw < 500 ? 'four-point contact ball' : 'three-row roller slewing'), mod('capacity', p.yawBearingAxialKg.toFixed(0), 'kg axial'), mod('regulatory', 'IEC 61400-4')]),
@@ -552,37 +552,63 @@ function emitFoundation(p: WindTurbineParams): DesignModule {
     ])
   return {
     module: 'foundation',
-    module_brief: '7×7×1.5 m reinforced concrete pad (C30/37) with 48× M48 anchor bolt cage and lightning earth-mesh — sized per EN 1992-1-1 and IEC 61400-2.',
+    module_brief: `${p.foundationDimText} ${p.isOffshore ? 'monopile foundation' : 'reinforced concrete pad (C30/37)'} with ${p.anchorBoltCount}× M${p.ratedPowerKw < 200 ? '36' : p.ratedPowerKw < 2000 ? '48' : '64'} anchor bolt cage (${p.anchorBoltMnCapacity.toFixed(1)} MN overturning capacity) and lightning earth-mesh — sized per ${p.isOffshore ? 'DNV-ST-0126' : 'EN 1992-1-1'} and ${p.ratedPowerKw < 50 ? 'IEC 61400-2' : p.isOffshore ? 'IEC 61400-3' : 'IEC 61400-1'}.`,
     overview_paragraph_en: '',
-    derived_parameters: { pad_volume_m3: 73.5 },
+    derived_parameters: { pad_volume_m3: p.foundationVolumeM3, pad_xy_m: p.foundationXyM, pad_depth_m: p.foundationDepthM, anchor_bolt_count: p.anchorBoltCount, anchor_capacity_mn: p.anchorBoltMnCapacity },
     allowed_radicals: ['concrete', 'steel', 'electromechanical_switching_function', 'electrical_conducting_function', 'copper'],
     applicability_confidence: 'high',
     sub_modules: [foundation],
   }
 }
 
-function emitRegulatoryCertification(_p: WindTurbineParams): DesignModule {
+function emitRegulatoryCertification(p: WindTurbineParams): DesignModule {
+  // 2026-05-23 L19 post-fix: regulatory standards selection is CLASS-DEPENDENT.
+  // IEC 61400-2 + MCS012 apply ONLY to SMALL WIND (swept area <200 m², ~50 kW).
+  // For utility-scale (≥0.5 MW) the design + type certificate is IEC 61400-1
+  // (loads) + IEC 61400-22 (conformity testing); grid connection moves from
+  // G99 (microgeneration ≤17 kVA per phase) to G98 / DC G59/3 / utility
+  // connection-agreement under National Grid ESO / Ofgem.
+  // Offshore adds IEC 61400-3 (offshore design) + DNV-GL service specs.
+  const sweptAreaM2 = Math.PI * (p.rotorDiameterM / 2) * (p.rotorDiameterM / 2)
+  const isSmallWind = sweptAreaM2 < 200 || p.ratedPowerKw < 50
+  const isUtility = p.ratedPowerKw >= 500
+  // Pick the appropriate primary design + grid + offshore standards
+  const primaryDesignStd = isSmallWind ? 'IEC 61400-2' : (p.isOffshore ? 'IEC 61400-3' : 'IEC 61400-1')
+  const designPlateName = isSmallWind ? 'IEC 61400-2 plate' : (p.isOffshore ? 'IEC 61400-3 plate' : 'IEC 61400-1 plate')
+  const designPlateCharId = isSmallWind ? 'iec_61400_2_plate' : (p.isOffshore ? 'iec_61400_3_plate' : 'iec_61400_1_plate')
+  const designPlateLabel = isSmallWind ? 'IEC 61400-2 design certificate plate' : (p.isOffshore ? 'IEC 61400-3 offshore design certificate plate' : 'IEC 61400-1 onshore design certificate plate')
+  const gridCertCharId = isSmallWind ? 'mcs_certificate' : (isUtility ? 'utility_connection_agreement' : 'g98_protection_plate')
+  const gridCertName = isSmallWind ? 'MCS certificate' : (isUtility ? 'utility connection agreement' : 'G98 protection plate')
+  const gridCertLabel = isSmallWind ? 'MCS certificate' : (isUtility ? 'National Grid ESO connection agreement' : 'G98 protection plate')
+  const gridCertRegulatory = isSmallWind ? 'MCS012' : (isUtility ? 'NGESO CUSC + EN 50549-2' : 'ENA G98')
+  const gridCertForm = isSmallWind ? 'laminated A4' : (isUtility ? 'signed connection-agreement record + protection compliance pack' : 'engraved 200×120 mm')
+  const conformityCertCharId = 'iec_61400_22_plate'
+  const conformityName = 'IEC 61400-22 conformity plate'
+  const conformityLabel = 'IEC 61400-22 type certificate conformity plate'
+  // Utility scale also requires NOTIFIED BODY conformity certificate
+  const includeNotifiedBody = isUtility
+  const words = [
+    word(`${designPlateCharId}_word`, designPlateName,
+      cc(designPlateCharId, designPlateLabel, null, 'aluminium'),
+      [mod('quantity', '×1'), mod('regulatory', primaryDesignStd), mod('form', 'engraved 200×120 mm'), mod('dimension', `${sweptAreaM2.toFixed(0)} m² swept area`)]),
+    word(`${gridCertCharId}_word`, gridCertName,
+      cc(gridCertCharId, gridCertLabel, null, isSmallWind ? 'polymer_thermoplastic' : 'aluminium'),
+      [mod('quantity', '×1'), mod('regulatory', gridCertRegulatory), mod('form', gridCertForm)]),
+    ...(includeNotifiedBody ? [word(`${conformityCertCharId}_word`, conformityName,
+      cc(conformityCertCharId, conformityLabel, null, 'aluminium'),
+      [mod('quantity', '×1'), mod('regulatory', 'IEC 61400-22'), mod('form', 'engraved 200×120 mm — DNV-GL or TÜV notified-body issued')])] : []),
+    word('safety_signage_kit_word', 'safety signage kit',
+      cc('safety_signage_kit', 'safety signage kit', null, 'polymer_thermoplastic'),
+      [mod('quantity', '×1'), mod('regulatory', 'EN ISO 7010'), mod('form', '6-piece HV + working-at-height + machinery hazard')]),
+  ]
   const cert = makeSubModule('regulatory_signage', 'regulatory signage', 'documents',
-    'IEC 61400-2 design + MCS012 install + G99 grid + EN 50549 compliance via plates and inspection records',
-    [
-      word('iec_61400_2_plate_word', 'IEC 61400-2 plate',
-        cc('iec_61400_2_plate', 'IEC 61400-2 design certificate plate', null, 'aluminium'),
-        [mod('quantity', '×1'), mod('regulatory', 'IEC 61400-2'), mod('form', 'engraved 200×120 mm')]),
-      word('mcs_certificate_word', 'MCS certificate',
-        cc('mcs_certificate', 'MCS certificate', null, 'polymer_thermoplastic'),
-        [mod('quantity', '×1'), mod('regulatory', 'MCS012'), mod('form', 'laminated A4')]),
-      word('g99_protection_plate_word', 'G99 protection plate',
-        cc('g99_protection_plate', 'G99 protection plate', null, 'aluminium'),
-        [mod('quantity', '×1'), mod('regulatory', 'ENA G99/3-3'), mod('form', 'engraved')]),
-      word('safety_signage_kit_word', 'safety signage kit',
-        cc('safety_signage_kit', 'safety signage kit', null, 'polymer_thermoplastic'),
-        [mod('quantity', '×1'), mod('regulatory', 'EN ISO 7010'), mod('form', '6-piece HV + working-at-height')]),
-    ])
+    `${primaryDesignStd} design + ${gridCertRegulatory} grid + EN ISO 7010 safety compliance via plates and inspection records${includeNotifiedBody ? ' + IEC 61400-22 type certification' : ''}`,
+    words)
   return {
     module: 'regulatory_certification',
-    module_brief: 'Mandatory regulatory plates + records: IEC 61400-2 design certificate, MCS012 micro-gen install, ENA G99 grid protection, EN ISO 7010 safety pictograms.',
+    module_brief: `Mandatory regulatory plates + records appropriate to ${p.ratedPowerKw} kW ${isSmallWind ? 'small wind (swept area <200 m²)' : p.isOffshore ? 'offshore utility' : 'onshore utility'} class: ${primaryDesignStd} design certificate, ${gridCertRegulatory} grid${includeNotifiedBody ? ', IEC 61400-22 notified-body type certificate' : ''}, EN ISO 7010 safety pictograms.`,
     overview_paragraph_en: '',
-    derived_parameters: { mandatory_count: 5 },
+    derived_parameters: { mandatory_count: words.length, swept_area_m2: sweptAreaM2, primary_design_std: primaryDesignStd, grid_std: gridCertRegulatory },
     allowed_radicals: ['aluminium', 'polymer_thermoplastic'],
     applicability_confidence: 'high',
     sub_modules: [cert],
