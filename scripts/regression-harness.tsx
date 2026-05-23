@@ -206,6 +206,87 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       (n) => n === 0,
       (n) => `${n} required fields missing: ${missing.join(', ')}`,
     ))
+
+    // Build #18r-fix2 invariant (2026-05-22 Loop 28 Bugs 1 + 5): all rack-count
+    // mentions across the BESS design must collapse to a single value. Loop 28
+    // shipped with module_brief="18 racks" and overview_paragraph_en="15 racks"
+    // because the deterministic emitter ignored Contract.quantities.rack_count.
+    const modulesBess: any[] = state?.moduleDecomposition?.modules ?? []
+    const rackValues = new Set<number>()
+    const rackMentions: Array<{ where: string; n: number }> = []
+    for (const mb of modulesBess) {
+      const drp = mb?.derived_parameters?.rack_count
+      if (typeof drp === 'number' && drp > 0) {
+        rackValues.add(drp); rackMentions.push({ where: `${mb.module}.derived_parameters.rack_count`, n: drp })
+      }
+      for (const f of ['module_brief', 'overview_paragraph_en']) {
+        const txt = String(mb?.[f] ?? '')
+        const re = /\b(\d+)\s+racks?\b/gi
+        let mm: RegExpExecArray | null
+        while ((mm = re.exec(txt)) !== null) {
+          const n = parseInt(mm[1], 10)
+          if (Number.isFinite(n) && n > 0 && n < 1000) {
+            rackValues.add(n); rackMentions.push({ where: `${mb.module}.${f}`, n })
+          }
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'BESS.rack_count_consistent',
+      'All rack-count mentions across BESS modules collapse to a single value',
+      rackValues.size,
+      (n) => n <= 1,
+      (n) => `${n} distinct rack-count values: ${[...rackValues].join(', ')} — mentions: ${rackMentions.map(r => `${r.where}=${r.n}`).join('; ').slice(0, 400)}`,
+    ))
+
+    // Build #18r-fix2 invariant (2026-05-22 Loop 28 Bug 4): Modbus TCP and
+    // other comms protocols must NOT be tagged kind:regulatory.
+    const protocolMisclassified: string[] = []
+    for (const mb of modulesBess) {
+      for (const sm of (mb?.sub_modules ?? [])) {
+        for (const w of (sm?.words ?? [])) {
+          for (const mc of (w?.modifier_characters ?? [])) {
+            const kind = String(mc?.kind ?? '').toLowerCase()
+            const value = String(mc?.value ?? '')
+            if (kind === 'regulatory' && /\b(?:modbus(?:\s+|-)?(?:tcp|rtu)|canopen|ethercat|profinet|opc[\s-]?ua|iec\s*61850)\b/i.test(value)) {
+              protocolMisclassified.push(`${mb.module}/${sm.id}/${w.id}: regulatory="${value}"`)
+            }
+          }
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'BESS.protocol_not_regulatory',
+      'No communication protocol appears under kind:regulatory in BESS modifier_characters',
+      protocolMisclassified.length,
+      (n) => n === 0,
+      (n) => `${n} protocols miscategorised as regulatory: ${protocolMisclassified.slice(0, 5).join('; ')}`,
+    ))
+
+    // Build #18r-fix2 invariant (2026-05-22 Loop 28 Bugs 2 + 3): overview prose
+    // must not contain LLM-hallucinated phrases contradicting tool outputs.
+    const FORBIDDEN_BESS_PROSE = [
+      { name: 'voltage_reconfiguration', pattern: /reconfigured to \d+\s*(?:-?series\s+)?cells?\b/i },
+      { name: 'invented_derating_range', pattern: /\d+\s*[-–—]\s*\d+\s*%\s+derating/i },
+      { name: 'efficiency_range_invented', pattern: /round[-\s]?trip\s+efficiency\s+of\s+\d+\s*[-–—]\s*\d+\s*%/i },
+    ]
+    const proseHits: string[] = []
+    for (const mb of modulesBess) {
+      for (const f of ['overview_paragraph_en', 'module_brief']) {
+        const txt = String(mb?.[f] ?? '')
+        for (const fp of FORBIDDEN_BESS_PROSE) {
+          const mm = txt.match(fp.pattern)
+          if (mm) proseHits.push(`${mb.module}.${f}: ${fp.name}="${mm[0]}"`)
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'BESS.no_forbidden_prose',
+      'No tool-contradicting phrases in BESS module prose',
+      proseHits.length,
+      (n) => n === 0,
+      (n) => `${n} forbidden phrases found: ${proseHits.slice(0, 5).join('; ')}`,
+    ))
   }
 
   // === Additional universal invariants ===
@@ -263,6 +344,77 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       g05.verdict,
       (v) => v !== 'HALT',
       (v) => `G0.5 verdict=${v}; mismatches=${JSON.stringify((g05.mismatches ?? []).map((m: any) => ({ target: m.target_field, briefUnit: m.target_unit, design: m.design_field, ratio: m.ratio })).slice(0, 3))} — likely missing unit family in classifyBriefUnitFamily or missing TARGET_RECONCILIATIONS spec`,
+    ))
+  }
+
+  // I10. P1-1 (2026-05-23): parsedBrief.constraints.target_performance.metrics
+  // MUST be an Array (may be empty for qualitative-only briefs). Multi-metric
+  // schema is the architectural fix for the unit-family bug class — if this
+  // field is absent or non-array, the brief parser has regressed to the
+  // pre-P1-1 schema and downstream unit-family bugs will re-emerge.
+  if (state?.parsedBrief?.constraints?.target_performance !== undefined) {
+    const metrics = state.parsedBrief.constraints.target_performance.metrics
+    assertions.push(assertEq(
+      'I10.metrics_array_present',
+      'parsedBrief.target_performance.metrics is an Array (post-P1-1 schema)',
+      Array.isArray(metrics),
+      (v) => v === true,
+      () => `metrics field missing or non-array; got ${JSON.stringify(metrics)}. Parser regressed to pre-P1-1 single-metric schema — re-check src/lib/pdf-engine-v2/prompts.ts and stages/0-brief-generation.ts`,
+    ))
+  }
+
+  // I11. P2-4 (2026-05-23): no "{name} word" suffix should survive into the
+  // final state. The pre-orchestrator strip catches most; the final-pass
+  // strip on state.moduleDecomposition (was broken until P2-4 fix) catches
+  // the rest. If a name_human ends in " word", later specialists re-added
+  // the suffix AND the strip didn't run — regression in either layer.
+  const checkWordSuffix = (obj: any, where: string): string | null => {
+    if (!obj || typeof obj !== 'object') return null
+    const name = obj.name_human
+    if (typeof name === 'string' && /\s+word$/i.test(name)) return `${where}: "${name}"`
+    return null
+  }
+  const wordSuffixViolations: string[] = []
+  const md = state?.moduleDecomposition
+  for (const m of (md?.modules ?? [])) {
+    const mv = checkWordSuffix(m, `module=${m.module}`)
+    if (mv) wordSuffixViolations.push(mv)
+    for (const sm of (m?.sub_modules ?? [])) {
+      const sv = checkWordSuffix(sm, `module=${m.module}/sub=${sm.id}`)
+      if (sv) wordSuffixViolations.push(sv)
+      for (const w of (sm?.words ?? [])) {
+        const wv = checkWordSuffix(w, `module=${m.module}/sub=${sm.id}/word=${w.id}`)
+        if (wv) wordSuffixViolations.push(wv)
+        const cv = checkWordSuffix(w?.content_character, `module=${m.module}/sub=${sm.id}/word=${w.id}/content_character`)
+        if (cv) wordSuffixViolations.push(cv)
+      }
+    }
+  }
+  assertions.push(assertEq(
+    'I11.no_word_suffix_in_state',
+    'No name_human field ends with " word" (post-P2-4 final-pass strip)',
+    wordSuffixViolations.length,
+    (n) => n === 0,
+    (n) => `${n} " word" suffix violations: ${wordSuffixViolations.slice(0, 5).join('; ')}`,
+  ))
+
+  // VF.scale_fallback_audit — P1-4 (2026-05-23): VF emitter logs
+  // SCALE_FALLBACK_FIRED when the orchestrator's tool plan didn't populate a
+  // scale-determining quantity. Future enhancement: read the chain log if
+  // available and assert no SCALE_FALLBACK_FIRED entries for the snapshot's
+  // run. For now, assert that for VF the key scale quantities are present in
+  // contract.quantities (which a working tool plan would populate).
+  if (productClass === 'vertical_farm' || productClass === 'verticalfarm') {
+    const oc = state?.orchestratorContract?.quantities ?? {}
+    const ec = state?.engineeringContract?.quantities ?? {}
+    const SCALE_KEYS = ['canopy_area_m2', 'trolley_count', 'led_installed_power_kw', 'annual_yield_kg', 'total_electrical_kw', 'total_system_mass_kg']
+    const missing = SCALE_KEYS.filter(k => oc[k]?.value == null && ec[k]?.value == null)
+    assertions.push(assertEq(
+      'VF.scale_fallback_audit',
+      'VF orchestrator/engineering contract has all scale-determining quantities (no qScale fallback would fire)',
+      missing.length,
+      (n) => n === 0,
+      (n) => `${n} scale keys missing from contract.quantities: ${missing.join(', ')} — VF emitter would log SCALE_FALLBACK_FIRED and ship a default-size design`,
     ))
   }
 
