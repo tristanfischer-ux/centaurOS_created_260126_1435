@@ -1102,10 +1102,14 @@ function computeBomTotals(state: any): BomTotals | null {
     const total = Number(macro?.total_gbp ?? 0)
     if (!name || !Number.isFinite(total) || total <= 0) continue
     if (claimedMacroAssemblies.has(name)) continue
-    // Match macro name against any word_id or word name in the design
-    const matched = wordNames.has(name)
-      || wordNames.has(`${name}_word`)
-      || Array.from(wordNames).some(wn => wn.includes(name) || name.includes(wn))
+    // Match macro to a design word ONLY via exact name or `_word` suffix.
+    // 2026-05-23-bugfix: dropped permissive reverse-substring check
+    // (`name.includes(wn)`) which caused false-positive matches — wind
+    // turbine has 153 design words including short names like "gear" that
+    // would substring-match macros like "planetary_gearbox", suppressing
+    // £3.18M of cost. Strict match only via exact ID; the BESS pattern of
+    // emitting word_id = `${macro_name}_word` is the supported mapping.
+    const matched = wordNames.has(name) || wordNames.has(`${name}_word`)
     if (!matched) {
       unmatchedMacroTotal_gbp = roundToPence(unmatchedMacroTotal_gbp + total)
       unmatchedMacros.push({ name, total })
@@ -3614,19 +3618,20 @@ function SubModuleBomBlock({
   partLinkMap?: Map<string, { url: string; title: string | null; manufacturer: string }>
 }) {
   if (bomLines.length === 0) return null
+  // 2026-05-23-bugfix: react-pdf wrap={false} on tables >12 rows triggers
+  // the overlap-on-overflow bug (windturbine-l9 page 18: 125 lines of
+  // overlapping text per pdftotext audit). Use minPresenceAhead instead:
+  // tells react-pdf "if <N pt available, push the WHOLE table to next page",
+  // which prevents both the original orphan-header bug AND the overlap.
+  // Estimate ~12pt per row + 18pt for header/separator/subtotal.
+  const minPresenceAheadPt = Math.min(28 + bomLines.length * 12, 600)
   return (
-    <View style={{ marginTop: 8, marginBottom: 6, marginLeft: 36 }} wrap={false}>
-      {/* wrap={false} — Bug #4 universal (2026-05-22 HP page 14 audit):
-          when the surrounding sub-module prose flowed into the BoM table
-          area, the table header + first row landed ON TOP of the prose
-          ("Indoor brazed-plate heat exchanger" — 4-line prose paragraph
-          had BoM headers PART/MANUFACTURER/PART NUMBER literally rendered
-          inside it). Marking the outer BoM container wrap={false} forces
-          react-pdf to render the whole table on a single page (small —
-          typically 5-10 rows = ~100-200pt tall, easily fits even when the
-          rest of the page is full). If a sub-module's BoM is too tall for
-          a page (>40 rows), this regresses to overflow — acceptable for
-          the safety it buys against overlap on the common case. */}
+    <View style={{ marginTop: 8, marginBottom: 6, marginLeft: 36 }} minPresenceAhead={minPresenceAheadPt}>
+      {/* See 2026-05-23 bugfix comment above. Old "wrap={false}" approach
+          was correct for the 5-10 row common case but caused overlap on
+          long tables (e.g. windturbine-l9 with 28 sub-modules × deeper
+          parts lists per the splitter expansion). minPresenceAhead gives
+          page-break alignment without the unbounded-overflow risk. */}
       {/* Header row — ITER-10.5 third review: SRC/REF renamed to be
           self-explanatory; a column legend renders beneath the table so
           the reader doesn't have to guess at the abbreviations. */}
