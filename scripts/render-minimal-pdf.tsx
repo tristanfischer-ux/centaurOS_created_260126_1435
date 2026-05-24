@@ -851,6 +851,27 @@ function computeBomTotals(state: any): BomTotals | null {
           && /(?:globalg|brcgs|brcg|ukca|wras|red\s*tractor|leaf\s*marque|leaf-marque|iso\s*\d|ifa\s*v|ce\s*mark)/i.test(combined)
         )
         if (isCertWord) continue
+        // BESS L4 (2026-05-24 Tristan post-mortem): the Generator (LLM)
+        // occasionally pulls contract-quantity field names (e.g.
+        // `total_system_mass_kg`, `total_cell_mass_kg`, `nameplate_capacity_kwh`)
+        // into the words[] list as if they were physical parts, with the
+        // contract's NUMERIC VALUE pinned to the `quantity` modifier.
+        // Downstream: Engine B's flash_lite_unknown_class fallback then
+        // hallucinates a per-each price (e.g. £4,250) and multiplies it by
+        // the value-as-count (e.g. 32,175 kg) → £136.7M structure_containment
+        // line that detonates B-3 cover-vs-module reconciliation.
+        // The contract-quantity → word conversion is the upstream bug
+        // (Generator + Engine B both contributing); the safe defensive
+        // fix is to refuse to BoM-aggregate any word whose id is shaped
+        // like an aggregate scalar (total_*_kg|kwh, *_mass_kg, *_count,
+        // *_capacity_kwh, *_voltage_v, *_current_a, *_ratio, *_pct,
+        // *_efficiency, *_fraction). These are physics quantities, not
+        // parts — they belong on the headline-derived cover card, not in
+        // the BoM section. Class-universal: every archetype contract has
+        // total_*_kg / *_count / *_efficiency-shaped scalars and the same
+        // Generator/Engine B path applies.
+        const IS_AGGREGATE_METRIC_WORD = /^(?:total_[a-z0-9_]*_(?:kg|kwh|kw|mwh|gwh|mw|gw|wh|m3|l|m2|m)|[a-z0-9_]+_(?:mass_kg|count|capacity_kwh|voltage_v|current_a|ratio|pct|efficiency|fraction|breach_kg|utilisation_pct)|nameplate_capacity_kwh|usable_capacity_kwh|continuous_power_kw|peak_power_kw|dc_bus_voltage_v|bus_continuous_current_a|bus_peak_current_a|string_voltage_nominal_v|string_continuous_current_a|string_peak_current_a|inverter_dissipated_kw|thermal_rejection_min_kw|brief_target_feasibility|brief_mass_cap_kg|container_count|rack_count|cell_count|cells_per_rack|series_cells_per_string|parallel_strings_per_rack|parallel_strings_total|dod_fraction|cell_voltage_v|cell_capacity_ah|cell_mass_kg)_word$/i
+        if (IS_AGGREGATE_METRIC_WORD.test(idLower)) continue
         const v = verifByWordId.get(w.id)
         const mods = w.modifier_characters ?? []
         // Quantity (integer)

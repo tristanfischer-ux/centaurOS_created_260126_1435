@@ -354,6 +354,14 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('form', 'stainless steel terminal set'),
         ],
       ),
+      // BESS L4 (2026-05-24, Physics Critic engineering_plausibility HIGH):
+      // cell voltage-sense leads in an 800 V nominal (912 V max) DC system
+      // MUST be rated for the full system voltage to ground per IEC 61140
+      // basic-insulation + IEC 60664-1 working-voltage class III. UL 1015
+      // is only 600 V rated (commonly mis-cited as 300 V) — inadequate for
+      // dielectric breakdown protection at 912 V max. Swap to UL 3266
+      // (silicone-insulated, 1000 V working voltage, 200 C rated; LAPP
+      // Ölflex Heat 180 SiHF and Belden 6300UE are class equivalents).
       word(
         'cell_voltage_tap_wire_word',
         'cell voltage tap wire word',
@@ -361,7 +369,8 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         [
           mod('quantity', fmtQty(p.cellCount)),
           mod('dimension', '22', 'AWG'),
-          mod('regulatory', 'UL 1015'),
+          mod('capacity', '1000', 'V'),
+          mod('regulatory', 'UL 3266'),
         ],
       ),
       word(
@@ -652,14 +661,18 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
       // engineering-contract.ts `bms_slave_module` macro can propagate
       // through scripts/render-minimal-pdf.tsx:885-927 strict matcher.
       // Without this word the macro orphans and audit-pdf-bom.ts B-2
-      // hard-exits code 10. Slave count = ceil(cellCount / 24) mirrors
-      // engineering-contract.ts BESS slaveCount derivation.
+      // hard-exits code 10.
+      // BESS L4 (2026-05-24, Physics Critic internal_coherence HIGH):
+      // slave boards monitor cells per RACK boundary, not system-wide.
+      // Per-rack ceil × rackCount = ceil(250/24) × 15 = 11 × 15 = 165,
+      // not the 157 a system-wide ceil would give. Mirrors the same
+      // formula in engineering-contract.ts BESS slaveCount derivation.
       word(
         'bms_slave_module_word',
         'BMS slave module word',
         cc('bms_slave_module', 'BMS slave module', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [
-          mod('quantity', fmtQty(Math.ceil(p.cellCount / 24))),
+          mod('quantity', fmtQty(Math.ceil(p.cellsPerRack / 24) * p.rackCount)),
           mod('form', '24-channel cell-voltage + temperature monitoring board'),
           mod('regulatory', 'IEC 62619'),
         ],

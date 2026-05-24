@@ -640,7 +640,14 @@ registerArchetype('bess', (brief: any) => {
   // £600/kW thermal rejection. Word names chosen for ≥0.66 token overlap
   // against Stage 1.7 emissions (cell_string sub-module, pcs_inverter_1mw,
   // container_enclosure, bms_master, bms_slave, liquid_cooling_loop_1mw).
-  const slaveCount = Math.ceil(cellCount / 24)  // 24-channel BMS slave boards
+  // BESS L4 (2026-05-24, Physics Critic internal_coherence HIGH): slave
+  // boards monitor cells per RACK, not per system — boards cannot span
+  // rack boundaries (the 24-channel monitoring IC's voltage-sense wires
+  // are physically confined to one rack's pack). System-wide division
+  // (3750 / 24 = 157) under-counts by ~5% because the per-rack remainder
+  // (250 % 24 = 10) must be rounded up per rack. Per-rack ceil × rackCount
+  // yields the physically correct total: ceil(250/24) × 15 = 11 × 15 = 165.
+  const slaveCount = Math.ceil(cellsPerRack / 24) * rackCount  // 24-channel BMS slave boards, per-rack boundary
   const macro_assembly_prices: MacroAssemblyPrice[] = [
     {
       word_name: 'lfp_prismatic_cell',
@@ -680,7 +687,7 @@ registerArchetype('bess', (brief: any) => {
       dimension_basis: 'each',
       dimension_value: slaveCount,
       total_gbp: 400 * slaveCount,
-      source_detail: `£400/slave × ${slaveCount} slaves (24-channel each; ceil(${cellCount} cells / 24))`,
+      source_detail: `£400/slave × ${slaveCount} slaves (24-channel each; ceil(${cellsPerRack} cells/rack / 24) × ${rackCount} racks — slaves cannot span rack boundaries per IEC 62619)`,
     },
     {
       word_name: 'liquid_cooling_chiller',
