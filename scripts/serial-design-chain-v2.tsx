@@ -4291,7 +4291,10 @@ async function main() {
         execFileSync(mmdcBin, [
           '-i', mmdPath,
           '-o', pngPath,
-          '--width', '1200',
+          // 2026-05-24 Tristan: was 1200 — produced landscape-leaning layout
+          // using only ~25% of portrait page. Narrow render forces Mermaid's
+          // auto-layout to wrap tools vertically, taller diagram fills page.
+          '--width', '600',
           '--backgroundColor', 'white',
         ], {
           stdio: 'pipe',
