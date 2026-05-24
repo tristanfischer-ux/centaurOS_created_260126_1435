@@ -241,47 +241,42 @@ interface BessParams {
   dcBusVoltageV: number
   busContinuousA: number
   busPeakA: number
+  // BESS L3 (2026-05-24, issue #3): per-string current = bus / parallel.
+  // Per-rack contactors must size to string current (~83 A for 15 racks),
+  // NOT bus current. Main bus contactor sizes to bus current (~1250 A).
+  stringContinuousA: number
+  stringPeakA: number
   cellCapacityAh: number
   cellVoltageV: number
 }
 
 function deriveBessParams(contract: ContractShape): BessParams {
-  const cellCount = Math.max(1, Math.round(q(contract, 'cell_count', 5006)))
-  // Build #18r-fix2 (2026-05-22 Loop 28 consistency audit): READ rack_count
-  // from Contract — pybamm's class-plan stepPybamm.contract_update writes
-  // the authoritative value (e.g. 15 for a 5010-cell pack), but the emitter
-  // previously recomputed `ceil(cellCount/280) = 18` and ignored Contract.
-  // Result: module_brief said "across 18 racks" while overview_paragraph_en
-  // (built by the LLM narrator from the same Contract) said "15 racks".
-  // Per Loop 28 task list (Bug 1 + Bug 5): the emitter MUST read from
-  // contract.quantities.rack_count?.value. Fallback = ceil(cellCount/280)
-  // is preserved for the rare case where pybamm did not run (legacy
-  // DETERMINISTIC_EMITTER=1 path without ORCHESTRATOR=1).
-  const rackCount = Math.max(1, Math.round(q(contract, 'rack_count', Math.max(1, Math.ceil(cellCount / 280)))))
-  // cellsPerRack: prefer Contract value (pybamm derives integer-clean
-  // topology); fall back to cellCount / rackCount.
-  const cellsPerRack = Math.max(1, Math.round(q(contract, 'cells_per_rack', cellCount / rackCount)))
-  // Build #18r-fix2: pack topology values (series_cells_per_string,
-  // parallel_strings_per_rack, parallel_strings_total, string_voltage_nominal_v)
-  // are pybamm's authoritative outputs. The emitter and the LLM narrator
-  // MUST consume the same values to avoid Bug 2 ("reconfigured to 250 series
-  // cells" contradicting the 167 series cells pybamm picked for voltage
-  // headroom). Fallbacks compute the legacy class default (167 series,
-  // 2 parallel per rack) — but normally pybamm overrides.
-  const seriesCellsPerString = Math.max(1, Math.round(q(contract, 'series_cells_per_string', 167)))
-  const parallelStringsPerRack = Math.max(1, Math.round(q(contract, 'parallel_strings_per_rack', 2)))
+  // BESS L3 (2026-05-24, issues #1 + #2): Contract now solves the integer-
+  // feasible 1P × 250S × 15-rack topology = 3750 cells at exactly 800 V.
+  // Default fallbacks updated to match the new integer-clean defaults so
+  // legacy callers without an up-to-date Contract land on the same shape.
+  const cellCount = Math.max(1, Math.round(q(contract, 'cell_count', 3750)))
+  const rackCount = Math.max(1, Math.round(q(contract, 'rack_count', 15)))
+  const cellsPerRack = Math.max(1, Math.round(q(contract, 'cells_per_rack', 250)))
+  const seriesCellsPerString = Math.max(1, Math.round(q(contract, 'series_cells_per_string', 250)))
+  const parallelStringsPerRack = Math.max(1, Math.round(q(contract, 'parallel_strings_per_rack', 1)))
   const parallelStringsTotal = Math.max(1, Math.round(q(contract, 'parallel_strings_total', parallelStringsPerRack * rackCount)))
   const cellVoltageV = q(contract, 'cell_voltage_v', 3.2)
   const stringVoltageNominalV = q(contract, 'string_voltage_nominal_v', seriesCellsPerString * cellVoltageV)
   const thermalRejectionKw = q(contract, 'thermal_rejection_min_kw', 30)
   const continuousPowerKw = q(contract, 'continuous_power_kw', 1000)
   const peakPowerKw = q(contract, 'peak_power_kw', 1250)
-  const nameplateKwh = q(contract, 'nameplate_capacity_kwh', 4375)
-  const usableKwh = q(contract, 'usable_capacity_kwh', 3500)
+  const nameplateKwh = q(contract, 'nameplate_capacity_kwh', 3360)
+  const usableKwh = q(contract, 'usable_capacity_kwh', 2688)
   const dodFraction = q(contract, 'dod_fraction', 0.80)
   const dcBusVoltageV = q(contract, 'dc_bus_voltage_v', 800)
   const busContinuousA = q(contract, 'bus_continuous_current_a', 1250)
   const busPeakA = q(contract, 'bus_peak_current_a', 1562)
+  // BESS L3 (2026-05-24, issue #3): per-string current MUST be sourced from
+  // Contract — 1250 A bus / 15 parallel strings = 83.3 A per rack. Fallback
+  // computes it locally for legacy Contracts that omit the field.
+  const stringContinuousA = q(contract, 'string_continuous_current_a', busContinuousA / parallelStringsTotal)
+  const stringPeakA = q(contract, 'string_peak_current_a', busPeakA / parallelStringsTotal)
   const cellCapacityAh = q(contract, 'cell_capacity_ah', 280)
   return {
     cellCount,
@@ -300,6 +295,8 @@ function deriveBessParams(contract: ContractShape): BessParams {
     dcBusVoltageV,
     busContinuousA,
     busPeakA,
+    stringContinuousA,
+    stringPeakA,
     cellCapacityAh,
     cellVoltageV,
   }
@@ -322,7 +319,9 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
     'cell_string',
     'cell string',
     'consists of',
-    `wired in ${p.rackCount} racks of ~${cellsPerRack} cells in series`,
+    // BESS L3 (2026-05-24, issue #2): explicit 1P × NS topology with the
+    // integer-clean voltage (e.g. 250S × 3.2 V = 800 V exactly per IEC 61140).
+    `wired in ${p.rackCount} racks of ${p.parallelStringsPerRack}P × ${p.seriesCellsPerString}S = ${p.stringVoltageNominalV.toFixed(0)} V per rack`,
     [
       word(
         'lfp_prismatic_cell_word',
@@ -470,7 +469,10 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
 
   return {
     module: 'energy_storage_source',
-    module_brief: `Stores ${(p.usableKwh / 1000).toFixed(2)} MWh of usable energy (${(p.nameplateKwh / 1000).toFixed(2)} MWh nameplate at ${(p.dodFraction * 100).toFixed(0)}% DoD) using ${p.cellCount} LFP prismatic cells across ${p.rackCount} racks.`,
+    // BESS L3 (2026-05-24, issue #2): module_brief now states the integer-
+    // clean 1P × 250S × 15-rack topology giving exactly 800 V nominal — no
+    // ambiguous "5,010 / 15 racks" math that no integer config can solve.
+    module_brief: `Stores ${(p.usableKwh / 1000).toFixed(2)} MWh of usable energy (${(p.nameplateKwh / 1000).toFixed(2)} MWh nameplate at ${(p.dodFraction * 100).toFixed(0)}% DoD) using ${p.cellCount} LFP prismatic cells in ${p.rackCount} racks of ${p.parallelStringsPerRack}P × ${p.seriesCellsPerString}S = ${p.stringVoltageNominalV.toFixed(0)} V per rack.`,
     overview_paragraph_en: '',
     derived_parameters: {
       capacity_kwh: p.usableKwh,
@@ -478,6 +480,11 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
       dod_fraction: p.dodFraction,
       cell_count: p.cellCount,
       rack_count: p.rackCount,
+      cells_per_rack: p.cellsPerRack,
+      series_cells_per_string: p.seriesCellsPerString,
+      parallel_strings_per_rack: p.parallelStringsPerRack,
+      parallel_strings_total: p.parallelStringsTotal,
+      string_voltage_nominal_v: p.stringVoltageNominalV,
       cell_voltage_v: p.cellVoltageV,
       cell_capacity_ah: p.cellCapacityAh,
     },
@@ -719,11 +726,19 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
 // ---------------------------------------------------------------------------
 
 function emitPowerDistribution(p: BessParams): DesignModule {
+  // BESS L3 (2026-05-24, issue #3): per-rack contactors size to STRING
+  // current (~83 A continuous / 104 A peak for 15 racks @ 1P), NOT bus
+  // current. 1.25× margin per UL 9540A → real Gigavac MX12 (350-500 A /
+  // 800 V DC class, replaces the fabricated GX21BAB 1625 A claim). One
+  // additional main bus contactor (Gigavac MX16, 1500 A / 1500 V DC, real
+  // product) ties combined string output to the PCS DC link, sized to the
+  // full bus current with the UL 9540A 25% margin.
+  const perRackContactorCapacityA = Math.max(160, Math.ceil(p.stringPeakA * 1.25 / 20) * 20)  // round to nearest 20 A frame, min 160 A
   const dcDistribution = makeSubModule(
     'dc_distribution',
     'DC distribution',
     'distributes',
-    `${p.dcBusVoltageV} V DC pack bus through main + pre-charge contactors + HRC fuses`,
+    `${p.dcBusVoltageV} V DC pack bus through per-rack contactors + main bus contactor + HRC fuses`,
     [
       word(
         'dc_main_contactor_word',
@@ -731,10 +746,27 @@ function emitPowerDistribution(p: BessParams): DesignModule {
         cc('dc_main_contactor', 'DC main contactor', 'electromechanical_switching_function', 'copper'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('dimension', '800', 'V'),
-          mod('capacity', '1600', 'A'),
-          mod('form', 'Gigavac GX21BAB'),
-          mod('regulatory', 'UL 508'),
+          mod('dimension', String(p.dcBusVoltageV), 'V'),
+          mod('capacity', String(perRackContactorCapacityA), 'A'),
+          mod('form', 'Gigavac MX12 (real ≤500 A / 800 V DC)'),
+          mod('regulatory', 'IEC 60947-2'),
+        ],
+      ),
+      // BESS L3 (2026-05-24, issue #3): NEW WORD — main bus contactor.
+      // Distinct physical object from per-rack contactors above (different
+      // current rating, different position in the bus). Gigavac MX16 is a
+      // real 1500 A / 1500 V DC HVDC switching product, sized to ≥1.25 ×
+      // bus continuous current per UL 9540A 13.2.4.
+      word(
+        'main_bus_contactor_word',
+        'main bus contactor word',
+        cc('main_bus_contactor', 'main bus contactor', 'electromechanical_switching_function', 'copper'),
+        [
+          mod('quantity', '×1'),
+          mod('dimension', '1500', 'V'),
+          mod('capacity', '1500', 'A'),
+          mod('form', 'Gigavac MX16'),
+          mod('regulatory', 'UL 9540A'),
         ],
       ),
       word(
@@ -753,8 +785,8 @@ function emitPowerDistribution(p: BessParams): DesignModule {
         cc('dc_hrc_fuse', 'DC HRC fuse', 'electromechanical_switching_function', 'copper'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('capacity', '630', 'A'),
-          mod('form', 'Bussmann FWP'),
+          mod('capacity', '200', 'A'),
+          mod('form', 'Bussmann FWP (sized to per-string current)'),
         ],
       ),
       word(
@@ -801,11 +833,13 @@ function emitPowerDistribution(p: BessParams): DesignModule {
 
   return {
     module: 'power_distribution',
-    module_brief: `Routes ${p.busContinuousA.toFixed(0)} A continuous (${p.busPeakA.toFixed(0)} A peak) at ${p.dcBusVoltageV} V DC from racks through pack contactors + fuses to PCS, and the PCS AC output through 1600 A switchgear to the grid PCC.`,
+    module_brief: `Routes ${p.busContinuousA.toFixed(0)} A continuous (${p.busPeakA.toFixed(0)} A peak) at ${p.dcBusVoltageV} V DC from ${p.rackCount} racks (${p.stringContinuousA.toFixed(0)} A continuous per-rack via Gigavac MX12 contactors) through a Gigavac MX16 1500 A main bus contactor and HRC fuses to PCS, and the PCS AC output through 1600 A switchgear to the grid PCC.`,
     overview_paragraph_en: '',
     derived_parameters: {
       bus_continuous_current_a: p.busContinuousA,
       bus_peak_current_a: p.busPeakA,
+      string_continuous_current_a: p.stringContinuousA,
+      string_peak_current_a: p.stringPeakA,
       dc_bus_voltage_v: p.dcBusVoltageV,
     },
     allowed_radicals: [
@@ -1016,14 +1050,23 @@ function emitSafetyProtection(p: BessParams): DesignModule {
     'extinguishes',
     'Novec 1230 clean-agent with rate-of-rise detection + VESDA aspiration',
     [
+      // BESS L3 (2026-05-24, issue #4): Novec 1230 charge mass MUST match the
+      // suppression physics. 5.3% v/v concentration in an 86 m³ 40-ft HC ISO
+      // container at 20 °C requires ~62.3 kg (PV=nRT with Novec MW=316.04 g/mol
+      // and ρ_vapour at 5.3% partial pressure). The previous 25 kg charge only
+      // yielded ~2.1% concentration — below the NFPA 2001 Class A minimum of
+      // 5.0% for clean-agent total-flooding systems. Spec a 70 kg Kidde
+      // ECARO-25 series cylinder (real product, charged to 62.3 kg net) so
+      // the cylinder rating bounds the required charge with a 10% margin.
       word(
         'clean_agent_cylinder_word',
         'clean agent cylinder word',
         cc('clean_agent_cylinder', 'clean agent cylinder', 'chemical_sensing_function', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', 'Novec 1230'),
-          mod('capacity', '25', 'kg'),
+          mod('form', 'Kidde ECARO-25 70 kg cylinder, Novec 1230 charge'),
+          mod('capacity', '62.3', 'kg'),
+          mod('performance', '5.3% v/v in 86 m³ @ 20 °C'),
           mod('regulatory', 'NFPA 2001'),
         ],
       ),
@@ -1126,7 +1169,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
     overview_paragraph_en: '',
     derived_parameters: {
       rack_count: p.rackCount,
-      suppression_agent_kg: 25,
+      // BESS L3 (2026-05-24, issue #4): suppression_agent_kg now matches the
+      // emitted cylinder capacity (62.3 kg @ 5.3% v/v in 86 m³ per NFPA 2001).
+      suppression_agent_kg: 62.3,
     },
     allowed_radicals: [
       'chemical_suppressant_material',

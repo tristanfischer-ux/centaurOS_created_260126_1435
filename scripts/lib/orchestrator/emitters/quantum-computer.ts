@@ -198,12 +198,13 @@ function emitSignalLinesMicrowave(p: QcParams): DesignModule {
 
 function emitAttenuatorChain(p: QcParams): DesignModule {
   const totalAttenuators = p.physicalQubits * 4
+  const paramAmps = Math.max(1, Math.ceil(p.physicalQubits / 4))
   return {
     module: 'attenuator_chain',
-    module_brief: `${totalAttenuators} cryogenic attenuators (-20/-20/-10/-10 dB per stage) to suppress Johnson noise.`,
+    module_brief: `${totalAttenuators} cryogenic attenuators (-20/-20/-10/-10 dB per stage) + ${paramAmps} parametric amplifiers (HEMT/JPA) to suppress Johnson noise on drive lines and quantum-limit readout SNR.`,
     overview_paragraph_en: '',
-    derived_parameters: { attenuator_count: totalAttenuators },
-    allowed_radicals: ['electrical_conducting_function', 'copper', 'ceramic'],
+    derived_parameters: { attenuator_count: totalAttenuators, parametric_amplifier_count: paramAmps },
+    allowed_radicals: ['electrical_conducting_function', 'superconducting_function', 'copper', 'ceramic'],
     applicability_confidence: 'high',
     sub_modules: [
       {
@@ -222,6 +223,27 @@ function emitAttenuatorChain(p: QcParams): DesignModule {
               { kind: 'quantity', value: fmt(totalAttenuators) },
               { kind: 'form', value: 'XMA 2082-6234 series' },
               { kind: 'dimension', value: '20', unit: 'dB' },
+            ],
+          },
+        ],
+      },
+      {
+        id: 'parametric_amplifier_set',
+        name_human: 'parametric amplifier set',
+        rad_syntax: `parametric_amplifier (${fmt(paramAmps)}, HEMT or JPA, quantum-limited)`,
+        role_verb: 'amplifies',
+        topology_clause: `one parametric amp per 4 readout-multiplexed qubits at MXC stage`,
+        english_sentence: '',
+        words: [
+          {
+            id: 'parametric_amplifier_word',
+            name_human: 'parametric amplifier',
+            content_character: { character_id: 'parametric_amplifier', name_human: 'parametric amplifier', function_radical_primary: 'superconducting_function', material_radical_primary: 'niobium_titanium' },
+            modifier_characters: [
+              { kind: 'quantity', value: fmt(paramAmps) },
+              { kind: 'form', value: 'Low Noise Factory HEMT or in-house JPA' },
+              { kind: 'dimension', value: '20', unit: 'dB gain' },
+              { kind: 'capacity', value: '4-8', unit: 'GHz' },
             ],
           },
         ],
@@ -267,12 +289,33 @@ function emitControlElectronicsAWG(p: QcParams): DesignModule {
 function emitDilutionFridgeInterface(p: QcParams): DesignModule {
   return {
     module: 'dilution_fridge_interface',
-    module_brief: `Bluefors LD400 / Oxford Triton 500 MXC plate mount, ${p.baseTempMk.toFixed(0)} mK base, MXC cooling ${p.mxcCoolingUw.toFixed(0)} µW.`,
+    module_brief: `Bluefors LD400 / Oxford Triton 500 dilution refrigerator with MXC plate mount, ${p.baseTempMk.toFixed(0)} mK base, MXC cooling ${p.mxcCoolingUw.toFixed(0)} µW.`,
     overview_paragraph_en: '',
     derived_parameters: { base_temp_mk: p.baseTempMk, mxc_cooling_uw: p.mxcCoolingUw },
     allowed_radicals: ['thermal_transfer_function', 'copper', 'aluminium'],
     applicability_confidence: 'high',
     sub_modules: [
+      {
+        id: 'dilution_refrigerator_assembly',
+        name_human: 'dilution refrigerator',
+        rad_syntax: 'dilution_refrigerator (×1, Bluefors LD400 / Oxford Triton 500)',
+        role_verb: 'cools',
+        topology_clause: `turnkey wet/dry dilution fridge with ${p.baseTempMk.toFixed(0)} mK base + ${p.mxcCoolingUw.toFixed(0)} µW MXC cooling`,
+        english_sentence: '',
+        words: [
+          {
+            id: 'dilution_refrigerator_word',
+            name_human: 'dilution refrigerator',
+            content_character: { character_id: 'dilution_refrigerator', name_human: 'dilution refrigerator', function_radical_primary: 'thermal_transfer_function', material_radical_primary: 'steel' },
+            modifier_characters: [
+              { kind: 'quantity', value: '×1' },
+              { kind: 'capacity', value: String(p.mxcCoolingUw.toFixed(0)), unit: 'µW @ 100 mK' },
+              { kind: 'form', value: 'Bluefors LD400 / Oxford Triton 500 turnkey' },
+              { kind: 'regulatory', value: 'CE / PED 2014/68/EU pressure vessel' },
+            ],
+          },
+        ],
+      },
       {
         id: 'mxc_mounting_plate',
         name_human: 'MXC mounting plate',

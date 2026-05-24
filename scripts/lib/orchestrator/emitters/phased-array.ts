@@ -151,7 +151,7 @@ function emitBeamformingNetwork(p: PaParams): DesignModule {
 function emitTransmitReceiveModules(p: PaParams): DesignModule {
   return {
     module: 'transmit_receive_modules',
-    module_brief: `${p.numElements} per-element T/R modules with SP4T switch + LNA + DPA structure.`,
+    module_brief: `${p.numElements} per-element T/R modules with SP4T switch + LNA + phase shifter + DPA structure.`,
     overview_paragraph_en: '',
     derived_parameters: { trx_module_count: p.numElements },
     allowed_radicals: ['silicon_semiconductor_function', 'gallium_arsenide', 'gallium_nitride'],
@@ -160,9 +160,9 @@ function emitTransmitReceiveModules(p: PaParams): DesignModule {
       {
         id: 'trx_module_set',
         name_human: 'T/R module set',
-        rad_syntax: `trx_module_per_element (${fmt(p.numElements)}, GaN PA + GaAs LNA + SP4T)`,
+        rad_syntax: `trx_module_per_element (${fmt(p.numElements)}, GaN PA + GaAs LNA + phase shifter + SP4T)`,
         role_verb: 'switches',
-        topology_clause: 'per-element T/R duplexed via SP4T',
+        topology_clause: 'per-element T/R duplexed via SP4T with LNA + phase shifter chain',
         english_sentence: '',
         words: [
           {
@@ -172,6 +172,26 @@ function emitTransmitReceiveModules(p: PaParams): DesignModule {
             modifier_characters: [
               { kind: 'quantity', value: fmt(p.numElements) },
               { kind: 'form', value: 'integrated GaN PA + GaAs LNA + SP4T' },
+            ],
+          },
+          {
+            id: 'low_noise_amplifier_word',
+            name_human: 'low-noise amplifier',
+            content_character: { character_id: 'gaas_low_noise_amplifier', name_human: 'GaAs low-noise amplifier', function_radical_primary: 'silicon_semiconductor_function', material_radical_primary: 'gallium_arsenide' },
+            modifier_characters: [
+              { kind: 'quantity', value: fmt(p.numElements) },
+              { kind: 'form', value: 'pHEMT GaAs LNA, NF < 1.8 dB' },
+              { kind: 'dimension', value: String(p.frequencyGhz), unit: 'GHz' },
+            ],
+          },
+          {
+            id: 'phase_shifter_word',
+            name_human: 'phase shifter',
+            content_character: { character_id: 'mmic_phase_shifter', name_human: 'MMIC phase shifter', function_radical_primary: 'silicon_semiconductor_function', material_radical_primary: 'gallium_arsenide' },
+            modifier_characters: [
+              { kind: 'quantity', value: fmt(p.numElements) },
+              { kind: 'form', value: '6-bit MMIC phase shifter, 5.625° LSB' },
+              { kind: 'dimension', value: String(p.frequencyGhz), unit: 'GHz' },
             ],
           },
         ],
