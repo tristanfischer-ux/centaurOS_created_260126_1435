@@ -54,17 +54,18 @@ eventually differ per code (currently uniform: no retry).
 | 7 | Orchestrator hard fail (when engineeringContract present but tool plan crashed) | Stage 17.5, line ~2360 |
 | 10 | BoM-quality audit FAILED — macros orphaned, line totals absurd, cover ≠ sub-totals | Stage 49b (audit-pdf-bom.ts), Tristan-driven 2026-05-23 |
 | 11 | Layout overlap audit FAILED — text spans render at same X+Y position | Stage 49.5 (audit-pdf-layout.py), Option B 2026-05-24 |
+| 12 | Numeric-claim drift detector FAILED — orchestrator-computed count diverges from BoM-emitted quantity > 20% (e.g. PyBaMM bms_slave_count=313 in narrative, BoM word qty=165) | Stage 49.7 (numeric-claim-drift-detector.ts), Tristan-driven 2026-05-24 after BESS L17 council |
 | 13 | Parts-spec validator FAILED — pinned part claims spec ≥1.5× manufacturer datasheet (e.g. Schaltbau C310 claimed 1500 A, real 500 A) | Stage 49.6 (parts-spec-validator.ts), Tristan-driven 2026-05-24 after BESS L17 council |
 
-Codes 4, 8, 9, 12 are reserved (4: brief-rewrite unfixable distinct from refinement halt; 8 was used pre-P2-5 for integrity, now mapped to 6; 12 reserved for the upcoming narrative-vs-BoM drift detector).
+Codes 4, 8, 9 are reserved (4: brief-rewrite unfixable distinct from refinement halt; 8 was used pre-P2-5 for integrity, now mapped to 6).
 
 When adding a new fatal exit, allocate the next free code AND update this table.
 
 ---
 
-## Self-reinforcing PDF-quality loop (CANONICAL — codified 2026-05-23 after Tristan-flagged wind L20; gate 3 added 2026-05-24; gate 4 added 2026-05-24 after BESS L17 council)
+## Self-reinforcing PDF-quality loop (CANONICAL — codified 2026-05-23 after Tristan-flagged wind L20; gate 3 added 2026-05-24; gates 4+5 added 2026-05-24 after BESS L17 council)
 
-**The chain is not acceptable until ALL FOUR of these audits PASS:**
+**The chain is not acceptable until ALL FIVE of these audits PASS:**
 
 1. `scripts/audit-pdf-run.ts` — measures **DESIGN FIDELITY** (Physics Critic dimensions, density, brief-vs-contract scale, visual overlap). Threshold: F-1 brief_to_design_fidelity ≥ 6, no HIGH-severity engineering issues.
 
@@ -79,7 +80,9 @@ When adding a new fatal exit, allocate the next free code AND update this table.
 
 4. `scripts/lib/parts-spec-validator.ts` — measures **PIN-CLAIM CORRECTNESS** of every emitted real industrial part. Threshold: zero HIGH findings (claim ≥ 1.5× authoritative datasheet spec). Reads modifier_characters from each word (manufacturer + part_number + rating_primary / capacity / dimension / form) and cross-checks against a curated KNOWN_PART_AUTHORITATIVE table seeded from manufacturer datasheets. Codified 2026-05-24 after BESS L17 council found Schaltbau C310 mis-rated 3× (1500 A claimed, real 500 A), Pfannenberg CC 90.000 mis-rated 5.5× (50 kW claimed, real 9 kW @ 35°C), Bussmann 170M6810 wrong part for 200 A class (real 1250 A fuse). Root cause: deterministic-emitter.ts inline-claims specs without datasheet cross-check; the validator closes that gap universally across all 35 archetypes.
 
-**Why all four are required**: Physics Critic measures _design fidelity to brief_ — does the design honour stated rated_power, voltage, geometry? It does NOT audit BoM LINE TOTALS or whether cover-page total reconciles with the BoM section. The wind L20 chain scored F-1 9/10 on fidelity while shipping foundation £24k for a 6 MW gravity base, blade £15, hub £45. The BoM-quality audit catches LINE-TOTAL bugs but does NOT measure whether the rendered PDF is readable — BESS L7 passed gates 1+2 while page 24 showed multi-line text stacked at the same Y coordinate. The layout-integrity audit catches that smear but does NOT verify pinned-part claims match manufacturer datasheets — BESS L17 passed gates 1+2+3 while shipping Schaltbau C310 at 1500 A (real 500 A) and Pfannenberg CC 90.000 at 50 kW (real 9 kW). Four independent quality dimensions: fidelity, cost-stack reconciliation, layout integrity, pin-claim correctness; all four must gate.
+5. `scripts/lib/numeric-claim-drift-detector.ts` — measures **NARRATIVE-vs-BoM CONSISTENCY**. Threshold: zero HIGH findings (drift > 20% between orchestrator-computed count and BoM word quantity). Walks every numeric count in state.orchestratorContract.quantities (e.g. `bms_slave_count = 313`), matches by name-substring to a BoM word, compares the contract value vs the BoM `quantity` modifier. Codified 2026-05-24 after BESS L17 PDF showed "PyBaMM sizing requires 313 BMS slave boards" in narrative + "165x Custom 24-channel cell-voltage + temperature board" in BoM — a 1.9× drift the reader could not reconcile. Root cause: orchestrator tools and deterministic-emitter use different assumptions (12-channel vs 24-channel slaves); nothing reconciles them post-emission. Universal across all 35 archetypes.
+
+**Why all five are required**: Physics Critic measures _design fidelity to brief_ — does the design honour stated rated_power, voltage, geometry? It does NOT audit BoM LINE TOTALS or whether cover-page total reconciles with the BoM section. The wind L20 chain scored F-1 9/10 on fidelity while shipping foundation £24k for a 6 MW gravity base, blade £15, hub £45. The BoM-quality audit catches LINE-TOTAL bugs but does NOT measure whether the rendered PDF is readable — BESS L7 passed gates 1+2 while page 24 showed multi-line text stacked at the same Y coordinate. The layout-integrity audit catches that smear but does NOT verify pinned-part claims match manufacturer datasheets — BESS L17 passed gates 1+2+3 while shipping Schaltbau C310 at 1500 A (real 500 A) and Pfannenberg CC 90.000 at 50 kW (real 9 kW). The pin-claim validator catches that but does NOT detect when narrative and BoM disagree on the same quantity — BESS L17 also had narrative "313 BMS slaves" while BoM said 165. Five independent quality dimensions: fidelity, cost-stack reconciliation, layout integrity, pin-claim correctness, narrative-BoM consistency; all five must gate.
 
 **The agent must NEVER trust chain stdout logs alone**. Every chain run:
 

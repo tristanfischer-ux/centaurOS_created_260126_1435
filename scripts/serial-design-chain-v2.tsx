@@ -4556,6 +4556,46 @@ async function main() {
     console.error(`[chain] parts-spec-validator flagged issues (see AUDIT-PARTS.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
 
+  // 2026-05-24 (Tristan-asked, council L17 root-cause fix): numeric-claim
+  // drift detector. The L17 council found "PyBaMM sizing requires 313 BMS
+  // slave boards" in narrative + "165x Custom 24-channel slave" in BoM —
+  // a 1.9× drift the reader cannot reconcile. Root cause: orchestrator
+  // tools (PyBaMM) compute counts and feed them to the LLM narrative
+  // generator; deterministic-emitter, independently, picks BoM quantities
+  // from a different assumption (e.g. 24-channel slaves). The two paths
+  // diverge.
+  //
+  // Fix: scripts/lib/numeric-claim-drift-detector.ts walks every numeric
+  // count in state.orchestratorContract.quantities, finds the matching
+  // BoM word by name-substring, compares. Drift > 20% (HIGH) blocks the
+  // chain at exit 12. Drift 5-20% (MED) surfaces in AUDIT-DRIFT.md for
+  // operator review but doesn't block. Universal across all 35 archetypes.
+  try {
+    execFileSync(
+      'npx',
+      ['tsx', resolve(__dirname, 'lib/numeric-claim-drift-detector.ts'), statePath, resolve(outDir, 'AUDIT-DRIFT.md')],
+      { stdio: 'inherit', cwd: resolve(__dirname, '..') },
+    )
+  } catch (err) {
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 12) {
+      console.error('')
+      console.error('╔══════════════════════════════════════════════════════════════════════╗')
+      console.error('║  CHAIN HARD-EXIT — Numeric-claim drift detector FAILED (code 12)    ║')
+      console.error('║  Orchestrator-computed count diverges from BoM-emitted quantity     ║')
+      console.error('║  by > 20% (e.g. BMS slave count 313 in narrative, 165 in BoM).      ║')
+      console.error('║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║')
+      console.error('║  See AUDIT-DRIFT.md for the diverging contract-vs-BoM quantities.   ║')
+      console.error('║  Fix area: align orchestrator tool assumption (e.g. PyBaMM cells/   ║')
+      console.error('║  slave) with deterministic-emitter constant (e.g. 24-channel       ║')
+      console.error('║  BMS slave). Whichever side is wrong, fix at the source.           ║')
+      console.error('╚══════════════════════════════════════════════════════════════════════╝')
+      logAction({ step: 'fatal_drift_audit', reason: 'numeric-claim-drift-detector exit 12', status: 12 })
+      process.exit(12)
+    }
+    console.error(`[chain] numeric-claim-drift-detector flagged issues (see AUDIT-DRIFT.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
+  }
+
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
   // try/catch. The renderer's own `open` was guarded; this one was not. In
   // the worker/LaunchAgent path, `open` can fail (no GUI session) and would
