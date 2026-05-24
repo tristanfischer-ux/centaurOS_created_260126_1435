@@ -144,15 +144,38 @@ function extractBomWordQuantities(state: any): BomWordQty[] {
 // ── MATCHING + COMPARISON ────────────────────────────────────────────────────
 
 function findMatchingBomWord(claim: NumericClaim, bom: BomWordQty[]): BomWordQty | null {
-  // Try each search term against word_id and word_name_human. Return the
-  // FIRST plausible match — words tend to be uniquely named per concept.
+  // 2026-05-24 BESS L18 fix: word-boundary tokenisation required. The
+  // original `includes()` match was too loose — "rack" (from rack_count)
+  // matched the substring inside "bracket" on PCS inverter mounting BRACKET,
+  // producing a false-positive HIGH drift. Switch to \b regex so "rack"
+  // matches "battery_rack" + "rack" + "racks" but NOT "bracket" or
+  // "racked-out". Word_id underscores treated as word boundaries via the
+  // pre-tokenised idTokens / nameTokens arrays.
+  const tokeniseId = (s: string): string[] => s.toLowerCase().split(/[\s_/-]+/).filter(Boolean)
+  const tokeniseName = (s: string): string[] => s.toLowerCase().split(/[\s_/-]+/).filter(Boolean)
+  const includesAsWhole = (tokens: string[], term: string): boolean => {
+    // Single-token term: exact-token match.
+    if (!/\s/.test(term)) return tokens.includes(term)
+    // Multi-token term: every term-token must appear in order somewhere.
+    const termTokens = term.toLowerCase().split(/\s+/).filter(Boolean)
+    for (let i = 0; i + termTokens.length <= tokens.length; i += 1) {
+      let ok = true
+      for (let j = 0; j < termTokens.length; j += 1) {
+        if (tokens[i + j] !== termTokens[j]) { ok = false; break }
+      }
+      if (ok) return true
+    }
+    return false
+  }
   const scoreOf = (w: BomWordQty): number => {
-    const idLower = w.word_id.toLowerCase()
-    const nameLower = w.word_name_human.toLowerCase()
+    const idTokens = tokeniseId(w.word_id)
+    const nameTokens = tokeniseName(w.word_name_human)
     for (const term of claim.noun_search_terms) {
-      if (idLower.includes(term) || nameLower.includes(term)) {
+      const t = term.toLowerCase().trim()
+      if (!t) continue
+      if (includesAsWhole(idTokens, t) || includesAsWhole(nameTokens, t)) {
         // Prefer the longest matching term — more specific.
-        return term.length
+        return t.length
       }
     }
     return 0
