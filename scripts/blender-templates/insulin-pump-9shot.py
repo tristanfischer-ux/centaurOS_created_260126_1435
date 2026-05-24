@@ -1,9 +1,7 @@
-"""insulin-pump-9shot.py — wearable insulin pump, Medtronic 780G / Tandem t:slim X2 class.
+"""insulin-pump-9shot.py — wearable insulin pump, 90 × 55 × 20 mm pocket device.
 
-Pocket-sized 90 × 55 × 20 mm pump with ABS/PC enclosure, touchscreen,
-buttons, USB port, top insulin reservoir, tubing quick-connect, infusion set,
-stepper-driven plunger, Li-ion battery, BLE/CGM electronics, low-flow pump,
-occlusion sensing, vibration alert motor, and safety/service features.
+Source: v3 repair pass. Tiny-scale geometry in metres. All primitives are packed
+inside the pump envelope unless intentionally flush to an exterior face.
 
 Run: /Applications/Blender.app/Contents/MacOS/Blender -b -P insulin-pump-9shot.py
 """
@@ -20,14 +18,10 @@ fl.init_scene()
 POC_DIR = Path(__file__).parent
 OUT = Path(os.environ.get("BLENDER_OUT_DIR", str(POC_DIR / "out-insulin-pump-9shot")))
 
-# Scale: 1 Blender unit = 1 metre. Device envelope 90×55×20 mm.
+# Scale: 1 Blender unit = 1 metre. Pump envelope 90×55×20 mm.
 W = 0.09
 D = 0.055
 H = 0.02
-
-CX = W / 2
-CY = 0.0
-CZ = H / 2
 
 MO = fl.make_module_dict([
     "structure_containment",
@@ -44,238 +38,316 @@ MO = fl.make_module_dict([
 ])
 
 MAT = fl.make_default_palette()
-MAT["adhesive"] = fl.make_mat("m_adhesive", (0.95, 0.92, 0.85), metallic=0.0, roughness=0.7, alpha=0.7)
-MAT["case_polymer"]     = fl.make_mat("m_case_polymer",     (0.16, 0.17, 0.20), metallic=0.0, roughness=0.48)
-MAT["front_glass"]      = fl.make_mat("m_front_glass",      (0.00, 0.18, 0.55), metallic=0.0, roughness=0.18)
-MAT["button_rubber"]    = fl.make_mat("m_button_rubber",    (0.00, 0.45, 1.00), metallic=0.0, roughness=0.55)
-MAT["insulin"]          = fl.make_mat("m_insulin",          (0.00, 0.95, 1.00), metallic=0.0, roughness=0.22, alpha=0.72)
-MAT["reservoir_clear"]  = fl.make_mat("m_reservoir_clear",  (0.72, 0.96, 1.00), metallic=0.0, roughness=0.08, alpha=0.38)
-MAT["silicone"]         = fl.make_mat("m_silicone",         (1.00, 0.35, 0.85), metallic=0.0, roughness=0.62)
-MAT["orange_alarm"]     = fl.make_mat("m_orange_alarm",     (1.00, 0.22, 0.00), metallic=0.0, roughness=0.42)
-MAT["tube"]             = fl.make_mat("m_tube",             (0.95, 0.98, 1.00), metallic=0.0, roughness=0.25, alpha=0.55)
-MAT["needle_steel"]     = fl.make_mat("m_needle_steel",     (0.88, 0.90, 0.94), metallic=0.8, roughness=0.22)
-MAT["label_white"]      = fl.make_mat("m_label_white",      (0.98, 0.98, 0.96), metallic=0.0, roughness=0.65)
-MAT["gold_contact"]     = fl.make_mat("m_gold_contact",     (1.00, 0.62, 0.05), metallic=0.45, roughness=0.28)
+MAT["case_offwhite"]     = fl.make_mat("m_case_offwhite",     (0.93, 0.90, 0.82), metallic=0.0, roughness=0.62)
+MAT["case_shadow"]       = fl.make_mat("m_case_shadow",       (0.70, 0.68, 0.60), metallic=0.0, roughness=0.70)
+MAT["display_dark"]      = fl.make_mat("m_display_dark",      (0.00, 0.02, 0.08), metallic=0.0, roughness=0.22)
+MAT["display_glow"]      = fl.make_mat("m_display_glow",      (0.00, 0.65, 1.00), metallic=0.0, roughness=0.20)
+MAT["button_grey"]       = fl.make_mat("m_button_grey",       (0.10, 0.12, 0.16), metallic=0.2, roughness=0.45)
+MAT["led_green"]         = fl.make_mat("m_led_green",         (0.00, 1.00, 0.18), metallic=0.0, roughness=0.22)
+MAT["reservoir_clear"]   = fl.make_mat("m_reservoir_clear",   (0.72, 0.95, 1.00), metallic=0.0, roughness=0.18, alpha=0.42)
+MAT["insulin_cyan"]      = fl.make_mat("m_insulin_cyan",      (0.00, 0.92, 1.00), metallic=0.0, roughness=0.28, alpha=0.68)
+MAT["silicone_red"]      = fl.make_mat("m_silicone_red",      (1.00, 0.04, 0.02), metallic=0.0, roughness=0.60)
+MAT["rubber_black"]      = fl.make_mat("m_rubber_black",      (0.01, 0.012, 0.018), metallic=0.0, roughness=0.70)
+MAT["adhesive"]          = fl.make_mat("m_adhesive",          (1.00, 0.80, 0.18), metallic=0.0, roughness=0.72)
+MAT["service_magenta"]   = fl.make_mat("m_service_magenta",   (1.00, 0.00, 0.70), metallic=0.0, roughness=0.48)
+MAT["dose_orange"]       = fl.make_mat("m_dose_orange",       (1.00, 0.38, 0.00), metallic=0.0, roughness=0.45)
+MAT["metal_contact"]     = fl.make_mat("m_metal_contact",     (0.95, 0.78, 0.25), metallic=0.55, roughness=0.28)
+MAT["label_white"]       = fl.make_mat("m_label_white",       (1.00, 1.00, 1.00), metallic=0.0, roughness=0.50)
 
 
 # ═══════ structure_containment ════════════════════════════════════════════
-fl.add_box("pump1_main_abs_pc_case", (CX, CY, CZ),
-           (W, D, H), MAT["case_polymer"], "structure_containment", MO)
-fl.add_box("pump1_front_bezel_frame", (CX, CY, H + 0.00045),
-           (W - 0.006, D - 0.006, 0.0010), MAT["enclosure"], "structure_containment", MO)
-fl.add_box("pump1_rear_cover_plate", (CX, CY, -0.00045),
-           (W - 0.004, D - 0.004, 0.0010), MAT["case_polymer"], "structure_containment", MO)
-fl.add_box("pump1_left_side_structural_rail", (CX, -D/2 + 0.002, CZ),
-           (W - 0.010, 0.0025, H - 0.003), MAT["enclosure"], "structure_containment", MO)
-fl.add_box("pump1_right_side_structural_rail", (CX, D/2 - 0.002, CZ),
-           (W - 0.010, 0.0025, H - 0.003), MAT["enclosure"], "structure_containment", MO)
-fl.add_box("pump1_reservoir_cradle_frame", (0.032, D/2 - 0.006, H + 0.002),
-           (0.056, 0.010, 0.004), MAT["enclosure"], "structure_containment", MO)
-fl.add_box("pump1_tubing_port_housing", (W - 0.003, D/2 - 0.010, H * 0.60),
-           (0.006, 0.013, 0.010), MAT["case_polymer"], "structure_containment", MO)
+# Outer shell/frame only. Internal functional components are deliberately not
+# tagged as structure so hero and module passes can ghost the case correctly.
+fl.add_box("pump1_backplate_shell", (W/2, 0, 0.0007),
+           (W, D, 0.0014), MAT["case_offwhite"], "structure_containment", MO)
+fl.add_box("pump1_sidewall_y_pos", (W/2, D/2 - 0.0015, H/2),
+           (W, 0.003, H), MAT["case_offwhite"], "structure_containment", MO)
+fl.add_box("pump1_sidewall_y_neg", (W/2, -D/2 + 0.0015, H/2),
+           (W, 0.003, H), MAT["case_offwhite"], "structure_containment", MO)
+fl.add_box("pump1_endcap_x_min", (0.0015, 0, H/2),
+           (0.003, D, H), MAT["case_offwhite"], "structure_containment", MO)
+fl.add_box("pump1_endcap_x_max", (W - 0.0015, 0, H/2),
+           (0.003, D, H), MAT["case_offwhite"], "structure_containment", MO)
+
+# Front-face bezel strips around the 60×40 mm LCD aperture.
+fl.add_box("pump1_front_bezel_top", (W/2, 0.0235, H - 0.0005),
+           (0.074, 0.003, 0.001), MAT["case_offwhite"], "structure_containment", MO)
+fl.add_box("pump1_front_bezel_bottom", (W/2, -0.0235, H - 0.0005),
+           (0.074, 0.003, 0.001), MAT["case_offwhite"], "structure_containment", MO)
+fl.add_box("pump1_front_bezel_left", (0.010, 0, H - 0.0005),
+           (0.005, 0.044, 0.001), MAT["case_offwhite"], "structure_containment", MO)
+fl.add_box("pump1_front_bezel_right", (0.080, 0, H - 0.0005),
+           (0.005, 0.044, 0.001), MAT["case_offwhite"], "structure_containment", MO)
+
+# Internal plastic ribs and cradles.
+fl.add_box("pump1_centre_rib", (0.045, 0, 0.0050),
+           (0.002, D - 0.008, 0.008), MAT["case_shadow"], "structure_containment", MO)
+fl.add_box("pump1_battery_cradle_front", (0.036, -0.023, 0.0045),
+           (0.054, 0.0015, 0.006), MAT["case_shadow"], "structure_containment", MO)
+fl.add_box("pump1_battery_cradle_back", (0.036, -0.001, 0.0045),
+           (0.054, 0.0015, 0.006), MAT["case_shadow"], "structure_containment", MO)
+fl.add_box("pump1_motor_bracket", (0.074, -0.011, 0.0040),
+           (0.014, 0.014, 0.004), MAT["case_shadow"], "structure_containment", MO)
+fl.add_box("pump1_reservoir_cradle_a", (0.045, 0.016, 0.0120),
+           (0.056, 0.0012, 0.004), MAT["case_shadow"], "structure_containment", MO)
+fl.add_box("pump1_reservoir_cradle_b", (0.045, 0.026, 0.0120),
+           (0.056, 0.0012, 0.004), MAT["case_shadow"], "structure_containment", MO)
+
+for i, (x, y) in enumerate([(0.008, 0.021), (0.082, 0.021), (0.008, -0.021), (0.082, -0.021)]):
+    fl.add_cyl(f"pump1_screw_boss_{i}", (x, y, 0.0040),
+               0.0020, 0.006, MAT["case_shadow"], "structure_containment", MO)
+
+fl.add_box("pump1_skid_foot_left", (0.045, 0.0215, 0.00035),
+           (0.070, 0.003, 0.0007), MAT["case_shadow"], "structure_containment", MO)
+fl.add_box("pump1_skid_foot_right", (0.045, -0.0215, 0.00035),
+           (0.070, 0.003, 0.0007), MAT["case_shadow"], "structure_containment", MO)
 
 
 # ═══════ energy_storage_source ════════════════════════════════════════════
-fl.add_box("pump2_lithium_polymer_cell", (0.024, -0.010, H * 0.43),
-           (0.030, 0.026, 0.0065), MAT["battery"], "energy_storage_source", MO)
-fl.add_box("pump2_cell_pouch_laminate", (0.024, -0.010, H * 0.43),
-           (0.032, 0.028, 0.0006), MAT["aluminium"], "energy_storage_source", MO)
-fl.add_box("pump2_battery_fuel_gauge_ic", (0.043, -0.022, H * 0.62),
-           (0.004, 0.004, 0.0012), MAT["control"], "energy_storage_source", MO)
-fl.add_box("pump2_charge_manager_ic", (0.051, -0.022, H * 0.62),
-           (0.005, 0.004, 0.0012), MAT["control"], "energy_storage_source", MO)
-fl.add_box("pump2_battery_protection_pack", (0.010, -0.022, H * 0.54),
-           (0.010, 0.005, 0.002), MAT["safety"], "energy_storage_source", MO)
-fl.add_cyl("pump2_cell_thermal_sensor", (0.038, -0.010, H * 0.78),
-           0.0015, 0.001, MAT["thermal"], "energy_storage_source", MO)
+# Rechargeable lithium pack at bottom of the case.
+fl.add_box("pump2_liion_cell", (0.036, -0.012, 0.0040),
+           (0.050, 0.020, 0.004), MAT["battery"], "energy_storage_source", MO)
+fl.add_box("pump2_cell_label", (0.036, -0.012, 0.00615),
+           (0.034, 0.012, 0.0003), MAT["label_white"], "energy_storage_source", MO)
+fl.add_box("pump2_positive_tab", (0.062, -0.007, 0.0042),
+           (0.004, 0.004, 0.001), MAT["metal_contact"], "energy_storage_source", MO)
+fl.add_box("pump2_negative_tab", (0.010, -0.017, 0.0042),
+           (0.004, 0.004, 0.001), MAT["metal_contact"], "energy_storage_source", MO)
+fl.add_box("pump2_fuel_gauge_ic", (0.058, -0.014, 0.0087),
+           (0.004, 0.004, 0.001), MAT["control"], "energy_storage_source", MO)
+fl.add_box("pump2_pack_thermistor", (0.026, -0.004, 0.0064),
+           (0.002, 0.002, 0.001), MAT["thermal"], "energy_storage_source", MO)
+fl.add_box("pump2_charge_management", (0.070, -0.019, 0.0087),
+           (0.006, 0.004, 0.001), MAT["control"], "energy_storage_source", MO)
+
+
+# ═══════ mass_fluid_transport_process ═════════════════════════════════════
+# Removable insulin reservoir along the top edge, 8 mm diameter × 50 mm long.
+fl.add_cyl("pump11_reservoir_clear_body", (0.045, 0.021, 0.0150),
+           0.0040, 0.050, MAT["reservoir_clear"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("pump11_insulin_fill_volume", (0.045, 0.021, 0.0150),
+           0.0031, 0.047, MAT["insulin_cyan"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("pump11_reservoir_left_cap", (0.020, 0.021, 0.0150),
+           0.0041, 0.0012, MAT["stainless"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("pump11_reservoir_right_cap", (0.070, 0.021, 0.0150),
+           0.0041, 0.0012, MAT["stainless"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("pump11_plunger_piston_seal", (0.026, 0.021, 0.0150),
+           0.0034, 0.0010, MAT["silicone_red"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+
+for i, x in enumerate([0.030, 0.038, 0.046, 0.054, 0.062]):
+    fl.add_box(f"pump11_reservoir_graduation_{i}", (x, 0.0249, 0.0150),
+               (0.0005, 0.0004, 0.006), MAT["ctrl_black"], "mass_fluid_transport_process", MO)
+
+# Side tubing port and Luer connector, flush inside the right side envelope.
+fl.add_cyl("pump11_tubing_port_barrel", (0.0860, 0.018, 0.0140),
+           0.0015, 0.005, MAT["insulin_cyan"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("pump11_luer_connector_tip", (0.0880, 0.018, 0.0140),
+           0.0011, 0.003, MAT["stainless"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_torus("pump11_luer_lock_ring", (0.0835, 0.018, 0.0140),
+             major_radius=0.0021, minor_radius=0.00035,
+             material=MAT["silicone_red"], module="mass_fluid_transport_process", module_objects=MO,
+             rotation=(0, math.radians(90), 0))
+fl.add_cyl("pump11_soft_tubing_stub", (0.077, 0.018, 0.0140),
+           0.0010, 0.010, MAT["reservoir_clear"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_box("pump11_fill_septum", (0.018, 0.021, 0.0150),
+           (0.002, 0.006, 0.006), MAT["silicone_red"], "mass_fluid_transport_process", MO)
 
 
 # ═══════ actuation_kinematics ═════════════════════════════════════════════
-fl.add_cyl("pump3_stepper_motor_can", (0.020, 0.010, H * 0.48),
-           0.006, 0.014, MAT["motor"], "actuation_kinematics", MO,
+# Stepper motor and lead-screw/plunger train.
+fl.add_cyl("pump4_stepper_motor_can", (0.074, -0.011, 0.0100),
+           0.0050, 0.015, MAT["motor"], "actuation_kinematics", MO)
+fl.add_cyl("pump4_motor_top_cap", (0.074, -0.011, 0.0178),
+           0.0051, 0.0007, MAT["stainless"], "actuation_kinematics", MO)
+fl.add_cyl("pump4_motor_bottom_cap", (0.074, -0.011, 0.0022),
+           0.0051, 0.0007, MAT["stainless"], "actuation_kinematics", MO)
+fl.add_box("pump4_micro_gearbox", (0.066, -0.004, 0.0110),
+           (0.011, 0.010, 0.006), MAT["heatsink"], "actuation_kinematics", MO)
+fl.add_cyl("pump4_plunger_shaft", (0.057, 0.018, 0.0120),
+           0.0020, 0.030, MAT["stainless"], "actuation_kinematics", MO,
            rotation=(0, math.radians(90), 0))
-fl.add_box("pump3_motor_mount_bracket", (0.020, 0.010, H * 0.20),
-           (0.018, 0.014, 0.002), MAT["aluminium"], "actuation_kinematics", MO)
-fl.add_box("pump3_reduction_gearbox", (0.033, 0.010, H * 0.48),
-           (0.010, 0.013, 0.007), MAT["motor"], "actuation_kinematics", MO)
-fl.add_cyl("pump3_precision_lead_screw", (0.049, 0.010, H * 0.48),
-           0.0012, 0.028, MAT["stainless"], "actuation_kinematics", MO,
+fl.add_cyl("pump4_drive_coupler", (0.071, 0.018, 0.0120),
+           0.0026, 0.003, MAT["dose_orange"], "actuation_kinematics", MO,
            rotation=(0, math.radians(90), 0))
-fl.add_cyl("pump3_plunger_drive_disk", (0.064, 0.010, H * 0.48),
-           0.005, 0.002, MAT["aluminium"], "actuation_kinematics", MO,
+fl.add_box("pump4_plunger_head", (0.042, 0.018, 0.0120),
+           (0.003, 0.007, 0.007), MAT["dose_orange"], "actuation_kinematics", MO)
+fl.add_cyl("pump4_front_bearing", (0.031, 0.018, 0.0120),
+           0.0027, 0.0015, MAT["stainless"], "actuation_kinematics", MO,
            rotation=(0, math.radians(90), 0))
-fl.add_box("pump3_linear_guide_rail_upper", (0.050, 0.016, H * 0.74),
-           (0.032, 0.001, 0.001), MAT["stainless"], "actuation_kinematics", MO)
-fl.add_box("pump3_linear_guide_rail_lower", (0.050, 0.004, H * 0.22),
-           (0.032, 0.001, 0.001), MAT["stainless"], "actuation_kinematics", MO)
-fl.add_box("pump3_anti_backlash_nut", (0.053, 0.010, H * 0.48),
-           (0.004, 0.006, 0.004), MAT["copper"], "actuation_kinematics", MO)
+fl.add_box("pump4_linear_guide_upper", (0.055, 0.014, 0.0100),
+           (0.030, 0.001, 0.001), MAT["heatsink"], "actuation_kinematics", MO)
+fl.add_box("pump4_linear_guide_lower", (0.055, 0.022, 0.0100),
+           (0.030, 0.001, 0.001), MAT["heatsink"], "actuation_kinematics", MO)
 
-
-# ═══════ environmental_interface ══════════════════════════════════════════
-fl.add_cyl("pump7_tubing_quick_connect_socket", (W + 0.002, D/2 - 0.010, H * 0.60),
-           0.0045, 0.006, MAT["silicone"], "environmental_interface", MO,
-           rotation=(0, math.radians(90), 0))
-fl.add_torus("pump7_luer_lock_ring", (W + 0.005, D/2 - 0.010, H * 0.60),
-             major_radius=0.005, minor_radius=0.0007,
-             material=MAT["orange_alarm"], module="environmental_interface", module_objects=MO,
-             rotation=(0, math.radians(90), 0))
-fl.add_cyl("pump7_external_tube_segment_1", (W + 0.020, D/2 - 0.010, H * 0.60),
-           0.0010, 0.030, MAT["tube"], "environmental_interface", MO,
-           rotation=(0, math.radians(90), 0))
-fl.add_cyl("pump7_external_tube_segment_2", (W + 0.035, D/2 - 0.022, H * 0.38),
-           0.0010, 0.026, MAT["tube"], "environmental_interface", MO,
-           rotation=(math.radians(55), 0, 0))
-fl.add_box("pump7_infusion_set_base", (W + 0.040, -0.022, 0.0015),
-           (0.022, 0.018, 0.002), MAT["silicone"], "environmental_interface", MO)
-fl.add_cyl("pump7_skin_adhesive_disc", (W + 0.040, -0.022, 0.0002),
-           0.013, 0.0007, MAT["adhesive"], "environmental_interface", MO)
-fl.add_cyl("pump7_subcutaneous_cannula", (W + 0.040, -0.022, -0.004),
-           0.00055, 0.008, MAT["needle_steel"], "environmental_interface", MO)
-fl.add_box("pump7_case_perimeter_gasket", (CX, CY, H + 0.0009),
-           (W - 0.003, D - 0.003, 0.0007), MAT["silicone"], "environmental_interface", MO)
-
-
-# ═══════ sensing_instrumentation ══════════════════════════════════════════
-fl.add_box("pump4_occlusion_pressure_sensor", (0.066, 0.002, H * 0.68),
-           (0.006, 0.005, 0.0015), MAT["sensor"], "sensing_instrumentation", MO)
-fl.add_box("pump4_flow_sensor_die", (0.071, 0.016, H * 0.58),
-           (0.004, 0.004, 0.0012), MAT["sensor"], "sensing_instrumentation", MO)
-fl.add_box("pump4_reservoir_level_optical_tx", (0.042, D/2 - 0.003, H + 0.004),
-           (0.002, 0.0015, 0.0015), MAT["sensor"], "sensing_instrumentation", MO)
-fl.add_box("pump4_reservoir_level_optical_rx", (0.052, D/2 - 0.003, H + 0.004),
-           (0.002, 0.0015, 0.0015), MAT["sensor"], "sensing_instrumentation", MO)
-fl.add_box("pump4_bubble_detector_led", (0.060, D/2 - 0.004, H + 0.002),
-           (0.002, 0.0015, 0.0015), MAT["sensor"], "sensing_instrumentation", MO)
-fl.add_box("pump4_temperature_probe", (0.014, 0.022, H * 0.55),
-           (0.003, 0.002, 0.001), MAT["thermal"], "sensing_instrumentation", MO)
-fl.add_box("pump4_cgm_receiver_frontend", (0.065, -0.019, H * 0.66),
-           (0.006, 0.005, 0.0014), MAT["sensor"], "sensing_instrumentation", MO)
+for i, x in enumerate([0.046, 0.050, 0.054, 0.058, 0.062, 0.066]):
+    fl.add_cyl(f"pump4_leadscrew_thread_{i}", (x, 0.018, 0.0120),
+               0.00225, 0.0006, MAT["dose_orange"], "actuation_kinematics", MO,
+               rotation=(0, math.radians(90), 0))
 
 
 # ═══════ control_compute_communication ════════════════════════════════════
-fl.add_box("pump5_main_mcu", (0.053, -0.006, H * 0.70),
-           (0.008, 0.008, 0.0016), MAT["control"], "control_compute_communication", MO)
-fl.add_box("pump5_insulin_dosing_asic", (0.065, -0.006, H * 0.70),
-           (0.006, 0.006, 0.0014), MAT["control"], "control_compute_communication", MO)
-fl.add_box("pump5_ble_radio_module", (0.075, -0.018, H * 0.70),
-           (0.008, 0.006, 0.0014), MAT["control"], "control_compute_communication", MO)
-fl.add_box("pump5_flash_memory", (0.043, 0.002, H * 0.70),
-           (0.005, 0.004, 0.0012), MAT["control"], "control_compute_communication", MO)
-fl.add_box("pump5_motor_driver_ic", (0.037, 0.020, H * 0.68),
-           (0.006, 0.005, 0.0014), MAT["control"], "control_compute_communication", MO)
-fl.add_box("pump5_cgm_decode_processor", (0.073, -0.006, H * 0.70),
-           (0.005, 0.005, 0.0012), MAT["control"], "control_compute_communication", MO)
-fl.add_cyl("pump5_ble_chip_antenna", (0.083, -0.022, H * 0.72),
-           0.0008, 0.012, MAT["antenna"], "control_compute_communication", MO,
-           rotation=(0, math.radians(90), 0))
+# Main PCB and communications components.
+fl.add_box("pump5_main_pcb", (0.045, 0.000, 0.0088),
+           (0.070, 0.040, 0.001), MAT["pcb"], "control_compute_communication", MO)
+fl.add_box("pump5_mcu", (0.041, 0.002, 0.0100),
+           (0.008, 0.008, 0.0014), MAT["control"], "control_compute_communication", MO)
+fl.add_box("pump5_ble_radio_chip", (0.055, 0.002, 0.0100),
+           (0.005, 0.005, 0.001), MAT["control"], "control_compute_communication", MO)
+fl.add_box("pump5_radio_shield", (0.061, 0.012, 0.0102),
+           (0.014, 0.010, 0.0012), MAT["heatsink"], "control_compute_communication", MO)
+fl.add_box("pump5_flash_memory", (0.029, 0.007, 0.0100),
+           (0.005, 0.004, 0.001), MAT["control"], "control_compute_communication", MO)
+fl.add_box("pump5_crystal", (0.030, -0.005, 0.0100),
+           (0.003, 0.002, 0.001), MAT["stainless"], "control_compute_communication", MO)
+fl.add_box("pump5_ble_antenna_trace_a", (0.074, 0.015, 0.0100),
+           (0.012, 0.0008, 0.0003), MAT["antenna"], "control_compute_communication", MO)
+fl.add_box("pump5_ble_antenna_trace_b", (0.080, 0.010, 0.0100),
+           (0.0008, 0.010, 0.0003), MAT["antenna"], "control_compute_communication", MO)
+fl.add_box("pump5_ble_antenna_trace_c", (0.074, 0.005, 0.0100),
+           (0.012, 0.0008, 0.0003), MAT["antenna"], "control_compute_communication", MO)
+
+for i, x in enumerate([0.020, 0.026, 0.032, 0.038, 0.044]):
+    fl.add_box(f"pump5_passive_row_a_{i}", (x, -0.014, 0.0100),
+               (0.0020, 0.0012, 0.0007), MAT["copper"], "control_compute_communication", MO)
+for i, x in enumerate([0.050, 0.056, 0.062, 0.068, 0.074]):
+    fl.add_box(f"pump5_passive_row_b_{i}", (x, -0.007, 0.0100),
+               (0.0016, 0.0012, 0.0007), MAT["copper"], "control_compute_communication", MO)
+
+for i, y in enumerate([-0.017, -0.011, -0.005, 0.001, 0.007, 0.013]):
+    fl.add_cyl(f"pump5_via_{i}", (0.018, y, 0.0096),
+               0.00055, 0.00025, MAT["metal_contact"], "control_compute_communication", MO)
+
+
+# ═══════ sensing_instrumentation ══════════════════════════════════════════
+fl.add_box("pump6_occlusion_pressure_sensor", (0.074, 0.018, 0.0110),
+           (0.003, 0.003, 0.002), MAT["sensor"], "sensing_instrumentation", MO)
+fl.add_box("pump6_flow_confirm_sensor", (0.078, 0.018, 0.0155),
+           (0.003, 0.002, 0.002), MAT["sensor"], "sensing_instrumentation", MO)
+fl.add_box("pump6_reservoir_temp_sensor", (0.034, 0.016, 0.0115),
+           (0.002, 0.002, 0.001), MAT["sensor"], "sensing_instrumentation", MO)
+fl.add_box("pump6_air_inline_optical_tx", (0.081, 0.016, 0.0130),
+           (0.0015, 0.0015, 0.0015), MAT["sensor"], "sensing_instrumentation", MO)
+fl.add_box("pump6_air_inline_optical_rx", (0.081, 0.020, 0.0130),
+           (0.0015, 0.0015, 0.0015), MAT["sensor"], "sensing_instrumentation", MO)
+fl.add_box("pump6_accelerometer", (0.022, 0.012, 0.0100),
+           (0.003, 0.003, 0.001), MAT["sensor"], "sensing_instrumentation", MO)
+for i, x in enumerate([0.051, 0.061, 0.071]):
+    fl.add_box(f"pump6_plunger_hall_sensor_{i}", (x, 0.014, 0.0100),
+               (0.002, 0.0015, 0.001), MAT["sensor"], "sensing_instrumentation", MO)
 
 
 # ═══════ safety_protection ════════════════════════════════════════════════
-fl.add_box("pump6_watchdog_supervisor", (0.055, -0.018, H * 0.82),
+# Vibration alert motor is modeled as a safety/alarm actuator per class spec.
+fl.add_cyl("pump7_vibration_alert_motor", (0.019, -0.021, 0.0110),
+           0.0030, 0.008, MAT["safety"], "safety_protection", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("pump7_vibe_endcap_a", (0.015, -0.021, 0.0110),
+           0.0031, 0.0006, MAT["stainless"], "safety_protection", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("pump7_vibe_endcap_b", (0.023, -0.021, 0.0110),
+           0.0031, 0.0006, MAT["stainless"], "safety_protection", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_box("pump7_watchdog_supervisor", (0.040, -0.018, 0.0100),
            (0.003, 0.003, 0.001), MAT["safety"], "safety_protection", MO)
-fl.add_box("pump6_redundant_cutoff_fet", (0.061, -0.018, H * 0.82),
-           (0.004, 0.003, 0.001), MAT["safety"], "safety_protection", MO)
-fl.add_box("pump6_thermal_fuse", (0.018, -0.026, H * 0.50),
-           (0.006, 0.002, 0.001), MAT["safety"], "safety_protection", MO)
-fl.add_box("pump6_bolus_lockout_latch", (0.079, 0.021, H * 0.60),
-           (0.005, 0.004, 0.003), MAT["orange_alarm"], "safety_protection", MO)
-fl.add_box("pump6_reservoir_door_interlock", (0.022, D/2 - 0.004, H + 0.005),
-           (0.006, 0.002, 0.002), MAT["safety"], "safety_protection", MO)
-for i in range(4):
-    fl.add_box(f"pump6_esd_tvs_array_{i}", (0.078 + i * 0.0025, -0.026, H * 0.75),
-               (0.0012, 0.0015, 0.0008), MAT["safety"], "safety_protection", MO)
-fl.add_box("pump6_emc_shield_can", (0.062, -0.006, H * 0.88),
-           (0.026, 0.018, 0.001), MAT["stainless"], "safety_protection", MO)
+fl.add_box("pump7_resettable_fuse", (0.052, -0.018, 0.0100),
+           (0.004, 0.002, 0.001), MAT["safety"], "safety_protection", MO)
+fl.add_cyl("pump7_overpressure_relief_valve", (0.083, 0.021, 0.0115),
+           0.0020, 0.002, MAT["safety"], "safety_protection", MO)
+fl.add_box("pump7_tamper_switch", (0.012, 0.018, 0.0100),
+           (0.003, 0.003, 0.001), MAT["safety"], "safety_protection", MO)
+for i, y in enumerate([-0.015, -0.011, -0.007, -0.003]):
+    fl.add_box(f"pump7_esd_suppressor_{i}", (0.079, y, 0.0100),
+               (0.0012, 0.0012, 0.0008), MAT["safety"], "safety_protection", MO)
 
 
-# ═══════ power_distribution ══════════════════════════════════════════════
-fl.add_box("pump8_main_rigid_pcb", (0.058, -0.004, H * 0.55),
-           (0.058, 0.042, 0.0009), MAT["pcb"], "power_distribution", MO)
-fl.add_box("pump8_button_display_flex", (0.045, 0.000, H * 0.90),
-           (0.052, 0.022, 0.0005), MAT["pcb"], "power_distribution", MO)
-fl.add_box("pump8_battery_connector", (0.042, -0.018, H * 0.58),
-           (0.005, 0.004, 0.002), MAT["powerdist"], "power_distribution", MO)
-fl.add_box("pump8_motor_connector", (0.035, 0.014, H * 0.58),
-           (0.005, 0.004, 0.002), MAT["powerdist"], "power_distribution", MO)
-for i in range(4):
-    fl.add_box(f"pump8_copper_power_rail_{i}", (0.040 + i * 0.010, -0.024, H * 0.61),
-               (0.008, 0.0006, 0.00035), MAT["copper"], "power_distribution", MO)
-for i in range(3):
-    fl.add_cyl(f"pump8_gold_pogo_contact_{i}", (0.081, 0.010 + i * 0.004, H * 0.70),
-               0.0009, 0.0005, MAT["gold_contact"], "power_distribution", MO)
+# ═══════ power_distribution ═══════════════════════════════════════════════
+fl.add_box("pump8_usb_charge_port", (0.0875, -0.015, 0.0060),
+           (0.003, 0.008, 0.002), MAT["ctrl_black"], "power_distribution", MO)
+fl.add_box("pump8_usb_shield", (0.0858, -0.015, 0.0060),
+           (0.0008, 0.009, 0.003), MAT["stainless"], "power_distribution", MO)
+fl.add_box("pump8_charge_contact_pos", (0.080, -0.024, 0.0070),
+           (0.004, 0.001, 0.002), MAT["metal_contact"], "power_distribution", MO)
+fl.add_box("pump8_charge_contact_neg", (0.070, -0.024, 0.0070),
+           (0.004, 0.001, 0.002), MAT["metal_contact"], "power_distribution", MO)
+for i, y in enumerate([-0.016, -0.010, -0.004, 0.002, 0.008, 0.014]):
+    fl.add_box(f"pump8_power_rail_{i}", (0.045, y, 0.0097),
+               (0.055, 0.00045, 0.00025), MAT["copper"], "power_distribution", MO)
+for i, y in enumerate([-0.016, -0.011, -0.006, -0.001]):
+    fl.add_cyl(f"pump8_flex_wire_{i}", (0.064, y, 0.0075),
+               0.00045, 0.025, MAT["copper"], "power_distribution", MO,
+               rotation=(0, math.radians(90), 0))
+fl.add_box("pump8_board_to_motor_connector", (0.066, -0.008, 0.0102),
+           (0.006, 0.003, 0.0015), MAT["powerdist"], "power_distribution", MO)
 
 
-# ═══════ hmi_ergonomics ══════════════════════════════════════════════════
-fl.add_box("pump9_colour_touchscreen", (0.045, -0.003, H + 0.0011),
-           (0.050, 0.032, 0.0012), MAT["front_glass"], "hmi_ergonomics", MO)
-fl.add_box("pump9_oled_active_area", (0.045, -0.003, H + 0.0018),
-           (0.044, 0.026, 0.0004), MAT["hmi"], "hmi_ergonomics", MO)
-fl.add_cyl("pump9_up_button", (0.078, 0.016, H + 0.0016),
-           0.0032, 0.0014, MAT["button_rubber"], "hmi_ergonomics", MO)
-fl.add_cyl("pump9_select_button", (0.078, 0.006, H + 0.0016),
-           0.0032, 0.0014, MAT["button_rubber"], "hmi_ergonomics", MO)
-fl.add_cyl("pump9_down_button", (0.078, -0.004, H + 0.0016),
-           0.0032, 0.0014, MAT["button_rubber"], "hmi_ergonomics", MO)
-fl.add_cyl("pump9_vibration_alert_motor", (0.017, -0.020, H * 0.73),
-           0.0035, 0.009, MAT["motor"], "hmi_ergonomics", MO,
-           rotation=(0, math.radians(90), 0))
-fl.add_cyl("pump9_piezo_sounder", (0.012, 0.018, H * 0.72),
-           0.005, 0.0012, MAT["ctrl_black"], "hmi_ergonomics", MO)
-for i in range(5):
-    fl.add_box(f"pump9_side_grip_rib_{i}", (0.007 + i * 0.006, -D/2 - 0.0005, H * 0.58),
-               (0.003, 0.001, 0.009), MAT["button_rubber"], "hmi_ergonomics", MO)
-fl.add_box("pump9_status_led_window", (0.080, -0.017, H + 0.0015),
-           (0.006, 0.002, 0.0005), MAT["orange_alarm"], "hmi_ergonomics", MO)
+# ═══════ environmental_interface ══════════════════════════════════════════
+fl.add_box("pump9_skin_side_adhesive_patch", (0.045, 0, 0.00025),
+           (0.070, 0.043, 0.0005), MAT["adhesive"], "environmental_interface", MO)
+fl.add_box("pump9_case_gasket_top", (W/2, 0.0250, 0.0185),
+           (0.082, 0.001, 0.001), MAT["silicone_red"], "environmental_interface", MO)
+fl.add_box("pump9_case_gasket_bottom", (W/2, -0.0250, 0.0185),
+           (0.082, 0.001, 0.001), MAT["silicone_red"], "environmental_interface", MO)
+fl.add_box("pump9_case_gasket_left", (0.006, 0, 0.0185),
+           (0.001, 0.048, 0.001), MAT["silicone_red"], "environmental_interface", MO)
+fl.add_box("pump9_case_gasket_right", (0.084, 0, 0.0185),
+           (0.001, 0.048, 0.001), MAT["silicone_red"], "environmental_interface", MO)
+fl.add_box("pump9_screen_seal", (0.045, 0, 0.01915),
+           (0.064, 0.044, 0.0004), MAT["rubber_black"], "environmental_interface", MO)
+fl.add_torus("pump9_reservoir_or_small", (0.022, 0.021, 0.0150),
+             major_radius=0.0044, minor_radius=0.00035,
+             material=MAT["silicone_red"], module="environmental_interface", module_objects=MO,
+             rotation=(0, math.radians(90), 0))
+fl.add_torus("pump9_reservoir_or_large", (0.068, 0.021, 0.0150),
+             major_radius=0.0044, minor_radius=0.00035,
+             material=MAT["silicone_red"], module="environmental_interface", module_objects=MO,
+             rotation=(0, math.radians(90), 0))
+fl.add_cyl("pump9_pressure_vent_membrane", (0.012, -0.010, 0.0192),
+           0.0025, 0.0005, MAT["thermal"], "environmental_interface", MO)
 
 
-# ═══════ maintenance_serviceability ══════════════════════════════════════
-fl.add_box("pump10_usb_charging_port", (W - 0.002, -0.015, H * 0.42),
-           (0.004, 0.010, 0.004), MAT["maint"], "maintenance_serviceability", MO)
-fl.add_box("pump10_usb_metal_shell", (W - 0.003, -0.015, H * 0.42),
-           (0.002, 0.008, 0.003), MAT["stainless"], "maintenance_serviceability", MO)
-fl.add_box("pump10_reservoir_release_tab", (0.012, D/2 + 0.001, H + 0.002),
-           (0.012, 0.003, 0.003), MAT["maint"], "maintenance_serviceability", MO)
-fl.add_box("pump10_fill_port_septum", (0.008, D/2 - 0.006, H + 0.003),
-           (0.006, 0.004, 0.002), MAT["silicone"], "maintenance_serviceability", MO)
-fl.add_box("pump10_serial_label", (0.045, 0.000, -0.0011),
-           (0.040, 0.018, 0.0003), MAT["label_white"], "maintenance_serviceability", MO)
-for i in range(4):
-    fl.add_cyl(f"pump10_case_screw_boss_{i}",
-               (0.012 + (i % 2) * 0.066, -0.020 + (i // 2) * 0.040, H * 0.18),
-               0.0022, 0.003, MAT["maint"], "maintenance_serviceability", MO)
-for i in range(5):
-    fl.add_cyl(f"pump10_debug_test_pad_{i}", (0.036 + i * 0.004, -0.021, H * 0.74),
-               0.00075, 0.0004, MAT["gold_contact"], "maintenance_serviceability", MO)
+# ═══════ hmi_ergonomics ═══════════════════════════════════════════════════
+# Front LCD touchscreen and four physical buttons.
+fl.add_box("pump3_lcd_touchscreen", (0.045, 0.000, 0.01975),
+           (0.060, 0.040, 0.0005), MAT["display_dark"], "hmi_ergonomics", MO)
+for i, y in enumerate([-0.012, -0.004, 0.004, 0.012]):
+    fl.add_box(f"pump3_lcd_ui_bar_{i}", (0.045, y, 0.01995),
+               (0.045 - i * 0.004, 0.0013, 0.00012), MAT["display_glow"], "hmi_ergonomics", MO)
+
+for i, (x, y) in enumerate([(0.066, -0.021), (0.073, -0.021), (0.080, -0.021), (0.087, -0.021)]):
+    fl.add_cyl(f"pump3_physical_button_{i}", (x, y, 0.01945),
+               0.0015, 0.0010, MAT["button_grey"], "hmi_ergonomics", MO)
+
+fl.add_sphere("pump3_status_led", (0.011, -0.021, 0.0190),
+              0.0010, MAT["led_green"], "hmi_ergonomics", MO)
+fl.add_cyl("pump3_piezo_sounder", (0.015, 0.014, 0.0105),
+           0.004, 0.0015, MAT["ctrl_black"], "hmi_ergonomics", MO)
 
 
-# ═══════ mass_fluid_transport_process ════════════════════════════════════
-fl.add_cyl("pump11_clear_insulin_reservoir_barrel", (0.040, D/2 + 0.004, H + 0.004),
-           0.0055, 0.052, MAT["reservoir_clear"], "mass_fluid_transport_process", MO,
-           rotation=(0, math.radians(90), 0))
-fl.add_cyl("pump11_insulin_fill_volume", (0.040, D/2 + 0.004, H + 0.004),
-           0.0043, 0.045, MAT["insulin"], "mass_fluid_transport_process", MO,
-           rotation=(0, math.radians(90), 0))
-fl.add_cyl("pump11_reservoir_plunger", (0.014, D/2 + 0.004, H + 0.004),
-           0.0047, 0.002, MAT["safety"], "mass_fluid_transport_process", MO,
-           rotation=(0, math.radians(90), 0))
-fl.add_cyl("pump11_reservoir_outlet_nozzle", (0.069, D/2 + 0.004, H + 0.004),
-           0.0020, 0.009, MAT["insulin"], "mass_fluid_transport_process", MO,
-           rotation=(0, math.radians(90), 0))
-fl.add_box("pump11_micro_pump_chamber", (0.069, 0.010, H * 0.50),
-           (0.008, 0.006, 0.004), MAT["insulin"], "mass_fluid_transport_process", MO)
-fl.add_box("pump11_inlet_check_valve", (0.063, 0.010, H * 0.50),
-           (0.003, 0.004, 0.003), MAT["fluid_water"], "mass_fluid_transport_process", MO)
-fl.add_box("pump11_outlet_check_valve", (0.075, 0.010, H * 0.50),
-           (0.003, 0.004, 0.003), MAT["fluid_water"], "mass_fluid_transport_process", MO)
-fl.add_cyl("pump11_internal_fluid_line_a", (0.068, 0.022, H * 0.68),
-           0.0008, 0.020, MAT["insulin"], "mass_fluid_transport_process", MO,
-           rotation=(math.radians(90), 0, 0))
-fl.add_cyl("pump11_internal_fluid_line_b", (0.078, 0.016, H * 0.60),
-           0.0008, 0.016, MAT["insulin"], "mass_fluid_transport_process", MO,
-           rotation=(0, math.radians(90), 0))
-fl.add_cyl("pump11_cannula_fluid_core", (W + 0.040, -0.022, -0.0035),
-           0.00025, 0.007, MAT["insulin"], "mass_fluid_transport_process", MO)
+# ═══════ maintenance_serviceability ═══════════════════════════════════════
+fl.add_box("pump10_reservoir_release_latch", (0.074, 0.024, 0.0188),
+           (0.011, 0.003, 0.0015), MAT["service_magenta"], "maintenance_serviceability", MO)
+fl.add_box("pump10_service_door_outline", (0.032, -0.022, 0.0189),
+           (0.026, 0.002, 0.0006), MAT["service_magenta"], "maintenance_serviceability", MO)
+fl.add_box("pump10_pull_tab", (0.018, 0.024, 0.0175),
+           (0.008, 0.003, 0.002), MAT["service_magenta"], "maintenance_serviceability", MO)
+fl.add_box("pump10_cartridge_alignment_label", (0.050, 0.024, 0.0189),
+           (0.018, 0.0015, 0.0004), MAT["label_white"], "maintenance_serviceability", MO)
+
+for i, (x, y) in enumerate([(0.008, 0.021), (0.082, 0.021), (0.008, -0.021), (0.082, -0.021)]):
+    fl.add_cyl(f"pump10_service_screw_head_{i}", (x, y, 0.0193),
+               0.0012, 0.0005, MAT["service_magenta"], "maintenance_serviceability", MO)
+
+for i, y in enumerate([-0.008, -0.004, 0.000, 0.004]):
+    fl.add_cyl(f"pump10_debug_test_pad_{i}", (0.027, y, 0.0102),
+               0.0008, 0.0003, MAT["service_magenta"], "maintenance_serviceability", MO)
 
 
 fl.add_lights(target_centre=(W/2,0,H/2),fill_energy=200,fill_size=10); fl.make_world_white(); fl.run_render_pipeline(OUT, MO, structure_module_id="structure_containment")

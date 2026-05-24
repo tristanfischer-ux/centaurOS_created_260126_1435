@@ -1,15 +1,16 @@
-"""hydrogen-electrolyser-9shot.py — PEM water electrolyser skid, 100 kW to 1 MW.
+"""hydrogen-electrolyser-9shot.py — PEM water electrolyser skid, 100–500 kW.
 
-Envelope 3.0 × 1.5 × 2.5 m. Steel skid with PEM stack, AC-DC rectifier,
-H2/O2 water separators, DI water polishing, circulation pump, heat exchanger,
-gas dryer, output buffer, safety venting, analyser, controls and HMI.
+Envelope 3.0 × 1.5 × 2.5 m. Packed skid with PEM stack, rectifier
+transformer, H2/O2 separators, circulation pump, heat exchanger, dryer column,
+DI polisher, external H2 buffer tank, control cabinet, safety, sensing,
+maintenance, HMI, and actuation features.
 
 Run:
   /Applications/Blender.app/Contents/MacOS/Blender -b -P hydrogen-electrolyser-9shot.py
 """
 import bpy
-import os
 import math
+import os
 import sys
 from pathlib import Path
 
@@ -39,198 +40,335 @@ MO = fl.make_module_dict([
 ])
 
 MAT = fl.make_default_palette()
-MAT["pem_stack"]    = fl.make_mat("m_pem_stack",    (0.00, 0.48, 1.00), metallic=0.1, roughness=0.35)
-MAT["membrane"]     = fl.make_mat("m_membrane",     (0.92, 0.00, 1.00), metallic=0.0, roughness=0.45)
-MAT["h2_gas"]       = fl.make_mat("m_h2_gas",       (0.00, 0.95, 1.00), metallic=0.0, roughness=0.25)
-MAT["o2_gas"]       = fl.make_mat("m_o2_gas",       (0.00, 0.90, 0.18), metallic=0.0, roughness=0.35)
-MAT["di_water"]     = fl.make_mat("m_di_water",     (0.00, 0.35, 1.00), metallic=0.2, roughness=0.25)
-MAT["dryer"]        = fl.make_mat("m_dryer",        (1.00, 0.35, 0.00), metallic=0.1, roughness=0.40)
-MAT["separator"]    = fl.make_mat("m_separator",    (0.88, 0.92, 0.96), metallic=0.65, roughness=0.28)
-MAT["rectifier"]    = fl.make_mat("m_rectifier",    (0.58, 0.00, 1.00), metallic=0.15, roughness=0.42)
-MAT["valve"]        = fl.make_mat("m_valve",        (1.00, 0.10, 0.55), metallic=0.1, roughness=0.40)
-MAT["pipe_h2"]      = fl.make_mat("m_pipe_h2",      (0.00, 0.85, 1.00), metallic=0.25, roughness=0.35)
-MAT["pipe_o2"]      = fl.make_mat("m_pipe_o2",      (0.00, 1.00, 0.20), metallic=0.25, roughness=0.35)
-MAT["pipe_water"]   = fl.make_mat("m_pipe_water",   (0.00, 0.25, 1.00), metallic=0.25, roughness=0.35)
-MAT["filter"]       = fl.make_mat("m_filter",       (1.00, 0.75, 0.00), metallic=0.05, roughness=0.45)
-MAT["panel_glass"]  = fl.make_mat("m_panel_glass",  (0.02, 0.12, 0.28), metallic=0.1, roughness=0.18)
-MAT["warning"]      = fl.make_mat("m_warning",      (1.00, 0.62, 0.00), metallic=0.0, roughness=0.45)
+MAT["shell_panel"] = fl.make_mat("m_shell_panel", (0.78, 0.82, 0.88), metallic=0.0, roughness=0.50, alpha=0.28)
+MAT["stack_blue"] = fl.make_mat("m_stack_blue", (0.00, 0.22, 1.00), metallic=0.05, roughness=0.38)
+MAT["stack_plate"] = fl.make_mat("m_stack_plate", (0.10, 0.14, 0.20), metallic=0.45, roughness=0.32)
+MAT["rectifier_slate"] = fl.make_mat("m_rectifier_slate", (0.18, 0.22, 0.32), metallic=0.35, roughness=0.48)
+MAT["vessel_cyan"] = fl.make_mat("m_vessel_cyan", (0.00, 0.85, 1.00), metallic=0.20, roughness=0.35)
+MAT["pump_orange"] = fl.make_mat("m_pump_orange", (1.00, 0.28, 0.00), metallic=0.10, roughness=0.42)
+MAT["brass"] = fl.make_mat("m_brass", (1.00, 0.62, 0.08), metallic=0.50, roughness=0.30)
+MAT["pipe_h2"] = fl.make_mat("m_pipe_h2", (0.00, 0.95, 1.00), metallic=0.35, roughness=0.25)
+MAT["pipe_o2"] = fl.make_mat("m_pipe_o2", (0.00, 0.50, 1.00), metallic=0.35, roughness=0.25)
+MAT["pipe_water"] = fl.make_mat("m_pipe_water_polisher", (0.00, 0.35, 1.00), metallic=0.30, roughness=0.28)
+MAT["valve_green"] = fl.make_mat("m_valve_green", (0.00, 0.95, 0.12), metallic=0.10, roughness=0.42)
+MAT["warning_red"] = fl.make_mat("m_warning_red", (1.00, 0.00, 0.00), metallic=0.0, roughness=0.45)
+MAT["walkway"] = fl.make_mat("m_walkway", (0.20, 0.24, 0.30), metallic=0.55, roughness=0.40)
+MAT["insulator"] = fl.make_mat("m_insulator", (0.62, 0.05, 0.95), metallic=0.0, roughness=0.55)
+MAT["white_label"] = fl.make_mat("m_white_label", (0.96, 0.96, 0.92), metallic=0.0, roughness=0.60)
 
 
-# ═══════ Module — structure_containment (skid frame + enclosure shell) ══════
-fl.add_box("he1_skid_base", (W/2, 0, 0.06), (W, D, 0.12), MAT["stainless"], "structure_containment", MO)
-for x, y in [(0.08, -D/2+0.08), (W-0.08, -D/2+0.08), (0.08, D/2-0.08), (W-0.08, D/2-0.08)]:
-    fl.add_box(f"he1_corner_post_{x:.2f}_{y:.2f}", (x, y, H/2), (0.06, 0.06, H), MAT["stainless"], "structure_containment", MO)
-for spec in [
-    ("he1_top_rail_front", (W/2, -D/2+0.06, H-0.05), (W-0.12, 0.05, 0.06)),
-    ("he1_top_rail_back",  (W/2,  D/2-0.06, H-0.05), (W-0.12, 0.05, 0.06)),
-    ("he1_top_rail_left",  (0.06, 0, H-0.05),         (0.05, D-0.12, 0.06)),
-    ("he1_top_rail_right", (W-0.06, 0, H-0.05),       (0.05, D-0.12, 0.06)),
-    ("he1_mid_rail_front", (W/2, -D/2+0.04, 1.25),    (W-0.12, 0.04, 0.05)),
-    ("he1_mid_rail_back",  (W/2,  D/2-0.04, 1.25),    (W-0.12, 0.04, 0.05)),
+# ═══════ Module — structure_containment: skid frame, shell panels, roof ═════
+# Base channel, held inside 0..3 m × -0.75..+0.75 m footprint.
+for name, loc, size in [
+    ("he1_base_front_channel", (W / 2, -0.675, 0.06), (W, 0.08, 0.12)),
+    ("he1_base_rear_channel", (W / 2, 0.675, 0.06), (W, 0.08, 0.12)),
+    ("he1_base_left_channel", (0.04, 0.0, 0.06), (0.08, D, 0.12)),
+    ("he1_base_right_channel", (W - 0.04, 0.0, 0.06), (0.08, D, 0.12)),
 ]:
-    fl.add_box(*spec, MAT["stainless"], "structure_containment", MO)
-for x in [0.55, 1.50, 2.45]:
-    fl.add_box(f"he1_roof_crossmember_{x:.2f}", (x, 0, H-0.04), (0.05, D-0.18, 0.05), MAT["stainless"], "structure_containment", MO)
-fl.add_box("he1_left_service_door_frame", (0.35, -D/2-0.005, 1.15), (0.55, 0.025, 1.85), MAT["enclosure"], "structure_containment", MO)
-fl.add_box("he1_right_louver_panel", (2.35, D/2+0.005, 1.20), (0.90, 0.025, 1.75), MAT["enclosure"], "structure_containment", MO)
-fl.add_box("he1_control_cabinet_shell", (2.72, -0.42, 1.05), (0.42, 0.52, 1.85), MAT["enclosure"], "structure_containment", MO)
-fl.add_box("he1_service_walkplate", (1.50, -0.69, 0.16), (2.70, 0.10, 0.035), MAT["stainless"], "structure_containment", MO)
+    fl.add_box(name, loc, size, MAT["stainless"], "structure_containment", MO)
+
+for i, x in enumerate([0.75, 1.50, 2.25]):
+    fl.add_box(f"he1_base_crossmember_{i}", (x, 0.0, 0.12), (0.06, 1.34, 0.08),
+               MAT["stainless"], "structure_containment", MO)
+
+# Four 75 mm square corner posts, 2500 mm tall.
+for i, (x, y) in enumerate([(0.075, -0.675), (0.075, 0.675), (2.925, -0.675), (2.925, 0.675)]):
+    fl.add_box(f"he1_corner_post_{i}", (x, y, H / 2), (0.075, 0.075, H),
+               MAT["stainless"], "structure_containment", MO)
+
+# Top frame.
+for name, loc, size in [
+    ("he1_top_front_channel", (W / 2, -0.675, H - 0.04), (W, 0.07, 0.07)),
+    ("he1_top_rear_channel", (W / 2, 0.675, H - 0.04), (W, 0.07, 0.07)),
+    ("he1_top_left_channel", (0.04, 0.0, H - 0.04), (0.07, D, 0.07)),
+    ("he1_top_right_channel", (W - 0.04, 0.0, H - 0.04), (0.07, D, 0.07)),
+]:
+    fl.add_box(name, loc, size, MAT["stainless"], "structure_containment", MO)
+
+# Service walkway on -Y side, 0.4 m wide, within envelope.
+fl.add_box("he1_service_walkway_plate", (W / 2, -0.55, 0.18), (2.78, 0.36, 0.05),
+           MAT["walkway"], "structure_containment", MO)
+for i, x in enumerate([0.25, 0.55, 0.85, 1.15, 1.45, 1.75, 2.05, 2.35, 2.65]):
+    fl.add_box(f"he1_walkway_grating_{i}", (x, -0.55, 0.215), (0.035, 0.34, 0.012),
+               MAT["stainless"], "structure_containment", MO)
+
+# Three translucent side panels and translucent roof.
+fl.add_box("he1_left_side_panel", (0.015, 0.0, 1.28), (0.03, 1.34, 2.24),
+           MAT["shell_panel"], "structure_containment", MO)
+fl.add_box("he1_right_side_panel", (2.985, 0.0, 1.28), (0.03, 1.34, 2.24),
+           MAT["shell_panel"], "structure_containment", MO)
+fl.add_box("he1_rear_side_panel", (W / 2, 0.735, 1.28), (2.78, 0.03, 2.24),
+           MAT["shell_panel"], "structure_containment", MO)
+fl.add_box("he1_translucent_roof", (W / 2, 0.0, 2.485), (2.88, 1.36, 0.03),
+           MAT["shell_panel"], "structure_containment", MO)
 
 
-# ═══════ Module — energy_conversion_transduction (PEM stack conversion) ═════
-STACK_X, STACK_Y = 0.86, -0.12
-STACK_Z = 1.16
-fl.add_box("he2_pem_stack_cell_block", (STACK_X, STACK_Y, STACK_Z), (0.60, 0.40, 1.55), MAT["pem_stack"], "energy_conversion_transduction", MO)
-fl.add_box("he2_stack_front_endplate", (STACK_X, STACK_Y-0.225, STACK_Z), (0.66, 0.045, 1.72), MAT["stainless"], "energy_conversion_transduction", MO)
-fl.add_box("he2_stack_rear_endplate", (STACK_X, STACK_Y+0.225, STACK_Z), (0.66, 0.045, 1.72), MAT["stainless"], "energy_conversion_transduction", MO)
-for i in range(12):
-    y = STACK_Y - 0.18 + i * 0.033
-    fl.add_box(f"he2_bipolar_plate_{i:02d}", (STACK_X, y, STACK_Z), (0.64, 0.008, 1.60), MAT["membrane"], "energy_conversion_transduction", MO)
-for x in [STACK_X-0.34, STACK_X+0.34]:
-    for z in [0.45, 1.87]:
-        fl.add_cyl(f"he2_stack_tie_rod_{x:.2f}_{z:.2f}", (x, STACK_Y, z), 0.015, 0.52, MAT["stainless"], "energy_conversion_transduction", MO, rotation=(math.radians(90), 0, 0))
-fl.add_box("he2_dc_positive_lug", (STACK_X-0.22, STACK_Y-0.28, 1.95), (0.12, 0.05, 0.10), MAT["copper"], "energy_conversion_transduction", MO)
-fl.add_box("he2_dc_negative_lug", (STACK_X+0.22, STACK_Y-0.28, 1.95), (0.12, 0.05, 0.10), MAT["copper"], "energy_conversion_transduction", MO)
-fl.add_box("he2_stack_compression_frame_top", (STACK_X, STACK_Y, 2.05), (0.78, 0.52, 0.08), MAT["stainless"], "energy_conversion_transduction", MO)
-fl.add_box("he2_stack_compression_frame_bottom", (STACK_X, STACK_Y, 0.25), (0.78, 0.52, 0.08), MAT["stainless"], "energy_conversion_transduction", MO)
-fl.add_cyl("he2_top_water_manifold", (STACK_X, STACK_Y+0.30, 1.96), 0.030, 0.66, MAT["pipe_water"], "energy_conversion_transduction", MO, rotation=(0, math.radians(90), 0))
-fl.add_cyl("he2_bottom_return_manifold", (STACK_X, STACK_Y+0.30, 0.34), 0.030, 0.66, MAT["pipe_water"], "energy_conversion_transduction", MO, rotation=(0, math.radians(90), 0))
+# ═══════ Module — energy_conversion_transduction ════════════════════════════
+# PEM stack: explicit centre x=1.2, y=0, z=1.0; size 0.6×0.4×1.8 m.
+fl.add_box("he2_pem_stack_active_block", (1.20, 0.0, 1.00), (0.60, 0.40, 1.80),
+           MAT["stack_blue"], "energy_conversion_transduction", MO)
+fl.add_box("he2_pem_stack_left_endplate", (0.88, 0.0, 1.00), (0.04, 0.46, 1.90),
+           MAT["stack_plate"], "energy_conversion_transduction", MO)
+fl.add_box("he2_pem_stack_right_endplate", (1.52, 0.0, 1.00), (0.04, 0.46, 1.90),
+           MAT["stack_plate"], "energy_conversion_transduction", MO)
+
+# Visible bipolar-plate edges on front face.
+for i, x in enumerate([0.96, 1.02, 1.08, 1.14, 1.20, 1.26, 1.32, 1.38, 1.44]):
+    fl.add_box(f"he2_stack_plate_line_{i}", (x, -0.213, 1.00), (0.010, 0.016, 1.72),
+               MAT["stainless"], "energy_conversion_transduction", MO)
+
+# Eight tie rods along stack X-axis.
+tie_rod_points = [(-0.235, 0.18), (0.235, 0.18), (-0.235, 0.58), (0.235, 0.58),
+                  (-0.235, 1.42), (0.235, 1.42), (-0.235, 1.82), (0.235, 1.82)]
+for i, (y, z) in enumerate(tie_rod_points):
+    fl.add_cyl(f"he2_stack_tie_rod_{i}", (1.20, y, z), 0.012, 0.76,
+               MAT["stainless"], "energy_conversion_transduction", MO,
+               rotation=(0, math.radians(90), 0))
+
+# Rectifier transformer: explicit centre x=0.4, y=0.3, z=0.6.
+fl.add_box("he2_rectifier_transformer", (0.40, 0.30, 0.60), (0.70, 0.70, 1.20),
+           MAT["rectifier_slate"], "energy_conversion_transduction", MO)
+for i, x in enumerate([0.18, 0.30, 0.42, 0.54, 0.66]):
+    fl.add_box(f"he2_rectifier_cooling_fin_{i}", (x, -0.055, 0.62), (0.035, 0.025, 1.05),
+               MAT["heatsink"], "energy_conversion_transduction", MO)
+for i, y in enumerate([0.14, 0.30, 0.46]):
+    fl.add_cyl(f"he2_transformer_winding_{i}", (0.40, y, 1.25), 0.055, 0.09,
+               MAT["copper"], "energy_conversion_transduction", MO,
+               rotation=(math.radians(90), 0, 0))
+
+# External H2 buffer tank, explicitly just outside envelope edge at x=3.2.
+fl.add_cyl("he2_external_h2_buffer_tank", (3.20, 0.0, 0.75), 0.20, 1.50,
+           MAT["vessel_cyan"], "energy_conversion_transduction", MO)
+for y in [-0.12, 0.12]:
+    fl.add_box(f"he2_buffer_tank_saddle_{y:+.2f}", (3.20, y, 0.06), (0.38, 0.06, 0.12),
+               MAT["stainless"], "energy_conversion_transduction", MO)
 
 
-# ═══════ Module — mass_fluid_transport_process (water + gas process train) ══
-H2_X, O2_X = 1.65, 2.03
-SEP_Y = 0.26
-for name, x, mat in [("h2", H2_X, MAT["h2_gas"]), ("o2", O2_X, MAT["o2_gas"])]:
-    fl.add_cyl(f"he3_{name}_water_separator_vessel", (x, SEP_Y, 1.05), 0.15, 1.50, MAT["separator"], "mass_fluid_transport_process", MO)
-    fl.add_cyl(f"he3_{name}_separator_top_cap", (x, SEP_Y, 1.82), 0.152, 0.05, mat, "mass_fluid_transport_process", MO)
-    fl.add_cyl(f"he3_{name}_separator_bottom_cap", (x, SEP_Y, 0.28), 0.152, 0.05, MAT["di_water"], "mass_fluid_transport_process", MO)
-    fl.add_box(f"he3_{name}_level_sight_glass", (x+0.155, SEP_Y-0.02, 1.05), (0.020, 0.030, 0.95), MAT["panel_glass"], "mass_fluid_transport_process", MO)
-fl.add_cyl("he3_di_polisher_column", (0.45, 0.42, 0.85), 0.12, 1.05, MAT["filter"], "mass_fluid_transport_process", MO)
-fl.add_cyl("he3_circulation_pump_body", (0.60, 0.42, 0.26), 0.105, 0.22, MAT["di_water"], "mass_fluid_transport_process", MO, rotation=(0, math.radians(90), 0))
-fl.add_box("he3_plate_heat_exchanger", (1.18, 0.44, 0.55), (0.36, 0.18, 0.48), MAT["thermal"], "mass_fluid_transport_process", MO)
-for i in range(6):
-    fl.add_box(f"he3_heat_exchanger_plate_{i}", (1.18 - 0.135 + i*0.054, 0.335, 0.55), (0.020, 0.035, 0.50), MAT["heatsink"], "mass_fluid_transport_process", MO)
-fl.add_cyl("he3_gas_dryer_tower_a", (2.38, 0.28, 0.98), 0.10, 1.20, MAT["dryer"], "mass_fluid_transport_process", MO)
-fl.add_cyl("he3_gas_dryer_tower_b", (2.62, 0.28, 0.98), 0.10, 1.20, MAT["dryer"], "mass_fluid_transport_process", MO)
-fl.add_cyl("he3_h2_output_buffer_tank", (2.50, 0.58, 0.62), 0.16, 0.72, MAT["h2_gas"], "mass_fluid_transport_process", MO, rotation=(0, math.radians(90), 0))
-fl.add_cyl("he3_h2_header_stack_to_separator", (1.25, 0.08, 1.82), 0.018, 0.82, MAT["pipe_h2"], "mass_fluid_transport_process", MO, rotation=(0, math.radians(72), 0))
-fl.add_cyl("he3_o2_header_stack_to_separator", (1.48, 0.47, 1.70), 0.018, 0.92, MAT["pipe_o2"], "mass_fluid_transport_process", MO, rotation=(0, math.radians(82), 0))
-fl.add_cyl("he3_water_feed_line", (0.75, 0.44, 0.55), 0.016, 0.72, MAT["pipe_water"], "mass_fluid_transport_process", MO, rotation=(0, math.radians(90), 0))
-fl.add_cyl("he3_h2_dryer_to_buffer_line", (2.50, 0.40, 1.30), 0.016, 0.50, MAT["pipe_h2"], "mass_fluid_transport_process", MO, rotation=(math.radians(90), 0, 0))
-for i, x in enumerate([0.44, 0.62, 1.34, 1.64, 2.20]):
-    fl.add_box(f"he3_process_valve_{i}", (x, 0.61, 1.15 if i > 2 else 0.62), (0.060, 0.060, 0.060), MAT["valve"], "mass_fluid_transport_process", MO)
+# ═══════ Module — mass_fluid_transport_process ══════════════════════════════
+# H2-water and O2-water separators: explicit centres.
+fl.add_cyl("he11_h2_water_separator", (2.00, -0.40, 0.75), 0.15, 1.50,
+           MAT["vessel_cyan"], "mass_fluid_transport_process", MO)
+fl.add_cyl("he11_o2_water_separator", (2.00, 0.40, 0.75), 0.15, 1.50,
+           MAT["vessel_cyan"], "mass_fluid_transport_process", MO)
+for name, y in [("h2", -0.40), ("o2", 0.40)]:
+    fl.add_sphere(f"he11_{name}_separator_top_dome", (2.00, y, 1.51), 0.15,
+                  MAT["vessel_cyan"], "mass_fluid_transport_process", MO)
+    fl.add_sphere(f"he11_{name}_separator_bottom_dome", (2.00, y, -0.005), 0.15,
+                  MAT["vessel_cyan"], "mass_fluid_transport_process", MO)
+
+# KOH circulation pump: explicit centre x=0.7, y=-0.4, z=0.3.
+fl.add_cyl("he11_koh_circulation_pump", (0.70, -0.40, 0.30), 0.15, 0.40,
+           MAT["pump_orange"], "mass_fluid_transport_process", MO)
+fl.add_cyl("he11_koh_pump_motor", (0.70, -0.18, 0.30), 0.10, 0.28,
+           MAT["motor"], "mass_fluid_transport_process", MO,
+           rotation=(math.radians(90), 0, 0))
+
+# Gas dryer and DI water polisher: explicit centres.
+fl.add_cyl("he11_gas_dryer_column", (2.50, 0.0, 0.70), 0.10, 1.20,
+           MAT["brass"], "mass_fluid_transport_process", MO)
+fl.add_cyl("he11_di_water_polisher", (0.40, -0.50, 0.50), 0.15, 0.80,
+           MAT["pipe_water"], "mass_fluid_transport_process", MO)
+
+# Process piping, packed inside the skid envelope.
+fl.add_cyl("he11_h2_stack_to_separator_line", (1.75, -0.40, 1.38), 0.018, 0.50,
+           MAT["pipe_h2"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("he11_o2_stack_to_separator_line", (1.75, 0.40, 1.38), 0.018, 0.50,
+           MAT["pipe_o2"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("he11_h2_separator_to_dryer_y_line", (2.25, -0.20, 1.28), 0.014, 0.40,
+           MAT["pipe_h2"], "mass_fluid_transport_process", MO,
+           rotation=(math.radians(90), 0, 0))
+fl.add_cyl("he11_h2_separator_to_dryer_x_line", (2.25, 0.0, 1.28), 0.014, 0.50,
+           MAT["pipe_h2"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("he11_dryer_to_buffer_line", (2.85, 0.0, 1.22), 0.014, 0.70,
+           MAT["pipe_h2"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("he11_koh_return_line", (0.95, -0.40, 0.72), 0.016, 0.50,
+           MAT["pump_orange"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("he11_di_to_stack_line", (0.80, -0.50, 0.95), 0.014, 0.80,
+           MAT["pipe_water"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
+fl.add_cyl("he11_o2_vent_line", (2.35, 0.40, 1.50), 0.014, 0.70,
+           MAT["pipe_o2"], "mass_fluid_transport_process", MO,
+           rotation=(0, math.radians(90), 0))
 
 
-# ═══════ Module — power_distribution (AC feed, rectifier, DC bus) ══════════
-fl.add_box("he4_ac_transformer", (0.48, -0.47, 0.55), (0.54, 0.50, 0.72), MAT["powerdist"], "power_distribution", MO)
-fl.add_box("he4_rectifier_cabinet", (1.34, -0.48, 0.82), (0.62, 0.48, 1.12), MAT["rectifier"], "power_distribution", MO)
-fl.add_box("he4_rectifier_heatsink", (1.34, -0.735, 0.86), (0.56, 0.035, 0.82), MAT["heatsink"], "power_distribution", MO)
-for i in range(7):
-    fl.add_box(f"he4_heatsink_fin_{i}", (1.07 + i*0.09, -0.775, 0.86), (0.018, 0.08, 0.82), MAT["heatsink"], "power_distribution", MO)
-for i, z in enumerate([1.50, 1.58, 1.66]):
-    fl.add_box(f"he4_ac_busbar_{i}", (0.92, -0.52, z), (0.70, 0.018, 0.018), MAT["copper"], "power_distribution", MO)
-fl.add_box("he4_dc_positive_bus", (1.08, -0.25, 1.92), (0.74, 0.026, 0.030), MAT["copper"], "power_distribution", MO)
-fl.add_box("he4_dc_negative_bus", (1.08, -0.20, 1.82), (0.74, 0.026, 0.030), MAT["copper"], "power_distribution", MO)
-fl.add_box("he4_main_breaker", (0.30, -0.73, 1.28), (0.22, 0.08, 0.28), MAT["safety"], "power_distribution", MO)
-fl.add_box("he4_emc_filter_choke", (0.68, -0.70, 1.28), (0.26, 0.12, 0.24), MAT["ctrl_black"], "power_distribution", MO)
-fl.add_cyl("he4_grounding_bar", (1.50, -0.72, 0.18), 0.014, 0.72, MAT["copper"], "power_distribution", MO, rotation=(0, math.radians(90), 0))
+# ═══════ Module — environmental_interface ═══════════════════════════════════
+# Heat exchanger plate pack: explicit centre x=0.7, y=+0.4, z=0.5.
+for i, y in enumerate([0.295, 0.325, 0.355, 0.385, 0.415, 0.445, 0.475, 0.505]):
+    fl.add_box(f"he7_heat_exchanger_plate_{i}", (0.70, y, 0.50), (0.50, 0.012, 0.80),
+               MAT["thermal"], "environmental_interface", MO)
+fl.add_box("he7_heat_exchanger_frame", (0.70, 0.40, 0.50), (0.56, 0.28, 0.86),
+           MAT["heatsink"], "environmental_interface", MO)
+fl.add_cyl("he7_cooling_fan", (0.70, 0.245, 0.82), 0.11, 0.035,
+           MAT["ctrl_black"], "environmental_interface", MO,
+           rotation=(math.radians(90), 0, 0))
+fl.add_torus("he7_cooling_fan_guard", (0.70, 0.225, 0.82), 0.11, 0.006,
+             MAT["stainless"], "environmental_interface", MO,
+             rotation=(math.radians(90), 0, 0))
+for i, z in enumerate([0.24, 0.36, 0.64, 0.76]):
+    fl.add_cyl(f"he7_heat_exchanger_port_{i}", (0.43, 0.40, z), 0.025, 0.10,
+               MAT["pipe_water"], "environmental_interface", MO,
+               rotation=(0, math.radians(90), 0))
+
+# Ventilation louvers on translucent roof/rear panel.
+for i, x in enumerate([0.55, 0.75, 0.95, 2.05, 2.25, 2.45]):
+    fl.add_box(f"he7_roof_vent_louver_{i}", (x, 0.22, 2.505), (0.14, 0.035, 0.010),
+               MAT["thermal"], "environmental_interface", MO)
 
 
-# ═══════ Module — control_compute_communication (PLC, IO, SCADA) ═══════════
-fl.add_box("he5_plc_controller", (2.72, -0.47, 1.40), (0.24, 0.08, 0.34), MAT["control"], "control_compute_communication", MO)
-fl.add_box("he5_remote_io_rack", (2.72, -0.47, 1.02), (0.28, 0.08, 0.25), MAT["control"], "control_compute_communication", MO)
-for i in range(5):
-    fl.add_box(f"he5_io_slice_{i}", (2.60 + i*0.06, -0.525, 1.02), (0.045, 0.035, 0.23), MAT["pcb"], "control_compute_communication", MO)
-fl.add_box("he5_scada_edge_pc", (2.72, -0.47, 0.67), (0.26, 0.08, 0.24), MAT["ctrl_black"], "control_compute_communication", MO)
-fl.add_box("he5_ethernet_switch", (2.72, -0.47, 1.78), (0.22, 0.07, 0.12), MAT["control"], "control_compute_communication", MO)
-fl.add_box("he5_cell_voltage_monitor", (1.28, -0.09, 2.14), (0.42, 0.07, 0.10), MAT["control"], "control_compute_communication", MO)
-fl.add_cyl("he5_telemetry_antenna", (2.72, -0.47, 2.08), 0.006, 0.22, MAT["antenna"], "control_compute_communication", MO)
-fl.add_box("he5_fiber_patch_panel", (2.72, -0.47, 1.92), (0.26, 0.05, 0.08), MAT["hmi"], "control_compute_communication", MO)
+# ═══════ Module — power_distribution ════════════════════════════════════════
+# AC power input and rectified DC busbars from transformer to PEM stack.
+fl.add_box("he8_ac_power_input_box", (0.18, 0.62, 0.28), (0.22, 0.10, 0.22),
+           MAT["powerdist"], "power_distribution", MO)
+for i, z in enumerate([0.32, 0.40, 0.48]):
+    fl.add_box(f"he8_ac_input_busbar_{i}", (0.34, 0.62, z), (0.34, 0.018, 0.018),
+               MAT["copper"], "power_distribution", MO)
+for i, y in enumerate([0.08, 0.17, 0.26]):
+    fl.add_box(f"he8_dc_busbar_transformer_to_stack_{i}", (0.78, y, 1.38), (0.52, 0.026, 0.026),
+               MAT["copper"], "power_distribution", MO)
+for i, z in enumerate([0.55, 0.95, 1.35, 1.75]):
+    fl.add_box(f"he8_stack_dc_vertical_bus_{i}", (0.86, 0.25, z), (0.030, 0.030, 0.30),
+               MAT["copper"], "power_distribution", MO)
+fl.add_box("he8_grounding_bar", (1.50, 0.69, 0.24), (2.40, 0.025, 0.025),
+           MAT["copper"], "power_distribution", MO)
+fl.add_box("he8_cable_tray", (1.55, 0.58, 2.05), (2.50, 0.10, 0.08),
+           MAT["powerdist"], "power_distribution", MO)
 
 
-# ═══════ Module — safety_protection (relief, venting, isolation) ═══════════
-for name, x, mat in [("h2", H2_X, MAT["h2_gas"]), ("o2", O2_X, MAT["o2_gas"])]:
-    fl.add_cyl(f"he6_{name}_prv_body", (x, SEP_Y, 1.97), 0.035, 0.08, MAT["safety"], "safety_protection", MO)
-    fl.add_cyl(f"he6_{name}_vent_riser", (x, SEP_Y+0.10, 2.25), 0.018, 0.44, mat, "safety_protection", MO)
-fl.add_cyl("he6_common_roof_vent_header", (2.06, 0.36, 2.42), 0.024, 0.92, MAT["safety"], "safety_protection", MO, rotation=(0, math.radians(90), 0))
-fl.add_box("he6_h2_flame_arrestor", (2.82, 0.36, 2.42), (0.12, 0.12, 0.10), MAT["safety"], "safety_protection", MO)
-fl.add_cyl("he6_stack_burst_disk", (0.54, -0.12, 2.00), 0.032, 0.035, MAT["safety"], "safety_protection", MO)
-fl.add_box("he6_dc_isolation_contactor", (1.65, -0.24, 1.90), (0.16, 0.12, 0.16), MAT["safety"], "safety_protection", MO)
-fl.add_cyl("he6_front_estop", (2.72, -0.765, 1.35), 0.050, 0.030, MAT["safety"], "safety_protection", MO, rotation=(math.radians(90), 0, 0))
-fl.add_box("he6_door_interlock_left", (0.62, -0.765, 1.55), (0.05, 0.025, 0.06), MAT["safety"], "safety_protection", MO)
-fl.add_box("he6_door_interlock_control", (2.50, -0.765, 1.55), (0.05, 0.025, 0.06), MAT["safety"], "safety_protection", MO)
-fl.add_box("he6_hazard_label_h2", (2.30, -0.765, 1.82), (0.18, 0.010, 0.12), MAT["warning"], "safety_protection", MO)
+# ═══════ Module — control_compute_communication ═════════════════════════════
+# Control cabinet: explicit centre x=2.7, y=+0.5, z=0.6.
+fl.add_box("he5_control_cabinet", (2.70, 0.50, 0.60), (0.50, 0.40, 1.20),
+           MAT["control"], "control_compute_communication", MO)
+fl.add_box("he5_plc_controller", (2.70, 0.285, 0.72), (0.30, 0.030, 0.28),
+           MAT["control"], "control_compute_communication", MO)
+fl.add_box("he5_safety_plc", (2.54, 0.285, 0.37), (0.12, 0.030, 0.18),
+           MAT["control"], "control_compute_communication", MO)
+fl.add_box("he5_edge_gateway", (2.86, 0.285, 0.38), (0.12, 0.030, 0.16),
+           MAT["control"], "control_compute_communication", MO)
+fl.add_box("he5_ethernet_switch", (2.70, 0.285, 0.98), (0.22, 0.030, 0.12),
+           MAT["control"], "control_compute_communication", MO)
+fl.add_cyl("he5_wireless_antenna", (2.70, 0.50, 1.34), 0.008, 0.22,
+           MAT["antenna"], "control_compute_communication", MO)
 
 
-# ═══════ Module — sensing_instrumentation (pressure, flow, gas analysis) ═══
-for i, x in enumerate([H2_X, O2_X]):
-    fl.add_cyl(f"he7_pressure_transmitter_{i}", (x-0.18, SEP_Y, 1.58), 0.030, 0.055, MAT["sensor"], "sensing_instrumentation", MO, rotation=(0, math.radians(90), 0))
-    fl.add_cyl(f"he7_level_transmitter_{i}", (x+0.19, SEP_Y, 0.90), 0.022, 0.050, MAT["sensor"], "sensing_instrumentation", MO, rotation=(0, math.radians(90), 0))
-fl.add_box("he7_h2_gas_analyser", (2.40, -0.10, 1.70), (0.28, 0.18, 0.22), MAT["sensor"], "sensing_instrumentation", MO)
-fl.add_box("he7_o2_in_h2_monitor", (2.70, -0.10, 1.70), (0.22, 0.16, 0.18), MAT["sensor"], "sensing_instrumentation", MO)
-fl.add_cyl("he7_stack_temp_probe_top", (0.45, -0.12, 1.70), 0.012, 0.24, MAT["sensor"], "sensing_instrumentation", MO, rotation=(0, math.radians(90), 0))
-fl.add_cyl("he7_stack_temp_probe_bottom", (0.45, -0.12, 0.70), 0.012, 0.24, MAT["sensor"], "sensing_instrumentation", MO, rotation=(0, math.radians(90), 0))
-fl.add_box("he7_water_conductivity_sensor", (0.42, 0.58, 0.62), (0.09, 0.06, 0.07), MAT["sensor"], "sensing_instrumentation", MO)
-fl.add_box("he7_flowmeter_water", (0.96, 0.58, 0.62), (0.09, 0.06, 0.14), MAT["sensor"], "sensing_instrumentation", MO)
-fl.add_box("he7_flowmeter_h2_output", (2.70, 0.58, 0.90), (0.08, 0.06, 0.16), MAT["sensor"], "sensing_instrumentation", MO)
-for i, loc in enumerate([(0.22, 0.67, 2.10), (1.40, 0.67, 2.10), (2.55, 0.67, 2.10)]):
-    fl.add_cyl(f"he7_h2_leak_detector_{i}", loc, 0.035, 0.025, MAT["sensor"], "sensing_instrumentation", MO)
+# ═══════ Module — safety_protection ═════════════════════════════════════════
+# PRVs, H2 leak detection, flame arrestor, purge and emergency stop.
+for name, y in [("h2", -0.40), ("o2", 0.40)]:
+    fl.add_cyl(f"he6_{name}_separator_prv", (2.00, y, 1.67), 0.035, 0.12,
+               MAT["warning_red"], "safety_protection", MO)
+fl.add_cyl("he6_stack_prv", (1.20, -0.26, 1.95), 0.030, 0.10,
+           MAT["warning_red"], "safety_protection", MO)
+fl.add_cyl("he6_buffer_tank_prv", (3.20, 0.0, 1.62), 0.035, 0.10,
+           MAT["warning_red"], "safety_protection", MO)
+for i, (x, y) in enumerate([(1.40, -0.62), (2.35, -0.62), (2.55, 0.62)]):
+    fl.add_box(f"he6_h2_leak_sensor_{i}", (x, y, 2.14), (0.08, 0.035, 0.05),
+               MAT["warning_red"], "safety_protection", MO)
+fl.add_cyl("he6_estop_mushroom", (2.70, 0.278, 1.08), 0.045, 0.030,
+           MAT["safety"], "safety_protection", MO,
+           rotation=(math.radians(90), 0, 0))
+fl.add_cyl("he6_estop_yellow_collar", (2.70, 0.292, 1.08), 0.060, 0.014,
+           MAT["control"], "safety_protection", MO,
+           rotation=(math.radians(90), 0, 0))
+fl.add_box("he6_blast_relief_panel_label", (1.55, 0.718, 1.72), (0.34, 0.010, 0.18),
+           MAT["warning_red"], "safety_protection", MO)
+fl.add_cyl("he6_flame_arrestor", (2.72, 0.0, 1.23), 0.040, 0.12,
+           MAT["warning_red"], "safety_protection", MO,
+           rotation=(0, math.radians(90), 0))
 
 
-# ═══════ Module — maintenance_serviceability (access, drains, lifting) ═════
-for x in [0.55, 1.45, 2.35]:
-    fl.add_torus(f"he8_lifting_eye_{x:.2f}", (x, -0.58, H-0.03), 0.055, 0.010, MAT["maint"], "maintenance_serviceability", MO, rotation=(math.radians(90), 0, 0))
-fl.add_box("he8_stack_slide_rail_left", (0.86, -0.40, 0.22), (0.80, 0.035, 0.050), MAT["maint"], "maintenance_serviceability", MO)
-fl.add_box("he8_stack_slide_rail_right", (0.86, 0.16, 0.22), (0.80, 0.035, 0.050), MAT["maint"], "maintenance_serviceability", MO)
-fl.add_cyl("he8_water_drain_port", (0.42, 0.73, 0.23), 0.025, 0.055, MAT["maint"], "maintenance_serviceability", MO, rotation=(math.radians(90), 0, 0))
-fl.add_cyl("he8_separator_blowdown_h2", (H2_X, 0.48, 0.24), 0.020, 0.18, MAT["maint"], "maintenance_serviceability", MO, rotation=(math.radians(90), 0, 0))
-fl.add_cyl("he8_separator_blowdown_o2", (O2_X, 0.48, 0.24), 0.020, 0.18, MAT["maint"], "maintenance_serviceability", MO, rotation=(math.radians(90), 0, 0))
-fl.add_box("he8_filter_cartridge_access", (0.45, 0.72, 1.15), (0.22, 0.025, 0.32), MAT["maint"], "maintenance_serviceability", MO)
-fl.add_box("he8_calibration_port_panel", (2.48, -0.73, 1.08), (0.28, 0.020, 0.18), MAT["maint"], "maintenance_serviceability", MO)
-for i in range(4):
-    fl.add_cyl(f"he8_quick_connect_{i}", (2.38 + i*0.08, -0.76, 0.82), 0.018, 0.030, MAT["maint"], "maintenance_serviceability", MO, rotation=(math.radians(90), 0, 0))
+# ═══════ Module — sensing_instrumentation ═══════════════════════════════════
+# Pressure gauges on separators, stack differential pressure, flow and quality sensors.
+for i, (name, y) in enumerate([("h2", -0.40), ("o2", 0.40)]):
+    fl.add_cyl(f"he4_{name}_pressure_gauge", (1.84, y, 1.20), 0.045, 0.025,
+               MAT["sensor"], "sensing_instrumentation", MO,
+               rotation=(0, math.radians(90), 0))
+    fl.add_box(f"he4_{name}_flow_meter", (1.62, y, 1.38), (0.08, 0.07, 0.12),
+               MAT["sensor"], "sensing_instrumentation", MO)
+fl.add_box("he4_stack_dp_transmitter", (1.55, -0.25, 1.62), (0.08, 0.05, 0.10),
+           MAT["sensor"], "sensing_instrumentation", MO)
+fl.add_cyl("he4_stack_temperature_probe", (1.20, -0.235, 0.82), 0.012, 0.16,
+           MAT["sensor"], "sensing_instrumentation", MO,
+           rotation=(math.radians(90), 0, 0))
+fl.add_cyl("he4_stack_conductivity_probe", (1.20, 0.235, 0.62), 0.012, 0.16,
+           MAT["sensor"], "sensing_instrumentation", MO,
+           rotation=(math.radians(90), 0, 0))
+fl.add_box("he4_di_resistivity_monitor", (0.40, -0.34, 0.78), (0.07, 0.04, 0.10),
+           MAT["sensor"], "sensing_instrumentation", MO)
+fl.add_box("he4_cooling_water_flow_meter", (0.43, 0.24, 0.62), (0.08, 0.05, 0.10),
+           MAT["sensor"], "sensing_instrumentation", MO)
+fl.add_box("he4_dryer_dewpoint_sensor", (2.50, -0.12, 1.05), (0.06, 0.04, 0.08),
+           MAT["sensor"], "sensing_instrumentation", MO)
+for i, z in enumerate([0.35, 0.90, 1.35]):
+    fl.add_box(f"he4_separator_level_sensor_{i}", (2.16, -0.40, z), (0.05, 0.04, 0.08),
+               MAT["sensor"], "sensing_instrumentation", MO)
 
 
-# ═══════ Module — hmi_ergonomics (operator interface) ══════════════════════
-fl.add_box("he9_hmi_bezel", (2.72, -0.785, 1.63), (0.34, 0.018, 0.26), MAT["enclosure"], "hmi_ergonomics", MO)
-fl.add_box("he9_hmi_touchscreen", (2.72, -0.798, 1.63), (0.29, 0.006, 0.20), MAT["hmi"], "hmi_ergonomics", MO)
-for i, c in enumerate([MAT["sensor"], MAT["control"], MAT["safety"], MAT["warning"]]):
-    fl.add_cyl(f"he9_operator_pushbutton_{i}", (2.59 + i*0.085, -0.795, 1.42), 0.018, 0.014, c, "hmi_ergonomics", MO, rotation=(math.radians(90), 0, 0))
-fl.add_box("he9_status_label_strip", (2.72, -0.795, 1.28), (0.34, 0.006, 0.06), MAT["ctrl_black"], "hmi_ergonomics", MO)
-for i, c in enumerate([MAT["safety"], MAT["warning"], MAT["sensor"]]):
-    fl.add_cyl(f"he9_stacklight_segment_{i}", (2.88, -0.42, 2.08 + i*0.055), 0.035, 0.045, c, "hmi_ergonomics", MO)
-fl.add_cyl("he9_stacklight_base", (2.88, -0.42, 2.03), 0.040, 0.035, MAT["powerdist"], "hmi_ergonomics", MO)
-for z in [0.90, 1.40]:
-    fl.add_torus(f"he9_front_door_pull_{z:.1f}", (0.36, -0.785, z), 0.060, 0.010, MAT["maint"], "hmi_ergonomics", MO, rotation=(0, math.radians(90), 0))
+# ═══════ Module — actuation_kinematics ══════════════════════════════════════
+# Solenoid valves on gas, water, KOH, and purge lines.
+for i, (x, y, z, mat) in enumerate([
+    (1.58, -0.40, 1.38, MAT["pipe_h2"]),
+    (1.58, 0.40, 1.38, MAT["pipe_o2"]),
+    (2.25, -0.40, 1.28, MAT["pipe_h2"]),
+    (2.25, 0.40, 1.50, MAT["pipe_o2"]),
+    (0.80, -0.50, 0.95, MAT["pipe_water"]),
+    (0.95, -0.40, 0.72, MAT["pump_orange"]),
+]):
+    fl.add_box(f"he9_solenoid_valve_body_{i}", (x, y, z), (0.075, 0.075, 0.065),
+               MAT["valve_green"], "actuation_kinematics", MO)
+    fl.add_cyl(f"he9_solenoid_coil_{i}", (x, y, z + 0.055), 0.028, 0.055,
+               MAT["ctrl_black"], "actuation_kinematics", MO)
+fl.add_cyl("he9_pump_coupling", (0.70, -0.28, 0.30), 0.045, 0.13,
+           MAT["maint"], "actuation_kinematics", MO,
+           rotation=(math.radians(90), 0, 0))
+fl.add_box("he9_motorized_purge_damper", (2.72, 0.0, 1.35), (0.10, 0.06, 0.08),
+           MAT["valve_green"], "actuation_kinematics", MO)
 
 
-# ═══════ Module — actuation_kinematics (pumps, valves, dampers) ════════════
-fl.add_cyl("he10_circulation_pump_motor", (0.78, 0.42, 0.26), 0.090, 0.20, MAT["motor"], "actuation_kinematics", MO, rotation=(0, math.radians(90), 0))
-fl.add_cyl("he10_feed_pump_motor", (0.30, 0.38, 0.30), 0.070, 0.18, MAT["motor"], "actuation_kinematics", MO, rotation=(0, math.radians(90), 0))
-fl.add_cyl("he10_feed_pump_head", (0.43, 0.38, 0.30), 0.060, 0.08, MAT["maint"], "actuation_kinematics", MO, rotation=(0, math.radians(90), 0))
-for i, x in enumerate([1.50, 1.78, 2.06, 2.34]):
-    fl.add_cyl(f"he10_pneumatic_valve_actuator_{i}", (x, 0.60, 1.32), 0.035, 0.08, MAT["control"], "actuation_kinematics", MO)
-    fl.add_box(f"he10_valve_stem_{i}", (x, 0.60, 1.24), (0.018, 0.018, 0.12), MAT["stainless"], "actuation_kinematics", MO)
-fl.add_cyl("he10_cooling_loop_modulating_valve", (1.18, 0.64, 0.82), 0.042, 0.075, MAT["control"], "actuation_kinematics", MO)
-fl.add_box("he10_vent_damper_actuator", (2.42, 0.73, 2.08), (0.12, 0.05, 0.09), MAT["control"], "actuation_kinematics", MO)
-for z in [0.75, 1.35, 1.95]:
-    fl.add_cyl(f"he10_service_door_hinge_{z:.2f}", (0.08, -0.765, z), 0.018, 0.080, MAT["maint"], "actuation_kinematics", MO)
+# ═══════ Module — maintenance_serviceability ════════════════════════════════
+# Service access ladder on -Y walkway and maintenance valves/drains.
+for x in [0.14, 0.26]:
+    fl.add_cyl(f"he10_ladder_side_rail_{x:.2f}", (x, -0.705, 1.12), 0.012, 1.72,
+               MAT["maint"], "maintenance_serviceability", MO)
+for i, z in enumerate([0.34, 0.54, 0.74, 0.94, 1.14, 1.34, 1.54, 1.74]):
+    fl.add_cyl(f"he10_ladder_rung_{i}", (0.20, -0.705, z), 0.010, 0.16,
+               MAT["maint"], "maintenance_serviceability", MO,
+               rotation=(0, math.radians(90), 0))
+fl.add_box("he10_stack_service_access_panel", (1.20, -0.236, 1.10), (0.42, 0.018, 0.62),
+           MAT["maint"], "maintenance_serviceability", MO)
+for i, (x, y, z) in enumerate([(2.00, -0.40, 0.15), (2.00, 0.40, 0.15), (2.50, 0.0, 0.13),
+                               (0.40, -0.50, 0.15), (0.70, -0.40, 0.16)]):
+    fl.add_cyl(f"he10_manual_drain_valve_{i}", (x, y - 0.13, z), 0.025, 0.055,
+               MAT["maint"], "maintenance_serviceability", MO,
+               rotation=(math.radians(90), 0, 0))
+for i, x in enumerate([1.00, 1.20, 1.40]):
+    fl.add_cyl(f"he10_stack_lifting_eye_{i}", (x, 0.0, 1.96), 0.045, 0.010,
+               MAT["maint"], "maintenance_serviceability", MO)
+fl.add_box("he10_spare_filter_cartridge", (0.26, -0.22, 0.28), (0.14, 0.14, 0.32),
+           MAT["white_label"], "maintenance_serviceability", MO)
+fl.add_box("he10_tool_tray", (2.28, -0.58, 0.34), (0.42, 0.16, 0.06),
+           MAT["maint"], "maintenance_serviceability", MO)
 
 
-# ═══════ Module — environmental_interface (cooling, ventilation, isolation) ═
-fl.add_box("he11_side_louver_bank", (2.35, 0.775, 1.25), (0.70, 0.020, 0.90), MAT["thermal"], "environmental_interface", MO)
-for i in range(7):
-    fl.add_box(f"he11_louver_slat_{i}", (2.35, 0.795, 0.88 + i*0.12), (0.72, 0.018, 0.025), MAT["heatsink"], "environmental_interface", MO, rotation=(math.radians(8), 0, 0))
-fl.add_cyl("he11_roof_exhaust_fan", (2.35, 0.20, 2.50), 0.18, 0.08, MAT["thermal"], "environmental_interface", MO)
-fl.add_torus("he11_fan_guard_ring", (2.35, 0.20, 2.55), 0.18, 0.010, MAT["ctrl_black"], "environmental_interface", MO)
-for i in range(4):
-    fl.add_box(f"he11_fan_guard_spoke_{i}", (2.35, 0.20, 2.555), (0.34, 0.012, 0.010), MAT["ctrl_black"], "environmental_interface", MO, rotation=(0, 0, math.radians(i*45)))
-fl.add_box("he11_cooling_water_inlet_panel", (1.20, 0.775, 0.32), (0.30, 0.020, 0.18), MAT["fluid_water"], "environmental_interface", MO)
-fl.add_box("he11_cooling_water_outlet_panel", (1.58, 0.775, 0.32), (0.30, 0.020, 0.18), MAT["thermal"], "environmental_interface", MO)
-for x, y in [(0.18, -0.58), (1.00, -0.58), (2.00, -0.58), (2.82, -0.58), (0.18, 0.58), (1.00, 0.58), (2.00, 0.58), (2.82, 0.58)]:
-    fl.add_cyl(f"he11_vibration_mount_{x:.2f}_{y:.2f}", (x, y, -0.01), 0.045, 0.030, MAT["ctrl_black"], "environmental_interface", MO)
-fl.add_box("he11_condensate_tray", (1.55, 0.62, 0.13), (1.20, 0.18, 0.045), MAT["thermal"], "environmental_interface", MO)
+# ═══════ Module — hmi_ergonomics ════════════════════════════════════════════
+# HMI screen on control-cabinet front, plus buttons and status beacon.
+fl.add_box("he3_hmi_bezel", (2.70, 0.292, 0.86), (0.30, 0.018, 0.22),
+           MAT["enclosure"], "hmi_ergonomics", MO)
+fl.add_box("he3_hmi_screen", (2.70, 0.280, 0.86), (0.25, 0.006, 0.16),
+           MAT["hmi"], "hmi_ergonomics", MO)
+for i, (x, mat) in enumerate([(2.60, MAT["sensor"]), (2.70, MAT["control"]), (2.80, MAT["safety"])]):
+    fl.add_cyl(f"he3_operator_button_{i}", (x, 0.278, 0.66), 0.018, 0.014,
+               mat, "hmi_ergonomics", MO,
+               rotation=(math.radians(90), 0, 0))
+for i, mat in enumerate([MAT["safety"], MAT["control"], MAT["sensor"]]):
+    fl.add_cyl(f"he3_status_beacon_{i}", (2.70, 0.50, 1.26 + i * 0.055), 0.032, 0.045,
+               mat, "hmi_ergonomics", MO)
+fl.add_cyl("he3_beacon_base", (2.70, 0.50, 1.215), 0.038, 0.025,
+           MAT["powerdist"], "hmi_ergonomics", MO)
+fl.add_box("he3_front_instruction_placard", (2.49, 0.280, 0.20), (0.16, 0.006, 0.08),
+           MAT["white_label"], "hmi_ergonomics", MO)
 
-fl.add_lights(target_centre=(W/2, 0, H/2), fill_energy=200, fill_size=10)
-fl.make_world_white()
-fl.run_render_pipeline(OUT, MO, structure_module_id="structure_containment")
+fl.add_lights(target_centre=(W/2,0,H/2),fill_energy=200,fill_size=10); fl.make_world_white(); fl.run_render_pipeline(OUT, MO, structure_module_id="structure_containment")

@@ -228,6 +228,16 @@ ${digest}
 
 16. COMPONENTS SHOULD FILL THEIR MODULE BBOXES — chunky volumes, not tiny dots in empty cabinets. Battery racks = rectangular volumes occupying most of their cell. Tanks = proper cylinders. The viewer should read "this module IS this coloured thing", not "tiny coloured sensor floating in space".
 
+## V3 FAILURE-MODE PREVENTION (2026-05-24 — derived from 18-template bootstrap retrospective)
+
+17. COMPONENTS MUST BE PACKED INSIDE THE ENVELOPE. Every fl.add_box / add_cyl primitive's centre coordinate MUST lie within the envelope bounds (0 ≤ x ≤ W, -D/2 ≤ y ≤ D/2, 0 ≤ z ≤ H) UNLESS the component is explicitly external (e.g. chiller skid for BESS-utility-scale, payload-bay extension for HAPS). "Exploded view" with components scattered outside the envelope is the wrong aesthetic — readers can't tell what the unit looks like assembled. Pack tightly inside the cabinet.
+
+18. structure_containment IS THE OUTER SHELL ONLY. Tag as structure_containment: cabinet walls, skid base, frame posts, top lid, doors. NEVER tag as structure_containment: any vividly-coloured internal component (compressor, vessel, PCB, battery, etc.). The hero render pass replaces all structure_containment objects' materials with a translucent ghost — internal components tagged as structure_containment will appear ghosted instead of vivid in the hero shot, killing the engineering readability.
+
+19. EVERY MAT["..."] KEY MUST BE DEFINED BEFORE USE. Walk your script before emitting it: every MAT["xyz"] reference in an fl.add_box / add_cyl call MUST appear in the MAT initialisation block (MAT["xyz"] = fl.make_mat(...)) before that call. Undefined keys produce KeyError at render time and zero PNGs. Common mistake: referencing MAT["adhesive"] / MAT["chiller"] / MAT["sealant"] without defining them — define ALL custom keys in the MAT block at top.
+
+20. TALL/NARROW ENVELOPES (one dim >5× others, e.g. wind-turbine 5×5×25). The default camera fits the bounding box, so a 25 m tower with nacelle-only-at-top renders as a thin line with a dot. To avoid empty-frame syndrome: emit primitives ALONG THE FULL LENGTH of the long axis (tower segments every 2 m with reinforcement rings, ladder rails, climb safety lines, lightning conductor, transition piece flange, aviation lights). Each long-axis primitive adds vertical anchor points the eye can track. Same applies to long-axis containers — emit racks/components along the full length, not clustered at one end.
+
 Generate the complete Python file now.`
 }
 
