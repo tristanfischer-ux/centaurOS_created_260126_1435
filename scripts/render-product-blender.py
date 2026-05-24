@@ -907,44 +907,27 @@ def place_camera(env_w: float, env_d: float, env_h: float,
     Cover / envelope shot: orbital camera centred on origin, framed to
     fit the whole envelope. radius derived from envelope diagonal.
 
-    Per-module shot (look_at + focal_size supplied): orbital camera
-    centred on the FOCAL MODULE, radius derived from the focal box's
-    diagonal so the module fills 60-80% of the frame and the COMPONENTS
-    inside it become legible (2026-05-21 enhancement per Tristan: per-
-    module renders MUST show recognisable components at proper zoom).
+    Per-module shot (look_at + focal_size accepted but IGNORED for
+    centre/distance): envelope-centred orbit, fit=0.30 framing the FULL
+    envelope. Only AZIMUTH varies per module — distance + centre do NOT.
+    Phase8 contract (mempalace 2026-05-22 forgeos_blender_per_module
+    _quality_bar): the saturated focal module inside the full envelope
+    context IS the visual signal. Earlier focal-centred orbit
+    (focal_diag*2.2 / fit=0.45) put the focal at the frame edge when the
+    focal box sat at one end of a 12 m container; camera looked past
+    empty space and the ghost envelope dominated.
 
-    Lens 35mm and elevation 28° are preserved across both modes — only
-    radius and look-at change, so the per-module images still feel like
-    the same orbital turntable, just zoomed in on the focal module.
+    Lens 35mm and elevation 28° are preserved across both modes.
     """
-    # Camera framing strategy (2026-05-22 rev):
-    # - Cover/wide shot: full envelope fits in frame, same as phase8 cover.
-    # - Per-module shot: zoom to ~2.5× the focal module extent so components
-    #   are legible (phase8 reference quality). The envelope will be cropped
-    #   but its wireframe edges still appear at the frame boundary, giving
-    #   spatial context. This is better than full-envelope (focal too small)
-    #   and better than the old tight zoom (lost all container context).
-    #   look_at + focal_size override the default cover framing.
+    diag = math.sqrt(env_w * env_w + env_d * env_d + env_h * env_h)
+    target_extent = diag / 2.0
     if look_at is not None and focal_size is not None:
-        # Per-module zoom: orbit around focal module centre, distance sized
-        # so focal fills ~40% of frame (leaving room to see neighbouring
-        # modules and container edges for context).
-        fdim = max(focal_size)
-        envelope_diag = math.sqrt(env_w**2 + env_d**2 + env_h**2)
-        # Blend: zoom close enough to see components, far enough to show context.
-        # 0.40 puts the focal at ~40% of frame; 2.5 × focal diag gives context.
-        focal_diag = math.sqrt(sum(s*s for s in focal_size))
-        # Zoom in: focal module fills ~40% of frame, neighbours visible.
-        # focal_diag * 2.2 → enough context to see adjacent sibling modules.
-        # envelope_diag * 0.22 as minimum prevents excessive zoom on tiny modules.
-        target_extent = max(focal_diag * 2.2, envelope_diag * 0.22)
-        fit = 0.45
-        centre = look_at
+        fit = 0.30
+    elif wide:
+        fit = 0.26
     else:
-        diag = math.sqrt(env_w * env_w + env_d * env_d + env_h * env_h)
-        target_extent = diag / 2.0
-        fit = 0.26 if wide else 0.50
-        centre = (0.0, 0.0, 0.0)
+        fit = 0.50
+    centre = (0.0, 0.0, 0.0)
     elevation_angle = math.radians(28.0)  # consistent ¾ view, cover + module
     distance = target_extent / fit
     az = math.radians(azimuth_deg)

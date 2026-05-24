@@ -228,13 +228,25 @@ export function runBlenderModulePass(opts: {
 }
 
 /**
- * Pick a per-module orbital azimuth. Same convention as the validated
- * Blender turntable pipeline: cover at -35°, modules start at +20°
- * and stride evenly around the orbital sphere.
+ * Pick a per-module orbital azimuth. Phase8 contract (mempalace
+ * forgeos_blender_per_module_quality_bar 2026-05-22 + bess-camera-orbit
+ * 2026-05-17): avoid end-on cones around 0°/180° which compress a long
+ * container into a thin sliver. Distribute modules across TWO safe
+ * arcs (30°-150° and 210°-330°), alternating by index parity so even
+ * indices land on +Y side, odd on -Y. Cover stays at -35°.
+ *
+ * For N=10: 30°, 210°, 60°, 240°, 90°, 270°, 120°, 300°, 150°, 330°.
+ * For N=12 (BESS L9): 30°, 210°, 50°, 230°, 70°, 250°, 90°, 270°,
+ * 110°, 290°, 130°, 310°, 150°, 330° (stride 20° per arc).
  */
 export function moduleAzimuth(moduleIndex: number, totalModules: number): number {
   if (totalModules <= 0) return 0
-  return (20 + (360 / totalModules) * moduleIndex) % 360
+  const inArc1 = moduleIndex % 2 === 0
+  const indexInArc = Math.floor(moduleIndex / 2)
+  const countInArc = Math.ceil((totalModules - (inArc1 ? 0 : 1)) / 2)
+  const stride = countInArc > 1 ? 120 / (countInArc - 1) : 0
+  const arcStart = inArc1 ? 30 : 210
+  return arcStart + indexInArc * stride
 }
 
 // ---------------------------------------------------------------------------
