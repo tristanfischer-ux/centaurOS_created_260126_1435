@@ -103,6 +103,22 @@ def main() -> int:
     # (written by generate-blender-scene.tsx). Falls back to the unmodified
     # class template if not present.
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Skip if outputs already exist (e.g. produced by phase 5 background
+    # runner before hero/modules stages fire). Avoids redundant ~10 min
+    # Blender runs for identical output.
+    existing_hero = out_dir / "00-hero.png"
+    existing_cover = out_dir / "blender-cover.png"
+    existing_modules = list(out_dir.glob("module-*.png"))
+    if existing_hero.exists() and existing_cover.exists() and existing_modules:
+        print(
+            f"[render-scene] outputs already present "
+            f"({len(existing_modules)} modules + hero + blender-cover); "
+            f"skipping Blender re-run",
+            flush=True,
+        )
+        return 0
+
     generated = out_dir / "blender-scene.py"
     if generated.exists():
         template = generated

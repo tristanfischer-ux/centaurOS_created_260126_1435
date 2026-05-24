@@ -73,11 +73,24 @@ function trySceneTemplate(
 ): Record<string, string> | null {
   const runner = resolve(__dirname, 'render-blender-scene.py')
   if (!existsSync(runner)) return null
+  // Skip the Blender re-run if all expected module images already exist.
+  // The phase 5 background runner OR the hero stage may have already
+  // produced these — re-running would burn ~10 min of Blender time for
+  // identical output.
+  const allExist = moduleIds.length > 0 && moduleIds.every((id) =>
+    existsSync(resolve(outDir, `module-${id}.png`)),
+  )
+  if (allExist) {
+    console.log(`[modules] all ${moduleIds.length} module images already on disk; skipping template render`)
+    const found: Record<string, string> = {}
+    for (const id of moduleIds) found[id] = resolve(outDir, `module-${id}.png`)
+    return found
+  }
   try {
     execFileSync(
       'python3',
       [runner, '--state', statePath, '--out-dir', outDir],
-      { stdio: 'inherit', timeout: 300_000 },
+      { stdio: 'inherit', timeout: 900_000 },
     )
   } catch (err: any) {
     const code = typeof err?.status === 'number' ? err.status : -1
