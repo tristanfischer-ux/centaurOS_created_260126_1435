@@ -180,13 +180,13 @@ describe('F8: Per-judge score breakdown (council-scorer)', () => {
     const state = makeState()
     await runCouncilScoring(state)
 
-    // B2 fix (2026-05-08): MiMo replaced by GPT-5.4 in council-scorer judges.
-    // D1-6 council BLOCKER fix: MiMo is a content generator, not precision extractor.
-    // The three judges should be Grok, GPT-5.4, GLM (engine-lineage excluded per SCORE-F9)
+    // B2 (2026-05-08): MiMo replaced by GPT-5.4.
+    // Iter-09 (2026-05-13): Mistral Large replaced by Gemini Flash-Lite (HTTP 400 unreliability).
+    // Current 3-judge rotation: Grok 4.3 + GPT-5.4 + Gemini 3.1 Flash-Lite (engine-lineage excluded per SCORE-F9).
     const uniqueModels = [...new Set(modelsSeen)]
     expect(uniqueModels).toContain('x-ai/grok-4.3')
     expect(uniqueModels).toContain('openai/gpt-5.4')
-    expect(uniqueModels).toContain('z-ai/glm-5.1')
+    expect(uniqueModels).toContain('google/gemini-3.1-flash-lite')
   })
 
   it('judge spread reflects individual judge scores, not just the average', async () => {

@@ -63,12 +63,12 @@ describe('quantity-derivation', () => {
       const overrides = deriveQuantities(bessSpecs, 'battery_energy_storage', parts, bomLines)
 
       expect(overrides).toHaveLength(1)
-      expect(overrides[0].rule).toBe('bess_rack_count')
-      // 4375 / 250 = 17.5 → 18 racks
-      expect(overrides[0].newQty).toBe(18)
+      expect(overrides[0].rule).toBe('bess_rack_count_voltage_aware')
+      // voltage-aware: 4896 cells × 3.2 V / 1500 V bus ≈ 9 racks (16 cells/string, 1 string/rack)
+      expect(overrides[0].newQty).toBe(9)
     })
 
-    it('derives BMS slaves = 1 per rack (18 racks → 18 slaves)', () => {
+    it('derives BMS slaves = 1 per 12 cells (4896 cells → 408 slaves)', () => {
       const parts: PartLike[] = [
         { partNumber: 'BMS-SLV-001', name: 'BMS Slave module control unit' },
       ]
@@ -77,8 +77,8 @@ describe('quantity-derivation', () => {
       const overrides = deriveQuantities(bessSpecs, 'battery_energy_storage', parts, bomLines)
 
       expect(overrides).toHaveLength(1)
-      expect(overrides[0].newQty).toBe(18)
-      expect(overrides[0].rule).toBe('bess_bms_slave_per_rack')
+      expect(overrides[0].newQty).toBe(408)
+      expect(overrides[0].rule).toBe('bess_bms_slave_per_12_cells')
     })
 
     it('derives BMS master = 1 per system (regardless of LLM guess)', () => {
