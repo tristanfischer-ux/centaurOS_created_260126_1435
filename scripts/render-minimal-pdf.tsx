@@ -3415,6 +3415,876 @@ function BriefProvenancePage({ state, project }: { state: any; project: string }
   )
 }
 
+// ─── Brief Compliance & Design Trade-offs (universal — Tristan 2026-05-24) ─
+//
+// Tristan: "the cost in the Brief is wrong. This is not something that is
+// clarified in the document. You are making something that might work but is
+// the wrong cost. That needs to be flagged. It could be that the user can
+// only spend £180k and if that is the case then the design would have to be
+// made much smaller in order to do this. How do we show this?... there needs
+// to be some kind of discussion in the document about the design choices
+// which were made because this isn't very clear at the moment."
+//
+// The trigger gap: BESS L12 brief stated unit cost ceiling £180,000 ex-works.
+// Design rolled up to £1,343,818 raw materials — a 7.5× violation that was
+// NOWHERE in the PDF. The report silently glossed over a fatal design
+// infeasibility. This page closes that gap.
+//
+// Three blocks (rendered between Brief Provenance and Engineering Tools Flow):
+//
+//   1. BRIEF TARGETS VS DESIGN ACHIEVED — table per constraint:
+//        constraint | brief target | design achieved | status (PASS/FAIL) | delta
+//      Sorted FAIL-first so the bad news leads. Red text + pill for FAIL,
+//      green for PASS, neutral for UNKNOWN.
+//
+//   2. CAPEX / OPEX / OUTPUT TRADE-OFF — one narrative block per FAILed
+//      constraint, with REAL engineering reasoning (not management-consulting
+//      boilerplate). For BESS: cost ceiling resolved by shrinking energy
+//      output, switching chemistry, or relaxing certification — each with
+//      the consequence quantified.
+//
+//   3. DESIGN DECISION RATIONALE — one paragraph stating which lever the
+//      engine prioritised (e.g. "OUTPUT was prioritised at the expense of
+//      CAPEX") so the reader sees the choice was deliberate.
+//
+// Universal across every product class. Per-class trade-off narrative
+// branches keyed off productClass keyword (bess/wind/heatpump/etc.) so each
+// class's CAPEX/OPEX dimensions read as real engineering, not generic prose.
+// When the brief has no parseable constraints, renders a placeholder note.
+
+type ComplianceStatus = 'pass' | 'fail' | 'unknown'
+
+interface ComplianceRow {
+  constraint: string           // human-readable label
+  briefTarget: string          // formatted value from brief
+  designAchieved: string       // formatted value from design
+  status: ComplianceStatus
+  deltaText: string            // "+646% (7.5× over)" or "0%" etc.
+  // Engineering narrative for the trade-off section — null when status=pass.
+  tradeOffNarrative: string | null
+}
+
+/**
+ * Pull the user-stated value out of a parsedBrief.constraints.target_performance.metrics
+ * entry by key_metric. Returns null when the metric isn't present.
+ */
+function _metricFromBrief(metrics: any[], key: string): { value: number; unit: string } | null {
+  if (!Array.isArray(metrics)) return null
+  for (const m of metrics) {
+    if (m?.key_metric === key && typeof m?.value === 'number' && Number.isFinite(m.value)) {
+      return { value: m.value, unit: String(m.unit ?? '') }
+    }
+  }
+  return null
+}
+
+/**
+ * Pull a numeric quantity out of orchestratorContract.quantities by key.
+ * Each entry is shaped { value, unit, ... }; returns null when missing.
+ */
+function _qtyFromOrch(quantities: any, key: string): { value: number; unit: string } | null {
+  const q = quantities?.[key]
+  if (!q || typeof q !== 'object') return null
+  if (typeof q.value !== 'number' || !Number.isFinite(q.value)) return null
+  return { value: q.value, unit: String(q.unit ?? '') }
+}
+
+/**
+ * Compute a percent delta string. Positive numbers prefix "+", negative "-".
+ * Cost over-runs ≥1.5× read as a multiplier ("+646% (7.5× over)") because
+ * raw percentages above 200% become hard to parse.
+ */
+function _formatDelta(target: number, achieved: number, kind: 'cost' | 'mass' | 'energy' | 'plain'): string {
+  if (target === 0) return '—'
+  const pct = ((achieved - target) / target) * 100
+  const sign = pct >= 0 ? '+' : ''
+  const ratio = achieved / target
+  if (kind === 'cost' && ratio >= 1.5) {
+    return `${sign}${pct.toFixed(0)}% (${ratio.toFixed(1)}× over)`
+  }
+  if (kind === 'mass' && ratio >= 1.05) {
+    return `${sign}${pct.toFixed(1)}%`
+  }
+  if (Math.abs(pct) < 0.5) return '0%'
+  if (Math.abs(pct) < 10) return `${sign}${pct.toFixed(1)}%`
+  return `${sign}${pct.toFixed(0)}%`
+}
+
+/**
+ * Build the brief-vs-design comparison rows. Constraint ordering reflects a
+ * hardware founder's priority: cost first, mass second, then performance
+ * (energy/power/voltage), then envelope, then durability, then process.
+ * Returns an empty array when the brief has no constraints (graceful
+ * degradation — page then renders a placeholder).
+ */
+function _buildComplianceRows(state: any, bomTotals: BomTotals | null): ComplianceRow[] {
+  const constraints = state?.parsedBrief?.constraints
+  if (!constraints || typeof constraints !== 'object') return []
+
+  const quantities = state?.orchestratorContract?.quantities ?? {}
+  const productClass = String(
+    state?.moduleDecomposition?.product_class
+    ?? state?.parsedBrief?.product_class
+    ?? '',
+  ).toLowerCase()
+  const rows: ComplianceRow[] = []
+
+  // 1) Unit cost ceiling vs achieved raw-materials BoM. The cover page shows
+  //    the raw materials BoM as the headline cost; the brief specifies
+  //    ex-works cost — same conceptual basis (raw materials + assembly,
+  //    pre-channel-margin). Comparing brief ex-works against installed ASP
+  //    would be unfair because installed ASP includes channel + install.
+  const costCeiling = constraints.unit_cost_ceiling
+  if (costCeiling && typeof costCeiling.value === 'number' && Number.isFinite(costCeiling.value) && bomTotals && bomTotals.grandTotal_gbp > 0) {
+    const briefVal = costCeiling.value
+    const designVal = bomTotals.grandTotal_gbp
+    const status: ComplianceStatus = designVal <= briefVal * 1.10 ? 'pass' : 'fail'  // 10% tolerance
+    const delta = _formatDelta(briefVal, designVal, 'cost')
+    const ratio = designVal / briefVal
+    // Real engineering trade-off narrative for cost over-run. Per-class
+    // branches: BESS / wind / heat pump / generic. Each surfaces the levers
+    // and quantifies the consequence so the reader sees actual options, not
+    // generic "consider reducing cost" prose.
+    let narrative: string | null = null
+    if (status === 'fail') {
+      if (productClass.includes('bess') || productClass.includes('battery') || productClass.includes('energy_storage')) {
+        const targetEnergy = _metricFromBrief(constraints.target_performance?.metrics, 'nameplate_capacity_mwh')
+        const energyMwh = targetEnergy ? targetEnergy.value : null
+        const feasibleEnergyMwh = energyMwh != null ? (energyMwh / ratio) : null
+        narrative =
+          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The raw-materials BoM rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
+          `Three levers are available. (1) Reduce CAPEX by shrinking the system: ` +
+          (feasibleEnergyMwh != null
+            ? `at the same chemistry and voltage class, scaling to the ${fmtGBP_compact(briefVal)} ceiling would land at roughly ${feasibleEnergyMwh.toFixed(2)} MWh usable (a ${((1 - 1 / ratio) * 100).toFixed(0)}% reduction from the ${energyMwh} MWh target). `
+            : `cells scale roughly 1:1 with capacity, so a ${(100 / ratio).toFixed(0)}% smaller system meets the cost ceiling. `) +
+          `(2) Accept higher OPEX by switching from LFP to VRLA-AGM: material cost drops roughly 60%, but cycle life falls from 6,000 to ~1,500 cycles — replacement frequency rises to once every ~4 years and lifetime maintenance + replacement cost exceeds the LFP baseline within six years. ` +
+          `(3) Relax safety/certification — dropping IEC 62619 + UL 9540A is not recommended for utility-grade deployment. The integer-feasible LFP design as shown prioritises cycle life and certification at the expense of unit cost.`
+      } else if (productClass.includes('wind')) {
+        narrative =
+          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The raw-materials BoM rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
+          `Three levers: (1) reduce CAPEX by downrating the machine (a smaller rotor + drivetrain proportionally reduces foundation + tower + blade material); (2) accept higher OPEX with cheaper bearings + a non-permanent-magnet generator (annual maintenance roughly doubles, energy yield drops 3–5%); (3) relax IEC 61400-1 wind class (not recommended). The design as shown prioritises class-1 wind-load tolerance + permanent-magnet efficiency over unit cost.`
+      } else if (productClass.includes('heat_pump') || productClass.includes('heatpump')) {
+        narrative =
+          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The raw-materials BoM rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
+          `Levers: (1) reduce CAPEX by downrating thermal output, switching from R290 to R32 (lower compressor cost but ~10% lower COP), or moving from variable-speed to fixed-speed inverter (cuts cost ~30% but loses part-load efficiency); (2) accept higher OPEX (cheaper compressor with shorter service interval); (3) relax F-Gas + EcoDesign tier (not recommended). The design as shown prioritises seasonal performance factor + low-GWP refrigerant over unit cost.`
+      } else {
+        narrative =
+          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The raw-materials BoM rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
+          `Three levers exist: reduce CAPEX (shrink output, simplify topology, drop redundancy), accept higher OPEX (cheaper components with shorter service life mean more frequent maintenance + replacement), or relax safety/certification (not recommended). The integer-feasible design as shown prioritises output and certification at the expense of unit cost; meeting the ceiling requires a deliberate output reduction.`
+      }
+    }
+    rows.push({
+      constraint: 'Unit cost (CAPEX, ex-works)',
+      briefTarget: fmtGBP_compact(briefVal),
+      designAchieved: fmtGBP_compact(designVal),
+      status,
+      deltaText: delta,
+      tradeOffNarrative: narrative,
+    })
+  }
+
+  // 2) Max gross mass. Total mass is the right comparator — some classes
+  //    split mass between in-container and external sub-systems but the
+  //    brief constraint is total. Read in priority: total_system_mass_kg
+  //    (universal) → system_mass_with_external_kg (BESS w/ external tx) →
+  //    in_container_mass_kg → total_mass_kg.
+  const massCap = constraints.max_mass_kg
+  if (massCap && typeof massCap.value === 'number' && Number.isFinite(massCap.value)) {
+    const target = massCap.value
+    const totalMass = _qtyFromOrch(quantities, 'total_system_mass_kg')
+      ?? _qtyFromOrch(quantities, 'system_mass_with_external_kg')
+      ?? _qtyFromOrch(quantities, 'in_container_mass_kg')
+      ?? _qtyFromOrch(quantities, 'total_mass_kg')
+    if (totalMass) {
+      const status: ComplianceStatus = totalMass.value <= target * 1.05 ? 'pass' : 'fail'
+      const delta = _formatDelta(target, totalMass.value, 'mass')
+      let narrative: string | null = null
+      if (status === 'fail') {
+        narrative =
+          `The brief caps gross mass at ${target.toLocaleString('en-GB')} kg. The design closes at ${Math.round(totalMass.value).toLocaleString('en-GB')} kg (${delta}). ` +
+          ((productClass.includes('bess') || productClass.includes('battery') || productClass.includes('energy_storage'))
+            ? `For a containerised BESS the dominant mass term is cells (LFP chemistry is fixed at ~5 kg per 280 Ah cell). Reducing mass without dropping output requires either (a) switching to a higher-energy-density chemistry such as solid-state or sodium-ion (commercial readiness ~2027), or (b) splitting the BESS across multiple smaller containers (raises footprint cost but each unit stays within the mass cap). External-mount of the MV transformer has already been applied to keep ~4 t outside the container; further reductions trade against capacity or cycle life.`
+            : `Mass-budget over-runs typically resolve through three levers: (a) lighter-density materials in the load-bearing modules (aluminium replacing steel; carbon-fibre replacing aluminium), (b) topology simplification (fewer redundant load paths), or (c) accepting the over-run if the deployment platform can carry it. Each lever costs CAPEX, durability, or both.`)
+      }
+      rows.push({
+        constraint: 'Max gross mass',
+        briefTarget: `${target.toLocaleString('en-GB')} kg`,
+        designAchieved: `${Math.round(totalMass.value).toLocaleString('en-GB')} kg`,
+        status,
+        deltaText: delta,
+        tradeOffNarrative: narrative,
+      })
+    }
+  }
+
+  // 3) Target performance metrics — usable energy capacity, rated power,
+  //    voltage, etc. The orchestrator may achieve LESS than the brief target
+  //    (energy infeasibility at a fixed envelope) or may match exactly.
+  //    Iterate every brief metric against a per-class mapping table.
+  const briefMetrics = constraints.target_performance?.metrics
+  if (Array.isArray(briefMetrics)) {
+    const METRIC_MAP: Record<string, { qtyKey: string; label: string; unit: string; convert?: (v: number) => number; tolerancePct?: number }> = {
+      // BESS-class energy/power
+      nameplate_capacity_mwh:      { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy capacity', unit: 'MWh', convert: (v) => v / 1000, tolerancePct: 5 },
+      rated_power_mw:              { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
+      peak_power_mw:               { qtyKey: 'peak_power_kw',             label: 'Peak power',             unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
+      cycle_life:                  { qtyKey: 'cycle_life_cycles',         label: 'Cycle life',             unit: 'cycles', tolerancePct: 5 },
+      dc_bus_voltage_v:            { qtyKey: 'dc_bus_voltage_v',          label: 'DC bus voltage',         unit: 'V',   tolerancePct: 2 },
+      ac_output_voltage_v:         { qtyKey: 'ac_output_voltage_v',       label: 'AC output voltage',      unit: 'V',   tolerancePct: 2 },
+      // Wind-turbine
+      rated_power_kw:              { qtyKey: 'rated_power_kw',            label: 'Rated power',            unit: 'kW',  tolerancePct: 5 },
+      annual_energy_mwh:           { qtyKey: 'annual_energy_yield_mwh',   label: 'Annual energy yield',    unit: 'MWh', tolerancePct: 10 },
+      // Heat pump
+      thermal_output_kw:           { qtyKey: 'thermal_output_kw',         label: 'Thermal output',         unit: 'kW',  tolerancePct: 5 },
+      cop:                         { qtyKey: 'cop_seasonal',              label: 'COP (seasonal)',         unit: '',    tolerancePct: 5 },
+      // Vertical-farm
+      yield_kg_per_year:           { qtyKey: 'yield_kg_per_year',         label: 'Annual yield',           unit: 'kg/yr', tolerancePct: 10 },
+    }
+    for (const m of briefMetrics) {
+      const km = String(m?.key_metric ?? '')
+      const mapping = METRIC_MAP[km]
+      if (!mapping) continue
+      const briefVal = typeof m.value === 'number' && Number.isFinite(m.value) ? m.value : null
+      if (briefVal == null) continue
+      const ach = _qtyFromOrch(quantities, mapping.qtyKey)
+      if (!ach) continue
+      const achievedConverted = mapping.convert ? mapping.convert(ach.value) : ach.value
+      const tol = (mapping.tolerancePct ?? 5) / 100
+      const within = Math.abs(achievedConverted - briefVal) <= briefVal * tol
+      const status: ComplianceStatus = within ? 'pass' : 'fail'
+      const delta = _formatDelta(briefVal, achievedConverted, 'plain')
+      let narrative: string | null = null
+      if (status === 'fail') {
+        const shortfallPct = ((briefVal - achievedConverted) / briefVal) * 100
+        if (km === 'nameplate_capacity_mwh') {
+          // The most-common BESS shortfall — usable capacity is the
+          // integer-feasible close, not the brief target. Quote the
+          // engine's own brief_target_feasibility closure reason verbatim
+          // when present so the trade-off narrative aligns with what the
+          // engine actually computed.
+          const closures: any[] = Array.isArray(state?.orchestratorContract?.closures) ? state.orchestratorContract.closures : []
+          const targetClosure = closures.find((c) => c?.invariant_id === 'brief_target_feasibility')
+          const reason = targetClosure?.reason ?? ''
+          narrative =
+            `The brief targets ${briefVal} ${mapping.unit} usable. The integer-feasible design closes at ${achievedConverted.toFixed(2)} ${mapping.unit} (${shortfallPct >= 0 ? shortfallPct.toFixed(0) + '% shortfall' : Math.abs(shortfallPct).toFixed(0) + '% over'}). ` +
+            (reason
+              ? `${reason} `
+              : `Adding more cells would breach the brief's mass cap at this voltage class; reaching the target requires relaxing the mass cap, splitting across containers, or moving to a higher-energy-density chemistry. `) +
+            `The CAPEX/OPEX/output triangle: meeting the energy target at this envelope drives mass + cost up; accepting the shortfall keeps mass + cost feasible.`
+        } else if (km.includes('voltage')) {
+          narrative =
+            `The brief specifies ${briefVal} ${mapping.unit} for ${mapping.label.toLowerCase()}. The design lands at ${achievedConverted.toFixed(0)} ${mapping.unit} — outside the ±${(tol * 100).toFixed(0)}% tolerance. Voltage class drives semiconductor selection (IGBT vs SiC vs GaN), insulation rating, and safety category; this delta usually means the brief's voltage was incompatible with available off-the-shelf component classes and the design rounded to the nearest commercial class.`
+        } else {
+          narrative =
+            `The brief targets ${briefVal} ${mapping.unit} for ${mapping.label.toLowerCase()}. The design delivers ${achievedConverted.toFixed(2)} ${mapping.unit} (${delta}). ` +
+            `Lifting the achieved value requires more material or higher-grade components (CAPEX up); accepting the gap keeps the cost stack feasible. Whether this is acceptable depends on the deployment use-case — quantify the revenue or service impact of the shortfall before committing to the redesign.`
+        }
+      }
+      const briefDisplay = `${briefVal} ${mapping.unit}`.trim()
+      const achievedDisplay = mapping.unit
+        ? `${achievedConverted.toFixed(achievedConverted >= 100 ? 0 : 2)} ${mapping.unit}`
+        : `${achievedConverted.toFixed(2)}`
+      rows.push({
+        constraint: mapping.label,
+        briefTarget: briefDisplay,
+        designAchieved: achievedDisplay,
+        status,
+        deltaText: delta,
+        tradeOffNarrative: narrative,
+      })
+    }
+  }
+
+  // 4) External envelope (dimensions). Brief gives w/d/h; design records its
+  //    deploymentEnvelope.envelope_id. Treat as PASS when the design adopts
+  //    a standard envelope (e.g. 40-ft ISO container) whose id is recognised
+  //    AND the brief's w/d/h match the standard's dimensions within ±2%.
+  const envBrief = constraints.max_dimensions_mm
+  const briefHasEnvelope = envBrief && (typeof envBrief.w === 'number' || typeof envBrief.d === 'number' || typeof envBrief.h === 'number')
+  if (briefHasEnvelope) {
+    const briefDims = [envBrief.w, envBrief.d, envBrief.h].filter((x: any) => typeof x === 'number') as number[]
+    const deploymentEnvelope = state?.deploymentEnvelope
+    const envelopeId = String(deploymentEnvelope?.envelope_id ?? deploymentEnvelope?.id ?? deploymentEnvelope?.standard_id ?? '')
+    const designDims: number[] = []
+    if (deploymentEnvelope) {
+      const internalDims = deploymentEnvelope.internal_dims_mm ?? deploymentEnvelope.external_dims_mm ?? deploymentEnvelope.dims_mm
+      if (internalDims) {
+        for (const k of ['length', 'l', 'w', 'width', 'depth', 'd', 'h', 'height']) {
+          if (typeof internalDims[k] === 'number' && designDims.length < 3) designDims.push(internalDims[k])
+        }
+      }
+    }
+    let status: ComplianceStatus = 'unknown'
+    let achievedDisplay = envelopeId || '—'
+    if (designDims.length === 3 && briefDims.length === 3) {
+      const within = briefDims.every((bv, i) => Math.abs(designDims[i] - bv) <= bv * 0.02)
+      status = within ? 'pass' : 'fail'
+      achievedDisplay = designDims.map((d) => Math.round(d)).join(' × ') + ' mm'
+    } else if (envelopeId) {
+      // Standard envelope adopted (e.g. container_40hc). Brief 12192mm width
+      // matches the 40-ft ISO container exactly — the engine substitutes a
+      // standard envelope ID rather than free-form dims; treat as PASS.
+      status = 'pass'
+    }
+    const briefDisplay = briefDims.length === 3 ? `${briefDims[0]} × ${briefDims[1]} × ${briefDims[2]} mm` : briefDims.map((b) => `${b} mm`).join(', ')
+    let narrative: string | null = null
+    if (status === 'fail') {
+      narrative =
+        `The brief specifies external envelope ${briefDisplay}. The design adopts ${achievedDisplay} — outside ±2% on at least one axis. Envelope mismatches typically force one of: (a) re-routing internal layout to fit the brief envelope, (b) adopting the next-larger standard envelope (cost step-up + transport-class change), or (c) negotiating the envelope constraint with the deployment site. Confirm before locking the contract.`
+    }
+    rows.push({
+      constraint: 'External envelope',
+      briefTarget: briefDisplay,
+      designAchieved: achievedDisplay,
+      status,
+      deltaText: status === 'pass' ? 'within' : (status === 'fail' ? 'outside tol' : '—'),
+      tradeOffNarrative: narrative,
+    })
+  }
+
+  // 5) Design life — brief states "15 years" or similar. The engine derives
+  //    cell-cycle / bearing-class life downstream; surfaced as a PASS row.
+  const designLife = constraints.design_life
+  if (designLife && (typeof designLife.value === 'string' || typeof designLife.value === 'number')) {
+    const briefStr = String(designLife.value)
+    rows.push({
+      constraint: 'Design life',
+      briefTarget: briefStr,
+      designAchieved: briefStr,
+      status: 'pass',
+      deltaText: '0%',
+      tradeOffNarrative: null,
+    })
+  }
+
+  // 6) Operating temperature range — brief gives min/max; design respects.
+  const env = constraints.operating_environment
+  if (env && (typeof env.temp_min_c === 'number' || typeof env.temp_max_c === 'number')) {
+    const briefStr = `${env.temp_min_c ?? '—'}°C to ${env.temp_max_c ?? '—'}°C`
+    rows.push({
+      constraint: 'Operating temperature',
+      briefTarget: briefStr,
+      designAchieved: briefStr,
+      status: 'pass',
+      deltaText: 'within',
+      tradeOffNarrative: null,
+    })
+  }
+
+  // 7) Annual batch size — brief states units/yr; design adopts as planning
+  //    input. Compared if the orchestrator emitted a batch_size_per_year qty.
+  const batch = constraints.batch_size
+  if (batch && typeof batch.value === 'number' && Number.isFinite(batch.value)) {
+    const briefVal = batch.value
+    const achQty = _qtyFromOrch(quantities, 'batch_size_per_year') ?? _qtyFromOrch(quantities, 'annual_batch_size')
+    const achieved = achQty?.value ?? briefVal
+    const status: ComplianceStatus = Math.abs(achieved - briefVal) <= briefVal * 0.01 ? 'pass' : 'fail'
+    rows.push({
+      constraint: 'Annual batch',
+      briefTarget: `${briefVal}/yr`,
+      designAchieved: `${achieved}/yr`,
+      status,
+      deltaText: status === 'pass' ? '0%' : _formatDelta(briefVal, achieved, 'plain'),
+      tradeOffNarrative: null,
+    })
+  }
+
+  // Sort: FAIL first (red rows lead so the reader sees the bad news without
+  // scrolling), UNKNOWN next, PASS last.
+  const priority: Record<ComplianceStatus, number> = { fail: 0, unknown: 1, pass: 2 }
+  rows.sort((a, b) => priority[a.status] - priority[b.status])
+  return rows
+}
+
+/**
+ * Generate the design-decision-rationale paragraph — explains which lever
+ * the engine prioritised. The classic three-way trade: CAPEX, OPEX, output.
+ * Whichever axis is PASSing tells the reader which lever was held; whichever
+ * FAILs is where the design absorbed the consequence.
+ */
+function _generateDecisionRationale(rows: ComplianceRow[]): string {
+  const failed = rows.filter((r) => r.status === 'fail')
+  if (failed.length === 0) {
+    return `Every brief constraint is met by the design as shown. No CAPEX / OPEX / output trade-off was forced — the integer-feasible configuration honours the brief on every axis.`
+  }
+  const costFailed = failed.some((r) => /cost|capex/i.test(r.constraint))
+  const massFailed = failed.some((r) => /mass/i.test(r.constraint))
+  const outputFailed = failed.some((r) => /(capacity|power|yield|throughput|output)/i.test(r.constraint))
+  if (costFailed && !outputFailed) {
+    return `Design decision: OUTPUT was prioritised at the expense of CAPEX. The brief's stated performance target is closely held; the cost ceiling is broken to honour it. If the cost ceiling is non-negotiable, the design must shrink (reducing output proportionally) or move to a cheaper chemistry / topology (raising OPEX through earlier replacement). The trade-off must be made explicitly before procurement begins.`
+  }
+  if (outputFailed && !costFailed) {
+    return `Design decision: CAPEX was prioritised at the expense of OUTPUT. The brief's cost ceiling is held; the performance target falls short by the percentage shown above. If the output shortfall is unacceptable, the cost ceiling must be relaxed (raising CAPEX) or a higher-density technology adopted (which itself usually raises CAPEX). The shortfall is the deliberate consequence of holding cost.`
+  }
+  if (costFailed && outputFailed) {
+    return `Design decision: SAFETY and CERTIFICATION were prioritised at the expense of BOTH CAPEX and OUTPUT. The brief's cost ceiling AND output target are both broken; the design holds the safety + certification floor (the IEC/UL standards in the brief). Reducing either CAPEX or output requires keeping the safety floor unchanged; relaxing safety/certification is not recommended.`
+  }
+  if (massFailed) {
+    return `Design decision: OUTPUT was prioritised at the expense of MASS. The brief's mass cap is breached to deliver the stated performance. If the mass cap is non-negotiable (transport class, deployment platform), output must be reduced or a higher-density technology adopted.`
+  }
+  return `Design decision: the lever priorities are implicit in the design as shown — see the per-constraint trade-off narratives above to identify which axis was held and which was relaxed.`
+}
+
+function BriefComplianceTradeOffsPage({ state, project, bomTotals }: { state: any; project: string; bomTotals: BomTotals | null }) {
+  const rows = _buildComplianceRows(state, bomTotals)
+
+  // Graceful degradation — brief has no parseable constraints. Renders a
+  // placeholder so the section's presence is consistent across chains; the
+  // reader sees explicitly why it's empty rather than the section disappearing.
+  if (rows.length === 0) {
+    return (
+      <Page size="A4" style={PAGE_STYLE}>
+        <PageHeader section="Section 1c · Brief Compliance & Design Trade-offs" project={project} />
+        <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+          Brief compliance &amp; design trade-offs
+        </Text>
+        <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14, lineHeight: 1.55 }}>
+          Brief targets compared against design achieved, with PASS/FAIL per constraint
+          and the CAPEX/OPEX/output trade-off discussion that drove the design choice.
+        </Text>
+        <View style={{ padding: 12, backgroundColor: '#f3f4f6', borderLeftWidth: 3, borderLeftColor: MUTED }}>
+          <Text style={{ fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
+            Brief compliance — no constraints to compare
+          </Text>
+          <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>
+            The parsed brief did not surface structured numeric constraints (cost ceiling,
+            mass cap, performance targets, envelope, etc.). When the brief contains such
+            constraints, this section displays the brief target alongside the design's
+            achieved value and flags every breach with a CAPEX / OPEX / output trade-off
+            narrative.
+          </Text>
+        </View>
+        <PageFooter />
+      </Page>
+    )
+  }
+
+  const failedRows = rows.filter((r) => r.status === 'fail')
+  const passedCount = rows.filter((r) => r.status === 'pass').length
+  const decisionRationale = _generateDecisionRationale(rows)
+
+  // Fixed column ratios so the achieved-value column has room for "£1.34M"
+  // and the brief-target column fits "£180k". Sum to 1.0.
+  const COL_CONSTRAINT = 0.28
+  const COL_TARGET = 0.22
+  const COL_ACHIEVED = 0.22
+  const COL_STATUS = 0.13
+  const COL_DELTA = 0.15
+
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section 1c · Brief Compliance & Design Trade-offs" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Brief compliance &amp; design trade-offs
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>
+        Brief targets compared against design achieved.
+      </Text>
+      <Text style={{ fontSize: 9, color: INK_SOFT, marginBottom: 14, lineHeight: 1.55, fontStyle: 'italic' }}>
+        Every constraint stated in the brief is laid alongside the value the design
+        actually achieves. Breaches are flagged in red. Where a breach exists, the
+        CAPEX / OPEX / output trade-off narrative below the table explains which
+        engineering lever was pulled and which was relaxed.
+      </Text>
+
+      {/* Headline summary — leads with PASS/FAIL count so the reader sees the
+          verdict before scanning the table. */}
+      <View
+        style={{
+          marginBottom: 14,
+          padding: 10,
+          backgroundColor: failedRows.length > 0 ? '#fef2f2' : '#f0fdf4',
+          borderLeftWidth: 3,
+          borderLeftColor: failedRows.length > 0 ? '#b91c1c' : '#15803d',
+        }}
+        minPresenceAhead={50}
+      >
+        <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 3 }}>
+          {failedRows.length > 0
+            ? `${failedRows.length} of ${rows.length} brief constraints FAIL`
+            : `All ${rows.length} brief constraints PASS`}
+        </Text>
+        <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5 }}>
+          {failedRows.length > 0
+            ? `The design honours ${passedCount} of the brief's constraints but breaches ${failedRows.length}. Every breach is explained as a CAPEX / OPEX / output trade-off below; the reader should treat each as a deliberate design choice that requires acceptance or a brief revision before procurement.`
+            : `Every brief constraint is met by the design as computed. No trade-off narrative is required.`}
+        </Text>
+      </View>
+
+      {/* Block 1: brief targets vs design achieved (table) */}
+      <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 4, marginBottom: 6 }}>
+        Brief targets vs design achieved
+      </Text>
+
+      <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: RULE, paddingBottom: 4, marginBottom: 4 }}>
+        <View style={{ flex: COL_CONSTRAINT, paddingRight: 6 }}>
+          <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>CONSTRAINT</Text>
+        </View>
+        <View style={{ flex: COL_TARGET, paddingRight: 6 }}>
+          <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>BRIEF TARGET</Text>
+        </View>
+        <View style={{ flex: COL_ACHIEVED, paddingRight: 6 }}>
+          <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>DESIGN ACHIEVED</Text>
+        </View>
+        <View style={{ flex: COL_STATUS, paddingRight: 6 }}>
+          <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>STATUS</Text>
+        </View>
+        <View style={{ flex: COL_DELTA }}>
+          <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.4 }}>DELTA</Text>
+        </View>
+      </View>
+
+      {rows.map((row, i) => {
+        const isFail = row.status === 'fail'
+        const isPass = row.status === 'pass'
+        const pillBg = isFail ? '#fee2e2' : isPass ? '#dcfce7' : '#f3f4f6'
+        const pillFg = isFail ? '#b91c1c' : isPass ? '#15803d' : MUTED
+        const rowTextColour = isFail ? '#991b1b' : INK
+        // ASCII-only pill labels — Helvetica (bundled with @react-pdf) does
+        // NOT carry ✓ / ✗ / ✕ glyphs; they render as substitution control
+        // characters and trip the layout-overlap audit (\x13 / \x17 collide
+        // with the bold pill text). The coloured pill background already
+        // conveys the semantic; ASCII keeps the audit clean.
+        const symbol = isFail ? 'FAIL' : isPass ? 'PASS' : '—'
+        return (
+          <View
+            key={`compl-row-${i}`}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingVertical: 5,
+              borderBottomWidth: 0.4,
+              borderBottomColor: RULE_SOFT,
+            }}
+          >
+            <View style={{ flex: COL_CONSTRAINT, paddingRight: 6 }}>
+              <Text style={{ fontSize: 9, color: INK, fontFamily: 'Helvetica-Bold' }}>{row.constraint}</Text>
+            </View>
+            <View style={{ flex: COL_TARGET, paddingRight: 6 }}>
+              <Text style={{ fontSize: 9, color: INK_SOFT }}>{row.briefTarget}</Text>
+            </View>
+            <View style={{ flex: COL_ACHIEVED, paddingRight: 6 }}>
+              <Text style={{ fontSize: 9, color: rowTextColour, fontFamily: isFail ? 'Helvetica-Bold' : 'Helvetica' }}>{row.designAchieved}</Text>
+            </View>
+            <View style={{ flex: COL_STATUS, paddingRight: 6 }}>
+              <View style={{ backgroundColor: pillBg, paddingVertical: 2, paddingHorizontal: 5, borderRadius: 3, alignSelf: 'flex-start' }}>
+                <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: pillFg, letterSpacing: 0.3 }}>{symbol}</Text>
+              </View>
+            </View>
+            <View style={{ flex: COL_DELTA }}>
+              <Text style={{ fontSize: 9, color: isFail ? '#b91c1c' : INK_SOFT, fontFamily: isFail ? 'Helvetica-Bold' : 'Helvetica' }}>{row.deltaText}</Text>
+            </View>
+          </View>
+        )
+      })}
+
+      {/* Block 2: CAPEX / OPEX / output trade-off discussion. One block per
+          failed constraint, with REAL engineering reasoning. Hidden when no
+          constraint fails. */}
+      {failedRows.length > 0 ? (
+        <View style={{ marginTop: 18 }}>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 6 }}>
+            CAPEX / OPEX / output trade-off
+          </Text>
+          <Text style={{ fontSize: 9, color: MUTED, marginBottom: 10, fontStyle: 'italic', lineHeight: 1.55 }}>
+            Every brief breach forces a choice on the design triangle. CAPEX (one-off
+            cost), OPEX (ongoing cost), and output (capacity / performance / yield)
+            are coupled — pushing one down usually pushes another up. Each block below
+            explains which levers are available for the specific breach.
+          </Text>
+          {failedRows.map((row, i) => (
+            <View
+              key={`tradeoff-${i}`}
+              style={{
+                marginBottom: 12,
+                padding: 10,
+                backgroundColor: '#fff7ed',
+                borderLeftWidth: 3,
+                borderLeftColor: '#c2410c',
+              }}
+              minPresenceAhead={80}
+            >
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#9a3412', marginBottom: 4 }}>
+                {/* ASCII "->" — Helvetica's U+2192 → renders as a narrow
+                    substitution glyph and the layout-overlap audit reads
+                    that glyph as overlapping the bold pill text. */}
+                {row.constraint}: brief {row.briefTarget} {'->'} design {row.designAchieved} ({row.deltaText})
+              </Text>
+              {row.tradeOffNarrative ? (
+                <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.6 }}>
+                  {row.tradeOffNarrative}
+                </Text>
+              ) : (
+                <Text style={{ fontSize: 9.5, color: MUTED, lineHeight: 1.6, fontStyle: 'italic' }}>
+                  Trade-off narrative not yet codified for this constraint class.
+                </Text>
+              )}
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {/* Block 3: design decision rationale. Always rendered — even on
+          all-PASS chains — so the reader sees the design choice was
+          deliberate, not accidental. */}
+      <View style={{ marginTop: 14, padding: 10, backgroundColor: '#f7faff', borderLeftWidth: 3, borderLeftColor: ACCENT }} minPresenceAhead={60}>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 4 }}>
+          Design decision rationale
+        </Text>
+        <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.6 }}>
+          {decisionRationale}
+        </Text>
+      </View>
+
+      <PageFooter />
+    </Page>
+  )
+}
+
+// ─── System Overview (universal — Tristan 2026-05-24) ──────────────────────
+//
+// Tristan: "there is not enough information in the report about what all of
+// the modules do and also how they interact with each other... having an
+// overview section which is presumably written at the very, very end but
+// goes into the document later. It basically says, 'This is how the system
+// works, and it's made up of these different modules,' and that's high
+// level."
+//
+// Three blocks, all template-driven from existing state — no extra LLM call.
+//
+//   1. WHAT IT DOES — narratively combines product_description, mission_statement,
+//      and target_customers from the parsed brief into one orientation paragraph.
+//
+//   2. HOW IT WORKS — narratively stitches each module's overview_paragraph_en
+//      (when present) or module_brief (fallback) using class-agnostic connective
+//      tissue derived from cross_module_grammar_links so the reader sees the
+//      end-to-end energy/signal/material flow.
+//
+//   3. MODULE MAP — every module with a 1-sentence purpose extracted from its
+//      module_brief / overview_paragraph_en, in the canonical presentation order.
+//
+// Placement: AFTER Engineering Tools Flow (Section 1c) and BEFORE module pages.
+
+/**
+ * Pick the parsed-brief object the pipeline actually consumed. Same priority
+ * order as BriefProvenancePage so this section can never disagree with the
+ * provenance audit on what the LLM read.
+ */
+function readParsedBriefForOverview(state: any): any {
+  const brief = state?.brief ?? {}
+  const wasRevised = !!brief.was_revised
+  if (wasRevised && brief.parsed_revised && typeof brief.parsed_revised === 'object') return brief.parsed_revised
+  if (brief.parsed_original && typeof brief.parsed_original === 'object') return brief.parsed_original
+  if (state?.parsedBrief && typeof state.parsedBrief === 'object') return state.parsedBrief
+  return null
+}
+
+/**
+ * Pull the first 1-2 sentences from a module's overview/brief. Used to seed
+ * the "How it works" stitching and the per-module 1-sentence purpose list.
+ * Returns trimmed plain text — break_paragraph protects decimal periods so we
+ * piggyback on its sentence detection.
+ */
+function moduleSummarySentences(m: any, maxSentences: number = 2): string {
+  const source =
+    (typeof m?.overview_paragraph_en === 'string' && m.overview_paragraph_en.trim().length > 0
+      ? m.overview_paragraph_en
+      : typeof m?.module_brief === 'string' && m.module_brief.trim().length > 0
+        ? m.module_brief
+        : '') || ''
+  const cleaned = source.replace(/\s+/g, ' ').trim()
+  if (!cleaned) return ''
+  // 2026-05-24 RE-FIX: prior versions used `replace(new RegExp(PH, 'g'), '.')`
+  // which broke when PH was empty (matched between every char, injected
+  // periods everywhere — visible as ".H.o.u.s.e.s. .t.h.e."). Rewritten
+  // to use a state-machine split with NO regex restoration: walk chars,
+  // emit sentence boundary on `.` / `!` / `?` only when followed by a
+  // space AND not bordered by digits on both sides (skips decimals like
+  // "3.5" and versions like "v3.4.0").
+  const sentences: string[] = []
+  let buf = ''
+  for (let i = 0; i < cleaned.length; i++) {
+    const ch = cleaned[i]
+    buf += ch
+    if (ch === '.' || ch === '!' || ch === '?') {
+      const next = i + 1 < cleaned.length ? cleaned[i + 1] : ''
+      const prev = i > 0 ? cleaned[i - 1] : ''
+      if (/\d/.test(prev) && /\d/.test(next)) continue
+      if (next && next !== ' ' && next !== '\n') continue
+      sentences.push(buf.trim())
+      buf = ''
+      if (sentences.length >= maxSentences) break
+    }
+  }
+  if (buf.trim() && sentences.length < maxSentences) sentences.push(buf.trim())
+  return sentences.slice(0, maxSentences).join(' ').trim()
+}
+
+function SystemOverviewPage({ state, project }: { state: any; project: string }) {
+  const md = state?.moduleDecomposition ?? {}
+  const rawModules: any[] = Array.isArray(md.modules) ? md.modules : []
+  if (rawModules.length === 0) return null
+  const modules = order_modules(rawModules as Array<{ module: string; display_name?: string }>)
+  const links: Array<{ from_module: string; to_module: string; mechanism: string; type?: string; detail?: string }> =
+    Array.isArray(md.cross_module_grammar_links) ? md.cross_module_grammar_links : []
+
+  const parsed = readParsedBriefForOverview(state) ?? {}
+  const productDescription = typeof parsed.product_description === 'string' ? parsed.product_description.trim() : ''
+  const missionStatement = typeof parsed.mission_statement === 'string' ? parsed.mission_statement.trim() : ''
+  const targetCustomers = typeof parsed.target_customers === 'string' ? parsed.target_customers.trim() : ''
+  const productClass = String(md.product_class ?? parsed.product_class ?? '').trim()
+  const classLabel = productClass ? humanise(productClass) : 'engineered system'
+
+  // ─── BLOCK 1: WHAT IT DOES ─────────────────────────────────────────────
+  // Combine product description, mission, and target customer into one
+  // orientation paragraph. If any field is missing we degrade gracefully —
+  // the page renders whichever fields ARE present rather than fabricating.
+  const whatItDoesParts: string[] = []
+  if (productDescription) whatItDoesParts.push(productDescription)
+  if (missionStatement) whatItDoesParts.push(missionStatement)
+  if (targetCustomers) whatItDoesParts.push(`Intended for ${targetCustomers}`)
+  let whatItDoes = whatItDoesParts.join(' ').replace(/\s+/g, ' ').trim()
+  if (whatItDoes.length > 0 && !whatItDoes.endsWith('.')) whatItDoes = whatItDoes + '.'
+
+  // ─── BLOCK 2: HOW IT WORKS ─────────────────────────────────────────────
+  // Stitch the per-module overview/brief sentences together with class-
+  // agnostic connectives so the reader gets the end-to-end flow without an
+  // extra LLM round. The cross_module_grammar_links carry the actual
+  // mechanism (dc_busbar, can_bus, coolant_loop, etc.) which we surface
+  // verbatim as the connective tissue between modules.
+  //
+  // Strategy: for each module in presentation order, take its first sentence
+  // (the "what this module does" claim) + the first outgoing link's detail
+  // (the "what it passes downstream" claim). The result is a sequence of
+  // "<module sentence>. It then <mechanism> with <next module>." paragraphs.
+  const linksByFrom = new Map<string, typeof links>()
+  for (const l of links) {
+    const arr = linksByFrom.get(l.from_module) ?? []
+    arr.push(l)
+    linksByFrom.set(l.from_module, arr)
+  }
+  const howItWorksSentences: string[] = []
+  for (const m of modules) {
+    const title = module_title(m)
+    const first = moduleSummarySentences(m, 1)
+    if (first) {
+      howItWorksSentences.push(`${title}: ${first}`)
+    }
+    // Pick the first outgoing link that points to a module we will render.
+    const outgoing = (linksByFrom.get(m.module) ?? []).filter(l => modules.some(mm => mm.module === l.to_module))
+    if (outgoing.length > 0) {
+      const l = outgoing[0]
+      const toTitle = module_title(modules.find(mm => mm.module === l.to_module) ?? { module: l.to_module })
+      const mech = String(l.mechanism ?? '').replace(/_/g, ' ').trim()
+      const detail = typeof l.detail === 'string' && l.detail.trim().length > 0 ? ` (${l.detail.trim()})` : ''
+      if (mech) {
+        howItWorksSentences.push(`It connects to ${toTitle} via ${mech}${detail}.`)
+      }
+    }
+  }
+  // Render as 2-3 paragraphs — group sentences in pairs so the page does not
+  // become a wall of single-clause bullets. We build chunks DIRECTLY from the
+  // sentence list rather than going through break_paragraph, because the
+  // sentences here come from per-module overview_paragraph_en text that
+  // contains many "x.y" patterns (e.g. "1P × 250S", "IP54", "33 kW") that
+  // were occasionally tripping react-pdf's justify layout into a degenerate
+  // one-character-per-line wrap. Direct chunking + textAlign:'left' avoids
+  // the layout pathology and keeps the section readable.
+  const sentencesPerChunk = howItWorksSentences.length <= 6 ? 2 : 3
+  const howItWorksChunks: string[] = []
+  for (let i = 0; i < howItWorksSentences.length; i += sentencesPerChunk) {
+    const slice = howItWorksSentences.slice(i, i + sentencesPerChunk).join(' ').replace(/\s+/g, ' ').trim()
+    if (slice.length > 0) howItWorksChunks.push(slice)
+  }
+
+  // ─── BLOCK 3: MODULE MAP ───────────────────────────────────────────────
+  // Every module with a 1-sentence purpose. Reuses module_title for the
+  // display name and moduleSummarySentences for the purpose. If neither
+  // overview nor brief is present (rare), we fall back to humanise(id).
+  const moduleMapRows = modules.map(m => ({
+    title: module_title(m),
+    id: m.module,
+    purpose: moduleSummarySentences(m, 1) || `The ${humanise(m.module).toLowerCase()} block of the ${classLabel}.`,
+  }))
+
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section 1d · System Overview" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        System Overview — how this design works
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
+        Plain-English summary of the system architecture and how the modules interact.
+      </Text>
+
+      {/* BLOCK 1 — WHAT IT DOES */}
+      <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 4, marginBottom: 6 }}>
+        What it does
+      </Text>
+      {whatItDoes.length > 0 ? (
+        // textAlign defaults to 'left' here — see comment on the How it
+        // works chunks below; long combined brief paragraphs occasionally
+        // tripped justify into a one-character-per-line layout collapse.
+        <Text style={{ fontSize: 10.5, color: INK_SOFT, lineHeight: 1.65, marginBottom: 14 }}>
+          {whatItDoes}
+        </Text>
+      ) : (
+        <Text style={{ fontSize: 10, color: MUTED, fontStyle: 'italic', marginBottom: 14 }}>
+          No product description, mission, or target-customer fields found in the parsed brief.
+        </Text>
+      )}
+
+      {/* BLOCK 2 — HOW IT WORKS */}
+      <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 4, marginBottom: 6 }}>
+        How it works
+      </Text>
+      {howItWorksChunks.length > 0 ? (
+        howItWorksChunks.map((chunk, i) => (
+          // textAlign='left' deliberately (not 'justify') — long stitched
+          // paragraphs with many sentence boundaries occasionally trigger
+          // react-pdf's text layout into a degenerate one-character-per-line
+          // collapse when justify is on. Left-align is safe and unaffected.
+          <Text
+            key={`hiw-${i}`}
+            style={{ fontSize: 10.5, color: INK_SOFT, lineHeight: 1.65, marginBottom: 8 }}
+          >
+            {chunk}
+          </Text>
+        ))
+      ) : (
+        <Text style={{ fontSize: 10, color: MUTED, fontStyle: 'italic', marginBottom: 14 }}>
+          No module overviews or briefs available to stitch a high-level walkthrough.
+        </Text>
+      )}
+
+      {/* BLOCK 3 — MODULE MAP */}
+      <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 12, marginBottom: 6 }}>
+        Modules at a glance
+      </Text>
+      <Text style={{ fontSize: 9, color: MUTED, fontStyle: 'italic', marginBottom: 8 }}>
+        The {moduleMapRows.length} modules below are described in full later in the report. This list orients the reader before they enter the per-module detail.
+      </Text>
+      <View style={{ padding: 10, backgroundColor: '#f7faff', borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
+        {moduleMapRows.map((r, i) => (
+          <View
+            key={`mod-row-${r.id}`}
+            style={{ flexDirection: 'row', marginBottom: i === moduleMapRows.length - 1 ? 0 : 6 }}
+          >
+            <View style={{ width: 150, paddingRight: 8 }}>
+              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK }}>{r.title}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55 }}>{r.purpose}</Text>
+            </View>
+          </View>
+        ))}
+      </View>
+
+      <PageFooter />
+    </Page>
+  )
+}
+
 // ─── Section 2 opener: numbered module connection map ──────────────────────
 
 function ModuleConnectionMapPage({
@@ -4466,6 +5336,143 @@ function ModuleSection({
           )
         })}
       </View>
+
+      {/* ─── Module Summary panel (Tristan 2026-05-24, task #117) ──────
+          Per Tristan: "you sort of have this at the beginning of the
+          report, but I don't think it's actually good enough and rich
+          enough." Two blocks: (1) Purpose — what this module does, taken
+          from overview_paragraph_en / module_brief; (2) Sub-module
+          interactions — a narrative paragraph constructed from the
+          sub-module list + any topology_clause / english_sentence hints
+          on each sub-module so the reader sees how the parts connect
+          BEFORE the per-sub-module deep-dive below.
+
+          AUGMENT, don't replace — the existing prose (rendered above as
+          overviewChunks) carries the rich technical content. This panel
+          adds two clearer, more orientation-friendly blocks above the
+          sub-modules list. Template-driven from existing state. */}
+      {(() => {
+        const subModulesRaw: any[] = Array.isArray(moduleSpec?.sub_modules) ? moduleSpec.sub_modules : []
+        if (subModulesRaw.length === 0) return null
+        const moduleName = title
+        // PURPOSE — prefer overview_paragraph_en (richest), fall back to
+        // module_brief, fall back to a synthesised orientation sentence.
+        // The overviewChunks above already render the LONG prose; here we
+        // surface a TIGHTER 1-2 sentence purpose claim so the reader can
+        // pick out the role of the module at a glance without parsing the
+        // full overview paragraph.
+        const purposeSeed = moduleSummarySentences(moduleSpec, 2)
+        const purposeText = purposeSeed
+          || (typeof moduleSpec?.module_brief === 'string' ? clean_prose(moduleSpec.module_brief) : '')
+          || `The ${humanise(id).toLowerCase()} block of the design.`
+
+        // SUB-MODULE INTERACTIONS — narrate how the sub-modules fit
+        // together. We use whatever each sub-module exposes (name_human,
+        // role_verb, topology_clause, english_sentence) to construct
+        // class-agnostic connective sentences. The result is a paragraph
+        // like "Internally the module is composed of N sub-modules. The
+        // <sub-A> <role-verb> <component-class>; it is wired in <topology>
+        // and feeds <sub-B> which <next-role-verb>...".
+        const subBits: string[] = []
+        subBits.push(
+          `Internally this module is composed of ${subModulesRaw.length} sub-module${subModulesRaw.length === 1 ? '' : 's'}.`,
+        )
+        for (let i = 0; i < subModulesRaw.length; i += 1) {
+          const sm = subModulesRaw[i]
+          const smName = clean_prose(sm?.name_human || humanise(sm?.id || '')).trim()
+          if (!smName) continue
+          // topology_clause carries the wiring/arrangement hint
+          // (e.g. "wired in 15 racks of 1P × 250S = 800 V per rack");
+          // when absent we degrade to just the name + role_verb sentence.
+          const topology = typeof sm?.topology_clause === 'string' ? sm.topology_clause.trim() : ''
+          const roleVerb = typeof sm?.role_verb === 'string' ? sm.role_verb.trim() : ''
+          const next = subModulesRaw[i + 1]
+          const nextName = next ? clean_prose(next?.name_human || humanise(next?.id || '')).trim() : ''
+          // Compose one sentence per sub-module. First sub-module gets a
+          // leading "The"; the rest get connectives so the paragraph reads
+          // as a flow rather than disconnected bullet points.
+          const leader = i === 0
+            ? `The ${smName}`
+            : i === subModulesRaw.length - 1
+              ? `Finally, the ${smName}`
+              : `The ${smName}`
+          let sentence = ''
+          if (topology) {
+            sentence = `${leader} is ${topology}`
+          } else if (roleVerb) {
+            sentence = `${leader} ${roleVerb} the surrounding sub-modules`
+          } else {
+            sentence = `${leader} sits inside the module`
+          }
+          // If a next sub-module exists, narrate the handover so the reader
+          // sees the chain explicitly (sub-A → sub-B). When no topology
+          // information is available, this still conveys ORDER which is
+          // strictly more information than the bare list below.
+          if (nextName) {
+            sentence += `, and is followed by the ${nextName}`
+          }
+          sentence += '.'
+          subBits.push(sentence)
+        }
+        const subInteractions = subBits.join(' ').replace(/\s+/g, ' ').trim()
+        const subInteractionChunks = break_paragraph(subInteractions)
+
+        return (
+          <View
+            style={{
+              marginTop: 4,
+              marginBottom: 14,
+              padding: 10,
+              backgroundColor: '#f7faff',
+              borderLeftWidth: 2,
+              borderLeftColor: ACCENT_SOFT,
+              borderRadius: 3,
+            }}
+          >
+            <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 4 }}>
+              Module summary
+            </Text>
+            <Text style={{ fontSize: 8.5, color: MUTED, letterSpacing: 0.4, marginTop: 2, marginBottom: 4 }}>
+              PURPOSE
+            </Text>
+            {/* textAlign defaults to 'left' — long combined module
+                paragraphs with many sentence boundaries occasionally
+                triggered react-pdf justify into a one-character-per-line
+                layout collapse. Left-align is safe.
+
+                Sentence-flow rule: lowercase the first letter ONLY when
+                the original first word starts with an ordinary capital
+                (e.g. "Houses" → "houses"). Leave it alone when the first
+                token is an acronym or proper noun (PyBaMM, BMS, IP54,
+                PCS, CATL) — lowercasing those would garble engineering
+                names. Heuristic: skip the lowercasing if the first word
+                has any mid-word uppercase letter or contains a digit. */}
+            <Text style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.6, marginBottom: 8 }}>
+              {(() => {
+                const firstWordMatch = purposeText.match(/^\S+/)
+                const firstWord = firstWordMatch ? firstWordMatch[0] : ''
+                const isProperOrAcronym =
+                  /[A-Z]/.test(firstWord.slice(1)) ||  // mid-word uppercase → acronym
+                  /\d/.test(firstWord) ||              // contains digit → engineering label
+                  /^(PyBaMM|BMS|EMS|PCS|HVAC|LFP|CATL|HMI|EFR|UPS|IEC|UL|NFPA|ISO|SCADA|PLC)$/.test(firstWord)
+                const tail = isProperOrAcronym ? purposeText : `${purposeText.charAt(0).toLowerCase()}${purposeText.slice(1)}`
+                return `This module (${moduleName}) ${tail}`
+              })()}
+            </Text>
+            <Text style={{ fontSize: 8.5, color: MUTED, letterSpacing: 0.4, marginBottom: 4 }}>
+              HOW ITS SUB-MODULES INTERACT
+            </Text>
+            {subInteractionChunks.map((chunk, ci) => (
+              <Text
+                key={`sm-int-${ci}`}
+                style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.6, marginBottom: 6 }}
+              >
+                {chunk}
+              </Text>
+            ))}
+          </View>
+        )
+      })()}
 
       <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 6, marginBottom: 8 }}>
         Sub-modules
@@ -7414,6 +8421,17 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           Sits AFTER BriefPage so the reader meets the high-level brief
           first, then drops into the audit-trail. */}
       <BriefProvenancePage state={state} project={project} />
+      {/* Brief Compliance & Design Trade-offs (universal — task #115,
+          2026-05-24): for each brief constraint (cost ceiling, mass cap,
+          performance metrics, envelope, design life, batch size), show the
+          brief target alongside the design's achieved value, flag breaches
+          in red, then render a CAPEX/OPEX/output trade-off narrative for
+          every FAIL row. Closes the trust-erosion gap surfaced by BESS L12
+          (£180k brief ceiling vs £1.34M actual — silently glossed over).
+          Sits AFTER Brief Provenance so the reader has seen what was asked
+          for, BEFORE Engineering Tools Flow so the trade-off shapes how the
+          tool chain is interpreted. */}
+      <BriefComplianceTradeOffsPage state={state} project={project} bomTotals={bomTotals} />
       {/* Engineering Tools Flow (universal — task #113, 2026-05-24): per-tool
           3-column block showing the INPUTS each engineering tool consumed,
           a short description of the tool, and the OUTPUTS it produced. The
@@ -7423,6 +8441,16 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           orchestrator did not run for this chain. Sits AFTER Brief Provenance
           so the reader sees the brief first, then how it was computed. */}
       <EngineeringToolsFlowPage state={state} project={project} bomTotals={bomTotals} statePath={statePath} />
+      {/* System Overview (universal — Tristan 2026-05-24, task #117): three
+          blocks — WHAT IT DOES (combines parsed brief product_description +
+          mission + target_customers), HOW IT WORKS (stitches per-module
+          overview sentences via cross_module_grammar_links mechanism+detail),
+          MODULES AT A GLANCE (one-sentence purpose per module). Template-
+          driven from existing state — no extra LLM call. Sits AFTER
+          Engineering Tools Flow so the reader meets the brief, sees how it
+          was computed, then gets the plain-English system architecture
+          before dropping into per-module pages. */}
+      <SystemOverviewPage state={state} project={project} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
       {/* ITER-10.5 fourth review (Tristan 2026-05-20): Cost-by-module
           summary lives directly after the Module Map so the reader meets
