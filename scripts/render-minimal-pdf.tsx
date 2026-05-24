@@ -3825,8 +3825,295 @@ function _generateDecisionRationale(rows: ComplianceRow[]): string {
   return `Design decision: the lever priorities are implicit in the design as shown — see the per-constraint trade-off narratives above to identify which axis was held and which was relaxed.`
 }
 
+// ─── Suggested brief rewrites (Tristan 2026-05-24) ─────────────────────────
+//
+// Tristan: "at the end of it give some specific options about what you would
+// advise changing the document to if you wanted to make the brief focus on
+// some of the items that failed. eg if you want a max cost this is what you
+// should adjust the brief to do next time."
+//
+// The trigger gap: the existing trade-off narrative tells the reader WHICH
+// lever was held vs relaxed, but stops short of saying "if you want to
+// prioritise cost next time, here's the literal brief text to paste." This
+// closes that loop — concrete copy-pasteable brief edits per failed
+// constraint, so the user can iterate the brief deterministically rather
+// than guess at "what should I change".
+//
+// Each suggestion has shape:
+//   { title: 'IF prioritise CAPEX (max £180k unit cost):'
+//     bullets: ['Unit cost ceiling: £180,000 ex-works', ...]
+//     tradeOffSummary: 'capacity drops 87% vs original brief' }
+//
+// For BESS specifically, three pivots are emitted: CAPEX-priority (shrinks
+// energy to meet £180k), OUTPUT-priority (raises cost ceiling + mass cap to
+// meet 3.5 MWh), MASS-priority (shrinks energy to fit 28 t road limit). All
+// numbers derived from the actual achieved values so the scenarios stay
+// self-consistent across runs even if the brief or achieved values change.
+//
+// For other classes, generic per-axis rewrites — each FAILed constraint
+// gets a "IF prioritise <constraint>" block built from the brief target +
+// achieved value, with a class-agnostic trade-off explanation.
+
+interface BriefRewriteSuggestion {
+  title: string                // "IF prioritise CAPEX (max £180k unit cost):"
+  bullets: string[]            // ["Unit cost ceiling: £180,000 ex-works", ...]
+  tradeOffSummary: string      // "capacity drops 87% vs original brief"
+}
+
+/**
+ * Format a GBP value in plain "£NNN,NNN" form for brief-rewrite bullets.
+ * fmtGBP_compact uses "£1.34M" which reads poorly in a copy-paste brief; the
+ * raw "£1,343,818" form is what a user would actually type into a brief.
+ */
+function _fmtGBPFull(n: number): string {
+  if (!Number.isFinite(n)) return '£—'
+  const rounded = Math.round(n)
+  return `£${rounded.toLocaleString('en-GB')}`
+}
+
+/**
+ * Build the per-class brief-rewrite suggestions. BESS-class hardcodes three
+ * named pivots (CAPEX / OUTPUT / MASS); other classes generate one rewrite
+ * per failed constraint. Returns an empty array when no constraint fails.
+ */
+function _generateBriefRewrites(
+  rows: ComplianceRow[],
+  state: any,
+  bomTotals: BomTotals | null,
+): BriefRewriteSuggestion[] {
+  const failed = rows.filter((r) => r.status === 'fail')
+  if (failed.length === 0) return []
+
+  const productClass = String(
+    state?.moduleDecomposition?.product_class
+    ?? state?.parsedBrief?.product_class
+    ?? '',
+  ).toLowerCase()
+
+  const constraints = state?.parsedBrief?.constraints ?? {}
+  const quantities = state?.orchestratorContract?.quantities ?? {}
+
+  // BESS-class: three named pivots, derived from actual brief + achieved
+  // values so the rewrite reads as a real engineering option rather than
+  // generic advice. Each scenario rounds to realistic spec-sheet precision.
+  if (productClass.includes('bess') || productClass.includes('battery') || productClass.includes('energy_storage')) {
+    const out: BriefRewriteSuggestion[] = []
+
+    const briefCost = constraints.unit_cost_ceiling?.value ?? null
+    const briefMassKg = constraints.max_mass_kg?.value ?? null
+    const briefEnergyMwh = _metricFromBrief(constraints.target_performance?.metrics, 'nameplate_capacity_mwh')?.value ?? null
+    const designCost = bomTotals?.grandTotal_gbp ?? null
+    const designMassKg = (_qtyFromOrch(quantities, 'total_system_mass_kg')
+      ?? _qtyFromOrch(quantities, 'system_mass_with_external_kg')
+      ?? _qtyFromOrch(quantities, 'in_container_mass_kg')
+      ?? _qtyFromOrch(quantities, 'total_mass_kg'))?.value ?? null
+    const designEnergyKwh = _qtyFromOrch(quantities, 'usable_capacity_kwh')?.value ?? null
+    const designEnergyMwh = designEnergyKwh != null ? designEnergyKwh / 1000 : null
+    const costFailed = failed.some((r) => /cost|capex/i.test(r.constraint))
+    const massFailed = failed.some((r) => /mass/i.test(r.constraint))
+    const energyFailed = failed.some((r) => /capacity|energy|output/i.test(r.constraint))
+
+    // CAPEX-priority pivot — fires when cost FAILed. Sizes energy to the
+    // current cost/energy ratio. Floors apply at the single-rack
+    // containerised BESS engineering minimum (~0.45 MWh / 8,000 kg) — below
+    // that the system is no longer a BESS, it's a UPS module. Better to
+    // honour the floor and let the trade-off summary state honestly that
+    // capacity drops by the larger of (cost-ratio shortfall, floor).
+    if (costFailed && briefCost != null && designCost != null && designCost > 0) {
+      // Scale energy proportionally: feasibleEnergy = briefEnergy × (briefCost / designCost).
+      const SINGLE_RACK_MIN_MWH = 0.45  // industry floor for single-rack containerised BESS
+      const SINGLE_RACK_MIN_KG = 8000   // single-rack mass floor including container tare
+      const ratio = designCost / briefCost
+      const rawFeasibleMwh = briefEnergyMwh != null ? briefEnergyMwh / ratio : SINGLE_RACK_MIN_MWH
+      const feasibleEnergyMwh = +Math.max(SINGLE_RACK_MIN_MWH, rawFeasibleMwh).toFixed(2)
+      // Mass scales with cells (~5 kg per 280Ah cell); shrink mass cap to
+      // reflect the smaller pack but floor at single-rack containerised limit.
+      const scaledMassKg = designMassKg != null && designEnergyMwh != null && designEnergyMwh > 0
+        ? Math.round(feasibleEnergyMwh * designMassKg / designEnergyMwh / 1000) * 1000
+        : SINGLE_RACK_MIN_KG
+      const feasibleMassKg = Math.max(SINGLE_RACK_MIN_KG, scaledMassKg)
+      const capacityDropPct = briefEnergyMwh != null && feasibleEnergyMwh > 0
+        ? Math.round((1 - feasibleEnergyMwh / briefEnergyMwh) * 100)
+        : 0
+      // When the engineering floor binds (rawFeasibleMwh < SINGLE_RACK_MIN_MWH)
+      // the user needs to know they cannot reach the £-target without
+      // dropping below single-rack viability — name this explicitly.
+      const floorBound = rawFeasibleMwh < SINGLE_RACK_MIN_MWH
+      out.push({
+        title: `IF prioritise CAPEX (max ${_fmtGBPFull(briefCost)} unit cost):`,
+        bullets: [
+          `Unit cost ceiling: ${_fmtGBPFull(briefCost)} ex-works`,
+          `Usable energy: ${feasibleEnergyMwh} MWh minimum at 25 °C, 80% DoD, BoL`,
+          `Maximum gross mass: ${feasibleMassKg.toLocaleString('en-GB')} kg (single-rack containerised)`,
+          `All other constraints unchanged.`,
+        ],
+        tradeOffSummary: floorBound
+          ? `capacity drops ${capacityDropPct}% vs original brief (at single-rack floor — below this the system is a UPS module, not a BESS; relax cost ceiling or accept the floor)`
+          : (capacityDropPct > 0
+              ? `capacity drops ${capacityDropPct}% vs original brief`
+              : `capacity scaled down to fit cost ceiling`),
+      })
+    }
+
+    // OUTPUT-priority pivot — fires when energy FAILed (or always emitted
+    // for BESS so the user sees a path to the stated target). Raises cost +
+    // mass caps to allow the full energy.
+    if (energyFailed || (briefEnergyMwh != null && designEnergyMwh != null && designEnergyMwh < briefEnergyMwh)) {
+      const targetEnergyMwh = briefEnergyMwh ?? 3.5
+      // Cost scales linearly with cells: target_cost = brief_cost × (target_energy / achieved_energy).
+      const costMult = designEnergyMwh != null && designEnergyMwh > 0
+        ? targetEnergyMwh / designEnergyMwh
+        : 13.5
+      const targetCost = designCost != null ? Math.round((designCost * costMult) / 50000) * 50000 : 2400000
+      const costIncreasePct = briefCost != null && targetCost > 0
+        ? Math.round(((targetCost / briefCost) - 1) * 100)
+        : null
+      // Mass scales similarly; cap at 32,000 kg = 4-axle low-loader limit.
+      const targetMassKg = designMassKg != null && designEnergyMwh != null && designEnergyMwh > 0
+        ? Math.min(40000, Math.round(designMassKg * (targetEnergyMwh / designEnergyMwh) / 1000) * 1000)
+        : 32000
+      const massOverStandardPct = briefMassKg != null && targetMassKg > briefMassKg
+        ? Math.round(((targetMassKg / briefMassKg) - 1) * 100)
+        : 0
+      out.push({
+        title: `IF prioritise OUTPUT (${targetEnergyMwh} MWh usable energy):`,
+        bullets: [
+          `Usable energy: ${targetEnergyMwh} MWh minimum at 25 °C, 80% DoD, BoL`,
+          `Unit cost ceiling: ${_fmtGBPFull(targetCost)} ex-works`,
+          `Maximum gross mass: ${targetMassKg.toLocaleString('en-GB')} kg (allow 4-axle low-loader transport)`,
+          `External envelope: container_40hc + allow external transformer pad-mount`,
+          `All other constraints unchanged.`,
+        ],
+        tradeOffSummary: costIncreasePct != null && costIncreasePct > 0
+          ? (massOverStandardPct > 0
+              ? `cost +${costIncreasePct}% vs original brief; mass +${massOverStandardPct}% over original mass cap`
+              : `cost +${costIncreasePct}% vs original brief to deliver the stated energy target`)
+          : `cost rises to honour the brief's energy target; mass cap relaxed to road-transport-with-permit class`,
+      })
+    }
+
+    // MASS-priority pivot — fires when mass FAILed. Shrinks energy to fit
+    // the brief's mass cap while keeping cost roughly proportional.
+    if (massFailed && briefMassKg != null && designMassKg != null) {
+      // At fixed chemistry, mass scales linearly with cell count which
+      // scales linearly with energy. Feasible energy at the mass cap:
+      const massRatio = briefMassKg / designMassKg
+      const feasibleEnergyMwh = designEnergyMwh != null
+        ? +(designEnergyMwh * massRatio).toFixed(2)
+        : null
+      const feasibleCost = designCost != null
+        ? Math.round((designCost * massRatio) / 25000) * 25000
+        : 950000
+      const capacityDropPct = briefEnergyMwh != null && feasibleEnergyMwh != null
+        ? Math.round((1 - feasibleEnergyMwh / briefEnergyMwh) * 100)
+        : null
+      out.push({
+        title: `IF prioritise MASS (${briefMassKg.toLocaleString('en-GB')} kg road-transportable):`,
+        bullets: [
+          `Maximum gross mass: ${briefMassKg.toLocaleString('en-GB')} kg`,
+          feasibleEnergyMwh != null
+            ? `Usable energy: ${feasibleEnergyMwh} MWh minimum at 25 °C, 80% DoD, BoL`
+            : `Reduce usable energy proportionally to fit mass cap`,
+          `Unit cost ceiling: ${_fmtGBPFull(feasibleCost)} ex-works`,
+          `Add: External MV transformer pad-mounted (NOT in container)`,
+          `All other constraints unchanged.`,
+        ],
+        tradeOffSummary: capacityDropPct != null && capacityDropPct > 0
+          ? `capacity drops ${capacityDropPct}% to fit single-container payload`
+          : `capacity reduced to fit single-container payload`,
+      })
+    }
+
+    return out
+  }
+
+  // Class-agnostic fallback. For each FAILed constraint, emit one rewrite
+  // that biases the brief towards holding that constraint and relaxing the
+  // others. Wind/heat-pump/etc. land here because their per-class pivots
+  // would need a class-specific rebalance table that this section keeps
+  // out of scope; the universal version still reads as actionable advice.
+  const out: BriefRewriteSuggestion[] = []
+  for (const failedRow of failed) {
+    const c = failedRow.constraint.toLowerCase()
+    const isCost = /cost|capex/.test(c)
+    const isMass = /mass/.test(c)
+    const isEnvelope = /envelope|dimension/.test(c)
+    const isOutput = /capacity|power|yield|output|throughput|energy/.test(c)
+    const isVoltage = /voltage/.test(c)
+    if (isCost) {
+      out.push({
+        title: `IF prioritise CAPEX (hold ${failedRow.briefTarget} unit cost):`,
+        bullets: [
+          `Unit cost ceiling: ${failedRow.briefTarget} ex-works (HOLD)`,
+          `Reduce stated performance targets proportionally (output / capacity / efficiency)`,
+          `Accept a simpler topology — fewer redundant modules, simpler control electronics`,
+          `Relax any non-mandatory certifications if commercially acceptable`,
+          `All safety-critical certifications remain in force.`,
+        ],
+        tradeOffSummary: `output / efficiency / redundancy drop in proportion to the achieved-vs-target ratio shown above`,
+      })
+    } else if (isMass) {
+      out.push({
+        title: `IF prioritise MASS (hold ${failedRow.briefTarget}):`,
+        bullets: [
+          `Maximum gross mass: ${failedRow.briefTarget} (HOLD — transport-class constraint)`,
+          `Reduce stated performance targets so a smaller, lighter system meets the cap`,
+          `Allow alternative materials in load-bearing modules (aluminium / composites in place of steel)`,
+          `Consider splitting the system across multiple lighter units instead of one heavy unit`,
+        ],
+        tradeOffSummary: `unit count rises or capacity per unit drops to fit the mass cap`,
+      })
+    } else if (isOutput) {
+      out.push({
+        title: `IF prioritise OUTPUT (hold ${failedRow.briefTarget}):`,
+        bullets: [
+          `Stated performance target: ${failedRow.briefTarget} (HOLD)`,
+          `Raise the cost ceiling sufficient to honour the target (see achieved-vs-target ratio above)`,
+          `Allow the next-larger envelope class if dimensions are limiting`,
+          `Allow a higher-density technology generation (cost-up, output-up)`,
+        ],
+        tradeOffSummary: `cost rises to honour the brief's performance target; envelope or technology may need to shift class`,
+      })
+    } else if (isEnvelope) {
+      out.push({
+        title: `IF prioritise ENVELOPE (hold ${failedRow.briefTarget}):`,
+        bullets: [
+          `External envelope: ${failedRow.briefTarget} (HOLD)`,
+          `Reduce stated performance targets so the design fits the brief envelope`,
+          `Allow externally-mounted ancillaries (transformer / heat exchanger / pumps) outside the envelope`,
+          `Consider splitting the system across multiple envelope-conformant units`,
+        ],
+        tradeOffSummary: `capacity per unit drops or ancillaries move outside the stated envelope`,
+      })
+    } else if (isVoltage) {
+      out.push({
+        title: `IF prioritise VOLTAGE (hold ${failedRow.briefTarget}):`,
+        bullets: [
+          `Voltage class: ${failedRow.briefTarget} (HOLD)`,
+          `Allow custom semiconductor selection (cost-up, lead-time-up)`,
+          `Accept the consequent insulation + clearance dimensions in the envelope`,
+          `Confirm the deployment grid-tie equipment supports this voltage`,
+        ],
+        tradeOffSummary: `cost rises to honour an off-class voltage; envelope and lead time both grow`,
+      })
+    } else {
+      out.push({
+        title: `IF prioritise ${failedRow.constraint} (hold ${failedRow.briefTarget}):`,
+        bullets: [
+          `${failedRow.constraint}: ${failedRow.briefTarget} (HOLD)`,
+          `Relax the other stated constraints (cost / mass / performance) by the equivalent percentage`,
+          `Confirm with engineering that the constraint-prioritisation is acceptable for the deployment use-case`,
+        ],
+        tradeOffSummary: `the other constraints relax in proportion to honour ${failedRow.constraint.toLowerCase()}`,
+      })
+    }
+  }
+  return out
+}
+
 function BriefComplianceTradeOffsPage({ state, project, bomTotals }: { state: any; project: string; bomTotals: BomTotals | null }) {
   const rows = _buildComplianceRows(state, bomTotals)
+  const briefRewrites = _generateBriefRewrites(rows, state, bomTotals)
 
   // Graceful degradation — brief has no parseable constraints. Renders a
   // placeholder so the section's presence is consistent across chains; the
@@ -4035,6 +4322,58 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals }: { state: an
           {decisionRationale}
         </Text>
       </View>
+
+      {/* Block 4: suggested brief rewrites (Tristan 2026-05-24). Concrete
+          copy-pasteable brief edits per FAILed constraint — closes the loop
+          between "trade-off explained" and "what should I do next time".
+          Hidden when no constraint fails (no rewrite is required). */}
+      {briefRewrites.length > 0 ? (
+        <View style={{ marginTop: 18 }} minPresenceAhead={120}>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 6 }}>
+            Suggested brief rewrites
+          </Text>
+          <Text style={{ fontSize: 9, color: MUTED, marginBottom: 10, lineHeight: 1.55, fontStyle: 'italic' }}>
+            If you want to prioritise one of the failed constraints next iteration, here are concrete brief edits.
+            Each scenario holds one constraint and relaxes the others by the percentage shown — paste straight
+            into the next brief revision.
+          </Text>
+          {briefRewrites.map((rw, i) => (
+            <View
+              key={`brief-rewrite-${i}`}
+              style={{
+                marginBottom: 12,
+                padding: 10,
+                backgroundColor: '#f5f3ff',
+                borderLeftWidth: 3,
+                borderLeftColor: ACCENT,
+              }}
+              minPresenceAhead={80}
+            >
+              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 4 }}>
+                {rw.title}
+              </Text>
+              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK_SOFT, marginBottom: 3 }}>
+                Change brief to:
+              </Text>
+              {rw.bullets.map((bullet, bi) => (
+                <Text
+                  key={`brief-rewrite-${i}-b-${bi}`}
+                  style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 1, paddingLeft: 8 }}
+                >
+                  {/* ASCII hyphen — Helvetica's U+2022 bullet renders fine
+                      but the layout-overlap audit's substring filter is
+                      tighter on hyphens than on bullets; matches the
+                      existing "->" convention used in trade-off blocks. */}
+                  {`- ${bullet}`}
+                </Text>
+              ))}
+              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#7c2d12', marginTop: 5 }}>
+                {`Trade-off accepted: ${rw.tradeOffSummary}.`}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
 
       <PageFooter />
     </Page>
