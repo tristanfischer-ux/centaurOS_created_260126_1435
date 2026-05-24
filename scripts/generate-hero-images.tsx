@@ -42,6 +42,7 @@
 
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { resolve, dirname } from 'path'
+import { execFileSync } from 'child_process'
 import {
   callGeminiI2I,
   runBlenderCoverPass,
@@ -50,6 +51,45 @@ import {
   writeImage,
   type ImageRef,
 } from './lib/illustration-i2i'
+
+/**
+ * Phase 2.5 (2026-05-24): dispatch to scripts/render-blender-scene.py which
+ * runs a per-class hand-coded Blender template (or LLM-generated blender-
+ * scene.py if phase 3 generator ran first). The template's render pipeline
+ * produces 00-hero.png + module-*.png + blender-cover.png mirror in one
+ * Blender call. We use blender-cover.png as the Gemini i2i reference so
+ * the photoreal cover is anchored on real geometry, not the cube grid.
+ *
+ * Returns the absolute path to blender-cover.png on success, or null if
+ * no template exists for this class (caller falls back to legacy
+ * runBlenderCoverPass).
+ */
+function trySceneTemplateHero(statePath: string, outDir: string): string | null {
+  const runner = resolve(__dirname, 'render-blender-scene.py')
+  if (!existsSync(runner)) return null
+  const blenderCover = resolve(outDir, 'blender-cover.png')
+  // Skip the second run if the template runner has already produced output
+  // for this chain run (e.g. when generate-module-images.tsx fired earlier).
+  if (existsSync(blenderCover) && existsSync(resolve(outDir, '00-hero.png'))) {
+    return blenderCover
+  }
+  try {
+    execFileSync(
+      'python3',
+      [runner, '--state', statePath, '--out-dir', outDir],
+      { stdio: 'inherit', timeout: 300_000 },
+    )
+  } catch (err: any) {
+    const code = typeof err?.status === 'number' ? err.status : -1
+    if (code === 5) {
+      console.error('[hero] no per-class template; falling back to legacy runBlenderCoverPass')
+    } else {
+      console.error(`[hero] render-blender-scene.py exited ${code}; falling back to legacy runBlenderCoverPass`)
+    }
+    return null
+  }
+  return existsSync(blenderCover) ? blenderCover : null
+}
 
 async function main() {
   const args = process.argv.slice(2)
@@ -65,10 +105,36 @@ async function main() {
   }
   const state = JSON.parse(readFileSync(statePath, 'utf-8'))
 
+  // STEP 0 (phase 3): LLM-generated brief-specific blender-scene.py.
+  // Writes <out-dir>/blender-scene.py + forge_blender_lib.py if successful;
+  // render-blender-scene.py picks them up automatically. Fail-soft: if the
+  // generator fails or no template exists for this class, the runner falls
+  // back to the unmodified per-class template (still phase-20-quality).
+  // Skip via BLENDER_SCENE_GEN_SKIP=1 (e.g. for fast smoke tests).
+  const outDirEarly = dirname(statePath)
+  const sceneGen = resolve(__dirname, 'generate-blender-scene.tsx')
+  if (process.env.BLENDER_SCENE_GEN_SKIP !== '1' && existsSync(sceneGen)) {
+    console.log('[hero] step 0: per-project geometry generator (LLM)...')
+    const t0 = Date.now()
+    try {
+      execFileSync('npx', ['tsx', sceneGen, statePath, '--write'], { stdio: 'inherit', timeout: 240_000 })
+      console.log(`[hero]   geometry generator OK in ${((Date.now() - t0) / 1000).toFixed(1)}s`)
+    } catch (err: any) {
+      console.error(`[hero]   geometry generator failed (${err?.status ?? 'err'}); falling back to unmodified template`)
+    }
+  }
+
   // STEP 1: Blender structural reference
+  // Phase 2.5: try the per-class template runner first (real geometry); fall
+  // back to the legacy single-shot cube-grid Blender if no template exists.
   console.log('[hero] step 1: Blender structural reference cover pass...')
   const t1 = Date.now()
-  const blenderCoverPath = runBlenderCoverPass(statePath)
+  let blenderCoverPath: string | null = trySceneTemplateHero(statePath, outDirEarly)
+  if (blenderCoverPath) {
+    console.log(`[hero]   template runner produced blender-cover.png in ${((Date.now() - t1) / 1000).toFixed(1)}s`)
+  } else {
+    blenderCoverPath = runBlenderCoverPass(statePath)
+  }
   const blenderRef: ImageRef | null = blenderCoverPath ? readImageRef(blenderCoverPath) : null
   if (blenderRef) {
     console.log(`[hero]   Blender cover OK in ${((Date.now() - t1) / 1000).toFixed(1)}s → ${blenderCoverPath}`)

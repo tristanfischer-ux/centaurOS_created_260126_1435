@@ -98,16 +98,25 @@ def main() -> int:
         print("[render-scene] FATAL: state has no product_class", file=sys.stderr)
         return 1
 
-    template = resolve_template(product_class)
-    if template is None:
-        print(
-            f"[render-scene] no template for product_class={product_class!r}; "
-            f"caller should fall back to the universal renderer",
-            file=sys.stderr,
-        )
-        return 5
-
+    # Phase 3 (mempalace drawer_forgeos_decisions_3f18c3cae92fe29e): prefer
+    # an LLM-generated brief-specific blender-scene.py if it exists in out_dir
+    # (written by generate-blender-scene.tsx). Falls back to the unmodified
+    # class template if not present.
     out_dir.mkdir(parents=True, exist_ok=True)
+    generated = out_dir / "blender-scene.py"
+    if generated.exists():
+        template = generated
+        print(f"[render-scene] using LLM-generated blender-scene.py at {generated}", flush=True)
+    else:
+        template = resolve_template(product_class)
+        if template is None:
+            print(
+                f"[render-scene] no template for product_class={product_class!r}; "
+                f"caller should fall back to the universal renderer",
+                file=sys.stderr,
+            )
+            return 5
+        print(f"[render-scene] using unmodified template {template.name}", flush=True)
     if not Path(BLENDER_BIN).exists():
         print(f"[render-scene] FATAL: Blender binary missing at {BLENDER_BIN}", file=sys.stderr)
         return 1
@@ -125,7 +134,7 @@ def main() -> int:
             [BLENDER_BIN, "--background", "--python", str(template)],
             env=env,
             check=True,
-            timeout=300,
+            timeout=900,  # LLM-generated scenes can have 150+ primitives → ~10 min render
         )
     except subprocess.CalledProcessError as e:
         print(f"[render-scene] FATAL: Blender exited {e.returncode}", file=sys.stderr)
