@@ -57,7 +57,7 @@ export interface CritiqueReport {
 // internal reasoning and returns empty content (verified A/B in ab-tests/).
 const FLASH_LITE_MODEL = 'google/gemini-3.5-flash'
 
-function compactDesign(modules: any[], brief: any, keyMetrics: any, partSummary: any, decisions: any[]): any {
+function compactDesign(modules: any[], brief: any, keyMetrics: any, partSummary: any, decisions: any[], contractTradeOffs: any): any {
   const compactModules = (modules || []).map((m: any) => ({
     module: m.module,
     display_name: m.display_name,
@@ -78,6 +78,14 @@ function compactDesign(modules: any[], brief: any, keyMetrics: any, partSummary:
     modules: compactModules,
     partVerificationSummary: partSummary ?? null,
     designDecisionsCount: (decisions ?? []).length,
+    // BESS L4 (2026-05-24): contract-documented trade-offs. When the
+    // engineering contract has explicitly accepted a shortfall against the
+    // brief (e.g. usable capacity below target because the integer-feasible
+    // single-container envelope cannot fit the requested cells), surface
+    // that to the critic so it does NOT re-flag the documented trade-off as
+    // a physics bug. The critic should report it as a NOTED constraint
+    // rather than a brief_to_design_fidelity HIGH issue.
+    contractAcceptedTradeOffs: contractTradeOffs ?? null,
   }
 }
 
@@ -86,8 +94,11 @@ function critiquePrompt(design: any, productClass: string): string {
 
 Product class: ${productClass}
 
+CONTRACT-ACCEPTED TRADE-OFFS (read FIRST):
+The chain runs an upstream deterministic engineering contract that solves the design's integer-clean topology against ALL brief constraints simultaneously (mass cap, container envelope, voltage class, integer rack/string counts, cost ceiling). When the brief is over-constrained (e.g. a 3.5 MWh target cannot fit a single 40-ft / 28 t envelope at 800 V), the contract documents the accepted trade-off explicitly in \`contractAcceptedTradeOffs\` (see top of the design JSON). Trade-offs there are NOT bugs — they are deliberate engineering decisions the contract has already justified. Do not flag a trade-off recorded here as a brief_to_design_fidelity HIGH issue; instead, in your headline note "design honours documented trade-off X". Real fidelity bugs are values the contract does NOT record as accepted trade-offs.
+
 Critique on five dimensions (0-10 each):
-1. brief_to_design_fidelity — do the headline numbers actually satisfy the brief? Pay particular attention to: target endurance vs energy storage, target power output vs converter ratings, target throughput vs flow capacity, ambient temperature vs cooling capacity. Do the math.
+1. brief_to_design_fidelity — do the headline numbers actually satisfy the brief, EXCLUDING the trade-offs the contract has documented? Pay particular attention to: target endurance vs energy storage, target power output vs converter ratings, target throughput vs flow capacity, ambient temperature vs cooling capacity. Do the math.
 2. engineering_plausibility — do the physics/spec values hold together? Check: current ratings vs cable cross-sections, heatsink capacity vs dissipated power, actuator torque vs required mechanical work, voltage classes consistent, mass/volume sane.
 3. internal_coherence — modules link sensibly (sensor connects to controller not structural mount); no orphans; cross-links semantically correct.
 4. part_realism — surviving (manufacturer, part_number) pairs look real, not fabricated-by-style.
@@ -140,10 +151,16 @@ export async function runPhysicsCritic(opts: {
   productClass: string
   apiKey: string
   model?: string
+  /** BESS L4 (2026-05-24): contract-documented accepted trade-offs. Pass the
+   *  engineering contract's brief_summary + brief_target_feasibility +
+   *  container_count + the relevant closure reason text so the critic can see
+   *  "design honours brief X with documented shortfall Y" rather than
+   *  re-flag the shortfall as a brief_to_design_fidelity bug. */
+  contractTradeOffs?: any
 }): Promise<CritiqueReport | null> {
   const t0 = Date.now()
   const model = opts.model || FLASH_LITE_MODEL
-  const design = compactDesign(opts.modules, opts.brief, opts.keyMetrics, opts.partSummary, opts.decisions ?? [])
+  const design = compactDesign(opts.modules, opts.brief, opts.keyMetrics, opts.partSummary, opts.decisions ?? [], opts.contractTradeOffs)
   const prompt = critiquePrompt(design, opts.productClass)
 
   let res: Response

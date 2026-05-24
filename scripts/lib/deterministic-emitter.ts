@@ -752,11 +752,19 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('regulatory', 'IEC 60947-2'),
         ],
       ),
-      // BESS L3 (2026-05-24, issue #3): NEW WORD — main bus contactor.
-      // Distinct physical object from per-rack contactors above (different
-      // current rating, different position in the bus). Gigavac MX16 is a
-      // real 1500 A / 1500 V DC HVDC switching product, sized to ≥1.25 ×
-      // bus continuous current per UL 9540A 13.2.4.
+      // BESS L4 (2026-05-24, physics-critic L3 issue #3): NEW WORD — main bus
+      // contactor. Distinct physical object from per-rack contactors above
+      // (different current rating, different position in the bus). Sized to
+      // ≥1.25 × bus continuous current per UL 9540A 13.2.4 (1.25 × 1250 A =
+      // 1562 A required; the chosen part is rated for that).
+      //
+      // L3 part-realism bug: original spec listed "Gigavac MX16 1500 V 1500 A"
+      // but the real Gigavac MX16 is only 600 A continuous (the 1500 figure
+      // is its voltage class, not its current rating). For a real 1500 A
+      // class HVDC contactor at 1500 V, Schaltbau C310 is the industry
+      // standard part in utility BESS (used in Sungrow SC-class skids,
+      // Huawei FusionSolar, CATL EnerC+). C310 datasheet: 1500 A continuous,
+      // 1500 V DC, 750 A breaking @ 800 V DC, IEC 60947-2 + UL 508 listed.
       word(
         'main_bus_contactor_word',
         'main bus contactor word',
@@ -765,7 +773,7 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('quantity', '×1'),
           mod('dimension', '1500', 'V'),
           mod('capacity', '1500', 'A'),
-          mod('form', 'Gigavac MX16'),
+          mod('form', 'Schaltbau C310 (1500 A continuous / 1500 V DC HVDC, IEC 60947-2)'),
           mod('regulatory', 'UL 9540A'),
         ],
       ),
@@ -833,7 +841,7 @@ function emitPowerDistribution(p: BessParams): DesignModule {
 
   return {
     module: 'power_distribution',
-    module_brief: `Routes ${p.busContinuousA.toFixed(0)} A continuous (${p.busPeakA.toFixed(0)} A peak) at ${p.dcBusVoltageV} V DC from ${p.rackCount} racks (${p.stringContinuousA.toFixed(0)} A continuous per-rack via Gigavac MX12 contactors) through a Gigavac MX16 1500 A main bus contactor and HRC fuses to PCS, and the PCS AC output through 1600 A switchgear to the grid PCC.`,
+    module_brief: `Routes ${p.busContinuousA.toFixed(0)} A continuous (${p.busPeakA.toFixed(0)} A peak) at ${p.dcBusVoltageV} V DC from ${p.rackCount} racks (${p.stringContinuousA.toFixed(0)} A continuous per-rack via Gigavac MX12 contactors) through a Schaltbau C310 1500 A / 1500 V DC main bus contactor and HRC fuses to PCS, and the PCS AC output through 1600 A switchgear to the grid PCC.`,
     overview_paragraph_en: '',
     derived_parameters: {
       bus_continuous_current_a: p.busContinuousA,

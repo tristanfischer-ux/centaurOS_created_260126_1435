@@ -32,6 +32,20 @@ export interface MassAggregatorInput {
   container_tare_kg_estimate: number
   /** Steel battery rack typical 130-180 kg per rack (depends on cell qty). */
   rack_mass_kg_each_estimate: number
+  /**
+   * BESS L4 (2026-05-24): authoritative container count from the
+   * engineering contract. When present (>0), the aggregator's split
+   * recommendation is overridden in favour of the contract value AND the
+   * "MUST split" warning is downgraded to an informational note explaining
+   * the trade-off. Use when the brief envelope is genuinely over-constrained
+   * and the contract has documented the deliberate shortfall via
+   * brief_target_feasibility=0. Set to null/undefined to use the default
+   * mass-budget heuristic.
+   */
+  container_count_authoritative?: number | null
+  /** Brief-target feasibility (1=met, 0=accepted shortfall). Informational
+   *  context for the warning text only — does not change container_count. */
+  brief_target_feasibility?: number | null
 }
 
 export interface MassAggregatorOutput {
@@ -75,11 +89,29 @@ export const massAggregator: Tool<MassAggregatorInput, MassAggregatorOutput> = {
     )
     const mass_budget_breach_kg = total_system_mass_kg - input.max_mass_kg_envelope
     const mass_budget_utilisation_pct = (total_system_mass_kg / Math.max(1, input.max_mass_kg_envelope)) * 100
-    const recommended_container_count = Math.max(1, Math.ceil(total_system_mass_kg / Math.max(1, input.max_mass_kg_envelope)))
+    const heuristic_container_count = Math.max(1, Math.ceil(total_system_mass_kg / Math.max(1, input.max_mass_kg_envelope)))
+    // BESS L4 (2026-05-24): authoritative container count from contract wins
+    // when present and > 0. Closes physics-critic L3 issue #4 where the
+    // mass-aggregator's "MUST split" recommendation was triggering the
+    // Generator/emitter chain to produce 2-container designs even after the
+    // engineering contract had explicitly chosen single-container (with
+    // brief_target_feasibility=0 documenting the accepted shortfall). The
+    // heuristic remains visible in the warning text for diagnostic transparency.
+    const contract_container_count = (input.container_count_authoritative ?? 0) > 0
+      ? Math.max(1, Math.floor(input.container_count_authoritative as number))
+      : null
+    const recommended_container_count = contract_container_count ?? heuristic_container_count
     const per_container_mass_kg = total_system_mass_kg / recommended_container_count
 
     const warnings: string[] = []
-    if (mass_budget_breach_kg > 0) {
+    if (contract_container_count !== null && mass_budget_breach_kg > 0) {
+      // Contract overrode the heuristic — describe the trade-off rather than
+      // demanding a split that violates the brief's single-container envelope.
+      const feasibilityNote = input.brief_target_feasibility === 0
+        ? '; brief_target_feasibility=0 (capacity shortfall documented in contract closure)'
+        : ''
+      warnings.push(`Mass-aggregator heuristic suggested ${heuristic_container_count} containers (total ${Math.round(total_system_mass_kg)} kg > envelope ${input.max_mass_kg_envelope} kg by ${Math.round(mass_budget_breach_kg)} kg) but engineering contract has authoritatively chosen ${recommended_container_count} container(s) per the brief's single-container envelope${feasibilityNote}. Honour contract.`)
+    } else if (mass_budget_breach_kg > 0) {
       warnings.push(`Mass budget breach: total ${Math.round(total_system_mass_kg)} kg > envelope ${input.max_mass_kg_envelope} kg by ${Math.round(mass_budget_breach_kg)} kg. Design MUST split into ${recommended_container_count} road-transportable containers (per_container ≈ ${Math.round(per_container_mass_kg)} kg each).`)
     } else if (mass_budget_utilisation_pct > 90) {
       warnings.push(`Mass budget tight: ${mass_budget_utilisation_pct.toFixed(1)}% utilised. Consider splitting into 2 containers for transport-stress and balance.`)

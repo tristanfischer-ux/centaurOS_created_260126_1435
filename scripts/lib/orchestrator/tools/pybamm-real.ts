@@ -40,6 +40,22 @@ export interface PybammInput {
   cell_capacity_ah: number
   cell_voltage_v: number
   ambient_temp_c?: number
+  /** Build #18r-fix1: DC bus voltage from contract for voltage-limit topology. */
+  dc_bus_voltage_v?: number
+  /** Build #18p: rated power for per-cell current sizing. */
+  rated_power_kw?: number
+  /**
+   * BESS L4 (2026-05-24): authoritative cell count from engineering-contract.
+   * When set (>0), pybamm uses this value directly and skips its own
+   * derive_pack_topology + EoL margin. Closes physics-critic L3 issue #2 +
+   * the pybamm 11×175 split that overrode the contract's 15×250 integer-clean
+   * topology. See bess.ts class plan + pybamm_run.py compute().
+   */
+  cell_count_authoritative?: number | null
+  rack_count_authoritative?: number | null
+  cells_per_rack_authoritative?: number | null
+  series_cells_per_string_authoritative?: number | null
+  parallel_strings_per_rack_authoritative?: number | null
 }
 
 export interface PybammOutput {

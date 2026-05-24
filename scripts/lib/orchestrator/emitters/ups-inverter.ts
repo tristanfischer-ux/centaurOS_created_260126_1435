@@ -92,6 +92,11 @@ function emitBatteryPack(p: Params): DesignModule {
       word('battery_cabinet_bms_word', 'battery cabinet BMS',
         cc('battery_cabinet_bms', 'battery cabinet BMS', 'silicon_semiconductor_function', 'steel'),
         [mod('quantity', '×1'), mod('form', 'cabinet + master BMS + cell balancing + DC disconnect + Class T fuse'), mod('capacity', p.batteryKwh.toFixed(1), 'kWh')]),
+      // 2026-05-24 orphan-fix: word for VRLA-AGM fallback when isLithium=false
+      // in the engineering-contract; macro `vrla_block_battery` propagates here.
+      word('vrla_block_battery_word', 'VRLA AGM block battery',
+        cc('vrla_block_battery', 'VRLA AGM block battery', 'electrochemical_energy_function', 'lead'),
+        [mod('quantity', '×1'), mod('capacity', p.batteryKwh.toFixed(1), 'kWh'), mod('form', '12 V VRLA-AGM block (CSB/Yuasa) — placeholder when Li-ion not selected'), mod('regulatory', 'BS EN 50272-2')]),
     ])
   return {
     module: 'battery_pack',

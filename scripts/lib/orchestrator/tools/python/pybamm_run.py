@@ -151,6 +151,50 @@ CELL_MASS_KG_BY_CHEMISTRY = {
     "lto": 5.9,   # higher mass per kWh
 }
 
+# Build #19d (2026-05-22): provenance metadata — every wrapper MUST emit this
+# block in its output so the report's Tools-Used page can audit each claim.
+PROVENANCE = {
+    "tool_name": "PyBaMM",
+    "tool_version": "26.4.3",
+    "tool_license": "BSD-3-Clause",
+    "tool_source_url": "https://github.com/pybamm-team/PyBaMM",
+    "tool_paper": "Sulzer, Marquis, Timms, Robinson, Chapman (2021), 'Python Battery Mathematical Modelling (PyBaMM)', Journal of Open Research Software, 9(1):14",
+    "tool_doi": "10.5334/jors.309",
+    "physics_basis": "Doyle-Fuller-Newman pseudo-2D electrochemistry model (Doyle, Fuller, Newman 1993, J. Electrochem. Soc. 140(6))",
+    "physics_paper_doi": "10.1149/1.2221597",
+    "parameter_set_reference": "Prada et al. (2013), 'A simplified electrochemical and thermal aging model of LiFePO4-graphite Li-ion batteries', J. Electrochem. Soc. 160(4):A616",
+    "confidence_class": "library",  # one of: library | datasheet | textbook | standard | empirical | estimated
+    "embedded_constants": {
+        "CELL_MASS_KG_BY_CHEMISTRY": {
+            "source": "CATL CB-280Ah-A-50 + EVE 280Ah + Calb 280Ah public datasheets, 2024-2025",
+            "confidence": "datasheet",
+        },
+        "R_MIN_MOHM_BY_CHEMISTRY": {
+            "source": "Industry-typical clamp: LFP 280Ah cell DC IR floor ≈ 0.3 mΩ from CATL/EVE/Calb datasheets. Required because PyBaMM DFN startup-transient estimate returns unphysical ≤0.02 mΩ.",
+            "confidence": "industry_typical",
+            "note": "See mempalace gotcha drawer_ForgeOS_gotchas_2f20805c0729bdc8",
+        },
+        "SYSTEM_OVERHEAD_MULTIPLIER (1.5x)": {
+            "source": "Industry-typical busbar+contactor+wiring loss factor; real BESS round-trip ηDC ≈ 95-97% with battery contributing 1-2% and balance-of-plant another 1-2%",
+            "confidence": "empirical",
+        },
+        "BMS_CHANNELS_PER_SLAVE (12)": {
+            "source": "ISL94212 BMS slave IC datasheet (Renesas/Intersil)",
+            "confidence": "datasheet",
+        },
+        "TARGET_CELLS_PER_RACK (280)": {
+            "source": "40-ft ISO container 8×2 rack layout heuristic; industry-typical",
+            "confidence": "industry_typical",
+        },
+        "DC_BUS_DERATING (0.92)": {
+            "source": "Industry-typical 8% headroom for end-of-charge over-voltage transients before SCPD trip",
+            "confidence": "industry_typical",
+        },
+    },
+    "last_reviewed_date": "2026-05-22",
+    "review_notes": "Build #18p-fix2: clamped R_min, corrected per-cell current for series-parallel topology, added voltage-limit check in derive_pack_topology.",
+}
+
 # Max cell voltage at end-of-charge (per chemistry)
 MAX_CELL_VOLTAGE_V = {
     "lfp": 3.65,  # LFP charge cutoff
@@ -249,6 +293,29 @@ def compute(payload: dict) -> dict:
     chemistry = str(payload.get("cell_chemistry", "lfp")).lower()
     cell_count, theoretical, nameplate = deterministic_cell_count(payload)
 
+    # BESS L4 (2026-05-24): respect engineering-contract authoritative topology.
+    # When the contract already solved for an integer-clean cell_count / rack
+    # split that fits the brief envelope (mass cap, single container, 800 V
+    # bus), pybamm MUST use those values directly instead of running its own
+    # derive_pack_topology + EoL margin (which silently produced 3850 cells /
+    # 11 racks × 350 cells/rack at 1120 V — a HIGH-severity physics-critic
+    # bug in L3). Pybamm still runs the DFN physics for voltage profile +
+    # internal resistance; only the topology / cell count is fixed by the
+    # contract. The bess.ts class plan passes these *_authoritative fields
+    # straight from engineering_contract.ts quantities (see comment in that
+    # file ~line 463 — cells_per_rack / series_cells_per_string / rack_count).
+    cell_count_authoritative = payload.get("cell_count_authoritative")
+    if cell_count_authoritative is not None and int(cell_count_authoritative) > 0:
+        cell_count = int(cell_count_authoritative)
+        # Override theoretical too so downstream consumers don't see a stale
+        # value — theoretical now equals authoritative (they're the same when
+        # contract has chosen the topology deliberately).
+        theoretical = cell_count
+        # Update nameplate to match the authoritative cell count.
+        cell_ah_input = float(payload.get("cell_capacity_ah", 280))
+        cell_v_input = float(payload.get("cell_voltage_v", 3.2))
+        nameplate = (cell_count * cell_ah_input * cell_v_input) / 1000.0
+
     # Try the real PyBaMM simulation. If it fails (parameter set missing
     # for the chemistry, etc.) fall back to empirical voltage profile.
     real_sim_ok = False
@@ -285,19 +352,62 @@ def compute(payload: dict) -> dict:
 
     # Build #18p-fix1 (2026-05-22): voltage-limit-aware pack topology.
     dc_bus_voltage_v = float(payload.get("dc_bus_voltage_v", 800))
-    topo = derive_pack_topology(
-        cell_count_raw=cell_count,
-        cell_voltage_v=float(payload.get("cell_voltage_v", 3.2)),
-        chemistry=chemistry,
-        dc_bus_voltage_v=dc_bus_voltage_v,
-    )
-    rack_count = topo["rack_count"]
-    cells_per_rack = topo["cells_per_rack"]
-    cell_count_rounded = topo["cell_count_rounded"]
-    series_cells_per_string = topo["series_cells_per_string"]
-    parallel_strings_per_rack = topo["strings_per_rack"]
-    parallel_strings_total = topo["parallel_strings_total"]
-    string_voltage_nominal_v = topo["string_voltage_nominal_v"]
+    cell_voltage_v_input = float(payload.get("cell_voltage_v", 3.2))
+    # BESS L4 (2026-05-24): if the engineering contract has already chosen an
+    # integer-clean topology, USE IT and skip derive_pack_topology entirely.
+    # The contract knows the brief constraints (mass cap, container envelope,
+    # bus voltage class) and picked the topology to satisfy ALL of them; the
+    # local solver here only knows the bus-voltage-derating heuristic and was
+    # producing 11-rack 175-series splits that violated the contract.
+    rack_count_auth = payload.get("rack_count_authoritative")
+    cells_per_rack_auth = payload.get("cells_per_rack_authoritative")
+    series_auth = payload.get("series_cells_per_string_authoritative")
+    parallel_per_rack_auth = payload.get("parallel_strings_per_rack_authoritative")
+    if (
+        rack_count_auth is not None
+        and cells_per_rack_auth is not None
+        and series_auth is not None
+        and parallel_per_rack_auth is not None
+        and int(rack_count_auth) > 0
+        and int(cells_per_rack_auth) > 0
+    ):
+        rack_count = int(rack_count_auth)
+        cells_per_rack = int(cells_per_rack_auth)
+        series_cells_per_string = int(series_auth)
+        parallel_strings_per_rack = int(parallel_per_rack_auth)
+        parallel_strings_total = parallel_strings_per_rack * rack_count
+        cell_count_rounded = rack_count * cells_per_rack
+        string_voltage_nominal_v = round(series_cells_per_string * cell_voltage_v_input, 1)
+        topo = {
+            "rack_count": rack_count,
+            "cells_per_rack": cells_per_rack,
+            "cell_count_rounded": cell_count_rounded,
+            "series_cells_per_string": series_cells_per_string,
+            "strings_per_rack": parallel_strings_per_rack,
+            "parallel_strings_total": parallel_strings_total,
+            "string_voltage_nominal_v": string_voltage_nominal_v,
+            "string_voltage_max_charge_v": round(
+                series_cells_per_string * MAX_CELL_VOLTAGE_V.get(chemistry, 3.65),
+                1,
+            ),
+            "max_series_cells_allowed": series_cells_per_string,
+            "dc_bus_voltage_v": dc_bus_voltage_v,
+            "headroom_pct": 0.0,  # contract chose this; headroom not applicable
+        }
+    else:
+        topo = derive_pack_topology(
+            cell_count_raw=cell_count,
+            cell_voltage_v=cell_voltage_v_input,
+            chemistry=chemistry,
+            dc_bus_voltage_v=dc_bus_voltage_v,
+        )
+        rack_count = topo["rack_count"]
+        cells_per_rack = topo["cells_per_rack"]
+        cell_count_rounded = topo["cell_count_rounded"]
+        series_cells_per_string = topo["series_cells_per_string"]
+        parallel_strings_per_rack = topo["strings_per_rack"]
+        parallel_strings_total = topo["parallel_strings_total"]
+        string_voltage_nominal_v = topo["string_voltage_nominal_v"]
 
     cell_mass_kg = CELL_MASS_KG_BY_CHEMISTRY.get(chemistry, 5.3)
     total_cell_mass_kg = round(cell_count_rounded * cell_mass_kg, 1)
@@ -379,6 +489,8 @@ def compute(payload: dict) -> dict:
             "c_rate_simulated": sim_result.get("c_rate_simulated"),
             "error": sim_result.get("_error"),
         },
+        # Build #19d: provenance block — surfaces in the report's Tools-Used page
+        "_provenance": PROVENANCE,
     }
 
 

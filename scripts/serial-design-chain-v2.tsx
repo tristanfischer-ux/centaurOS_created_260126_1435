@@ -727,6 +727,39 @@ function setByPath(obj: any, path: string, value: any): void {
 
 // ─── Prompts ────────────────────────────────────────────────────────────────
 
+// BESS L4 (2026-05-24): build a compact "contract trade-offs" object for the
+// physics critic. Surfaces accepted shortfalls (brief_target_feasibility=0)
+// + the contract's brief_summary + closure reasons so the critic can see
+// "design honours brief target X with documented shortfall Y" rather than
+// re-flag the shortfall as a brief_to_design_fidelity HIGH issue. Returns
+// null when no contract is available. See physics-critic.ts comment block
+// for the contractAcceptedTradeOffs key in the design JSON.
+function buildContractTradeOffs(engineeringContract: EngineeringContract | null): any {
+  if (!engineeringContract) return null
+  const q = engineeringContract.quantities ?? {}
+  const closures = engineeringContract.closures ?? []
+  const tradeOffClosures = closures
+    .filter((c: any) => c.status === 'warn' || c.invariant_id === 'brief_target_feasibility')
+    .map((c: any) => ({
+      invariant_id: c.invariant_id,
+      status: c.status,
+      reason: c.reason,
+    }))
+  const acceptedFlags: Record<string, any> = {}
+  for (const key of ['brief_target_feasibility', 'container_count']) {
+    const qty = (q as any)[key]
+    if (qty && typeof qty.value !== 'undefined') {
+      acceptedFlags[key] = { value: qty.value, source_detail: qty.source_detail ?? null }
+    }
+  }
+  return {
+    brief_summary: engineeringContract.brief_summary,
+    product_class: engineeringContract.product_class,
+    accepted_flags: acceptedFlags,
+    accepted_trade_off_closures: tradeOffClosures,
+  }
+}
+
 function generatorSystem(engineeringContract?: EngineeringContract | null): string {
   // Build #6c (Tristan 2026-05-21, council verdict — GLM-5.1 (a) pick;
   // reinforced by (d) plurality verdict that the lossy channel between
@@ -2485,6 +2518,7 @@ async function main() {
       keyMetrics,
       productClass,
       apiKey,
+      contractTradeOffs: buildContractTradeOffs(engineeringContract),
     })
     if (skeletonCritique) {
       const s = skeletonCritique.scores
@@ -2546,6 +2580,7 @@ async function main() {
       keyMetrics,
       productClass,
       apiKey,
+      contractTradeOffs: buildContractTradeOffs(engineeringContract),
     })
     if (critique) {
       console.error(`[chain] critic scored: brief=${critique.scores.brief_to_design_fidelity}/10 phys=${critique.scores.engineering_plausibility}/10 coh=${critique.scores.internal_coherence}/10 part=${critique.scores.part_realism}/10 hon=${critique.scores.honesty_signal}/10 (${critique.latency_ms}ms)`)

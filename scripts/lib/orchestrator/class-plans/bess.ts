@@ -39,7 +39,18 @@ const stepPybamm: ToolStep = {
     // already parses these from the brief; class plan should NOT re-hardcode.
     // Audit per Tristan 2026-05-22 found 8 values I had hardcoded that
     // engineering_contract.ts already extracts from brief constraints.
-    target_energy_kwh: c.quantities?.usable_capacity_kwh?.value ?? 3500,
+    //
+    // BESS L4 (2026-05-24): use REQUESTED target (brief value), not the
+    // achieved (single-container envelope-limited) value. When the contract
+    // already chose an integer-clean topology (cell_count source=calculator),
+    // we pass the authoritative cell_count + rack_count + series so pybamm
+    // RESPECTS the contract's topology decision instead of re-deriving its own
+    // 11×175 split that violates the contract's 15×250 integer-clean solve.
+    // Pybamm still runs its DFN physics (voltage profile, internal resistance,
+    // thermal dissipation); it just stops overriding the topology.
+    target_energy_kwh: c.quantities?.usable_capacity_kwh_requested?.value
+      ?? c.quantities?.usable_capacity_kwh?.value
+      ?? 3500,
     dod_fraction: c.quantities?.dod_fraction?.value ?? 0.80,
     cell_chemistry: 'lfp' as const,  // TODO #18o: engineering-judgment dispatch from brief.target_material text
     cell_capacity_ah: c.quantities?.cell_capacity_ah?.value ?? 280,
@@ -47,6 +58,15 @@ const stepPybamm: ToolStep = {
     ambient_temp_c: c.envelope?.operating_environment?.temp_max_c ?? 25,
     dc_bus_voltage_v: c.quantities?.dc_bus_voltage_v?.value ?? 800,
     rated_power_kw: c.quantities?.continuous_power_kw?.value ?? 1000,
+    // BESS L4: authoritative topology hints from engineering-contract. When
+    // present pybamm uses these literally (skips derive_pack_topology + the
+    // EoL cell-count round-up). Contract-built topology already respects
+    // mass cap + DC bus voltage class boundary (250S × 3.2V = 800V exactly).
+    cell_count_authoritative: c.quantities?.cell_count?.value ?? null,
+    rack_count_authoritative: c.quantities?.rack_count?.value ?? null,
+    cells_per_rack_authoritative: c.quantities?.cells_per_rack?.value ?? null,
+    series_cells_per_string_authoritative: c.quantities?.series_cells_per_string?.value ?? null,
+    parallel_strings_per_rack_authoritative: c.quantities?.parallel_strings_per_rack?.value ?? null,
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as {
@@ -447,6 +467,15 @@ const stepMassAggregator: ToolStep = {
       pcs_mass_kg_estimate,
       container_tare_kg_estimate: 4000,    // 40-ft ISO container ISO 668 (this IS hardcoded — physical standard)
       rack_mass_kg_each_estimate: 150,     // steel battery rack (industry-typical, TODO: derive from cell_count × mass_per_cell × frame_overhead)
+      // BESS L4 (2026-05-24): authoritative container count from contract.
+      // When the contract has explicitly chosen single-container (because
+      // the rack-count solver was capped to the mass envelope and the
+      // resulting brief_target_feasibility=0 is the accepted trade-off),
+      // the mass aggregator MUST NOT emit a "split into 2 containers"
+      // warning that overrides the design. See engineering-contract.ts
+      // ~line 549 (container_count quantity) for context.
+      container_count_authoritative: c.quantities?.container_count?.value ?? null,
+      brief_target_feasibility: c.quantities?.brief_target_feasibility?.value ?? null,
     }
   },
   contract_update: (c: ContractInProgress, output: any) => {
