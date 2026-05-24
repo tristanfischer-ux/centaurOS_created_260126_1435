@@ -5331,11 +5331,14 @@ function SubModuleBomBlock({
       {/* Data rows */}
       {bomLines.map((row, ri) => {
         const noteIdx = noteIndexMap.get(row.word_id)
+        // 2026-05-24 Tristan: number formatting — comma-separate thousands so
+        // £375000.00 reads as £375,000.00, ×3750 as ×3,750. Aligns with
+        // sub-total formatting which already uses toLocaleString().
         const unitPriceCell = row.unit_price_gbp > 0
-          ? `~£${row.unit_price_gbp.toFixed(2)}`
+          ? `~£${row.unit_price_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '—'
         const lineCell = row.line_total_gbp > 0
-          ? `£${row.line_total_gbp.toFixed(2)}`
+          ? `£${row.line_total_gbp.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
           : '—'
         const src = srcLabelForRow(row)
         const ref = priceRealityRefForRow(row)
@@ -5383,7 +5386,7 @@ function SubModuleBomBlock({
                 </Text>
               )
             })()}
-            <Text style={{ width: 30, fontSize: 9, color: INK, textAlign: 'right' }}>×{row.quantity ?? 1}</Text>
+            <Text style={{ width: 30, fontSize: 9, color: INK, textAlign: 'right' }}>×{(row.quantity ?? 1).toLocaleString('en-GB')}</Text>
             <Text style={{ width: 50, fontSize: 9, color: INK, textAlign: 'right' }}>{unitPriceCell}</Text>
             <Text style={lineTextStyle}>{lineCell}</Text>
             <View style={{ width: 60, paddingLeft: 6, flexDirection: 'row', alignItems: 'baseline' }}>

@@ -35,6 +35,7 @@ import { resolve, dirname } from 'path'
 import { execFileSync } from 'child_process'
 
 const DEFAULT_MODEL = process.env.BLENDER_GEN_MODEL || 'openai/gpt-5.5'
+const FALLBACK_MODEL = process.env.BLENDER_GEN_FALLBACK || 'anthropic/claude-sonnet-4.6'
 const TEMPLATES_DIR = resolve(__dirname, 'blender-templates')
 
 // product_class substring → template filename. Same mapping as
@@ -269,33 +270,44 @@ async function main(): Promise<number> {
   const template = readFileSync(templatePath, 'utf-8')
   const prompt = buildPrompt(state, lib, template)
 
-  console.log(`[geom-gen] product_class=${productClass} template=${templatePath.split('/').pop()} model=${DEFAULT_MODEL}`)
-  const t0 = Date.now()
-  let py = await callModel(prompt, DEFAULT_MODEL)
-  if (!py) {
-    console.error('[geom-gen] first model call failed')
-    return 6
-  }
-  console.log(`[geom-gen] first attempt: ${py.split('\n').length} lines, ${((Date.now() - t0) / 1000).toFixed(1)}s`)
+  console.log(`[geom-gen] product_class=${productClass} template=${templatePath.split('/').pop()} primary=${DEFAULT_MODEL} fallback=${FALLBACK_MODEL}`)
 
-  let check = pythonSyntaxCheck(py)
-  if (!check.ok) {
-    console.error(`[geom-gen] syntax check failed, retrying once with error feedback...`)
-    const retryPrompt = prompt + `\n\nThe previous attempt failed with this Python syntax error:\n\n${check.error}\n\nProduce a fully-valid Python file this time. Output only the Python.`
-    const py2 = await callModel(retryPrompt, DEFAULT_MODEL)
-    if (py2) {
-      const check2 = pythonSyntaxCheck(py2)
-      if (check2.ok) {
-        py = py2
-        check = check2
-        console.log(`[geom-gen] retry succeeded: ${py.split('\n').length} lines`)
-      }
+  // Try primary model with one syntax-retry, then fall back to a second model
+  // with the same retry pattern. Tristan 2026-05-24 production setup:
+  // primary=GPT-5.5 (most visual detail), fallback=Sonnet 4.6 (cleaner code,
+  // still phase-20 quality, half the cost). Both follow the v2 strict-fidelity
+  // rules baked into the prompt above.
+  async function tryModel(model: string): Promise<{ py: string; modelUsed: string } | null> {
+    const t0 = Date.now()
+    const first = await callModel(prompt, model)
+    if (!first) return null
+    console.log(`[geom-gen] [${model}] first attempt: ${first.split('\n').length} lines, ${((Date.now() - t0) / 1000).toFixed(1)}s`)
+    const c1 = pythonSyntaxCheck(first)
+    if (c1.ok) return { py: first, modelUsed: model }
+    console.error(`[geom-gen] [${model}] syntax fail; retry with error feedback`)
+    const retryPrompt = prompt + `\n\nThe previous attempt failed with this Python syntax error:\n\n${c1.error}\n\nProduce a fully-valid Python file this time. Output only the Python.`
+    const second = await callModel(retryPrompt, model)
+    if (!second) return null
+    const c2 = pythonSyntaxCheck(second)
+    if (c2.ok) {
+      console.log(`[geom-gen] [${model}] retry succeeded: ${second.split('\n').length} lines`)
+      return { py: second, modelUsed: model }
     }
+    console.error(`[geom-gen] [${model}] retry also failed: ${c2.error}`)
+    return null
   }
-  if (!check.ok) {
-    console.error(`[geom-gen] retry also failed: ${check.error}`)
+
+  let result = await tryModel(DEFAULT_MODEL)
+  if (!result) {
+    console.error(`[geom-gen] primary ${DEFAULT_MODEL} failed; trying fallback ${FALLBACK_MODEL}`)
+    result = await tryModel(FALLBACK_MODEL)
+  }
+  if (!result) {
+    console.error(`[geom-gen] both primary and fallback failed; runner will use unmodified template`)
     return 6
   }
+  const py = result.py
+  console.log(`[geom-gen] using output from ${result.modelUsed}`)
 
   const outDir = dirname(statePath)
   const outPath = resolve(outDir, 'blender-scene.py')
