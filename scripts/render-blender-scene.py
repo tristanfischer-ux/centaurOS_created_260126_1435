@@ -40,28 +40,32 @@ BLENDER_BIN = os.environ.get(
 # correctness because keys don't overlap, but list shorter keys last so
 # longer specific matches win (e.g. "bess-utility-scale" → bess).
 CLASS_TO_TEMPLATE: dict[str, str] = {
-    # BESS — chain classifier emits "energy_storage" as the primary slug
+    # Original 7 templates (May 17 ported 2026-05-24)
     "energy_storage": "bess-9shot.py",
     "battery_energy_storage": "bess-9shot.py",
     "bess": "bess-9shot.py",
-    # Bioreactor
     "bioreactor": "bioreactor-9shot.py",
-    # Drone
     "drone": "drone-9shot.py",
     "consumer_cinematography_drone": "drone-9shot.py",
-    # AUV
     "auv": "auv-9shot.py",
     "autonomous_underwater": "auv-9shot.py",
-    # CGM / wearable
     "cgm": "cgm-9shot.py",
     "wearable_medical_device": "cgm-9shot.py",
-    # Edge-AI
     "edge_ai": "edge-ai-9shot.py",
     "edge-ai": "edge-ai-9shot.py",
-    # EV charger
     "ev_charger": "ev-charger-9shot.py",
     "ev-charger": "ev-charger-9shot.py",
     "dc_fast_ev_charger": "ev-charger-9shot.py",
+    # Phase 1 stage-gate templates (bootstrapped via GPT-5.5, 2026-05-24)
+    "heat_pump": "heat-pump-residential-9shot.py",
+    "heat-pump": "heat-pump-residential-9shot.py",
+    "heat_pump_residential": "heat-pump-residential-9shot.py",
+    "heatpump": "heat-pump-residential-9shot.py",
+    "mini_split_heatpump": "heat-pump-residential-9shot.py",
+    "vertical_farm": "vertical-farm-9shot.py",
+    "vertical-farm": "vertical-farm-9shot.py",
+    "haps": "haps-9shot.py",
+    "high_altitude_pseudo_satellite": "haps-9shot.py",
 }
 
 

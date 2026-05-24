@@ -41,6 +41,7 @@ const TEMPLATES_DIR = resolve(__dirname, 'blender-templates')
 // product_class substring → template filename. Same mapping as
 // scripts/render-blender-scene.py CLASS_TO_TEMPLATE.
 const CLASS_TO_TEMPLATE: Array<[string, string]> = [
+  // Original 7 templates (May 17 ported 2026-05-24)
   ['energy_storage', 'bess-9shot.py'],
   ['battery_energy_storage', 'bess-9shot.py'],
   ['bess', 'bess-9shot.py'],
@@ -56,6 +57,16 @@ const CLASS_TO_TEMPLATE: Array<[string, string]> = [
   ['ev_charger', 'ev-charger-9shot.py'],
   ['ev-charger', 'ev-charger-9shot.py'],
   ['dc_fast_ev_charger', 'ev-charger-9shot.py'],
+  // Phase 1 stage-gate templates (bootstrapped via GPT-5.5, 2026-05-24)
+  ['heat_pump_residential', 'heat-pump-residential-9shot.py'],
+  ['heat-pump', 'heat-pump-residential-9shot.py'],
+  ['mini_split_heatpump', 'heat-pump-residential-9shot.py'],
+  ['heatpump', 'heat-pump-residential-9shot.py'],
+  ['heat_pump', 'heat-pump-residential-9shot.py'],
+  ['vertical_farm', 'vertical-farm-9shot.py'],
+  ['vertical-farm', 'vertical-farm-9shot.py'],
+  ['haps', 'haps-9shot.py'],
+  ['high_altitude_pseudo_satellite', 'haps-9shot.py'],
 ]
 
 function resolveTemplate(productClass: string): string | null {
