@@ -5369,6 +5369,18 @@ function SubModuleBomBlock({
               // distributor / manufacturer link when partLinkMap has the SKU
               // (same map the narrative uses via renderProseWithLinks).
               const pn = row.part_number
+              // 2026-05-24 (HAPS L1 audit-pdf-layout exit 11): a 20-char
+              // hyphenated part_number like "RWC-CF-RIB-NACA23012" overflowed
+              // the flex:1.6 column (~99pt) and ran into the QTY column, with
+              // "×34" rendering on top of the trailing characters. react-pdf
+              // breaks Text at spaces by default but NOT at hyphens for
+              // unhyphenated tokens. Insert a zero-width space after each
+              // hyphen so react-pdf can break the line at the hyphen — visual
+              // result identical for short PNs, long PNs wrap to a 2nd line
+              // inside the cell instead of overflowing. Universal across all
+              // 35 archetypes — HAPS, BESS, satellite, wind etc. all have
+              // hyphenated part numbers.
+              const pnWithBreaks = pn ? pn.replace(/-/g, '-​') : null
               const linked = pn && partLinkMap ? partLinkMap.get(pn) : null
               if (linked && linked.url) {
                 return (
@@ -5376,13 +5388,13 @@ function SubModuleBomBlock({
                     src={linked.url}
                     style={{ flex: 1.6, fontSize: 8.5, color: ACCENT_SOFT, fontFamily: 'Helvetica-Bold', textDecoration: 'underline' }}
                   >
-                    {pn}
+                    {pnWithBreaks}
                   </Link>
                 )
               }
               return (
                 <Text style={{ flex: 1.6, fontSize: 8.5, color: INK_SOFT, fontFamily: 'Helvetica-Bold' }}>
-                  {pn ?? '—'}
+                  {pnWithBreaks ?? '—'}
                 </Text>
               )
             })()}
