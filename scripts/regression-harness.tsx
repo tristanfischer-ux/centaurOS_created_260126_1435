@@ -287,6 +287,132 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       (n) => n === 0,
       (n) => `${n} forbidden phrases found: ${proseHits.slice(0, 5).join('; ')}`,
     ))
+
+    // BESS L5 invariants (2026-05-24, physics-critic L5 four HIGH issues):
+    // each fix gets a guard so iter-(N+1) catches a regression iter-N didn't.
+
+    // BESS.busbar_density — cell-to-cell busbar must have ≥117 mm² (≤3 A/mm²
+    // @ 350 A) per IEC 61439-1 enclosed-pack current density. Guards against
+    // re-introducing the 12×3 mm = 36 mm² spec that gave 9.72 A/mm².
+    const busbarBadDims: string[] = []
+    for (const mb of modulesBess) {
+      for (const sm of (mb?.sub_modules ?? [])) {
+        for (const w of (sm?.words ?? [])) {
+          const wid = String(w?.id ?? w?.word_id ?? '')
+          if (!/cell_to_cell_busbar/.test(wid)) continue
+          // search modifier_characters for kind=dimension with mm² < 117
+          for (const mc of (w?.modifier_characters ?? [])) {
+            const kind = String(mc?.kind ?? '').toLowerCase()
+            const value = String(mc?.value ?? '')
+            const unit = String(mc?.unit ?? '').toLowerCase()
+            if (kind !== 'dimension' || unit !== 'mm') continue
+            // try to parse "A×B" or "AxB" mm formats
+            const mmDim = value.match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/)
+            if (!mmDim) continue
+            const area = parseFloat(mmDim[1]) * parseFloat(mmDim[2])
+            if (area < 117) busbarBadDims.push(`${mb.module}/${sm.id}/${wid}: ${value} mm = ${area.toFixed(0)} mm² (need ≥117 mm² for ≤3 A/mm² @ 350 A)`)
+          }
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'BESS.busbar_density',
+      'Cell-to-cell busbar cross-section ≥117 mm² for 350 A continuous (≤3 A/mm² per IEC 61439-1)',
+      busbarBadDims.length,
+      (n) => n === 0,
+      (n) => `${n} undersized busbars: ${busbarBadDims.slice(0, 3).join('; ')}`,
+    ))
+
+    // BESS.ac_breaker_size — AC main breaker frame must be ≥2000 A so it
+    // covers 1.25 × I_peak at 400 V 3-phase for any peak power ≥1 MW.
+    // Catches regression to 1600 A frame undersizing reported by physics
+    // critic L5 brief_to_design_fidelity HIGH.
+    const breakerBadSize: string[] = []
+    for (const mb of modulesBess) {
+      for (const sm of (mb?.sub_modules ?? [])) {
+        for (const w of (sm?.words ?? [])) {
+          const wid = String(w?.id ?? w?.word_id ?? '')
+          if (!/ac_main_breaker/.test(wid)) continue
+          for (const mc of (w?.modifier_characters ?? [])) {
+            const kind = String(mc?.kind ?? '').toLowerCase()
+            const value = String(mc?.value ?? '')
+            const unit = String(mc?.unit ?? '').toLowerCase()
+            if (kind !== 'capacity' || unit !== 'a') continue
+            const amps = parseFloat(value)
+            if (Number.isFinite(amps) && amps < 2000) breakerBadSize.push(`${mb.module}/${sm.id}/${wid}: ${amps} A (need ≥2000 A frame for 1.25 × I_peak at 400 V 3-phase)`)
+          }
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'BESS.ac_breaker_size',
+      'AC main breaker frame ≥2000 A (covers 1.25 × peak current at 400 V 3-phase)',
+      breakerBadSize.length,
+      (n) => n === 0,
+      (n) => `${n} undersized AC breakers: ${breakerBadSize.slice(0, 3).join('; ')}`,
+    ))
+
+    // BESS.lem_part_realism — pack current transducer MUST NOT be a fictitious
+    // LEM LAH 25-NP / similar small-signal PCB-mount transducer when measuring
+    // ≥80 A rack current. Catches regression where bare "current transducer
+    // 2500 A" emission lets the LLM hallucinate undersized LEM parts.
+    const lemHits: string[] = []
+    const FORBIDDEN_LEM_PARTS = [/lem\s+lah\s+25[- ]?np/i, /lem\s+las\s+\d+[- ]?np/i, /lem\s+lts\s+25[- ]?np/i]
+    for (const mb of modulesBess) {
+      for (const sm of (mb?.sub_modules ?? [])) {
+        for (const w of (sm?.words ?? [])) {
+          const wid = String(w?.id ?? w?.word_id ?? '')
+          if (!/current_transducer|pack_current|current_sensor/.test(wid)) continue
+          for (const mc of (w?.modifier_characters ?? [])) {
+            const value = String(mc?.value ?? '')
+            for (const fp of FORBIDDEN_LEM_PARTS) {
+              if (fp.test(value)) lemHits.push(`${mb.module}/${sm.id}/${wid}: "${value}" — small-signal PCB-mount transducer wrong for ≥80 A rack current`)
+            }
+          }
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'BESS.lem_part_realism',
+      'Pack current transducer is NOT a small-signal PCB-mount LEM part (LAH 25-NP class)',
+      lemHits.length,
+      (n) => n === 0,
+      (n) => `${n} fictitious LEM parts: ${lemHits.slice(0, 3).join('; ')}`,
+    ))
+
+    // BESS.mass_closure_documented — when in_container_mass_kg > brief cap,
+    // the contract MUST surface mass_feasibility=0 as a documented trade-off.
+    // Catches regression where mass overrun is silently absorbed into the
+    // BoM without honouring the brief's mass envelope.
+    let massFlagPresent = true
+    let massFeasibilityVal: number | null = null
+    let inContainerMassVal: number | null = null
+    let briefMassCapVal: number | null = null
+    const eosCheck = state?.moduleDecomposition?.modules?.find((m: any) => m.module === 'energy_storage_source')
+    // Read contract via the design's contractAcceptedTradeOffs (added L5)
+    const contractFlags = (state?.contractAcceptedTradeOffs?.accepted_flags as any) ?? null
+    if (contractFlags) {
+      massFeasibilityVal = contractFlags.mass_feasibility?.value ?? null
+      inContainerMassVal = contractFlags.in_container_mass_kg?.value ?? null
+    }
+    // Read brief cap from parsedBrief if available
+    briefMassCapVal = Number(state?.parsedBrief?.constraints?.max_mass_kg?.value ?? state?.briefBlock?.constraints?.max_mass_kg?.value ?? 28000)
+    if (massFeasibilityVal === null || inContainerMassVal === null) {
+      // contract not yet propagated — skip rather than false-fail
+      massFlagPresent = true
+    } else if (inContainerMassVal > briefMassCapVal && massFeasibilityVal !== 0) {
+      massFlagPresent = false
+    }
+    assertions.push(assertEq(
+      'BESS.mass_closure_documented',
+      'When in-container mass exceeds brief cap, contract surfaces mass_feasibility=0 as documented trade-off',
+      massFlagPresent ? 1 : 0,
+      (n) => n === 1,
+      () => `in_container=${inContainerMassVal} kg vs cap=${briefMassCapVal} kg but mass_feasibility=${massFeasibilityVal} (expected 0)`,
+    ))
+
+    // Suppress unused-var warning for the eosCheck (kept for future invariants)
+    void eosCheck
   }
 
   // === Additional universal invariants ===

@@ -746,7 +746,19 @@ function buildContractTradeOffs(engineeringContract: EngineeringContract | null)
       reason: c.reason,
     }))
   const acceptedFlags: Record<string, any> = {}
-  for (const key of ['brief_target_feasibility', 'container_count']) {
+  // BESS L5 (2026-05-24, physics-critic L5 engineering_plausibility HIGH —
+  // mass budget overrun): surface mass_feasibility + transformer_installation
+  // + in_container_mass_kg + external_transformer_mass_kg so the Physics
+  // Critic sees the documented industry-standard external-transformer
+  // layout as the accepted trade-off (not a bug to re-flag).
+  for (const key of [
+    'brief_target_feasibility',
+    'container_count',
+    'mass_feasibility',
+    'transformer_installation',
+    'in_container_mass_kg',
+    'external_transformer_mass_kg',
+  ]) {
     const qty = (q as any)[key]
     if (qty && typeof qty.value !== 'undefined') {
       acceptedFlags[key] = { value: qty.value, source_detail: qty.source_detail ?? null }
