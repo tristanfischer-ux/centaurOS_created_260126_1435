@@ -4291,10 +4291,13 @@ async function main() {
         execFileSync(mmdcBin, [
           '-i', mmdPath,
           '-o', pngPath,
-          // 2026-05-24 Tristan: was 1200 — produced landscape-leaning layout
-          // using only ~25% of portrait page. Narrow render forces Mermaid's
-          // auto-layout to wrap tools vertically, taller diagram fills page.
-          '--width', '600',
+          // 2026-05-24: was 600 — vertical layout was correct (height>width
+          // due to invisible ordering edges) but text was unreadable at PDF
+          // zoom (~72 DPI). Bumped to 2400 (4× resolution) so embedded image
+          // at 530pt PDF width hits ~325 DPI, print-quality sharp text.
+          // Aspect ratio is set by Mermaid's layout, not the --width param,
+          // so the portrait shape is preserved.
+          '--width', '2400',
           '--backgroundColor', 'white',
         ], {
           stdio: 'pipe',
