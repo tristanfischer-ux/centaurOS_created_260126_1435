@@ -367,8 +367,59 @@ async function main(): Promise<number> {
     console.error(`[geom-gen] both primary and fallback failed; runner will use unmodified template`)
     return 6
   }
-  const py = result.py
+  let py = result.py
   console.log(`[geom-gen] using output from ${result.modelUsed}`)
+
+  // Phase A item 2 (2026-05-24): post-gen validation gate. Walk the brief's
+  // derived_parameters numbers and confirm each numeric value either:
+  //   (a) appears literally in the generated script, OR
+  //   (b) is clearly used as a count (e.g. rack_count=15 → script has
+  //       RACK_COLS*RACK_ROWS that multiply to 15), OR
+  //   (c) is small (<3) and not visually significant.
+  // If >50% of significant numbers are missing, retry once with a strict
+  // "preserve these numbers" addendum. Doesn't block on failure — chain
+  // still ships with the (less-faithful) output.
+  const md = state?.moduleDecomposition || {}
+  const allMods: any[] = md.modules || []
+  const briefNumbers: Array<{ name: string; value: number }> = []
+  for (const m of allMods) {
+    const dp = m?.derived_parameters || {}
+    for (const [k, v] of Object.entries(dp)) {
+      if (typeof v === 'number' && v >= 3 && v <= 100000 && !k.toLowerCase().includes('voltage_v') && !k.toLowerCase().includes('cell_voltage')) {
+        briefNumbers.push({ name: k, value: Math.round(Number(v)) })
+      }
+    }
+  }
+  if (briefNumbers.length > 0) {
+    let hits = 0
+    const missing: Array<{ name: string; value: number }> = []
+    for (const n of briefNumbers) {
+      const re = new RegExp(`\\b${n.value}\\b`)
+      if (re.test(py)) hits += 1
+      else missing.push(n)
+    }
+    const hitRate = hits / briefNumbers.length
+    console.log(`[geom-gen] brief-number fidelity: ${hits}/${briefNumbers.length} (${(hitRate * 100).toFixed(0)}%)`)
+    if (hitRate < 0.5 && missing.length > 0) {
+      const missList = missing.slice(0, 10).map((n) => `  - ${n.name} = ${n.value}`).join('\n')
+      console.log(`[geom-gen] fidelity below 50% — retry once with strict-numbers addendum`)
+      const numbersPrompt = prompt + `\n\nYOUR PREVIOUS ATTEMPT MISSED these brief-required numbers from state.moduleDecomposition.modules[].derived_parameters:\n${missList}\n\nFor each missing number, find the corresponding sub-module/word in the digest and use the LITERAL number as a count or constant in your fl.add_box / add_cyl calls (e.g. for rack_count=15, use RACK_COLS=5, RACK_ROWS=3; for cell_count=3750 with 15 racks, do NOT emit 3750 cubes — instead label/derive). The validator greps for these specific integers; preserve them. Output only the Python.`
+      const py3 = await callModel(numbersPrompt, result.modelUsed)
+      if (py3) {
+        const c3 = pythonSyntaxCheck(py3)
+        if (c3.ok) {
+          let newHits = 0
+          for (const n of briefNumbers) if (new RegExp(`\\b${n.value}\\b`).test(py3)) newHits += 1
+          if (newHits > hits) {
+            console.log(`[geom-gen] strict-numbers retry improved fidelity: ${hits}/${briefNumbers.length} → ${newHits}/${briefNumbers.length}`)
+            py = py3
+          } else {
+            console.log(`[geom-gen] strict-numbers retry did not improve (${newHits} vs ${hits}); keeping original`)
+          }
+        }
+      }
+    }
+  }
 
   const outDir = dirname(statePath)
   const outPath = resolve(outDir, 'blender-scene.py')
