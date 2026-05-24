@@ -5265,77 +5265,6 @@ function ModuleSection({
               <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>£{moduleCostGbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
             </Text>
           </View>
-        ) : null}
-      </View>
-
-      {moduleImagePath ? (
-        <View style={{ marginBottom: 14, alignItems: 'center' }}>
-          <Image src={moduleImagePath} style={{ width: 515, height: 360, objectFit: 'contain' }} />
-          <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 24 }}>
-            Illustration only — generic class render. Module {index} ({title}) shown in identity colour; other modules muted; enclosure ghosted.
-          </Text>
-        </View>
-      ) : state && readBriefEnvelopeDimensions(state) ? (() => {
-        // ITER-10.5 (Tristan 2026-05-20): module-class static PNG suppressed
-        // because the brief envelope clearly exceeds the ≤2 m cabinet scale
-        // of the static-render library. Render a proportional brief-envelope
-        // outline with a "this module is inside" note instead.
-        const env = readBriefEnvelopeDimensions(state)!
-        return (
-          <View style={{ marginBottom: 14, alignItems: 'center', paddingVertical: 18, borderRadius: 4, backgroundColor: '#fafafa', borderWidth: 0.5, borderColor: RULE }}>
-            <EnvelopeOutline
-              widthMm={env.widthMm}
-              depthMm={env.depthMm}
-              heightMm={env.heightMm}
-              label={env.label}
-              maxBoxW={300}
-              maxBoxH={240}
-              productClass={String(state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? '')}
-              state={state}
-            />
-            <Text style={{ fontSize: 8, color: MUTED, marginTop: 10, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 36 }}>
-              Module {index} ({title}) sits within the envelope above. Per-module class render suppressed because the static PNG library does not match this envelope scale.
-            </Text>
-          </View>
-        )
-      })() : null}
-
-      {/* Build #19f (2026-05-22): per-module Tools Used callout. Lists every
-          orchestrator tool whose output contributed to a quantity referenced
-          by this module's sub-modules or derived_parameters. Renders nothing
-          when the orchestrator phase didn't run for this design. */}
-      <ModuleToolsCallout moduleSpec={moduleSpec} state={state} />
-
-      <View style={{ marginBottom: 14 }}>
-        {(overviewChunks.length > 0 ? overviewChunks : [overview || `Module ${index} of the product.`]).map((chunk, i) => (
-          <Text
-            key={i}
-            style={{ fontSize: 10.5, color: INK_SOFT, lineHeight: 1.65, marginBottom: 8, textAlign: 'justify' }}
-          >
-            {chunk}
-          </Text>
-        ))}
-        {/* ITER-10.5 fifth review: module-level engineering checks
-            (physics-critic findings not tied to a specific sub-module)
-            flow inline as engineering-check paragraphs, NOT a boxed
-            callout. Sub-module-tied findings render in their sub-module's
-            Notes block beneath the BoM. */}
-        {physicsModuleLevel.map((f, fi) => {
-          const issue = String(f.issue ?? '').replace(/\s+/g, ' ').trim()
-          const check = String(f.suggested_check ?? '').replace(/\s+/g, ' ').trim()
-          if (!issue && !check) return null
-          return (
-            <Text
-              key={`mod-finding-${fi}`}
-              style={{ fontSize: 10.5, color: INK_SOFT, lineHeight: 1.65, marginBottom: 8, textAlign: 'justify' }}
-            >
-              <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Engineering check — </Text>
-              {issue}{issue && !issue.endsWith('.') ? '.' : ''}
-              {check ? ` Suggested action: ${check}` : ''}
-            </Text>
-          )
-        })}
-      </View>
 
       {/* ─── Module Summary panel (Tristan 2026-05-24, task #117) ──────
           Per Tristan: "you sort of have this at the beginning of the
@@ -5458,6 +5387,78 @@ function ModuleSection({
                 const tail = isProperOrAcronym ? purposeText : `${purposeText.charAt(0).toLowerCase()}${purposeText.slice(1)}`
                 return `This module (${moduleName}) ${tail}`
               })()}
+        ) : null}
+      </View>
+
+      {moduleImagePath ? (
+        <View style={{ marginBottom: 14, alignItems: 'center' }}>
+          <Image src={moduleImagePath} style={{ width: 515, height: 360, objectFit: 'contain' }} />
+          <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 24 }}>
+            Illustration only — generic class render. Module {index} ({title}) shown in identity colour; other modules muted; enclosure ghosted.
+          </Text>
+        </View>
+      ) : state && readBriefEnvelopeDimensions(state) ? (() => {
+        // ITER-10.5 (Tristan 2026-05-20): module-class static PNG suppressed
+        // because the brief envelope clearly exceeds the ≤2 m cabinet scale
+        // of the static-render library. Render a proportional brief-envelope
+        // outline with a "this module is inside" note instead.
+        const env = readBriefEnvelopeDimensions(state)!
+        return (
+          <View style={{ marginBottom: 14, alignItems: 'center', paddingVertical: 18, borderRadius: 4, backgroundColor: '#fafafa', borderWidth: 0.5, borderColor: RULE }}>
+            <EnvelopeOutline
+              widthMm={env.widthMm}
+              depthMm={env.depthMm}
+              heightMm={env.heightMm}
+              label={env.label}
+              maxBoxW={300}
+              maxBoxH={240}
+              productClass={String(state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? '')}
+              state={state}
+            />
+            <Text style={{ fontSize: 8, color: MUTED, marginTop: 10, fontStyle: 'italic', textAlign: 'center', paddingHorizontal: 36 }}>
+              Module {index} ({title}) sits within the envelope above. Per-module class render suppressed because the static PNG library does not match this envelope scale.
+            </Text>
+          </View>
+        )
+      })() : null}
+
+      {/* Build #19f (2026-05-22): per-module Tools Used callout. Lists every
+          orchestrator tool whose output contributed to a quantity referenced
+          by this module's sub-modules or derived_parameters. Renders nothing
+          when the orchestrator phase didn't run for this design. */}
+      <ModuleToolsCallout moduleSpec={moduleSpec} state={state} />
+
+      <View style={{ marginBottom: 14 }}>
+        {(overviewChunks.length > 0 ? overviewChunks : [overview || `Module ${index} of the product.`]).map((chunk, i) => (
+          <Text
+            key={i}
+            style={{ fontSize: 10.5, color: INK_SOFT, lineHeight: 1.65, marginBottom: 8, textAlign: 'justify' }}
+          >
+            {chunk}
+          </Text>
+        ))}
+        {/* ITER-10.5 fifth review: module-level engineering checks
+            (physics-critic findings not tied to a specific sub-module)
+            flow inline as engineering-check paragraphs, NOT a boxed
+            callout. Sub-module-tied findings render in their sub-module's
+            Notes block beneath the BoM. */}
+        {physicsModuleLevel.map((f, fi) => {
+          const issue = String(f.issue ?? '').replace(/\s+/g, ' ').trim()
+          const check = String(f.suggested_check ?? '').replace(/\s+/g, ' ').trim()
+          if (!issue && !check) return null
+          return (
+            <Text
+              key={`mod-finding-${fi}`}
+              style={{ fontSize: 10.5, color: INK_SOFT, lineHeight: 1.65, marginBottom: 8, textAlign: 'justify' }}
+            >
+              <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>Engineering check — </Text>
+              {issue}{issue && !issue.endsWith('.') ? '.' : ''}
+              {check ? ` Suggested action: ${check}` : ''}
+            </Text>
+          )
+        })}
+      </View>
+
             </Text>
             <Text style={{ fontSize: 8.5, color: MUTED, letterSpacing: 0.4, marginBottom: 4 }}>
               HOW ITS SUB-MODULES INTERACT
