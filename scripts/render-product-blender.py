@@ -121,6 +121,22 @@ def _hex_to_rgb(h: str) -> tuple[float, float, float]:
     )
 
 
+def _srgb_to_linear_channel(c: float) -> float:
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _to_linear(rgb: tuple[float, float, float]) -> tuple[float, float, float]:
+    """Convert sRGB display values (0..1) → scene-linear for Blender shader
+    inputs. Palette tuples + hex codes throughout this file are sRGB
+    intuitive values (e.g. #d4413a "fire crimson"); Blender's Principled
+    BSDF Base Color and World Background Color inputs expect LINEAR,
+    so a missing conversion makes every identity colour render too pale
+    (2026-05-24: BESS L12 safety_protection intended (212,65,58)
+    displayed as (235,140,130); phase8-spec background (0.85,0.85,0.87)
+    displayed near-white at (~0.93,0.93,0.94), killing shape contrast)."""
+    return tuple(_srgb_to_linear_channel(c) for c in rgb)
+
+
 def palette_for(module_id: str) -> tuple[float, float, float]:
     """Stable colour for any module id. Returns linear sRGB 0..1."""
     if module_id in _PALETTE_HEX:
@@ -330,7 +346,7 @@ def make_flat_material(name: str, rgb: tuple[float, float, float],
     nt = mat.node_tree
     bsdf = nt.nodes.get("Principled BSDF")
     if bsdf:
-        bsdf.inputs["Base Color"].default_value = (*rgb, 1.0)
+        bsdf.inputs["Base Color"].default_value = (*_to_linear(rgb), 1.0)
         # Zero out everything that would make it look photoreal
         if "Specular IOR Level" in bsdf.inputs:
             bsdf.inputs["Specular IOR Level"].default_value = 0.0
@@ -511,9 +527,10 @@ def add_component_shape(
         nt = emi_mat.node_tree
         bsdf = nt.nodes.get("Principled BSDF")
         if bsdf:
-            bsdf.inputs["Base Color"].default_value = (*rgb, 1.0)
+            lin = _to_linear(rgb)
+            bsdf.inputs["Base Color"].default_value = (*lin, 1.0)
             if "Emission Color" in bsdf.inputs:
-                bsdf.inputs["Emission Color"].default_value = (*rgb, 1.0)
+                bsdf.inputs["Emission Color"].default_value = (*lin, 1.0)
             if "Emission Strength" in bsdf.inputs:
                 bsdf.inputs["Emission Strength"].default_value = 1.5
             if "Specular IOR Level" in bsdf.inputs:
@@ -987,7 +1004,7 @@ def add_lighting(env_w: float, env_d: float, env_h: float) -> None:
     world.use_nodes = True
     bg = world.node_tree.nodes.get("Background")
     if bg:
-        bg.inputs["Color"].default_value = (0.85, 0.85, 0.87, 1.0)
+        bg.inputs["Color"].default_value = (*_to_linear((0.85, 0.85, 0.87)), 1.0)
         bg.inputs["Strength"].default_value = 1.0
 
 
