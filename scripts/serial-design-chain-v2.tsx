@@ -4163,6 +4163,43 @@ async function main() {
     console.error(`[chain] audit-pdf-bom flagged issues (see AUDIT-BOM.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
 
+  // 2026-05-24 Option B: audit-pdf-layout.py is the layout-overlap detector.
+  // The previous audit-pdf-run V-1 check worked from pdftotext -layout
+  // output, which collapses lines by Y bucket and lost the per-span geometry
+  // needed to distinguish real overlaps from legitimate column layouts. After
+  // three incremental wrap={false} patches in render-minimal-pdf.tsx (lines
+  // 3742, 4144, P1-6 sweep) the bug returned for the 4th time on BESS L7.
+  // Tristan-approved (2026-05-24): build a bbox-geometry detector instead of
+  // patching per-incident. The Python script reads PDF spans via PyMuPDF and
+  // flags pairs where bboxes intersect by >50% X-share and >40% Y-share.
+  //
+  // HARD GATE: layout audit exits 11 on FAIL. Chain HARD-EXITS code 11 —
+  // the PDF + state.json remain on disk (status='blocked') for the operator
+  // to inspect, but the chain MUST NOT declare success. A smear page is
+  // unrecoverable through downstream patching; the render needs a fix.
+  try {
+    execFileSync('python3', [resolve(__dirname, 'audit-pdf-layout.py'), pdfPath], {
+      stdio: 'inherit',
+      cwd: resolve(__dirname, '..'),
+    })
+  } catch (err) {
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 11) {
+      console.error('')
+      console.error('╔══════════════════════════════════════════════════════════════════════╗')
+      console.error('║  CHAIN HARD-EXIT — Layout-overlap audit FAILED (code 11)            ║')
+      console.error('║  Text spans render at the same X+Y position (wrap={false} smear).   ║')
+      console.error('║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║')
+      console.error('║  See <pdf>.AUDIT-LAYOUT.md for the offending pages + bboxes.        ║')
+      console.error('║  Fix area: scripts/render-minimal-pdf.tsx — add page-break-before   ║')
+      console.error('║  on the sub-module wrap={false} block that overflowed the page.     ║')
+      console.error('╚══════════════════════════════════════════════════════════════════════╝')
+      logAction({ step: 'fatal_layout_audit', reason: 'audit-pdf-layout exit 11', status: 11 })
+      process.exit(11)
+    }
+    console.error(`[chain] audit-pdf-layout flagged issues (see AUDIT-LAYOUT.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
+  }
+
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
   // try/catch. The renderer's own `open` was guarded; this one was not. In
   // the worker/LaunchAgent path, `open` can fail (no GUI session) and would

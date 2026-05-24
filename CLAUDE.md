@@ -53,6 +53,7 @@ eventually differ per code (currently uniform: no retry).
 | 6 | PDF integrity check failed (size < 1 KB OR header ≠ %PDF-) | Stage 48.5, lines ~4002/4012/4019 |
 | 7 | Orchestrator hard fail (when engineeringContract present but tool plan crashed) | Stage 17.5, line ~2360 |
 | 10 | BoM-quality audit FAILED — macros orphaned, line totals absurd, cover ≠ sub-totals | Stage 49b (audit-pdf-bom.ts), Tristan-driven 2026-05-23 |
+| 11 | Layout overlap audit FAILED — text spans render at same X+Y position | Stage 49.5 (audit-pdf-layout.py), Option B 2026-05-24 |
 
 Codes 4, 8, 9 are reserved (4: brief-rewrite unfixable distinct from refinement halt; 8 was used pre-P2-5 for integrity, now mapped to 6).
 
@@ -60,9 +61,9 @@ When adding a new fatal exit, allocate the next free code AND update this table.
 
 ---
 
-## Self-reinforcing PDF-quality loop (CANONICAL — codified 2026-05-23 after Tristan-flagged wind L20)
+## Self-reinforcing PDF-quality loop (CANONICAL — codified 2026-05-23 after Tristan-flagged wind L20; gate 3 added 2026-05-24)
 
-**The chain is not acceptable until BOTH of these audits PASS:**
+**The chain is not acceptable until ALL THREE of these audits PASS:**
 
 1. `scripts/audit-pdf-run.ts` — measures **DESIGN FIDELITY** (Physics Critic dimensions, density, brief-vs-contract scale, visual overlap). Threshold: F-1 brief_to_design_fidelity ≥ 6, no HIGH-severity engineering issues.
 
@@ -73,14 +74,16 @@ When adding a new fatal exit, allocate the next free code AND update this table.
    - B-5 module proportion vs class industry shares (`CLASS_MODULE_SHARES`)
    - B-6 PDF text extraction sanity (informational)
 
-**Why both are required**: Physics Critic measures _design fidelity to brief_ — does the design honour stated rated_power, voltage, geometry? It does NOT audit BoM LINE TOTALS or whether cover-page total reconciles with the BoM section. The wind L20 chain scored F-1 9/10 on fidelity while shipping foundation £24k for a 6 MW gravity base, blade £15, hub £45. Two independent quality dimensions; both must gate.
+3. `scripts/audit-pdf-layout.py` — measures **LAYOUT INTEGRITY** via PyMuPDF bbox geometry. Threshold: zero overlap findings. Flags any pair of text spans whose bounding boxes intersect by >50% X-share AND >40% Y-share. Distinguishes legitimate side-by-side column layouts (table headers at same Y but different X — pass) from real overlaps (two text lines at the same Y AND same X — fail). Substring-inside ligature artefacts filtered. Codified 2026-05-24 after BESS L7 surfaced the wrap={false} smear for the 4th time despite three incremental render-minimal-pdf.tsx patches (lines 3742, 4144, P1-6 sweep); option B (build detector) replaces option A (patch per incident).
+
+**Why all three are required**: Physics Critic measures _design fidelity to brief_ — does the design honour stated rated_power, voltage, geometry? It does NOT audit BoM LINE TOTALS or whether cover-page total reconciles with the BoM section. The wind L20 chain scored F-1 9/10 on fidelity while shipping foundation £24k for a 6 MW gravity base, blade £15, hub £45. The BoM-quality audit catches LINE-TOTAL bugs but does NOT measure whether the rendered PDF is readable — BESS L7 passed gates 1+2 while page 24 showed multi-line text stacked at the same Y coordinate (the sub-module title + the prose + the BoM header all rendered at y~771). Three independent quality dimensions: fidelity, cost-stack reconciliation, layout integrity; all three must gate.
 
 **The agent must NEVER trust chain stdout logs alone**. Every chain run:
 
 1. Open the resulting `chain-v2.pdf` (via pdftotext extraction of cover lines + BoM sub-totals + sample line items per module).
 2. Verify cover Raw materials BoM ≈ Σ of module sub-totals shown in the BoM table.
 3. Verify per-line items pass class-specific industry floors (e.g. utility wind blade ≥ £100k each — anything 1000× under is wrong).
-4. Confirm BOTH `audit-pdf-run.ts` AND `audit-pdf-bom.ts` exit 0.
+4. Confirm `audit-pdf-run.ts`, `audit-pdf-bom.ts`, AND `audit-pdf-layout.py` all exit 0.
 5. Only THEN declare the chain validated.
 
 When `audit-pdf-bom` reports orphaned macros, the macro→word matcher in `scripts/render-minimal-pdf.tsx:885-927` is the first suspect — it uses fuzzy token-matching that fails when macro names contain qualifier tokens (assembly, drivetrain, gravity, onshore, bedplate, scale, panel). Fix paths: (a) lower matcher threshold + strip qualifier tokens, (b) rename macros in engineering-contract.ts to match word_ids exactly, (c) widen cost-repair UP-cap for the class.
