@@ -44,6 +44,7 @@ import { runResearchSynthesis } from '../src/lib/pdf-engine-v2/stages/1-research
 import { LLM_CONFIG } from '../src/lib/pdf-engine-v2/llm-config'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
 import { buildContractForChain, type EngineeringContract } from './lib/engineering-contract'
+import { generateToolsFlowMermaid } from './lib/tools-flow-mermaid'
 // 2026-05-23 PRUNE: deleted canEmitBess + emitBessDesign standalone import.
 // The orchestrator's assembler.ts lazy-loads emitBessDesign internally via
 // `await import('../deterministic-emitter')` at assembler.ts:130 — that path
@@ -4260,6 +4261,58 @@ async function main() {
   } catch (err) {
     console.error(`[chain] failed to re-stamp partVerificationSummary + G2 + G3 after Engine B/C: ${(err as Error).message}; continuing`)
     logAction({ step: 'recompute_summary_after_engines', ok: false, error: String(err).slice(0, 200) })
+  }
+
+  // ── Engineering Tools Flow — Mermaid diagram (2026-05-24, replaces the
+  //    rejected 3-column + text-flow designs). Generates tools-flow.mmd from
+  //    the state, then renders to tools-flow.png via mermaid-cli (mmdc) at
+  //    1200px wide. render-minimal-pdf.tsx looks for tools-flow.png in the
+  //    state dir and embeds it; if the PNG is missing the renderer shows a
+  //    placeholder note.
+  //
+  //    Failure handling: a missing mmdc binary or a render error MUST NOT
+  //    fail the chain — we log + continue, and the PDF section falls back to
+  //    the placeholder. Determinism: same state.json → same .mmd source
+  //    (generator is locale-pinned + stable-sorted).
+  try {
+    const mmdPath = resolve(outDir, 'tools-flow.mmd')
+    const pngPath = resolve(outDir, 'tools-flow.png')
+    const mermaidRes = generateToolsFlowMermaid(liveState)
+    if (mermaidRes.empty) {
+      console.error('[chain] tools-flow: no orchestrator tools — skipping mermaid render')
+      logAction({ step: 'tools_flow_mermaid', ok: true, skipped: true, reason: 'no_tools' })
+    } else {
+      writeFileSync(mmdPath, mermaidRes.source)
+      const mmdcBin = resolve(__dirname, '..', 'node_modules', '.bin', 'mmdc')
+      try {
+        execFileSync(mmdcBin, [
+          '-i', mmdPath,
+          '-o', pngPath,
+          '--width', '1200',
+          '--backgroundColor', 'white',
+        ], {
+          stdio: 'pipe',
+          cwd: resolve(__dirname, '..'),
+          timeout: 60_000,
+        })
+        const pngStat = statSync(pngPath)
+        console.error(`[chain] tools-flow: rendered ${pngStat.size} bytes (${mermaidRes.toolCount} tools)`)
+        logAction({
+          step: 'tools_flow_mermaid',
+          ok: true,
+          tool_count: mermaidRes.toolCount,
+          mmd_path: mmdPath,
+          png_path: pngPath,
+          png_size: pngStat.size,
+        })
+      } catch (mmdcErr) {
+        console.error(`[chain] tools-flow: mmdc render failed — ${(mmdcErr as Error).message.slice(0, 120)}; PDF will use placeholder`)
+        logAction({ step: 'tools_flow_mermaid', ok: false, error: String(mmdcErr).slice(0, 200) })
+      }
+    }
+  } catch (err) {
+    console.error(`[chain] tools-flow: generation failed — ${(err as Error).message.slice(0, 120)}; continuing`)
+    logAction({ step: 'tools_flow_mermaid', ok: false, error: String(err).slice(0, 200) })
   }
 
   const pdfPath = resolve(outDir, 'chain-v2.pdf')

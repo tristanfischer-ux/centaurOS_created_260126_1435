@@ -6429,34 +6429,49 @@ function SystemLevelRisksPage({ state, project }: { state: any; project: string 
 
 // ─── 2026-05-24 (task #113) · Engineering-Tools-Flow front-of-PDF section ──
 //
-// Tristan ask: "show clearly what the inputs to the tools were and the
-// outputs of the tools. that way the reader can see up front how the
-// report is based off real engineering / physics."
+// Tristan ask (original): "show clearly what the inputs to the tools were
+// and the outputs of the tools. that way the reader can see up front how
+// the report is based off real engineering / physics."
 //
-// Renders a per-tool block (3 columns: INPUTS → tool box → OUTPUTS) for
-// every tool in state.toolsUsedPage.tools, in the order the orchestrator
-// ran them (state.orchestratorContract._tools_run preferred; falls back
-// to alphabetical from toolsUsedPage if the order field is missing).
+// Tristan reframe (2026-05-24, after rejecting the first 3-column build):
+// "Needs to be much more of a flow and you should see all of the flows.
+//  Since the pages are portrait we should have the inputs at the top of
+//  the page and how the information flows to the BOM at the bottom of
+//  the page with all of the flows and tools between them showing ALL of
+//  the inputs and outputs."
 //
-// INPUTS column derivation — per-tool input keys are explicit interfaces
-// in scripts/lib/orchestrator/tools/*.ts but the chain currently strips
-// invocation_input from per-quantity provenance (aggregator splits one
-// tool result into N claims). We reconstruct inputs from two honest
-// sources:
-//   (a) brief envelope + brief constraints (target_performance, etc.) —
-//       these are universal inputs every tool consumes;
-//   (b) upstream tools' OUTPUT field names that match this tool's known
-//       INPUT field names — that's a real data-flow edge from the
-//       orchestrator's tool ordering.
+// Layout: single-column TOP-TO-BOTTOM flow on a portrait A4 page (with
+// natural page-breaks when the chain has many tools — minPresenceAhead
+// per block, no wrap={false}).
 //
-// OUTPUTS column: tool's claims, truncated to top-8 most-important by
-// the heuristic in pickTopOutputs() (outputs that feed downstream tools
-// first, then outputs that appear as BoM fields).
+//   1. BRIEF INPUTS panel at the top — every envelope / target_performance
+//      field consumed by at least one tool, plus the core identity fields
+//      (class, application, form factor, nameplate). Deduplicated by
+//      humanised label.
+//   2. Tool blocks in orchestrator run order — each lists INPUTS USED with
+//      explicit source tags ("from brief envelope" / "from brief target" /
+//      "from <upstream tool>") AND every OUTPUT (no truncation — PyBaMM's
+//      18 fields all render). Followed by a "flows to >>" row naming the
+//      downstream tools that consume any output, or "bill of materials"
+//      for terminal outputs.
+//   3. BILL OF MATERIALS summary panel at the bottom — top-10 macro-priced
+//      line items + grand-total raw materials.
 //
-// Downstream "feeds into" annotation: for each output, search the inputs
-// of EVERY downstream tool (those after this one in _tools_run). If any
-// downstream tool's input list contains a key matching this output, the
-// edge is shown as "→ feeds: ngspice, mass-aggregator".
+// Per-tool INPUT derivation uses three honest sources, walked in order so
+// each row carries the strongest available provenance:
+//   (a) upstream-tool claim whose field name matches a known input key —
+//       proves a data-flow edge in the orchestrator's run order;
+//   (b) brief envelope (orchestratorContract.envelope);
+//   (c) target_performance.metrics by key_metric;
+//   (d) scalar constraints (max_mass_kg, design_life, etc.).
+//
+// Downstream "flows to" annotation: for each output, search the inputs of
+// every downstream tool. If any downstream tool's input list contains a
+// matching key, the edge is shown. No downstream consumer = terminal
+// output → flows to bill of materials.
+//
+// CRITICAL: never use Unicode arrows (↓ → ↘ ▼). The PyMuPDF layout
+// detector trips on the composite glyphs. ASCII 'v' + '>>' only.
 
 interface ToolIoHint {
   /** Field names this tool consumes — used to match against upstream
@@ -6744,138 +6759,196 @@ function downstreamConsumers(outputField: string, toolId: string, toolRunOrder: 
   return consumers
 }
 
-function EngineeringToolsFlowPage({ state, project }: { state: any; project: string }) {
+// Build #20a (2026-05-24, Tristan-rejected the 3-column design):
+// "Needs to be much more of a flow and you should see all of the flows. Since
+//  the pages are portrait we should have the inputs at the top of the page
+//  and how the information flows to the BOM at the bottom of the page with
+//  all of the flows and tools between them showing ALL of the inputs and
+//  outputs"
+//
+// Layout: single column, top-to-bottom. Brief inputs block at the top
+// (all envelope + target_performance fields used by any tool). Tools in
+// orchestrator _tools_run order, each block listing every input with its
+// explicit source ("from brief envelope" / "from brief target" / "from
+// <upstream tool>") AND every output (no truncation — PyBaMM's 18 claims
+// must all render). BoM summary block at the bottom listing the top
+// macro-priced line items + grand total.
+//
+// Never use Unicode arrows (↓ → ↘) — PyMuPDF layout detector trips on the
+// composite glyphs. Use ASCII 'v' for down + '>>' for forward. See drawer
+// `forgeos_decisions_layout_overlap_option_b_2026_05_24` for the codification.
+
+/** Resolve a brief value for a given input-key candidate, returning the
+ *  numeric/string value + unit + source label so the renderer can group
+ *  inputs by provenance (envelope / target_performance / scalar constraint).
+ *  Returns null if the key cannot be matched against any brief field.
+ *
+ *  Match discipline (2026-05-24 Build #20a):
+ *  - Envelope: exact lowercased key match only (envelope fields are
+ *    canonical short tokens like "class", "voltage_tier", "form_factor").
+ *  - target_performance.metrics: exact key_metric match OR strict
+ *    substring where the SHARED segment is at least 6 chars (prevents
+ *    "target" → "target_material" leaks).
+ *  - Scalar constraints: exact key map only — no fuzzy prefix matching. */
+function resolveBriefValue(
+  inputKey: string,
+  envelope: Record<string, any>,
+  briefConstraints: Record<string, any>,
+): { value: string; unit?: string; source: string } | null {
+  const k = inputKey.toLowerCase()
+
+  // 1. Envelope — exact key only.
+  if (envelope) {
+    const v = envelope[k]
+    if (v != null && (typeof v === 'string' || typeof v === 'number')) {
+      return {
+        value: typeof v === 'number' ? v.toLocaleString(undefined, { maximumFractionDigits: 4 }) : String(v),
+        source: 'from brief envelope',
+      }
+    }
+  }
+
+  // 2. target_performance.metrics — exact key_metric, unit-stripped core
+  // match (so `rated_power_kw` resolves against `rated_power_mw`), or
+  // strict substring overlap of ≥6 chars. The metric carries unit + value.
+  const stripUnit = (s: string): string => s.replace(/_(?:kwh|mwh|gwh|kw|mw|gw|v|kv|mv|a|ka|ma|kg|tonne|kn|nm|hz|khz|mhz|ghz|pct|m|mm|cm|m2|m3|s|min|h|c|k)$/i, '')
+  const kCore = stripUnit(k)
+  const tgt = briefConstraints?.target_performance
+  if (tgt && Array.isArray(tgt.metrics)) {
+    for (const m of tgt.metrics) {
+      const mk = String(m?.key_metric ?? '').toLowerCase()
+      if (!mk) continue
+      const mkCore = stripUnit(mk)
+      const exactHit = mk === k
+      const coreHit = kCore.length >= 5 && mkCore.length >= 5 && (kCore === mkCore)
+      const longHit = (mk.length >= 6 && k.length >= 6) && (mk.includes(k) || k.includes(mk))
+      if (exactHit || coreHit || longHit) {
+        const v = m.value
+        if (v != null) {
+          const out = typeof v === 'number' ? v.toLocaleString(undefined, { maximumFractionDigits: 4 }) : String(v)
+          return { value: out, unit: m.unit ?? undefined, source: 'from brief target' }
+        }
+      }
+    }
+  }
+
+  // 3. Scalar constraints — exact key OR unit-stripped core match against
+  // the constraint name. E.g. mass-aggregator's input `envelope_max_mass_kg`
+  // maps onto constraints.max_mass_kg by core-token overlap of length ≥5.
+  // Renderer keeps the match strict (≥5 chars, no wild prefix bridges).
+  const tryConstraint = (constraintKey: string): { value: string; unit?: string; source: string } | null => {
+    const node = briefConstraints?.[constraintKey]
+    if (node == null) return null
+    if (typeof node === 'string' || typeof node === 'number') {
+      return { value: String(node), source: 'from brief envelope' }
+    }
+    if (typeof node === 'object' && 'value' in node && node.value != null) {
+      const unit = typeof (node as any).unit === 'string' ? (node as any).unit : undefined
+      return { value: String(node.value), unit, source: 'from brief envelope' }
+    }
+    return null
+  }
+  const exact = tryConstraint(k)
+  if (exact) return exact
+  for (const cName of Object.keys(briefConstraints ?? {})) {
+    const cCore = stripUnit(cName.toLowerCase())
+    if (cCore.length < 5) continue
+    if (kCore === cCore || (kCore.length >= 5 && (kCore.endsWith('_' + cCore) || kCore.startsWith(cCore + '_')))) {
+      const hit = tryConstraint(cName)
+      if (hit) return hit
+    }
+  }
+
+  return null
+}
+
+/** Build an unordered, deduplicated list of inputs each tool actually consumes
+ *  with explicit source tags. Walks upstream claims first (highest-value
+ *  signal — proves the data-flow edge), then envelope + target_performance. */
+function deriveToolInputsFull(
+  toolId: string,
+  upstreamClaimsByTool: Map<string, any[]>,
+  envelope: Record<string, any>,
+  briefConstraints: Record<string, any>,
+): Array<{ label: string; value: string; source: string }> {
+  const hint = TOOL_IO_HINTS[toolId]
+  const rows: Array<{ label: string; value: string; source: string }> = []
+  const seen = new Set<string>()
+  const push = (label: string, value: string, source: string) => {
+    if (seen.has(label)) return
+    seen.add(label)
+    rows.push({ label, value, source })
+  }
+
+  if (!hint || hint.inputs.length === 0) {
+    // Fallback: at minimum show class + application + nameplate so the
+    // block doesn't render empty.
+    for (const k of ['class', 'application', 'voltage_tier', 'scale_tier', 'form_factor', 'nameplate_kwh', 'nameplate_mw']) {
+      if (envelope[k] != null) push(humanise(k), String(envelope[k]), 'from brief envelope')
+    }
+    return rows
+  }
+
+  for (const inKey of hint.inputs) {
+    // 1. Upstream claim (data-flow edge)
+    let matched = false
+    for (const [upToolId, claims] of upstreamClaimsByTool) {
+      for (const c of claims) {
+        const f = String(c?.field ?? '').toLowerCase()
+        const k = inKey.toLowerCase()
+        if (f === k || f.includes(k) || k.includes(f)) {
+          const v = c.value
+          const display = typeof v === 'number'
+            ? v.toLocaleString(undefined, { maximumFractionDigits: 4 })
+            : String(v ?? '—')
+          const unit = c.unit ? ` ${c.unit}` : ''
+          push(humanise(inKey), `${display}${unit}`, `from ${upToolId}`)
+          matched = true
+          break
+        }
+      }
+      if (matched) break
+    }
+    if (matched) continue
+
+    // 2. Brief envelope / target_performance / scalar constraint
+    const brief = resolveBriefValue(inKey, envelope, briefConstraints)
+    if (brief) {
+      const unit = brief.unit ? ` ${brief.unit}` : ''
+      push(humanise(inKey), `${brief.value}${unit}`, brief.source)
+    }
+  }
+
+  return rows
+}
+
+// 2026-05-24 Build #20b: Tristan rejected both the per-tool 3-column block
+// design and the top-down text-list-flow design. Asked for a Mermaid diagram
+// instead. The diagram is generated server-side by serial-design-chain-v2.tsx
+// (via scripts/lib/tools-flow-mermaid.ts + mermaid-cli) into a PNG that lives
+// next to state.json. This page embeds the PNG; when it's missing (older
+// state, no orchestrator, or mermaid-cli not installed) we render a
+// placeholder explaining how to regenerate it.
+function EngineeringToolsFlowPage({
+  state,
+  project,
+  bomTotals: _bomTotals,
+  statePath,
+}: {
+  state: any
+  project: string
+  bomTotals: BomTotals | null
+  statePath: string
+}) {
   const page = readToolsUsedPage(state)
   if (!page) return null
   const tools: any[] = Array.isArray(page.tools) ? page.tools : []
   if (tools.length === 0) return null
 
-  const envelope: Record<string, any> = state?.orchestratorContract?.envelope ?? {}
-  const briefConstraints: Record<string, any> = state?.parsedBrief?.constraints ?? {}
-
-  // Resolve the orchestrator's actual run order. The aggregator emits the
-  // tools list sorted alphabetically (see attribution.ts:215), so we always
-  // override with _tools_run when available.
-  const toolById = new Map<string, any>(tools.map((t) => [String(t.tool_id ?? ''), t]))
-  const runOrderIds = resolveToolRunOrder(state, tools).filter((id) => toolById.has(id))
-  // Any tools present in toolsUsedPage but not in _tools_run get appended.
-  for (const t of tools) {
-    const id = String(t.tool_id ?? '')
-    if (!runOrderIds.includes(id)) runOrderIds.push(id)
-  }
-  const orderedTools = runOrderIds.map((id) => toolById.get(id))
-
-  // Group claims by tool — for the "upstream outputs to inputs" lookup
-  // we need to walk the tools earlier in the run order.
-  const claimsByTool = new Map<string, any[]>()
-  for (const t of orderedTools) {
-    claimsByTool.set(String(t.tool_id ?? ''), Array.isArray(t.claims) ? t.claims : [])
-  }
-
-  // BoM-bound output fields — outputs whose names appear in module
-  // engineering-contract macros. For the final "feeds into BoM" callout
-  // at the end. Best-effort: pull from contract.macro_assembly_prices.
-  const bomBoundFields = new Set<string>()
-  const macros = state?.orchestratorContract?.macro_assembly_prices
-  if (Array.isArray(macros)) {
-    for (const m of macros) {
-      if (typeof m?.field === 'string') bomBoundFields.add(m.field.toLowerCase())
-      if (typeof m?.id === 'string') bomBoundFields.add(m.id.toLowerCase())
-    }
-  }
-
-  // Column widths inside the printable area (210mm A4 minus 64pt left/right
-  // padding = ~468pt). 3 columns: 130 / 200 / 130 with 4pt gaps.
-  const COL_IN = 130
-  const COL_MID = 198
-  const COL_OUT = 130
-
-  const renderInputsCol = (rows: ReturnType<typeof deriveToolInputs>): React.ReactNode => (
-    <View style={{ width: COL_IN, padding: 7, backgroundColor: '#fafafa', borderRadius: 3, borderWidth: 0.5, borderColor: RULE_SOFT }}>
-      <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.5, marginBottom: 4 }}>INPUTS</Text>
-      {rows.map((r, i) => (
-        <View key={`in-${i}`} style={{ marginBottom: 3 }}>
-          <Text style={{ fontSize: 7.5, color: INK_SOFT, lineHeight: 1.35 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{r.label}</Text>
-            {`  ${r.value}`}
-          </Text>
-          <Text style={{ fontSize: 6.5, color: MUTED, fontStyle: 'italic' }}>{r.source}</Text>
-        </View>
-      ))}
-    </View>
-  )
-
-  const renderToolBox = (tool: any): React.ReactNode => {
-    const narrative = getToolNarrative(String(tool.tool_id ?? ''))
-    const hint = TOOL_IO_HINTS[String(tool.tool_id ?? '')]
-    const description = hint?.short_role
-      || narrative?.description
-      || page.intro
-      || `Engineering tool ${tool.tool_id}.`
-    return (
-      <View style={{ width: COL_MID, padding: 8, backgroundColor: '#f0f6ff', borderRadius: 4, borderWidth: 1, borderColor: ACCENT_SOFT }}>
-        <Text style={{ fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>
-          {tool.tool_name || tool.tool_id}
-        </Text>
-        <Text style={{ fontSize: 7.5, color: MUTED, marginBottom: 4 }}>
-          {tool.tool_version ? `v${tool.tool_version}` : ''}
-          {tool.tool_license ? `  ·  ${tool.tool_license}` : ''}
-          {tool.confidence_class ? `  ·  ${String(tool.confidence_class).toUpperCase()}` : ''}
-        </Text>
-        <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.45 }}>
-          {normalise_unicode(description)}
-        </Text>
-        {tool.physics_basis ? (
-          <Text style={{ fontSize: 7, color: MUTED, lineHeight: 1.4, marginTop: 4, fontStyle: 'italic' }}>
-            {normalise_unicode(tool.physics_basis).slice(0, 200)}
-            {tool.physics_basis.length > 200 ? '…' : ''}
-          </Text>
-        ) : null}
-      </View>
-    )
-  }
-
-  const renderOutputsCol = (tool: any, toolId: string): React.ReactNode => {
-    const claims = Array.isArray(tool.claims) ? tool.claims : []
-    const { selected, truncated } = pickTopOutputs(claims, toolId, runOrderIds, 8)
-    const allConsumers = new Set<string>()
-    for (const c of claims) {
-      for (const cons of downstreamConsumers(String(c?.output_field ?? c?.field ?? ''), toolId, runOrderIds)) {
-        allConsumers.add(cons)
-      }
-    }
-    return (
-      <View style={{ width: COL_OUT, padding: 7, backgroundColor: '#fafafa', borderRadius: 3, borderWidth: 0.5, borderColor: RULE_SOFT }}>
-        <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.5, marginBottom: 4 }}>OUTPUTS</Text>
-        {selected.map((c, i) => {
-          const v = Number.isFinite(c.value)
-            ? c.value.toLocaleString(undefined, { maximumFractionDigits: 4 })
-            : String(c.value ?? '—')
-          return (
-            <Text key={`out-${i}`} style={{ fontSize: 7.5, color: INK_SOFT, lineHeight: 1.35, marginBottom: 1.5 }}>
-              <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{String(c.field ?? '—')}</Text>
-              {`  ${v}${c.unit ? ' ' + c.unit : ''}`}
-            </Text>
-          )
-        })}
-        {truncated > 0 ? (
-          <Text style={{ fontSize: 6.5, color: MUTED, fontStyle: 'italic', marginTop: 2 }}>
-            {`+ ${truncated} more output${truncated === 1 ? '' : 's'}`}
-          </Text>
-        ) : null}
-        {allConsumers.size > 0 ? (
-          <Text style={{ fontSize: 7, color: ACCENT_SOFT, marginTop: 5, lineHeight: 1.35 }}>
-            <Text style={{ fontFamily: 'Helvetica-Bold' }}>{'>> feeds: '}</Text>
-            {Array.from(allConsumers).join(', ')}
-          </Text>
-        ) : (
-          <Text style={{ fontSize: 7, color: MUTED, marginTop: 5, fontStyle: 'italic' }}>
-            {'>> flows to BoM'}
-          </Text>
-        )}
-      </View>
-    )
-  }
+  // The chain writes tools-flow.png alongside state.json in the same outDir.
+  const stateDir = dirname(statePath)
+  const pngPath = join(stateDir, 'tools-flow.png')
+  const pngExists = existsSync(pngPath)
 
   return (
     <Page size="A4" style={PAGE_STYLE}>
@@ -6883,88 +6956,49 @@ function EngineeringToolsFlowPage({ state, project }: { state: any; project: str
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
         Engineering tools — how the design was computed
       </Text>
-      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>
-        Every spec in the bill of materials traces to one of the tools below.
-      </Text>
-      <Text style={{ fontSize: 9, color: INK_SOFT, marginBottom: 14, lineHeight: 1.55, fontStyle: 'italic' }}>
-        Inputs come from the brief or from an upstream tool's output. Each tool
-        runs in the order shown; its outputs flow into the next tool that needs
-        them, or directly into the bill of materials.
+      <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 14, lineHeight: 1.55 }}>
+        The diagram below shows the brief at the top, each engineering tool used
+        to compute this design in run order, and the bill of materials at the
+        bottom. Every arrow carries the field name and value flowing between
+        nodes — from a brief input into a tool, between tools when one consumes
+        another's output, and finally into the bill of materials.
       </Text>
 
-      {orderedTools.map((tool: any, ti: number) => {
-        const toolId = String(tool.tool_id ?? '')
-        // Upstream claims = every tool earlier in the run order.
-        const upstreamClaims = new Map<string, any[]>()
-        for (let j = 0; j < ti; j++) {
-          const upId = String(orderedTools[j]?.tool_id ?? '')
-          const claims = claimsByTool.get(upId) ?? []
-          if (claims.length > 0) upstreamClaims.set(upId, claims)
-        }
-        const inputs = deriveToolInputs(toolId, upstreamClaims, envelope, briefConstraints)
-        // Reserve enough vertical space so a tool block stays together on
-        // one page when feasible. Block height ≈ 110-150pt depending on row
-        // counts. Use minPresenceAhead per Option B detector codification —
-        // never wrap={false} (the layout audit gate will flag it).
-        const blockReserveHeight = 140
-        return (
-          <View key={toolId || `tool-${ti}`} minPresenceAhead={blockReserveHeight}>
-            <View style={{ flexDirection: 'row', alignItems: 'stretch', marginBottom: 4 }}>
-              {renderInputsCol(inputs)}
-              {/* horizontal arrow into the tool box */}
-              <View style={{ width: 8, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ fontSize: 14, color: ACCENT_SOFT, fontFamily: 'Helvetica-Bold' }}>{'>'}</Text>
-              </View>
-              {renderToolBox(tool)}
-              <View style={{ width: 8, justifyContent: 'center', alignItems: 'center' }}>
-                <Text style={{ fontSize: 14, color: ACCENT_SOFT, fontFamily: 'Helvetica-Bold' }}>{'>'}</Text>
-              </View>
-              {renderOutputsCol(tool, toolId)}
-            </View>
-            {/* downward arrow to next tool — drawn for all but last */}
-            {ti < orderedTools.length - 1 ? (
-              <View style={{ alignItems: 'center', marginBottom: 4 }}>
-                <View style={{ width: 0.8, height: 14, backgroundColor: ACCENT_SOFT }} />
-                <Text style={{ fontSize: 11, color: ACCENT_SOFT, fontFamily: 'Helvetica-Bold', marginTop: -3 }}>v</Text>
-              </View>
-            ) : null}
-          </View>
-        )
-      })}
+      {pngExists ? (
+        // 480pt at 72 dpi covers the full text column on A4 portrait (the
+        // page has 64pt of horizontal padding either side; usable width is
+        // 595 - 128 = 467pt). We give react-pdf 460pt + auto height so the
+        // image lays out fluidly without overflow.
+        <View style={{ alignItems: 'center', marginVertical: 6 }}>
+          <Image src={pngPath} style={{ width: 460, objectFit: 'contain' }} />
+        </View>
+      ) : (
+        <View
+          style={{
+            marginVertical: 16,
+            padding: 14,
+            backgroundColor: '#fef3c7',
+            borderRadius: 4,
+            borderLeftWidth: 3,
+            borderLeftColor: '#b45309',
+          }}
+        >
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
+            Tool-flow diagram unavailable
+          </Text>
+          <Text style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 4 }}>
+            {`This chain produced ${tools.length} engineering tools but the Mermaid diagram could not be rendered for this report. The diagram is generated by serial-design-chain-v2.tsx via mermaid-cli (mmdc) and saved as tools-flow.png next to state.json.`}
+          </Text>
+          <Text style={{ fontSize: 9, color: MUTED, fontStyle: 'italic' }}>
+            {'To regenerate: install mermaid-cli (`npm install --save-dev @mermaid-js/mermaid-cli`) and re-run the chain. The per-tool inputs and outputs are listed in the Tools-Used appendix near the end of this report.'}
+          </Text>
+        </View>
+      )}
 
-      {/* Final block: all OUTPUTS that flow into the BoM. */}
-      <View minPresenceAhead={70} style={{ marginTop: 12, padding: 10, backgroundColor: '#f0fdf4', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: '#065f46' }}>
-        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
-          {'Final tool outputs >> bill of materials'}
-        </Text>
-        <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
-          {(() => {
-            // Quick summary line listing the highest-impact field totals.
-            const summaryFields: string[] = []
-            for (const t of orderedTools) {
-              const claims = Array.isArray(t.claims) ? t.claims : []
-              for (const c of claims) {
-                const f = String(c?.field ?? '').toLowerCase()
-                // Heuristic: highlight count + total mass + total power fields.
-                if (
-                  f.includes('count') || f.includes('total') || f.includes('nameplate')
-                  || f.includes('rated') || f.includes('voltage') || f.includes('capacity')
-                  || bomBoundFields.has(f)
-                ) {
-                  const v = Number.isFinite(c.value)
-                    ? c.value.toLocaleString(undefined, { maximumFractionDigits: 2 })
-                    : String(c.value ?? '—')
-                  summaryFields.push(`${String(c.field)}=${v}${c.unit ? ' ' + c.unit : ''}`)
-                }
-                if (summaryFields.length >= 12) break
-              }
-              if (summaryFields.length >= 12) break
-            }
-            if (summaryFields.length === 0) return 'Outputs above are consumed by the bill of materials, the cost stack, and the per-module engineering checks.'
-            return `Key values that flow into the BoM table: ${summaryFields.join(' · ')}.`
-          })()}
-        </Text>
-      </View>
+      <Text style={{ fontSize: 9, color: MUTED, marginTop: 6, lineHeight: 1.5, fontStyle: 'italic', textAlign: 'center' }}>
+        Every arrow shows a value flowing from one tool's output into another
+        tool's input or directly into the bill of materials.
+      </Text>
 
       <PageFooter />
     </Page>
@@ -7294,7 +7328,7 @@ function ModuleToolsCallout({ moduleSpec, state }: { moduleSpec: any; state: any
   )
 }
 
-function MinimalDocument({ state, subject }: { state: any; subject: string }) {
+function MinimalDocument({ state, subject, statePath }: { state: any; subject: string; statePath: string }) {
   const project = String(state.projectId || 'forge-engineering-report')
   const rawModules = state.moduleDecomposition?.modules ?? []
   const modules = order_modules(rawModules as Array<{ module: string; display_name?: string }>)
@@ -7388,7 +7422,7 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
           "→ flows to BoM" for terminal outputs). Renders null when the
           orchestrator did not run for this chain. Sits AFTER Brief Provenance
           so the reader sees the brief first, then how it was computed. */}
-      <EngineeringToolsFlowPage state={state} project={project} />
+      <EngineeringToolsFlowPage state={state} project={project} bomTotals={bomTotals} statePath={statePath} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
       {/* ITER-10.5 fourth review (Tristan 2026-05-20): Cost-by-module
           summary lives directly after the Module Map so the reader meets
@@ -7502,7 +7536,7 @@ async function main() {
   console.error(`[render-minimal-pdf] modules: ${(state.moduleDecomposition?.modules ?? []).length}`)
   console.error(`[render-minimal-pdf] rendering...`)
 
-  const blob = await pdf(<MinimalDocument state={state} subject={subject} />).toBlob()
+  const blob = await pdf(<MinimalDocument state={state} subject={subject} statePath={statePath} />).toBlob()
   const buffer = Buffer.from(await blob.arrayBuffer())
   writeFileSync(outPath, buffer)
   const sizeKb = (buffer.length / 1024).toFixed(1)
