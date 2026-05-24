@@ -363,6 +363,77 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     category: 'crimp_lug',
     rated_current_a: 350,
   },
+  // ── BESS L18 fix (2026-05-24): AC LCL output filter ──────────────
+  // Schaffner FN6840 series — LCL filter for Active Front End motor drives
+  // and active infeed converters. Same topology as utility BESS PCS. Family
+  // covers the AFE/AIC LCL current range used by 250 kW – 2 MW PCS modules
+  // (now part of TE Connectivity / Schaffner brand still produced).
+  // The deterministic-emitter pins this part with a CALCULATED current
+  // (continuous_power_kw → AC continuous × 1.25 safety factor, rounded up
+  // to the next 100 A — matching how Schaffner catalogues stock the line).
+  // Because the catalogue spans 250-2500 A, we do not pin a single
+  // rated_current_a here — instead, we treat the FN6840 as a family-level
+  // marker and rely on the sizing-vs-design audit (gate 14) to verify the
+  // emitted rating matches the design's continuous AC current.
+  // Source: https://www.schaffner.com/product/FN6840
+  {
+    manufacturer: 'Schaffner',
+    part_number_pattern: /^FN6840(?:[\s/-].*)?$/i,
+    category: 'lcl_filter_inductor',
+    rated_voltage_ac_v: 690,
+    notes: 'Schaffner FN6840 series: LCL filter for Active Front End motor drives / active infeed converters. Family-level pin — the deterministic-emitter computes the actual A rating from continuous_power_kw via the universal sizing rule; the parts validator therefore only checks the part TYPE is correct here, and gate 14 (sizing-vs-design audit) validates the current. Acquired by TE Connectivity 2026; family continues under the Schaffner brand.',
+  },
+  // ── BESS L18 fix (2026-05-24): deflagration vent panel ───────────
+  // Rembe BESS.EGV-IAF — aluminium burst-disc-style deflagration vent panel
+  // certified to both NFPA 68 (US) and EN 14797 (EU). Specifically marketed
+  // by Rembe for utility-scale BESS containers. Replaces the previous
+  // polycarbonate pin (polycarbonate is an impact-RESISTANT polymer that
+  // does NOT rupture at the low pressures NFPA 68 requires for explosion
+  // venting; the container would over-pressurise and fail structurally
+  // before a polycarbonate panel would rupture).
+  // Source: https://rembe.us/en-us/bess-explosion-safety/bess-egv-iaf
+  {
+    manufacturer: 'Rembe',
+    part_number_pattern: /^BESS\.EGV-IAF$/i,
+    category: 'deflagration_vent_panel',
+    notes: 'Rembe BESS.EGV-IAF: aluminium deflagration vent panel for BESS roof installation, insulation on inside of panel facing BESS interior, vents deflagrations upward. Certified to NFPA 68 + EN 14797. The correct part type for a BESS explosion vent — distinct from polycarbonate (impact-resistant, will NOT rupture).',
+  },
+  // ── BESS L18 fix (2026-05-24): door position safety switch ───────
+  // Eaton LS-S11S-ZB — IEC 60947-5-1 positive-opening safety position /
+  // limit switch from the LS-Titan miniature DIN range. 1NO+1NC contacts,
+  // IP66/IP67, 6 A AC-15 @ 230 V / 3 A DC-13 @ 24 V, screw terminals.
+  // Replaces the LLM-emitted Eaton M22-DL-G (which is a panel-mount
+  // illuminated PUSHBUTTON, not a door switch). The deterministic emitter
+  // now pins this part on the door_position_switch slot in the structure_
+  // containment ISO container shell sub-module so the downstream LLM no
+  // longer has to invent one (and gets it wrong).
+  // Source: https://www.eaton.com/us/en-us/skuPage.LS-S11-ZB.html +
+  //  https://www.eaton.com/content/dam/eaton/products/industrialcontrols-drives-automation-sensors/sensors-and-limit-switches-v9-t5-ca8100011e.pdf
+  {
+    manufacturer: 'Eaton',
+    part_number_pattern: /^LS-S11(?:S(?:[-\s/].*)?|[-\s/].*|)$/i,
+    category: 'safety_limit_switch',
+    rated_current_a: 6,
+    rated_voltage_ac_v: 230,
+    notes: 'Eaton LS-S11S-ZB: IEC 60947-5-1 positive-opening safety limit switch with 1NO+1NC contacts, IP66/IP67, 6 A AC-15 @ 230 V / 3 A DC-13 @ 24 V, screw terminals. The correct part type for a door position sensor — distinct from M22-DL-G (which is an illuminated panel-mount pushbutton from the IEC 22.5 mm RMQ-Titan family, NOT a limit switch).',
+  },
+  // ── BESS L18 fix (2026-05-24): HV cable gland ────────────────────
+  // Hawke 501/421 (Universal) — dual-cert Exd + Exe single-seal compression
+  // cable gland in nickel-plated brass, M16 → M75 entry threads available,
+  // suitable for non-armoured HV power cables in Zone 1/21 and Zone 2/22
+  // hazardous areas. Replaces the LLM-emitted Roxtec CF 16 (which is a
+  // RECTANGULAR cable transit FRAME — wedge-and-module sealing for
+  // through-wall cable runs, not a round threaded gland; cannot mate with
+  // M63 enclosure entries).
+  // Source: https://www.hubbell.com/hawke/en/products/501421-ex-d-ex-e-cable-gland/p/3913698
+  // Pattern matches '501/421', '501/421/Universal', '501/421/UNIV', etc.
+  {
+    manufacturer: 'Hawke',
+    part_number_pattern: /^501\/421(?:\/.*)?$/i,
+    category: 'hv_cable_gland',
+    rated_voltage_ac_v: 11000,
+    notes: 'Hawke 501/421/Universal: dual-cert (Exd + Exe) compression-style HV cable gland, nickel-plated brass, M16-M75 entry threads, IEC 60079-0 + IEC 60079-1 + IEC 60079-7, BASEEFA + IECEx + ATEX certified, suitable for HV power cables (11 kV typical) in Zone 1/21 + Zone 2/22 hazardous areas. The correct part type for a round threaded HV gland — distinct from Roxtec CF 16 (which is a RECTANGULAR cable transit FRAME, not a round gland).',
+  },
 ]
 
 // ── PARSERS ──────────────────────────────────────────────────────────────────

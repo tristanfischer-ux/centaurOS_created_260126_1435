@@ -613,14 +613,41 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
           mod('form', '6×450µF film'),
         ],
       ),
+      // BESS L18 (2026-05-24, Physics Critic engineering_plausibility HIGH —
+      // AC filter inductor was hardcoded at 100 A for a 1 MW PCS at 400 V
+      // 3-phase, which has a continuous AC current of 1000000 / (400 × √3) =
+      // 1443 A; with the IEC 60947-2 / UL 489 1.25× continuous-duty margin
+      // the LCL inductor must be rated ≥ 1804 A. The previous 100 A spec
+      // was 18× undersized — the inductor would saturate and burn out under
+      // load. The rating is now CALCULATED from continuousPowerKw (which
+      // sources from the engineering Contract) so any future PCS-power
+      // change automatically resizes the filter. Rounding up to the next
+      // 100 A keeps the emitted figure in line with how real LCL filter
+      // catalogues are sized (Schaffner FN6840 series, Schmidbauer LCL
+      // chokes, Block FK air-core reactors are all stocked in 100-A
+      // increments).
+      // Pinned to Schaffner FN6840 series (LCL filter for Active Front End
+      // motor drives / active infeed converters — same topology as utility
+      // BESS PCS). Source: Schaffner FN6840 datasheet
+      // (https://www.schaffner.com/product/FN6840) confirms the FN6840 line
+      // covers AFE/AIC LCL filtering across the active-infeed current range
+      // used by 250 kW – 2 MW PCS modules. Acquired by TE Connectivity
+      // 2026; family still produced under the Schaffner brand.
       word(
-        'pcs_lcl_output_filter_word',
-        'PCS LCL output filter word',
-        cc('pcs_lcl_output_filter', 'PCS LCL output filter', 'electrical_conducting_function', 'copper'),
+        'pcs_filter_inductor_word',
+        'PCS LCL output filter inductor word',
+        cc('pcs_filter_inductor', 'PCS LCL output filter inductor', 'electrical_conducting_function', 'copper'),
         [
           mod('quantity', '×1'),
           mod('dimension', '50', 'µH'),
-          mod('capacity', '100', 'A 3-phase'),
+          // AC continuous current = continuousPowerKw × 1000 / (400 × √3),
+          // multiplied by 1.25 IEC 60947-2 / UL 489 safety factor, rounded
+          // UP to the next 100 A — matches how LCL filter catalogues size
+          // their AFE/AIC inductors.
+          mod('rating_primary', `${Math.ceil((p.continuousPowerKw * 1000 / (400 * Math.sqrt(3)) * 1.25) / 100) * 100} A 3-phase continuous`),
+          mod('manufacturer', 'Schaffner'),
+          mod('part_number', 'FN6840 series'),
+          mod('regulatory', 'IEC 60947-2 + UL 489'),
         ],
       ),
     ],
@@ -1274,14 +1301,34 @@ function emitSafetyProtection(p: BessParams): DesignModule {
     'vents',
     'pressure-relief panels + MOV smoke-vent interlock',
     [
+      // BESS L18 (2026-05-24, Physics Critic engineering_plausibility MED):
+      // the previous "polycarbonate" pin was a hard-to-rupture impact polymer
+      // — exactly the wrong material for a deflagration vent which must
+      // rupture at low pressure (NFPA 68 typical Pred 5-50 mbar) to release
+      // overpressure. Polycarbonate is engineered to RESIST impact (machine
+      // guards, helmets, riot shields); a polycarbonate "vent panel" would
+      // resist the explosion and let the container shell over-pressurise,
+      // causing structural failure. Replaced with Rembe BESS.EGV-IAF, a
+      // real aluminium deflagration vent panel certified to both NFPA 68
+      // and EN 14797 specifically for utility-scale BESS containers.
+      // Material radical changed from polymer_thermoplastic → aluminium to
+      // reflect the actual rupture mechanism. Source: Rembe BESS catalogue
+      // (https://rembe.com/en-us/bess-explosion-safety/bess-egv-iaf).
+      // Alternative real-part pins (also NFPA 68-certified) — kept as
+      // commented reference for future swaps:
+      //   - Continental Disc Corp BS-B (forward-acting Al burst disc, ASME)
+      //   - BS&B Safety Systems SRD-LO (graphite scored rupture disc)
+      //   - Fike CV/CD-series composite deflagration vent panels
       word(
         'deflagration_vent_panel_word',
         'deflagration vent panel word',
-        cc('deflagration_vent_panel', 'deflagration vent panel', 'pressure_vessel_function', 'polymer_thermoplastic'),
+        cc('deflagration_vent_panel', 'deflagration vent panel', 'pressure_vessel_function', 'aluminium'),
         [
           mod('quantity', '×4'),
-          mod('form', 'polycarbonate'),
-          mod('regulatory', 'NFPA 68'),
+          mod('manufacturer', 'Rembe'),
+          mod('part_number', 'BESS.EGV-IAF'),
+          mod('form', 'aluminium burst-disc style deflagration vent (NOT polycarbonate — polycarbonate is an impact-RESISTANT polymer that does not rupture at the low pressures NFPA 68 requires)'),
+          mod('regulatory', 'NFPA 68 + EN 14797'),
         ],
       ),
       word(
@@ -1346,6 +1393,11 @@ function emitSafetyProtection(p: BessParams): DesignModule {
       'chemical_sensing_function',
       'electromechanical_switching_function',
       'pressure_vessel_function',
+      // BESS L18 (2026-05-24): deflagration vent panel material radical
+      // changed polymer_thermoplastic (polycarbonate — wrong) → aluminium
+      // (Rembe BESS.EGV-IAF — real burst-disc-style vent panel). Added
+      // here so the radical-validator (gate 4) accepts it.
+      'aluminium',
     ],
     applicability_confidence: 'high',
     sub_modules: [fireSuppression, deflagrationVents, safetyLabelling],
@@ -1404,6 +1456,40 @@ function emitStructureContainment(_p: BessParams): DesignModule {
           mod('ip_rating', 'IP54'),
         ],
       ),
+      // BESS L18 (2026-05-24, Physics Critic internal_coherence MED):
+      // previously the door_position_switch slot was left unspecified in
+      // the deterministic emitter, so the downstream LLM (5-r1-grok /
+      // 8-r4-flashlite) back-filled it with "Eaton M22-DL-G" — a green-
+      // illuminated panel-mount PUSHBUTTON from the IEC 22.5 mm RMQ-Titan
+      // family, NOT a limit switch. A door cannot be sensed by an operator
+      // button (the door would need to physically press a panel-mounted
+      // button every time). Pinned to Eaton LS-S11S-ZB — a real safety
+      // position / limit switch from Eaton's LS-Titan miniature DIN range,
+      // certified to IEC 60947-5-1 with positive-opening contacts, 1NO+1NC,
+      // IP66/IP67, screw terminals, 6 A AC-15 @ 230 V / 3 A DC-13 @ 24 V.
+      // Source: Eaton LS-S11S-ZB product page
+      // (https://www.eaton.com/us/en-us/skuPage.LS-S11-ZB.html) +
+      // Eaton sensors and limit switches catalogue
+      // (https://www.eaton.com/content/dam/eaton/products/industrialcontrols-drives-automation-sensors/sensors-and-limit-switches-v9-t5-ca8100011e.pdf).
+      // Alternative real-part pins (also safety-rated door switches) — kept
+      // as commented reference for future swaps:
+      //   - Siemens 3SE5132-0AB02-1AC4 (positively-driven safety switch)
+      //   - Pizzato FR 754-M2 (magnetic safety sensor, ISO 14119)
+      //   - Schmersal BNS33 / BNS260 (coded magnetic sensor)
+      word(
+        'door_position_switch_word',
+        'door position switch word',
+        cc('door_position_switch', 'door position safety switch', 'electromechanical_switching_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×2'),
+          mod('manufacturer', 'Eaton'),
+          mod('part_number', 'LS-S11S-ZB'),
+          mod('form', 'IEC 60947-5-1 positive-opening safety limit switch with 1NO+1NC contacts (NOT an Eaton M22-DL pushbutton — M22 is a panel-mount operator, not a door limit switch)'),
+          mod('rating_primary', '6 A AC-15 / 3 A DC-13'),
+          mod('ip_rating', 'IP66/IP67'),
+          mod('regulatory', 'IEC 60947-5-1'),
+        ],
+      ),
       word(
         'grounding_lug_set_word',
         'grounding lug set word',
@@ -1418,11 +1504,16 @@ function emitStructureContainment(_p: BessParams): DesignModule {
 
   return {
     module: 'structure_containment',
-    module_brief: 'Houses the BESS in a 40-foot HC ISO container with reinforced floor, mineral-wool fire-rated insulation and IP54 double-leaf doors.',
+    module_brief: 'Houses the BESS in a 40-foot HC ISO container with reinforced floor, mineral-wool fire-rated insulation and IP54 double-leaf doors with positive-opening door position safety switches.',
     overview_paragraph_en: '',
     derived_parameters: {
       container_count: 1,
       floor_load_kg: 28000,
+      // BESS L18 (2026-05-24): door-position safety switches now pinned
+      // deterministically (Eaton LS-S11S-ZB × 2) so the downstream LLM
+      // does not back-fill with M22-DL-G pushbutton (which is a panel
+      // operator, not a door limit switch).
+      door_position_switch_count: 2,
     },
     allowed_radicals: [
       'steel',
@@ -1430,6 +1521,9 @@ function emitStructureContainment(_p: BessParams): DesignModule {
       'mineral_fibre_material',
       'polymer_thermoplastic',
       'electrical_conducting_function',
+      // BESS L18 (2026-05-24): door position safety switch is an
+      // electromechanical switching element — added to allowed_radicals.
+      'electromechanical_switching_function',
     ],
     applicability_confidence: 'high',
     sub_modules: [isoContainerShell],
@@ -1506,13 +1600,34 @@ function emitInterconnect(_p: BessParams): DesignModule {
     'connects',
     'MV cable gland + 0.5S metering CTs at the PCC',
     [
+      // BESS L18 (2026-05-24, Physics Critic part_realism MED):
+      // previous pin had only generic "ATEX EEx-d" form text — leaving the
+      // slot incompletely specified, which the downstream LLM emitter then
+      // back-filled with the WRONG type of part (Roxtec CF 16, a RECTANGULAR
+      // cable transit FRAME for through-wall cable runs, not a round HV
+      // gland that mates with M-thread enclosure entries). Pinned to
+      // Hawke 501/421 — a real, dual-cert (Exd + Exe) compression-style
+      // single-seal cable gland in nickel-plated brass with M63 entry
+      // threads, suitable for non-armoured HV cables in Zone 1/21 and
+      // Zone 2/22 hazardous areas. Source: Hawke 501/421 datasheet
+      // (Hubbell/Hawke International,
+      // https://www.hubbell.com/hawke/en/products/501421-ex-d-ex-e-cable-gland/p/3913698).
+      // Alternative real-part pins (also HV-rated round glands) — kept as
+      // commented reference for future swaps:
+      //   - CMP A2RC METRIC (brass, BS 6121:Part 1 / EN 50262, M-thread)
+      //   - Cortem ICRSTC11 (Italian, 11 kV armoured)
+      //   - Prysmian CCG-RA series (HV when ordered with the cable run)
       word(
         'mv_cable_gland_word',
         'MV cable gland word',
         cc('mv_cable_gland', 'MV cable gland', 'electrical_conducting_function', 'copper'),
         [
           mod('quantity', '×3'),
-          mod('form', 'ATEX EEx-d'),
+          mod('manufacturer', 'Hawke'),
+          mod('part_number', '501/421/Universal'),
+          mod('form', 'compression-style HV cable gland, nickel-plated brass, M63 entry (round, NOT a Roxtec rectangular cable transit frame)'),
+          mod('rating_primary', '11 kV'),
+          mod('regulatory', 'IEC 60079-0 + IEC 60079-1 + IEC 60079-7 (Exd + Exe)'),
         ],
       ),
       word(
