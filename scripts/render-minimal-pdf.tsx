@@ -5265,6 +5265,8 @@ function ModuleSection({
               <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>£{moduleCostGbp.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
             </Text>
           </View>
+        ) : null}
+      </View>
 
       {/* ─── Module Summary panel (Tristan 2026-05-24, task #117) ──────
           Per Tristan: "you sort of have this at the beginning of the
@@ -5387,8 +5389,6 @@ function ModuleSection({
                 const tail = isProperOrAcronym ? purposeText : `${purposeText.charAt(0).toLowerCase()}${purposeText.slice(1)}`
                 return `This module (${moduleName}) ${tail}`
               })()}
-        ) : null}
-      </View>
 
       {moduleImagePath ? (
         <View style={{ marginBottom: 14, alignItems: 'center' }}>
