@@ -3744,8 +3744,15 @@ function SubModuleBomBlock({
   // overlapping text per pdftotext audit). Use minPresenceAhead instead:
   // tells react-pdf "if <N pt available, push the WHOLE table to next page",
   // which prevents both the original orphan-header bug AND the overlap.
-  // Estimate ~12pt per row + 18pt for header/separator/subtotal.
-  const minPresenceAheadPt = Math.min(28 + bomLines.length * 12, 600)
+  //
+  // 2026-05-24 (bess-l7 user-reported): on Section 2 / Module 5 sub-module 5.1
+  // the previous 12pt-per-row reserve was too tight — when a sub-module landed
+  // in the bottom third of a page, header + first ~3 rows fitted but the
+  // remainder overflowed at the SAME Y position as the subtotal/legend lines,
+  // producing the multi-layer text smear Tristan flagged. Widen to ~16pt per
+  // row + 60pt for header + separator + sub-total + legend so the reserve
+  // matches the actual rendered height of a typical 5-row BoM block (~140pt).
+  const minPresenceAheadPt = Math.min(60 + bomLines.length * 16, 600)
   // 2026-05-23 P2-3: count excluded rows so sub-total label can flag them.
   // Tristan flagged "96 + 8 ≠ 0" bug: the table showed line totals (96 and
   // 8) but the sub-total summed to a different number because rows with
@@ -3833,7 +3840,7 @@ function SubModuleBomBlock({
             <Text style={lineTextStyle}>{lineCell}</Text>
             <View style={{ width: 60, paddingLeft: 6, flexDirection: 'row', alignItems: 'baseline' }}>
               {isExcluded ? (
-                <Text style={{ fontSize: 7.5, color: '#b45309', fontFamily: 'Helvetica-Bold' }}>EXCLUDED</Text>
+                <Text style={{ fontSize: 7.5, color: '#b45309', fontFamily: 'Helvetica-Bold' }}>PRICE-QUERY</Text>
               ) : (
                 <>
                   <Text style={{ fontSize: 8, color: MUTED }}>{src}</Text>
@@ -3848,7 +3855,7 @@ function SubModuleBomBlock({
       <View style={{ flexDirection: 'row', paddingTop: 5, paddingBottom: 3, borderTopWidth: 0.6, borderTopColor: RULE }}>
         <Text style={{ flex: 7.6, fontSize: 8.5, color: INK_SOFT, fontStyle: 'italic' }}>
           Sub-total — {subModuleName}
-          {excludedCount > 0 ? ` (excl. ${excludedCount} item${excludedCount === 1 ? '' : 's'} pending review)` : ''}
+          {excludedCount > 0 ? ` (excl. ${excludedCount} item${excludedCount === 1 ? '' : 's'} pending price verification)` : ''}
         </Text>
         <Text style={{ width: 55, fontSize: 9.5, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>
           £{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -3861,7 +3868,7 @@ function SubModuleBomBlock({
           "corpus" term and describes the price-sanity check as comparing
           against typical prices for similar components. */}
       <Text style={{ fontSize: 6.5, color: MUTED, marginTop: 4, lineHeight: 1.5, fontStyle: 'italic' }}>
-        SOURCE: Web = found in a distributor catalogue (DigiKey / Mouser / Farnell etc.) · Est. = web estimate, not a live quote · Mfr = found on the manufacturer&apos;s own site · — = no source recorded.  PRICE CHECK (against typical prices for similar components): OK = price sits in the normal range · &gt;2x = price looks more than 2× higher than typical · &lt;.5x = price looks less than half of typical · - = no comparable parts on record to check against.
+        SOURCE: Web = found in a distributor catalogue (DigiKey / Mouser / Farnell etc.) · Est. = web estimate, not a live quote · Mfr = found on the manufacturer&apos;s own site · — = no source recorded.  PRICE CHECK (against typical prices for similar components): OK = price sits in the normal range · &gt;2x = price looks more than 2× higher than typical · &lt;.5x = price looks less than half of typical · - = no comparable parts on record to check against.  PRICE-QUERY = part is required for the design but the unit price is under the industry floor for this class; verify the part number and specification before procurement.
       </Text>
     </View>
   )
@@ -4136,10 +4143,25 @@ function ModuleSection({
           for (const n of notes) {
             if (n.word_id) noteIndexMap.set(n.word_id, n.idx)
           }
+          // 2026-05-24 (bess-l7 user-reported, Section 2 Module 5 sub-module 5.1):
+          // Multi-layer text smear when a sub-module starts in the bottom third
+          // of a page. The title block already had `minPresenceAhead={80}`, but
+          // the WHOLE sub-module (title + prose + BoM header + first rows) had
+          // no joint break-alignment. react-pdf would render title + prose, then
+          // the BoM block's own reserve would push the table to the next page,
+          // leaving prose + notes overlapping at the same Y as the BoM that
+          // already advanced. Fix: add an outer reserve that covers title (~25pt)
+          // + first prose chunk (~60pt) + BoM header (~18pt) + min(rows, 6) rows
+          // (~16pt each) so the next page-break candidate is AFTER the BoM
+          // begins, not in the middle of the prose-to-BoM transition. Cap at
+          // 6 rows so very long tables (e.g. cell_string with 9 lines) don't
+          // force unnecessary page breaks for the whole sub-module.
+          const outerReserve = 120 + Math.min(subBomLines.length, 6) * 14
           return (
             <View
               key={sm.id}
               style={{ paddingVertical: 11, borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT }}
+              minPresenceAhead={outerReserve}
             >
               {/* 2026-05-23 fix (user-reported on windturbine-l5 page 18):
                   Earlier "wrap={false} around title + full first prose chunk"
@@ -4152,7 +4174,9 @@ function ModuleSection({
                   title together with at least 80pt of follow-on content
                   (~3 prose lines). This prevents BOTH orphaned titles AND
                   the overlap smear, because react-pdf flows normally and only
-                  the minPresenceAhead constraint forces page-break alignment. */}
+                  the minPresenceAhead constraint forces page-break alignment.
+                  The 2026-05-24 outer-reserve above strengthens this for the
+                  prose → BoM transition specifically. */}
               <View minPresenceAhead={80}>
                 <View style={{ flexDirection: 'row', marginBottom: 5, alignItems: 'baseline' }}>
                   <Text style={{ width: 36, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT_SOFT }}>

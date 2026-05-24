@@ -411,6 +411,20 @@ export function persistWebFallbackCandidate(
 
   const { mergedAttrs } = mergeArchetypeMatch(null, newMatch, sourceQuery)
   const mergedJson = sqlEscape(JSON.stringify(mergedAttrs))
+  // 2026-05-24 (bess-l7 user-reported): replace the static `web_fallback`
+  // search_profile_id with a per-chain stamp so each discovery is traceable
+  // back to the specific chain run that surfaced it. Format mirrors the
+  // existing per-discovery-run profile tags already in the DB
+  // (e.g. `bess-supplier-discovery-20260422`, `space-components-uk`) so the
+  // companies table stays uniformly grep-able by profile. Class is normalised
+  // to lower-case + non-alphanumerics collapsed to underscores so values like
+  // "Wind Turbine" don't break the tag shape.
+  const isoDate = new Date().toISOString().slice(0, 10).replace(/-/g, '_')
+  const safeClass = (productClass || 'unknown')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '') || 'unknown'
+  const searchProfileTag = `discovered_${isoDate}_${safeClass}_chain`
   const insertSql = `INSERT OR IGNORE INTO companies (
     id, name, website_url, domain, country, city,
     source, source_url, source_query, raw_snippet,
@@ -432,7 +446,7 @@ export function persistWebFallbackCandidate(
     'discovered',
     ${newRelevance},
     '${mergedJson}',
-    'web_fallback',
+    '${sqlEscape(searchProfileTag)}',
     'pdf_engine_web_fallback',
     datetime('now'),
     datetime('now')
