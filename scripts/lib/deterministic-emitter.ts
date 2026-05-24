@@ -227,6 +227,11 @@ function makeSubModule(
 interface BessParams {
   cellCount: number
   rackCount: number
+  cellsPerRack: number
+  seriesCellsPerString: number
+  parallelStringsPerRack: number
+  parallelStringsTotal: number
+  stringVoltageNominalV: number
   thermalRejectionKw: number
   continuousPowerKw: number
   peakPowerKw: number
@@ -242,9 +247,32 @@ interface BessParams {
 
 function deriveBessParams(contract: ContractShape): BessParams {
   const cellCount = Math.max(1, Math.round(q(contract, 'cell_count', 5006)))
-  // 280 cells per rack is the CATL/EVE class default for utility BESS
-  // (matches the BMS slave coverage in the prompts.ts worked example).
-  const rackCount = Math.max(1, Math.ceil(cellCount / 280))
+  // Build #18r-fix2 (2026-05-22 Loop 28 consistency audit): READ rack_count
+  // from Contract — pybamm's class-plan stepPybamm.contract_update writes
+  // the authoritative value (e.g. 15 for a 5010-cell pack), but the emitter
+  // previously recomputed `ceil(cellCount/280) = 18` and ignored Contract.
+  // Result: module_brief said "across 18 racks" while overview_paragraph_en
+  // (built by the LLM narrator from the same Contract) said "15 racks".
+  // Per Loop 28 task list (Bug 1 + Bug 5): the emitter MUST read from
+  // contract.quantities.rack_count?.value. Fallback = ceil(cellCount/280)
+  // is preserved for the rare case where pybamm did not run (legacy
+  // DETERMINISTIC_EMITTER=1 path without ORCHESTRATOR=1).
+  const rackCount = Math.max(1, Math.round(q(contract, 'rack_count', Math.max(1, Math.ceil(cellCount / 280)))))
+  // cellsPerRack: prefer Contract value (pybamm derives integer-clean
+  // topology); fall back to cellCount / rackCount.
+  const cellsPerRack = Math.max(1, Math.round(q(contract, 'cells_per_rack', cellCount / rackCount)))
+  // Build #18r-fix2: pack topology values (series_cells_per_string,
+  // parallel_strings_per_rack, parallel_strings_total, string_voltage_nominal_v)
+  // are pybamm's authoritative outputs. The emitter and the LLM narrator
+  // MUST consume the same values to avoid Bug 2 ("reconfigured to 250 series
+  // cells" contradicting the 167 series cells pybamm picked for voltage
+  // headroom). Fallbacks compute the legacy class default (167 series,
+  // 2 parallel per rack) — but normally pybamm overrides.
+  const seriesCellsPerString = Math.max(1, Math.round(q(contract, 'series_cells_per_string', 167)))
+  const parallelStringsPerRack = Math.max(1, Math.round(q(contract, 'parallel_strings_per_rack', 2)))
+  const parallelStringsTotal = Math.max(1, Math.round(q(contract, 'parallel_strings_total', parallelStringsPerRack * rackCount)))
+  const cellVoltageV = q(contract, 'cell_voltage_v', 3.2)
+  const stringVoltageNominalV = q(contract, 'string_voltage_nominal_v', seriesCellsPerString * cellVoltageV)
   const thermalRejectionKw = q(contract, 'thermal_rejection_min_kw', 30)
   const continuousPowerKw = q(contract, 'continuous_power_kw', 1000)
   const peakPowerKw = q(contract, 'peak_power_kw', 1250)
@@ -255,10 +283,14 @@ function deriveBessParams(contract: ContractShape): BessParams {
   const busContinuousA = q(contract, 'bus_continuous_current_a', 1250)
   const busPeakA = q(contract, 'bus_peak_current_a', 1562)
   const cellCapacityAh = q(contract, 'cell_capacity_ah', 280)
-  const cellVoltageV = q(contract, 'cell_voltage_v', 3.2)
   return {
     cellCount,
     rackCount,
+    cellsPerRack,
+    seriesCellsPerString,
+    parallelStringsPerRack,
+    parallelStringsTotal,
+    stringVoltageNominalV,
     thermalRejectionKw,
     continuousPowerKw,
     peakPowerKw,
@@ -278,7 +310,10 @@ function deriveBessParams(contract: ContractShape): BessParams {
 // ---------------------------------------------------------------------------
 
 function emitEnergyStorageSource(p: BessParams): DesignModule {
-  const cellsPerRack = Math.round(p.cellCount / p.rackCount)
+  // Build #18r-fix2 (2026-05-22): cellsPerRack now sourced from Contract via
+  // BessParams.cellsPerRack (pybamm's authoritative integer-clean topology).
+  // busbarsPerRack remains a derived shape metric (no Contract field for it).
+  const cellsPerRack = p.cellsPerRack
   const busbarsPerRack = Math.max(0, cellsPerRack - 1)
   const totalBusbars = Math.max(0, p.cellCount - p.rackCount)
   const tempSensorCount = p.rackCount * 4
@@ -601,7 +636,25 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
         cc('bms_master_housing', 'BMS master housing', null, 'steel'),
         [
           mod('quantity', '×1'),
-          mod('regulatory', 'IP54'),
+          // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): IP54 is an
+          // ingress-protection rating (IEC 60529), use dedicated `ip_rating`.
+          mod('ip_rating', 'IP54'),
+        ],
+      ),
+      // BESS L2 (2026-05-24): emit bms_slave_module_word so the
+      // engineering-contract.ts `bms_slave_module` macro can propagate
+      // through scripts/render-minimal-pdf.tsx:885-927 strict matcher.
+      // Without this word the macro orphans and audit-pdf-bom.ts B-2
+      // hard-exits code 10. Slave count = ceil(cellCount / 24) mirrors
+      // engineering-contract.ts BESS slaveCount derivation.
+      word(
+        'bms_slave_module_word',
+        'BMS slave module word',
+        cc('bms_slave_module', 'BMS slave module', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', fmtQty(Math.ceil(p.cellCount / 24))),
+          mod('form', '24-channel cell-voltage + temperature monitoring board'),
+          mod('regulatory', 'IEC 62619'),
         ],
       ),
     ],
@@ -620,7 +673,10 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('form', 'Beckhoff CX7000'),
-          mod('regulatory', 'Modbus TCP'),
+          // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4): Modbus TCP is a
+          // communication protocol (IEC 61158), not a regulatory standard.
+          // Use the dedicated `protocol` kind.
+          mod('protocol', 'Modbus TCP'),
         ],
       ),
       word(
@@ -630,7 +686,9 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('form', 'Anybus AB7634'),
-          mod('regulatory', 'ModbusRTU/TCP'),
+          // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4): Modbus RTU/TCP is a
+          // communication protocol (IEC 61158), not a regulatory standard.
+          mod('protocol', 'Modbus RTU/TCP'),
         ],
       ),
     ],
@@ -784,7 +842,9 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('quantity', '×1'),
           mod('capacity', String(chillerKw), 'kW'),
           mod('form', 'glycol/water'),
-          mod('regulatory', 'R513A'),
+          // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): R513A is a
+          // refrigerant material, not a regulatory standard. Use `material`.
+          mod('material', 'R513A'),
         ],
       ),
       word(
@@ -833,7 +893,9 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('quantity', '×4'),
           mod('form', 'axial'),
           mod('capacity', '80', 'W'),
-          mod('regulatory', 'EBM-Papst'),
+          // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): EBM-Papst is a
+          // manufacturer, not a regulatory standard.
+          mod('manufacturer', 'EBM-Papst'),
         ],
       ),
       word(
@@ -907,7 +969,10 @@ function emitMassFluidTransportProcess(_p: BessParams): DesignModule {
         [
           mod('quantity', '×4'),
           mod('form', 'brass'),
-          mod('regulatory', 'glycol-rated'),
+          // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): "glycol-rated"
+          // is a service-fluid compatibility descriptor, not a regulatory
+          // standard. Move to `performance`.
+          mod('performance', 'glycol-rated'),
         ],
       ),
       word(
@@ -1123,7 +1188,8 @@ function emitStructureContainment(_p: BessParams): DesignModule {
         cc('door_assembly_double_leaf', 'door assembly double leaf', null, 'steel'),
         [
           mod('quantity', '×1'),
-          mod('regulatory', 'IP54'),
+          // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): IP54 = IP rating.
+          mod('ip_rating', 'IP54'),
         ],
       ),
       word(
@@ -1177,7 +1243,8 @@ function emitOperatorInterface(_p: BessParams): DesignModule {
           mod('quantity', '×1'),
           mod('form', 'Siemens TP1500 Comfort'),
           mod('dimension', '15', '"'),
-          mod('regulatory', 'IP65'),
+          // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): IP65 = IP rating.
+          mod('ip_rating', 'IP65'),
         ],
       ),
       word(
@@ -1187,7 +1254,10 @@ function emitOperatorInterface(_p: BessParams): DesignModule {
         [
           mod('quantity', '×2'),
           mod('form', 'mushroom-head'),
-          mod('regulatory', 'Eaton M22-PV'),
+          // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): Eaton M22-PV is
+          // a manufacturer + part number, not a regulatory standard.
+          mod('manufacturer', 'Eaton'),
+          mod('part_number', 'M22-PV'),
         ],
       ),
     ],
@@ -1239,7 +1309,12 @@ function emitInterconnect(_p: BessParams): DesignModule {
         cc('grid_pcc_metering_ct', 'grid PCC metering CT', 'magnetic_coupling_function', 'copper'),
         [
           mod('quantity', '×3'),
-          mod('regulatory', '0.5S accuracy'),
+          // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): "0.5S accuracy"
+          // is a performance class (IEC 61869 metering CT), not the standard
+          // itself. Use `performance` for the class spec; cite the standard
+          // separately as `regulatory`.
+          mod('performance', '0.5S accuracy class'),
+          mod('regulatory', 'IEC 61869-2'),
         ],
       ),
     ],

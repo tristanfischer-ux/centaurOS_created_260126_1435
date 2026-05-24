@@ -113,6 +113,14 @@ function emitHeadPerceptionSensors(_p: HumParams): DesignModule {
     word('microphone_array_word', 'microphone array',
       cc('microphone_array', 'microphone array', 'optical_sensing_function', 'polymer_thermoplastic'),
       [mod('quantity', '×4'), mod('form', 'MEMS far-field')]),
+    // BESS L2 fan-out 2026-05-24: aggregate `sensor_suite` word so the
+    // engineering-contract.ts macro propagates through the strict matcher in
+    // scripts/render-minimal-pdf.tsx:885-927. Aggregates cameras + IMU +
+    // microphones + foot F/T + ToF lidar across the body.
+    word('sensor_suite_word', 'sensor suite',
+      cc('sensor_suite', 'sensor suite', 'optical_sensing_function', 'polymer_thermoplastic'),
+      [mod('quantity', '×1'),
+       mod('form', 'RGB-D cameras + 9-DOF IMU + 4-mic array + foot F/T + ToF lidar aggregate')]),
   ])
 
   return {
@@ -136,6 +144,14 @@ function emitNeckPanTilt(_p: HumParams): DesignModule {
     word('neck_servo_motor_word', 'neck servo motor',
       cc('neck_servo_motor', 'neck servo motor', 'electromechanical_switching_function', 'steel'),
       [mod('quantity', '×2'), mod('form', 'Dynamixel XH540'), mod('capacity', '10', 'N·m')]),
+    // BESS L2 fan-out 2026-05-24: aggregate `waist_neck_actuators` word so
+    // the engineering-contract.ts macro propagates through the strict matcher
+    // in scripts/render-minimal-pdf.tsx:885-927. Pairs neck pan/tilt with
+    // 3 waist actuators per the contract dofWaistNeck=5 budget.
+    word('waist_neck_actuators_word', 'waist neck actuators',
+      cc('waist_neck_actuators', 'waist + neck actuators', 'electromechanical_switching_function', 'steel'),
+      [mod('quantity', '×5'),
+       mod('form', 'series-elastic 5-30 N·m + pan/tilt neck servos for sensor orientation')]),
   ])
 
   return {
@@ -170,6 +186,14 @@ function emitShoulderArmJoints(p: HumParams): DesignModule {
       cc('elbow_actuator', 'elbow actuator', 'electromechanical_switching_function', 'steel'),
       [mod('quantity', '×2'),
        mod('capacity', String(Math.round(p.peakElbowNm)), 'N·m')]),
+    // BESS L2 fan-out 2026-05-24: aggregate `arm_actuator_assembly` word so
+    // the engineering-contract.ts macro propagates through the strict matcher
+    // in scripts/render-minimal-pdf.tsx:885-927.
+    word('arm_actuator_assembly_word', 'arm actuator assembly',
+      cc('arm_actuator_assembly', 'arm actuator assembly', 'electromechanical_switching_function', 'steel'),
+      [mod('quantity', '×14'),
+       mod('form', '7-DOF bilateral: harmonic-drive shoulder + elbow + wrist actuators 10-80 N·m'),
+       mod('capacity', String(Math.round(p.peakShoulderNm)), 'N·m')]),
   ])
 
   return {
@@ -203,6 +227,18 @@ function emitHandDexterousFingers(p: HumParams): DesignModule {
       cc('fingertip_tactile_sensor', 'fingertip tactile sensor', 'optical_sensing_function', 'polymer_thermoplastic'),
       [mod('quantity', '×10'),
        mod('form', 'GelSight Mini / capacitive array')]),
+    // BESS L2 fan-out 2026-05-24: aggregate `hand_finger_actuators` +
+    // `end_effector_hands` words so the engineering-contract.ts macros
+    // propagate through the strict matcher in
+    // scripts/render-minimal-pdf.tsx:885-927.
+    word('hand_finger_actuators_word', 'hand finger actuators',
+      cc('hand_finger_actuators', 'hand finger actuators', 'electromechanical_switching_function', 'steel'),
+      [mod('quantity', fmtQty(p.fingerDof * 2)),
+       mod('form', 'tendon-driven 0.5-5 N·m miniature actuators per finger DOF (×2 hands)')]),
+    word('end_effector_hands_word', 'end effector hands',
+      cc('end_effector_hands', 'end effector dexterous hands', 'electromechanical_switching_function', 'steel'),
+      [mod('quantity', '×2'),
+       mod('form', p.fingerDof >= 10 ? '5-finger dexterous hand with tendon-driven fingers + tactile sensors per fingertip' : '2-finger underactuated gripper for power-grasp')]),
   ])
 
   return {
@@ -298,6 +334,15 @@ function emitKneeAnkleJoints(p: HumParams): DesignModule {
       [mod('quantity', '×4'),
        mod('form', '2-DOF parallel actuator'),
        mod('capacity', '150', 'N·m')]),
+    // BESS L2 fan-out 2026-05-24: aggregate `leg_actuator_assembly` word so
+    // the engineering-contract.ts macro propagates through the strict matcher
+    // in scripts/render-minimal-pdf.tsx:885-927. Aggregates 12 leg actuators
+    // (hip3 + knee + ankle2 per leg × 2 legs).
+    word('leg_actuator_assembly_word', 'leg actuator assembly',
+      cc('leg_actuator_assembly', 'leg actuator assembly', 'electromechanical_switching_function', 'steel'),
+      [mod('quantity', '×12'),
+       mod('form', 'QDD brushless 50-200 N·m: hip3 + knee + ankle2 per leg, FOC servo drive with absolute encoder'),
+       mod('capacity', String(Math.round(p.peakHipNm)), 'N·m')]),
   ])
 
   return {
@@ -332,6 +377,14 @@ function emitFootTerrainSensor(p: HumParams): DesignModule {
       cc('foot_pressure_pad', 'foot pressure pad', 'optical_sensing_function', 'polymer_thermoplastic'),
       [mod('quantity', '×2'),
        mod('form', 'Tekscan F-Scan')]),
+    // BESS L2 fan-out 2026-05-24: aggregate `structural_frame` word so the
+    // engineering-contract.ts macro propagates through the strict matcher in
+    // scripts/render-minimal-pdf.tsx:885-927. Whole-body chassis (7075-T6
+    // aluminium or CFRP-hybrid for the consumer/light variant).
+    word('structural_frame_word', 'structural frame',
+      cc('structural_frame', 'structural frame', 'electromechanical_switching_function', 'aluminium'),
+      [mod('quantity', '×1'),
+       mod('form', '7075-T6 aluminium machined/cast structural members + steel fasteners (consumer variant: CFRP shells + aluminium endplates)')]),
   ])
 
   return {
@@ -367,6 +420,19 @@ function emitBatteryPack(p: HumParams): DesignModule {
       [mod('quantity', '×1'),
        mod('form', 'aluminium 6061 + EPDM gasket'),
        mod('regulatory', 'IP54')]),
+    // BESS L2 fan-out 2026-05-24: aggregate `lithium_ion_battery_pack` +
+    // `enclosure_skin_panels` words so the engineering-contract.ts macros
+    // propagate through the strict matcher in
+    // scripts/render-minimal-pdf.tsx:885-927.
+    word('lithium_ion_battery_word', 'lithium-ion battery',
+      cc('lithium_ion_battery', 'lithium-ion battery', 'electrochemical_energy_function', 'lithium_iron_phosphate_chemistry'),
+      [mod('quantity', '×1'),
+       mod('form', `48 V Li-ion 18650/21700 pouch (${p.packKwh.toFixed(2)} kWh at 220 Wh/kg pack-level)`),
+       mod('capacity', p.packKwh.toFixed(2), 'kWh')]),
+    word('enclosure_skin_panels_word', 'enclosure skin panels',
+      cc('enclosure_skin_panels', 'enclosure skin panels', 'electromechanical_switching_function', 'polymer_thermoplastic'),
+      [mod('quantity', '×1'),
+       mod('form', 'moulded polycarbonate / soft TPE skin shells (IP54 dust + water spray rating; ISO 13482 force-limited for consumer variant)')]),
   ])
 
   return {
@@ -404,6 +470,14 @@ function emitBmsThermalLoop(_p: HumParams): DesignModule {
       cc('pack_thermistor', 'pack thermistor', 'thermal_transfer_function', 'ceramic'),
       [mod('quantity', '×8'),
        mod('form', 'NTC 10k')]),
+    // BESS L2 fan-out 2026-05-24: aggregate `thermal_management_cooling`
+    // word so the engineering-contract.ts macro propagates through the
+    // strict matcher in scripts/render-minimal-pdf.tsx:885-927.
+    word('thermal_management_cooling_word', 'thermal management cooling',
+      cc('thermal_management_cooling', 'thermal management cooling loop', 'thermal_transfer_function', 'aluminium'),
+      [mod('quantity', '×1'),
+       mod('form', 'forced-air blower + heat-pipe to chassis skin for battery and motor drives'),
+       mod('regulatory', 'ISO 13482 <60°C surface temp limit')]),
   ])
 
   return {

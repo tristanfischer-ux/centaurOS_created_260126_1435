@@ -756,7 +756,7 @@ registerArchetype('haps', (brief: any) => {
       source_detail: `£${gaasArealCostGbpM2}/m² × ${(wingAreaM2 * 0.4).toFixed(1)} m² laminate (40% of wing)`,
     },
     {
-      word_name: 'lithium_sulphur_battery_pack',
+      word_name: 'lithium_sulphur_cell',
       unit_price_gbp: liSbatteryPerKwhGbp,
       dimension_basis: 'kwh_capacity',
       dimension_value: batteryKwh,
@@ -978,7 +978,12 @@ registerArchetype('vertical_farm', (brief: any) => {
 
   const macro_assembly_prices: MacroAssemblyPrice[] = [
     {
-      word_name: 'horticultural_led_array',
+      // BESS L2 fan-out 2026-05-24: renamed `horticultural_led_array` →
+      // `horticultural_led_fixture` so the strict matcher in
+      // scripts/render-minimal-pdf.tsx:885-927 propagates to
+      // horticultural_led_fixture_word in vertical_farm.ts. `array` is not a
+      // QUALIFIER_TOKEN and no *_array_word exists in the VF emitter.
+      word_name: 'horticultural_led_fixture',
       unit_price_gbp: ledPerKwGbp,
       dimension_basis: 'kwh_capacity',  // actually kW power not energy but using same bucket
       dimension_value: ledPowerKw,
@@ -1502,7 +1507,9 @@ registerArchetype('drone', (brief: any) => {
       source_detail: `£600/kg payload × ${payloadKg.toFixed(2)} kg (3-axis brushless gimbal + camera module)`,
     },
     {
-      word_name: 'propeller_set_carbon',
+      // 2026-05-24 (orphan-fix): renamed propeller_set_carbon → cf_propeller_blade
+      // to match emitter word_id cf_propeller_blade_word (strict matcher).
+      word_name: 'cf_propeller_blade',
       unit_price_gbp: 25,
       dimension_basis: 'each',
       dimension_value: motorCount,
@@ -1742,7 +1749,12 @@ registerArchetype('auv', (brief: any) => {
       source_detail: `£450/kWh × ${batteryKwh.toFixed(2)} kWh (LFP subsea-rated, oil-compensated pack)`,
     },
     {
-      word_name: 'syntactic_foam_buoyancy',
+      // BESS L2 fan-out 2026-05-24: renamed `syntactic_foam_buoyancy` →
+      // `syntactic_foam_block` so the strict matcher in
+      // scripts/render-minimal-pdf.tsx:885-927 propagates to
+      // syntactic_foam_block_word in auv.ts. `buoyancy` is not in
+      // QUALIFIER_TOKENS and no *_buoyancy_word exists.
+      word_name: 'syntactic_foam_block',
       unit_price_gbp: 1500,
       dimension_basis: 'cubic_metre',
       dimension_value: buoyancyFoamVolumeM3,
@@ -2017,12 +2029,14 @@ registerArchetype('bioreactor', (brief: any) => {
       source_detail: `£2,500 flat — chiller + heater + circulation pump + PID control`,
     },
     {
-      word_name: 'ph_dosing_system',
+      // Renamed 2026-05-24 to align with emitter word_id `peristaltic_pump_acid_base_word`
+      // (strict matcher requires all macro semantic tokens ⊂ candidate tokens).
+      word_name: 'peristaltic_pump_acid_base',
       unit_price_gbp: 1800,
       dimension_basis: 'each',
       dimension_value: 1,
       total_gbp: 1800,
-      source_detail: `£1,800 flat — 2-channel peristaltic pump + acid/base reservoirs + pH probe`,
+      source_detail: `£1,800 flat — 2-channel peristaltic acid/base dosing pump + reservoirs + pH probe`,
     },
     {
       word_name: 'do_probe_optical',
@@ -3025,7 +3039,9 @@ registerArchetype('solar_inverter', (brief: any) => {
       source_detail: `£4/kW × ${ratedKw} kW (TDK/EPCOS B32778 film capacitors, ${dcLinkJoulesPerKw} J/kW energy, 105°C rated)`,
     },
     {
-      word_name: 'ac_filter_inductor',
+      // 2026-05-24 orphan-fix: renamed from `ac_filter_inductor` to match
+      // emitter word_id `lcl_inverter_inductor_word`.
+      word_name: 'lcl_inverter_inductor',
       unit_price_gbp: 6,
       dimension_basis: 'kw_power',
       dimension_value: ratedKw,
@@ -3033,7 +3049,9 @@ registerArchetype('solar_inverter', (brief: any) => {
       source_detail: `£6/kW × ${ratedKw} kW (LCL filter, ferrite or grain-oriented Si steel core, ${filterInductorMh.toFixed(2)} mH × ${acRatedCurrentA.toFixed(0)} A)`,
     },
     {
-      word_name: 'ac_filter_capacitor_bank',
+      // 2026-05-24 orphan-fix: renamed from `ac_filter_capacitor_bank` to
+      // match emitter word_id `lcl_filter_cap_word`.
+      word_name: 'lcl_filter_cap',
       unit_price_gbp: 1.5,
       dimension_basis: 'kw_power',
       dimension_value: ratedKw,
@@ -3041,7 +3059,9 @@ registerArchetype('solar_inverter', (brief: any) => {
       source_detail: `£1.5/kW × ${ratedKw} kW (X2 metallised polypropylene, IEC 60384-14 class)`,
     },
     {
-      word_name: 'mppt_controller_card',
+      // 2026-05-24 orphan-fix: renamed from `mppt_controller_card` to match
+      // emitter word_id `mppt_input_board_word`.
+      word_name: 'mppt_input_board',
       unit_price_gbp: 180,
       dimension_basis: 'each',
       dimension_value: mpptCount,
@@ -3073,7 +3093,9 @@ registerArchetype('solar_inverter', (brief: any) => {
       source_detail: `£80 flat — RCMU residual-current monitor (Type B) + arc-fault detection per UL 1741 SA / IEC 62109-2`,
     },
     {
-      word_name: 'enclosure_ip65_powder_coated',
+      // 2026-05-24 orphan-fix: renamed from `enclosure_ip65_powder_coated` to
+      // match emitter word_id `aluminium_cabinet_shell_word`.
+      word_name: 'aluminium_cabinet_shell',
       unit_price_gbp: 8,
       dimension_basis: 'kg_mass',
       dimension_value: massKg * 0.4,  // enclosure is ~40% of mass
@@ -4070,7 +4092,9 @@ registerArchetype('ups_inverter', (brief: any) => {
       source_detail: `£${powerModulePerKw}/kW × ${ratedKw} kW (${semiconductorTech} IGBT/SiC bridge + gate drivers + isolated power supplies; Infineon FF/Cree Wolfspeed module class)`,
     },
     {
-      word_name: 'rectifier_pfc_front_end',
+      // 2026-05-24 orphan-fix: renamed from `rectifier_pfc_front_end` to
+      // match emitter word_id `pfc_rectifier_word`.
+      word_name: 'pfc_rectifier',
       unit_price_gbp: 28,
       dimension_basis: 'kw_power',
       dimension_value: ratedKw,
@@ -4078,7 +4102,9 @@ registerArchetype('ups_inverter', (brief: any) => {
       source_detail: `£28/kW × ${ratedKw} kW (three-level NPC PFC rectifier, THDi <3%, Vienna-rectifier topology common above 100 kW)`,
     },
     {
-      word_name: 'output_filter_inductor_capacitor',
+      // 2026-05-24 orphan-fix: renamed from `output_filter_inductor_capacitor`
+      // to match emitter word_id `inverter_output_filter_word`.
+      word_name: 'inverter_output_filter',
       unit_price_gbp: 8,
       dimension_basis: 'kw_power',
       dimension_value: ratedKw,
@@ -4118,7 +4144,10 @@ registerArchetype('ups_inverter', (brief: any) => {
       source_detail: `£4,000 flat (ARM Cortex-M7 + DSP control card + colour touch LCD + SNMP/Modbus TCP/BACnet card per IEC 62040-3 monitoring class)`,
     },
     {
-      word_name: 'fans_heat_exchanger_cooling',
+      // 2026-05-24 orphan-fix: renamed from `fans_heat_exchanger_cooling` to
+      // match emitter word_id `axial_fan_word`. Macro covers the cooling
+      // assembly; cost flows to the axial fan line.
+      word_name: 'axial_fan',
       unit_price_gbp: coolingPerKw,
       dimension_basis: 'kw_power',
       dimension_value: ratedKw,
@@ -4126,7 +4155,9 @@ registerArchetype('ups_inverter', (brief: any) => {
       source_detail: `£${coolingPerKw}/kW × ${ratedKw} kW (${coolingType === 'liquid' ? 'liquid cooling skid with chiller for >1 MW frame' : 'EC fans + finned-stack heat exchanger, hot-swappable'})`,
     },
     {
-      word_name: 'enclosure_ip20_powder_coated',
+      // 2026-05-24 orphan-fix: renamed from `enclosure_ip20_powder_coated` to
+      // match emitter word_id `rack_chassis_word`.
+      word_name: 'rack_chassis',
       unit_price_gbp: enclosurePerKg,
       dimension_basis: 'kg_mass',
       dimension_value: enclosureMassKg,
@@ -4406,7 +4437,9 @@ registerArchetype('3d_printer_fdm', (brief: any) => {
       source_detail: `£${motionPerL}/L × ${buildVolL.toFixed(1)} L + £600 base (${motionTopology} topology: HIWIN/THK linear rails, NEMA17/23 steppers or Mitsubishi servos, GT2 belts or ball screws on Z)`,
     },
     {
-      word_name: 'heated_bed_assembly',
+      // 2026-05-24 (orphan-fix): renamed heated_bed_assembly → build_plate_heated
+      // to match emitter word_id build_plate_heated_word (strict matcher).
+      word_name: 'build_plate_heated',
       unit_price_gbp: 30,
       dimension_basis: 'litre_volume',
       dimension_value: buildVolL,
@@ -4422,7 +4455,9 @@ registerArchetype('3d_printer_fdm', (brief: any) => {
       source_detail: `£${extruderUnit} × ${extruderCount} extruder${extruderCount > 1 ? 's' : ''} (${materialsClass === 'high_temp' ? 'Inconel heater block + ceramic insulator + 450°C-rated thermistor for PEEK/PEKK' : materialsClass === 'industrial' ? 'hardened-steel nozzle for abrasive filled filaments, all-metal hotend, dual-drive geared extruder' : 'brass nozzle, V6/J-head hotend, Bowden or direct feed'})`,
     },
     {
-      word_name: 'chamber_heater_circulation',
+      // 2026-05-24 (orphan-fix): renamed chamber_heater_circulation →
+      // chamber_heater_ptc to match emitter word_id chamber_heater_ptc_word.
+      word_name: 'chamber_heater_ptc',
       unit_price_gbp: chamberHeaterPerL,
       dimension_basis: 'litre_volume',
       dimension_value: buildVolL,
@@ -4446,7 +4481,9 @@ registerArchetype('3d_printer_fdm', (brief: any) => {
       source_detail: `£${filamentFeedPerExtruder} × ${extruderCount} (${materialsClass === 'consumer' ? 'single-pinion BMG or planetary geared feed' : 'BondTech / E3D Hemera-style dual-drive geared, hardened steel for filled filaments, filament runout + tangle sensor'})`,
     },
     {
-      word_name: 'frame_machined_aluminium',
+      // 2026-05-24 (orphan-fix): renamed frame_machined_aluminium →
+      // frame_extrusion to match emitter word_id frame_extrusion_2020_word.
+      word_name: 'frame_extrusion',
       unit_price_gbp: 80,
       dimension_basis: 'litre_volume',
       dimension_value: buildVolL,
@@ -4454,7 +4491,10 @@ registerArchetype('3d_printer_fdm', (brief: any) => {
       source_detail: `£80/L × ${buildVolL.toFixed(1)} L (welded steel or machined aluminium frame, 2020/3030/4040 extrusion or CNC-milled plate, ground levelling pads)`,
     },
     {
-      word_name: 'enclosure_with_filtration',
+      // 2026-05-24 (orphan-fix): renamed enclosure_with_filtration →
+      // enclosure_filtration to drop the 'with' qualifier; matched by new
+      // emitter word enclosure_filtration_word added in 3d-printer-fdm.ts.
+      word_name: 'enclosure_filtration',
       unit_price_gbp: enclosureBaseCost,
       dimension_basis: 'each',
       dimension_value: 1,
@@ -4755,7 +4795,9 @@ registerArchetype('cnc_machine', (brief: any) => {
   const controlCost = controlOem === 'heidenhain' ? 25000 : controlOem === 'siemens' ? 18000 : controlOem === 'fanuc' ? 14000 : 16000
   const macro_assembly_prices: MacroAssemblyPrice[] = [
     {
-      word_name: 'spindle_motor_cartridge',
+      // 2026-05-24 (orphan-fix): renamed spindle_motor_cartridge →
+      // motorised_spindle to match emitter word_id motorised_spindle_unit_word.
+      word_name: 'motorised_spindle',
       unit_price_gbp: spindlePerKw,
       dimension_basis: 'kw_power',
       dimension_value: spindleKw,
@@ -4763,7 +4805,9 @@ registerArchetype('cnc_machine', (brief: any) => {
       source_detail: `£${spindlePerKw}/kW × ${spindleKw} kW (${spindleTaper}-taper motorised spindle, ${maxSpindleRpm} rpm ceramic angular-contact bearings, integrated draw bar + tool clamp; Siemens 1FE1 / Fanuc αi / Kessler class)`,
     },
     {
-      word_name: 'ball_screw_per_axis',
+      // 2026-05-24 (orphan-fix): renamed ball_screw_per_axis → ballscrew_drive
+      // to match emitter word_id ballscrew_drive_word.
+      word_name: 'ballscrew_drive',
       unit_price_gbp: ballScrewPerAxis,
       dimension_basis: 'each',
       dimension_value: axisCount,
@@ -4771,7 +4815,9 @@ registerArchetype('cnc_machine', (brief: any) => {
       source_detail: `£${ballScrewPerAxis} × ${axisCount} axis ball screws (NSK/SKF/THK C3-class ground, 32-50 mm × 16 mm pitch, double-nut preloaded, ABEC-5 thrust bearings)`,
     },
     {
-      word_name: 'linear_guide_rail_per_axis',
+      // 2026-05-24 (orphan-fix): renamed linear_guide_rail_per_axis →
+      // linear_guideway_hgr45 to match emitter word_id linear_guideway_hgr45_word.
+      word_name: 'linear_guideway_hgr45',
       unit_price_gbp: linearGuidePerAxis,
       dimension_basis: 'each',
       dimension_value: axisCount,
@@ -4779,7 +4825,9 @@ registerArchetype('cnc_machine', (brief: any) => {
       source_detail: `£${linearGuidePerAxis} × ${axisCount} axes (HIWIN HG35 / THK SHS35 preloaded linear rails + 4 cars per axis, dynamic load 30-80 kN, class C2 preload)`,
     },
     {
-      word_name: 'servo_drives_per_axis',
+      // 2026-05-24 (orphan-fix): renamed servo_drives_per_axis →
+      // servo_drive_yaskawa to match emitter word_id servo_drive_yaskawa_word.
+      word_name: 'servo_drive_yaskawa',
       unit_price_gbp: servoDrivePerAxis,
       dimension_basis: 'each',
       dimension_value: axisCount,
@@ -4795,7 +4843,9 @@ registerArchetype('cnc_machine', (brief: any) => {
       source_detail: `£${framePerKg}/kg × ${(massKg - enclosureMassKg).toFixed(0)} kg (${frameMaterial === 'cast_iron' ? 'Meehanite cast-iron ribbed base + column, vibration-damped' : 'mineral-cast polymer-concrete monolithic structure, 10× damping factor vs cast iron'})`,
     },
     {
-      word_name: 'tool_changer_atc',
+      // 2026-05-24 (orphan-fix): renamed tool_changer_atc →
+      // tool_carousel_chain to match emitter word_id tool_carousel_chain_word.
+      word_name: 'tool_carousel_chain',
       unit_price_gbp: 180,
       dimension_basis: 'each',
       dimension_value: toolMagazineCapacity,
@@ -4811,7 +4861,9 @@ registerArchetype('cnc_machine', (brief: any) => {
       source_detail: `£15/L × ${coolantCapacityL} L + £8,000 base (high-pressure pump 70 bar through-spindle + 5 bar flood + chip auger + paper-band filtration + skimmer)`,
     },
     {
-      word_name: 'enclosure_with_chip_evacuation',
+      // 2026-05-24 (orphan-fix): renamed enclosure_with_chip_evacuation →
+      // chip_conveyor_hinge_belt to match emitter word_id chip_conveyor_hinge_belt_word.
+      word_name: 'chip_conveyor_hinge_belt',
       unit_price_gbp: 45,
       dimension_basis: 'kg_mass',
       dimension_value: enclosureMassKg,
@@ -4819,7 +4871,9 @@ registerArchetype('cnc_machine', (brief: any) => {
       source_detail: `£45/kg × ${enclosureMassKg.toFixed(0)} kg (welded sheet steel enclosure with chip conveyor, polycarbonate viewing window, interlocked sliding door per EN 12417 + ISO 23125 machine safety)`,
     },
     {
-      word_name: 'control_system_cnc',
+      // 2026-05-24 (orphan-fix): renamed control_system_cnc → cnc_controller
+      // to match emitter word_id cnc_controller_word.
+      word_name: 'cnc_controller',
       unit_price_gbp: controlCost,
       dimension_basis: 'each',
       dimension_value: 1,
@@ -5123,7 +5177,11 @@ registerArchetype('e_bike', (brief: any) => {
       source_detail: `£${motorCost} (${isMidDrive ? `Bosch Performance Line CX / Shimano EP8 / Brose / Bafang BBSHD class ${motorW} W mid-drive with torque + cadence sensor, EN 15194 compliant cut-off` : `Bafang H750C / Direct-drive hub ${motorW} W with Hall sensors, geared planetary or direct-drive`})`,
     },
     {
-      word_name: 'battery_pack_lithium_ion',
+      // 2026-05-24 (orphan-fix): renamed battery_pack_lithium_ion →
+      // lithium_18650_cell to match emitter word_id lithium_18650_cell_word.
+      // The macro covers the WHOLE pack; matcher converts to per-cell unit price
+      // (macro_total / cell_qty) when propagating onto the cell line.
+      word_name: 'lithium_18650_cell',
       unit_price_gbp: batteryCellPerWh * 1000,  // per kWh
       dimension_basis: 'kwh_capacity',
       dimension_value: batteryKwh,
@@ -5147,7 +5205,9 @@ registerArchetype('e_bike', (brief: any) => {
       source_detail: `£${frameCost} (${frameMaterial} ${frameMaterial === 'carbon' ? 'monocoque T700 carbon fibre layup' : frameMaterial === 'steel' ? 'chromoly 4130 TIG-welded' : '6061-T6 hydroformed alu TIG-welded'} frame + fork, EN 15194 fatigue tested, integrated battery mount)`,
     },
     {
-      word_name: 'drivetrain_groupset',
+      // 2026-05-24 (orphan-fix): renamed drivetrain_groupset →
+      // chain_chainring_drivetrain to match emitter word_id chain_chainring_drivetrain_word.
+      word_name: 'chain_chainring_drivetrain',
       unit_price_gbp: drivetrainCost,
       dimension_basis: 'each',
       dimension_value: 1,
@@ -5163,7 +5223,9 @@ registerArchetype('e_bike', (brief: any) => {
       source_detail: `£${wheelsCost} (${wheelSizeIn}" rims ${frameMaterial === 'carbon' ? 'carbon fibre or alloy + DT Swiss / Mavic hubs' : 'double-walled alu rim + sealed-bearing hubs'}, ${frameMaterial === 'carbon' ? 'tubeless-ready' : '36-spoke 13G steel'}, Schwalbe Marathon Plus / Continental Grand Prix tyres)`,
     },
     {
-      word_name: 'brake_set_hydraulic_disc',
+      // 2026-05-24 (orphan-fix): renamed brake_set_hydraulic_disc →
+      // hydraulic_disc_caliper to match emitter word_id hydraulic_disc_caliper_word.
+      word_name: 'hydraulic_disc_caliper',
       unit_price_gbp: brakesCost,
       dimension_basis: 'each',
       dimension_value: 1,
@@ -5171,7 +5233,9 @@ registerArchetype('e_bike', (brief: any) => {
       source_detail: `£${brakesCost} (${isHydraulicDisc ? `Shimano MT200 or SRAM Level T hydraulic disc, 180/160 mm rotors, EN 15194 50 N lever-force compliant${legalClass === 'off_road' ? ', 4-pot for off-road' : ', 2-pot'}` : 'Tektro mechanical cable disc, 160 mm rotor — budget commuter class'})`,
     },
     {
-      word_name: 'display_sensors_module',
+      // 2026-05-24 (orphan-fix): renamed display_sensors_module →
+      // handlebar_display to match emitter word_id handlebar_display_word.
+      word_name: 'handlebar_display',
       unit_price_gbp: displayCost,
       dimension_basis: 'each',
       dimension_value: 1,
@@ -6475,7 +6539,7 @@ registerArchetype('solid_state_battery', (brief: any) => {
   const cellPerKwh = electrolyteType === 'sulphide' ? 300 : electrolyteType === 'oxide' ? 400 : 250
   const macro_assembly_prices: MacroAssemblyPrice[] = [
     {
-      word_name: 'solid_state_cells_lithium_metal',
+      word_name: 'li_metal_foil',
       unit_price_gbp: cellPerKwh,
       dimension_basis: 'kwh_capacity',
       dimension_value: nameplateKwh,
@@ -6483,7 +6547,7 @@ registerArchetype('solid_state_battery', (brief: any) => {
       source_detail: `£${cellPerKwh}/kWh × ${nameplateKwh.toFixed(1)} kWh (${totalCellCount} × ${cellCapacityAh} Ah pouch cells, ${electrolyteType} electrolyte + Li-metal anode + ${electrolyteType === 'sulphide' ? 'NMC811' : electrolyteType === 'oxide' ? 'LFP or NMC' : 'NMC622'} cathode; FOAK pricing — BNEF projects 60% cost reduction by 2030)`,
     },
     {
-      word_name: 'pack_housing_extruded_al',
+      word_name: 'cell_frame_polymer',
       unit_price_gbp: 25,
       dimension_basis: 'kwh_capacity',
       dimension_value: nameplateKwh,
@@ -6491,7 +6555,7 @@ registerArchetype('solid_state_battery', (brief: any) => {
       source_detail: `£25/kWh × ${nameplateKwh.toFixed(1)} kWh (extruded 6063-T5 aluminium tray with structural cross-members, automotive IP67 sealed with EPDM gasket, vibration-isolated cell mounting per ISO 12405)`,
     },
     {
-      word_name: 'cell_holder_interconnect_busbar',
+      word_name: 'busbar_intercell',
       unit_price_gbp: 14,
       dimension_basis: 'kwh_capacity',
       dimension_value: nameplateKwh,
@@ -6499,7 +6563,7 @@ registerArchetype('solid_state_battery', (brief: any) => {
       source_detail: `£14/kWh × ${nameplateKwh.toFixed(1)} kWh (glass-filled PA66 V-0 cell holder + Al-tab laser-welded busbar interconnect, EMC-shielded routing)`,
     },
     {
-      word_name: 'bms_distributed_master_slave',
+      word_name: 'bms_master',
       unit_price_gbp: 35 * modulesPerPack + 4500,
       dimension_basis: 'each',
       dimension_value: 1,
@@ -6507,7 +6571,7 @@ registerArchetype('solid_state_battery', (brief: any) => {
       source_detail: `£${(35 * modulesPerPack + 4500).toLocaleString()} (TI BQ79616 / Analog Devices LTC6813 isoSPI slave per module × ${modulesPerPack} + ASIL-C master controller with HV measurement + insulation monitor)`,
     },
     {
-      word_name: 'thermal_management_plate_loop',
+      word_name: 'cold_plate_aluminium',
       unit_price_gbp: 10,
       dimension_basis: 'kwh_capacity',
       dimension_value: nameplateKwh,
@@ -6515,7 +6579,7 @@ registerArchetype('solid_state_battery', (brief: any) => {
       source_detail: `£10/kWh × ${nameplateKwh.toFixed(1)} kWh (${electrolyteType === 'sulphide' ? 'liquid cold plate + 50/50 ethylene glycol loop — required for sulphide narrow temp window' : electrolyteType === 'oxide' ? 'passive finstack or optional liquid cooling — oxide wider temp window' : 'passive air convection'})`,
     },
     {
-      word_name: 'hv_disconnect_contactor_fuse',
+      word_name: 'precharge_contactor',
       unit_price_gbp: 950,
       dimension_basis: 'each',
       dimension_value: 1,
@@ -6523,7 +6587,7 @@ registerArchetype('solid_state_battery', (brief: any) => {
       source_detail: `£950 flat (TE Connectivity LEV ${packVoltageNominalV} V DC contactor + pre-charge resistor + main contactor + Eaton Bussmann Class T fuse + service disconnect plug)`,
     },
     {
-      word_name: 'pack_enclosure_with_fire_barrier',
+      word_name: 'compression_plate',
       unit_price_gbp: 8,
       dimension_basis: 'kg_mass',
       dimension_value: enclosureMassKg,
@@ -6864,7 +6928,10 @@ registerArchetype('pemfc', (brief: any) => {
       source_detail: `£${stackPerKw}/kW × ${ratedKw} kW (${cellsCount} cells × ${cellAreaCm2} cm² CCM with Pt/C catalyst-coated ${isHighTempPem ? 'PBI-polybenzimidazole HT-PEM' : 'PFSA-Nafion'} membranes + ${appClass === 'automotive' ? 'metal' : 'graphite'} bipolar plates + EPDM gaskets + endplates with current collectors; Pt ~${ptGramsPerStack.toFixed(1)} g per stack ≈ £${ptValueGbp.toFixed(0)} raw Pt content)`,
     },
     {
-      word_name: 'air_compressor_intercooler',
+      // 2026-05-24 orphan-fix: renamed from `air_compressor_intercooler` to
+      // match emitter word_id `air_compressor_word`. Intercooler cost flows
+      // to the compressor line; macro source_detail still explains the split.
+      word_name: 'air_compressor',
       unit_price_gbp: airCompPerKw,
       dimension_basis: 'kw_power',
       dimension_value: ratedKw,
@@ -6872,7 +6939,9 @@ registerArchetype('pemfc', (brief: any) => {
       source_detail: `£${airCompPerKw}/kW × ${ratedKw} kW (Garrett G-series or Honeywell motor-driven 2-3 stage turbo compressor + air-to-water intercooler, oil-free for FC purity, ${airMassFlowKgPerHr.toFixed(1)} kg/hr flow @ ${pressureBar} bar boost)`,
     },
     {
-      word_name: 'h2_injector_recirculation',
+      // 2026-05-24 orphan-fix: renamed from `h2_injector_recirculation` to
+      // match emitter word_id `h2_recirculation_blower_word`.
+      word_name: 'h2_recirculation_blower',
       unit_price_gbp: 140,
       dimension_basis: 'kw_power',
       dimension_value: ratedKw,
@@ -6880,7 +6949,9 @@ registerArchetype('pemfc', (brief: any) => {
       source_detail: `£140/kW × ${ratedKw} kW (Bosch/Toyota piezoelectric H2 injector + jet-pump recirculation or H2 recirc blower; anode-loop water/N2 purge solenoids)`,
     },
     {
-      word_name: 'cooling_loop_radiator',
+      // 2026-05-24 orphan-fix: renamed from `cooling_loop_radiator` to match
+      // emitter word_id `pemfc_radiator_word`.
+      word_name: 'pemfc_radiator',
       unit_price_gbp: 100,
       dimension_basis: 'kw_power',
       dimension_value: heatRejectionKw,
@@ -6888,7 +6959,9 @@ registerArchetype('pemfc', (brief: any) => {
       source_detail: `£100/kW × ${heatRejectionKw.toFixed(0)} kW (low-conductivity 50/50 glycol coolant + radiator + electric coolant pump + DI water deioniser + 3-way thermostat valve; HV-isolated for 700 V stack)`,
     },
     ...(isHighTempPem ? [] : [{
-      word_name: 'water_management_humidifier',
+      // 2026-05-24 orphan-fix: renamed from `water_management_humidifier` to
+      // match emitter word_id `cathode_humidifier_word`.
+      word_name: 'cathode_humidifier',
       unit_price_gbp: 45,
       dimension_basis: 'kw_power' as const,
       dimension_value: ratedKw,
@@ -7292,7 +7365,7 @@ registerArchetype('smr', (brief: any) => {
   const concretePerM3 = 450
   const macro_assembly_prices: MacroAssemblyPrice[] = [
     {
-      word_name: 'reactor_pressure_vessel',
+      word_name: 'pressuriser_vessel',
       unit_price_gbp: vesselPerKg,
       dimension_basis: 'kg_mass',
       dimension_value: vesselMassKg,
@@ -7300,7 +7373,7 @@ registerArchetype('smr', (brief: any) => {
       source_detail: `£${vesselPerKg}/kg × ${vesselMassKg.toFixed(0)} kg (SA-508 Class 3 forged low-alloy steel with 308L SS internal cladding; ASME BPVC Section III Subsection NB; single forging at ${vesselDiameterM.toFixed(1)} m × ${vesselHeightM.toFixed(1)} m × ${(vesselWallThicknessM * 1000).toFixed(0)} mm wall; Doosan Heavy / Japan Steel Works / Sheffield Forgemasters class)`,
     },
     {
-      word_name: 'steam_generators_or_ihx',
+      word_name: 'helical_tube_bundle',
       unit_price_gbp: sgPerKg,
       dimension_basis: 'kg_mass',
       dimension_value: steamGeneratorMassKg,
@@ -7308,7 +7381,7 @@ registerArchetype('smr', (brief: any) => {
       source_detail: `£${sgPerKg}/kg × ${steamGeneratorMassKg.toFixed(0)} kg (${coolantClass === 'pwr' || coolantClass === 'bwr' ? 'Inconel 690 helical or once-through SG, ASME III Class 1' : coolantClass === 'htgr' ? 'compact PCHE IHX helium-to-water' : 'sodium/salt-to-secondary IHX with double-wall stress-relieving tubes'})`,
     },
     {
-      word_name: 'control_rod_drive_mechanisms',
+      word_name: 'crdm',
       unit_price_gbp: 180_000,
       dimension_basis: 'each',
       dimension_value: numControlRods,
@@ -7316,7 +7389,7 @@ registerArchetype('smr', (brief: any) => {
       source_detail: `£180,000 × ${numControlRods} CRDMs (${coolantClass === 'msr' ? 'control rods + freeze-plug drain valve passive shutdown' : 'magnetic-jack or hydraulic CRDM per RG 1.155 with gravity scram + ATWS mitigation'})`,
     },
     {
-      word_name: 'primary_coolant_pumps',
+      word_name: 'primary_coolant_pump',
       unit_price_gbp: coolantClass === 'sfr' ? 2_500_000 : 1_200_000,
       dimension_basis: 'each',
       dimension_value: numPrimaryPumps,
@@ -7324,7 +7397,7 @@ registerArchetype('smr', (brief: any) => {
       source_detail: `£${(coolantClass === 'sfr' ? 2.5 : 1.2).toFixed(1)}M × ${numPrimaryPumps} pumps (${coolantClass === 'pwr' ? 'KSB/Flowserve canned-rotor RCP, 15.5 MPa, hermetically sealed' : coolantClass === 'sfr' ? 'EM pump for liquid sodium, no rotating seal' : coolantClass === 'htgr' ? 'helium circulator blower' : 'centrifugal pump for molten salt'})`,
     },
     {
-      word_name: 'containment_steel_liner',
+      word_name: 'containment_dome',
       unit_price_gbp: 55,
       dimension_basis: 'kg_mass',
       dimension_value: containmentSteelMassKg,
@@ -7340,7 +7413,7 @@ registerArchetype('smr', (brief: any) => {
       source_detail: `£${concretePerM3}/m³ × ${containmentConcreteM3.toFixed(0)} m³ (post-tensioned reinforced concrete + boron-doped neutron shielding for radiation protection; designed for DBA + aircraft impact per RG 1.91)`,
     },
     {
-      word_name: 'turbine_generator_set',
+      word_name: 'steam_turbine',
       unit_price_gbp: turbinePerKw,
       dimension_basis: 'kw_power',
       dimension_value: turbineGeneratorKw,
@@ -7348,7 +7421,7 @@ registerArchetype('smr', (brief: any) => {
       source_detail: `£${turbinePerKw}/kW × ${turbineGeneratorKw.toFixed(0)} kW (${coolantClass === 'htgr' ? 'supercritical CO₂ Brayton cycle or steam Rankine' : 'steam Rankine condensing turbine'} + 4-pole synchronous generator; Siemens/MHI/GE class; outside modular boundary but counted in installed ASP envelope)`,
     },
     {
-      word_name: 'instrumentation_and_control_class_1e',
+      word_name: 'rps_chassis',
       unit_price_gbp: 45_000_000,
       dimension_basis: 'each',
       dimension_value: 1,
@@ -7356,7 +7429,7 @@ registerArchetype('smr', (brief: any) => {
       source_detail: `£45M flat — Class 1E safety-related I&C per 10 CFR 50.55a(h) and IEEE Std 603; diverse and redundant 4-train protection system; Westinghouse Common Q or Mitsubishi MELTAC class; ATWS mitigation + post-accident monitoring per RG 1.97`,
     },
     {
-      word_name: 'refuelling_machinery',
+      word_name: 'refuel_machine',
       unit_price_gbp: 18_000_000,
       dimension_basis: 'each',
       dimension_value: 1,
@@ -7364,7 +7437,7 @@ registerArchetype('smr', (brief: any) => {
       source_detail: `£18M flat — refuelling cavity + overhead manipulator + transfer cask + spent-fuel pool with passive heat removal; ${refuellingYears}-yr refuelling interval (${(refuellingFraction * 100).toFixed(0)}% reload per outage)`,
     },
     {
-      word_name: 'initial_fuel_assemblies',
+      word_name: 'uo2_fuel_assembly',
       unit_price_gbp: fuelPerKgU,
       dimension_basis: 'kg_mass',
       dimension_value: fuelLoadingKgU,
@@ -8130,7 +8203,7 @@ registerArchetype('dac', (brief: any) => {
   const waterTreatmentPerTon = 15
   const macro_assembly_prices: MacroAssemblyPrice[] = [
     {
-      word_name: 'contactor_structure_with_fans',
+      word_name: 'contactor_louvre',
       unit_price_gbp: contactorPerTon,
       dimension_basis: 'each',
       dimension_value: captureTonsYr,
@@ -8138,7 +8211,7 @@ registerArchetype('dac', (brief: any) => {
       source_detail: `£${contactorPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (${sorbentType === 3 ? 'cross-flow contactor tower with PVC fill + KOH spray + axial fans, Carbon Engineering DAC1 class' : sorbentType === 2 ? 'monolithic MOF structured packing + axial-flow fans + housing' : 'modular collector cubes with axial fans, ducts, sorbent baskets, structural cage; Climeworks/Heirloom class'}; ${numCollectorModules} units of ${modularCollectorTonsPerUnit} t/yr each; ${contactorFaceAreaM2.toFixed(0)} m² total face area @ ${contactorFaceVelocityMs} m/s)`,
     },
     {
-      word_name: 'sorbent_inventory',
+      word_name: 'amine_sorbent',
       unit_price_gbp: sorbentPricePerKg,
       dimension_basis: 'kg_mass',
       dimension_value: sorbentMassKg,
@@ -8146,7 +8219,7 @@ registerArchetype('dac', (brief: any) => {
       source_detail: `£${sorbentPricePerKg}/kg × ${sorbentMassKg.toFixed(0)} kg (${sorbentType === 1 ? 'amine-functionalised silica or PEI on porous silica gel; ~3-5 yr replacement' : sorbentType === 2 ? 'MOF MIL-101 or amine-grafted MOF; early-stage premium, declining cost trajectory' : sorbentType === 3 ? 'KOH/NaOH solution; high turnover (~1.5 yr lifetime) but cheap make-up' : 'zeolite 13X molecular sieve; longest lifetime but lower CO₂ uptake per kg'}); annual replacement cost ~£${(sorbentPricePerKg * sorbentMassKg / sorbentReplacementYears).toLocaleString(undefined, { maximumFractionDigits: 0 })}/yr`,
     },
     {
-      word_name: 'regeneration_skid',
+      word_name: 'structural_steel_skid',
       unit_price_gbp: regenSkidPerTon,
       dimension_basis: 'each',
       dimension_value: captureTonsYr,
@@ -8154,7 +8227,7 @@ registerArchetype('dac', (brief: any) => {
       source_detail: `£${regenSkidPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (${isHighTempProcess ? `${regenTempC}°C calciner — natural-gas, hydrogen or electric resistance heating; lime slaker; refractory-lined rotary kiln; £180/(tCO₂/yr) dominant cost at HT-DAC scale` : `${regenTempC}°C steam regeneration — plate + shell-tube heat exchangers + dry vacuum pumps + valves + piping; can run on waste heat from adjacent facility`})`,
     },
     {
-      word_name: 'co2_compression_train',
+      word_name: 'centrifugal_compressor',
       unit_price_gbp: compressionTrainPerTon,
       dimension_basis: 'each',
       dimension_value: captureTonsYr,
@@ -8162,7 +8235,7 @@ registerArchetype('dac', (brief: any) => {
       source_detail: `£${compressionTrainPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (4-stage centrifugal compressor 1 → ${co2CompressionPressureBar} bar with water-cooled intercooling, moisture knock-out drum, molecular sieve dehydrator to ≤50 ppm H₂O, MAN/Atlas Copco/Mitsubishi class; ${compressionMw.toFixed(2)} MW electric drive)`,
     },
     {
-      word_name: 'heat_recovery_loop',
+      word_name: 'plate_frame_hx',
       unit_price_gbp: heatRecoveryPerTon,
       dimension_basis: 'each',
       dimension_value: captureTonsYr,
@@ -8170,7 +8243,7 @@ registerArchetype('dac', (brief: any) => {
       source_detail: `£${heatRecoveryPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (plate heat exchangers + shell-tube economiser recovering ~40% of regen heat into incoming air or process water; cuts thermal demand by ~20-30%)`,
     },
     {
-      word_name: 'control_system_dcs',
+      word_name: 'dcs_controller',
       unit_price_gbp: 180_000 + 8 * captureTonsYr,
       dimension_basis: 'each',
       dimension_value: 1,
@@ -8178,7 +8251,7 @@ registerArchetype('dac', (brief: any) => {
       source_detail: `£${(180_000 + 8 * captureTonsYr).toLocaleString()} (Emerson DeltaV or Honeywell Experion DCS + ${isHighTempProcess ? 'SIL-2 SIS for calciner trip + fuel-isolation per IEC 61511' : 'standard process control'}; HMI + historian + cybersecurity per IEC 62443)`,
     },
     {
-      word_name: 'foundation_concrete',
+      word_name: 'concrete_slab',
       unit_price_gbp: foundationPerTon,
       dimension_basis: 'each',
       dimension_value: captureTonsYr,
@@ -8186,7 +8259,7 @@ registerArchetype('dac', (brief: any) => {
       source_detail: `£${foundationPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (reinforced concrete slab + piled foundation for contactor + regen + compression infrastructure; designed for wind loading + seismic per local code)`,
     },
     {
-      word_name: 'power_supply_infrastructure',
+      word_name: 'mv_switchgear',
       unit_price_gbp: powerSupplyPerTon,
       dimension_basis: 'each',
       dimension_value: captureTonsYr,
@@ -8194,7 +8267,7 @@ registerArchetype('dac', (brief: any) => {
       source_detail: `£${powerSupplyPerTon}/(tCO₂/yr) × ${captureTonsYr.toLocaleString()} tCO₂/yr (${electricalContinuousMw.toFixed(1)} MW supply: 11/33 kV step-down transformer + MV switchgear + LV distribution + cabling; grid-connected or co-located with renewable generation)`,
     },
     {
-      word_name: 'water_treatment_plant',
+      word_name: 'edi_polisher',
       unit_price_gbp: waterTreatmentPerTon,
       dimension_basis: 'each',
       dimension_value: captureTonsYr,

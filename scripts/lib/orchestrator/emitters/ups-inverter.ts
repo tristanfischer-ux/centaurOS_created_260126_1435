@@ -87,6 +87,11 @@ function emitBatteryPack(p: Params): DesignModule {
       word('battery_fuse_word', 'battery fuse',
         cc('battery_fuse', 'battery fuse', 'electromechanical_switching_function', 'ceramic'),
         [mod('quantity', '×1'), mod('capacity', String(Math.max(50, Math.round(p.ratedPowerKw * 1000 / 48 * 1.3))), 'A'), mod('form', 'Bussmann FNQ-R')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `battery_cabinet_bms` (tokens: battery+cabinet+bms) propagates here.
+      word('battery_cabinet_bms_word', 'battery cabinet BMS',
+        cc('battery_cabinet_bms', 'battery cabinet BMS', 'silicon_semiconductor_function', 'steel'),
+        [mod('quantity', '×1'), mod('form', 'cabinet + master BMS + cell balancing + DC disconnect + Class T fuse'), mod('capacity', p.batteryKwh.toFixed(1), 'kWh')]),
     ])
   return {
     module: 'battery_pack',
@@ -134,6 +139,11 @@ function emitTransferSwitch(p: Params): DesignModule {
       word('bypass_contactor_word', 'bypass contactor',
         cc('bypass_contactor', 'bypass contactor', 'electromechanical_switching_function', 'copper'),
         [mod('quantity', '×1'), mod('capacity', String(Math.max(50, Math.round(p.ratedPowerKw * 1000 / 230 * 1.5))), 'A'), mod('form', 'mechanical maintenance bypass')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `static_bypass_switch` (tokens: static+bypass+switch) propagates here.
+      word('static_bypass_switch_word', 'static bypass switch',
+        cc('static_bypass_switch', 'static bypass switch', 'silicon_semiconductor_function', 'copper'),
+        [mod('quantity', '×1'), mod('form', 'thyristor back-to-back static switch + paralleled isolation'), mod('regulatory', 'IEC 62040-3 5-cycle ride-through')]),
     ])
   return {
     module: 'transfer_switch',
@@ -162,6 +172,12 @@ function emitInverter(p: Params): DesignModule {
       word('inverter_heatsink_word', 'inverter heatsink',
         cc('inverter_heatsink', 'inverter heatsink', 'thermal_transfer_function', 'aluminium'),
         [mod('quantity', '×1'), mod('form', 'extruded aluminium')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `power_module_inverter_block` (tokens: power+inverter+block)
+      // propagates here.
+      word('inverter_power_block_word', 'inverter power block',
+        cc('inverter_power_block', 'inverter power block', 'silicon_semiconductor_function', 'silicon_semiconductor_function'),
+        [mod('quantity', '×1'), mod('form', 'IGBT/SiC bridge block + gate drivers + isolated PSUs'), mod('capacity', p.ratedPowerKw.toFixed(1), 'kW')]),
     ])
   return {
     module: 'inverter',
@@ -190,6 +206,12 @@ function emitMonitoringLcd(_p: Params): DesignModule {
       word('audible_alarm_word', 'audible alarm',
         cc('audible_alarm', 'audible alarm', 'electromechanical_switching_function', 'polymer_thermoplastic'),
         [mod('quantity', '×1'), mod('capacity', '85', 'dBA @ 1m')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `control_logic_display_comms` (tokens: control+logic+display+comms)
+      // propagates here.
+      word('control_logic_display_comms_word', 'control logic + display + comms',
+        cc('control_logic_display_comms', 'control logic + display + comms', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+        [mod('quantity', '×1'), mod('form', 'ARM Cortex-M7 control card + colour touch LCD + SNMP/Modbus TCP/BACnet'), mod('regulatory', 'IEC 62040-3 monitoring class')]),
     ])
   return {
     module: 'monitoring_LCD',

@@ -105,6 +105,11 @@ function emitStackCells(p: Params): DesignModule {
       word('compression_band_word', 'compression band',
         cc('compression_band', 'compression band', 'electromechanical_switching_function', 'steel'),
         [mod('quantity', '×4'), mod('form', 'stainless tie-rod')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `fuel_cell_stack_assembly` (tokens: fuel+cell+stack) propagates here.
+      word('fuel_cell_stack_word', 'fuel cell stack',
+        cc('fuel_cell_stack', 'fuel cell stack', 'electrochemical_energy_function', 'polymer_thermoplastic'),
+        [mod('quantity', '×1'), mod('form', `${p.cellCount}-cell PEMFC stack with CCM membranes + bipolar plates + endplates`), mod('capacity', p.ratedPowerKw.toFixed(0), 'kW')]),
     ])
   return {
     module: 'stack_cells',
@@ -307,6 +312,11 @@ function emitDcDcConverter(p: Params): DesignModule {
       word('current_sensor_dc_word', 'current sensor DC',
         cc('current_sensor_dc', 'current sensor DC', 'electromechanical_switching_function', 'copper'),
         [mod('quantity', '×2'), mod('form', 'LEM LF series'), mod('capacity', String(Math.round(p.ratedPowerKw * 1000 / (p.cellCount * p.cellVoltageV) * 1.3)), 'A')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `dc_dc_converter` (token: converter) propagates here.
+      word('dc_dc_converter_word', 'DC-DC converter',
+        cc('dc_dc_converter', 'DC-DC converter', 'silicon_semiconductor_function', 'silicon_semiconductor_function'),
+        [mod('quantity', '×1'), mod('form', 'SiC boost converter, ISO 7637-2 EMC compliant'), mod('capacity', p.ratedPowerKw.toFixed(0), 'kW')]),
     ])
   return {
     module: 'dc_dc_converter',
@@ -338,6 +348,11 @@ function emitControllerAvionics(_p: Params): DesignModule {
       word('cell_voltage_monitor_word', 'cell voltage monitor',
         cc('cell_voltage_monitor', 'cell voltage monitor', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [mod('quantity', '×1'), mod('form', 'modular bank'), mod('capacity', '1000', 'cells')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `fc_controller_sensors` (tokens: controller+sensors) propagates here.
+      word('fc_controller_sensors_word', 'FC controller + sensors',
+        cc('fc_controller_sensors', 'FC controller + sensors', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+        [mod('quantity', '×1'), mod('form', 'ASIL-C fuel cell controller + cell-voltage monitor + H₂/O₂ sensors + insulation monitor'), mod('regulatory', 'ISO 26262')]),
     ])
   return {
     module: 'controller_avionics',
@@ -372,6 +387,12 @@ function emitRegulatorySafety(_p: Params): DesignModule {
       word('h2_warning_label_word', 'H₂ warning label',
         cc('h2_warning_label', 'H₂ warning label', null, 'polymer_thermoplastic'),
         [mod('quantity', '×4'), mod('regulatory', 'EN ISO 7010')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `enclosure_with_h2_detection_atex` (tokens: with+detection+atex)
+      // propagates here.
+      word('enclosure_with_h2_detection_atex_word', 'enclosure with H₂ detection (ATEX)',
+        cc('enclosure_with_h2_detection_atex', 'enclosure with H₂ detection (ATEX)', 'chemical_sensing_function', 'steel'),
+        [mod('quantity', '×1'), mod('form', 'sheet-metal or composite enclosure + ATEX Zone 2 H₂ detector with 4 vol-% trip + active ventilation'), mod('regulatory', 'ISO 19880-1 + UN ECE R134')]),
     ])
   return {
     module: 'regulatory_safety',

@@ -135,6 +135,12 @@ function emitPowerElectronicsDc(p: Params): DesignModule {
       word('dc_busbar_word', 'DC busbar',
         cc('dc_busbar', 'DC busbar', 'electrical_conducting_function', 'copper'),
         [mod('quantity', '×2'), mod('form', 'Cu tin-plated'), mod('capacity', String(Math.round(p.ratedPowerKw * 1000 / (p.cellCount * 2.0))), 'A')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `transformer_rectifier_unit` (tokens: transformer+rectifier)
+      // propagates here.
+      word('transformer_rectifier_word', 'transformer-rectifier',
+        cc('transformer_rectifier', 'transformer-rectifier', 'magnetic_coupling_function', 'copper'),
+        [mod('quantity', '×1'), mod('capacity', p.ratedPowerKw.toFixed(0), 'kW'), mod('form', 'isolation step-down transformer + 12-pulse SCR/IGBT rectifier'), mod('regulatory', 'IEC 60076 + IEC 60146-1-1')]),
     ])
   return {
     module: 'power_electronics_DC',
@@ -174,6 +180,12 @@ function emitWaterSupplyDi(p: Params): DesignModule {
       word('water_conductivity_sensor_word', 'water conductivity sensor',
         cc('water_conductivity_sensor', 'water conductivity sensor', 'electrical_conducting_function', 'polymer_thermoplastic'),
         [mod('quantity', '×2'), mod('regulatory', 'ASTM D1125'), mod('capacity', '0.05', 'µS/cm')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `water_purification_skid` (tokens: water+purification+skid)
+      // propagates here.
+      word('water_purification_skid_word', 'water purification skid',
+        cc('water_purification_skid', 'water purification skid', 'electrochemical_energy_function', 'steel'),
+        [mod('quantity', '×1'), mod('form', 'RO + EDI + polish skid to ASTM Type I/II'), mod('capacity', (p.h2KgPerDay * 9 / 24).toFixed(0), 'kg/h')]),
     ])
   return {
     module: 'water_supply_DI',
@@ -205,6 +217,12 @@ function emitGasSeparationH2O2(p: Params): DesignModule {
       word('h2_purity_sensor_word', 'H₂ purity sensor',
         cc('h2_purity_sensor', 'H₂ purity sensor', 'optical_sensing_function', 'polymer_thermoplastic'),
         [mod('quantity', '×1'), mod('form', 'TCD analyser'), mod('regulatory', 'ISO 14687-2')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `gas_separator_drying_skid` (tokens: gas+separator+drying+skid)
+      // propagates here.
+      word('gas_separator_drying_skid_word', 'gas separator + drying skid',
+        cc('gas_separator_drying_skid', 'gas separator + drying skid', 'pressure_vessel_function', 'steel'),
+        [mod('quantity', '×1'), mod('form', 'H₂/O₂ knock-out separators + TSA molecular-sieve drying to <5 ppm H₂O'), mod('capacity', p.h2KgPerDay.toFixed(0), 'kg/day')]),
     ])
   return {
     module: 'gas_separation_H2_O2',
@@ -236,6 +254,11 @@ function emitBalanceOfPlant(_p: Params): DesignModule {
       word('h2_leak_sensor_word', 'H₂ leak sensor',
         cc('h2_leak_sensor', 'H₂ leak sensor', 'chemical_sensing_function', 'ceramic'),
         [mod('quantity', fmtQty(8)), mod('form', 'catalytic + IR'), mod('regulatory', 'IEC 60079-29-1')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `balance_of_plant_piping` (tokens: balance+plant+piping) propagates here.
+      word('balance_of_plant_piping_word', 'balance of plant piping',
+        cc('balance_of_plant_piping', 'balance of plant piping', null, 'steel'),
+        [mod('quantity', '×1'), mod('form', '316L SS + Hastelloy C-276 wetted parts + manual/actuated valves + N₂ purge'), mod('regulatory', 'ASME B31.12')]),
     ])
   return {
     module: 'balance_of_plant',
@@ -264,6 +287,11 @@ function emitCoolingLoop(p: Params): DesignModule {
       word('expansion_tank_word', 'expansion tank',
         cc('expansion_tank', 'expansion tank', 'pressure_vessel_function', 'steel'),
         [mod('quantity', '×1'), mod('capacity', '50', 'L')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `cooling_water_skid` (tokens: cooling+water+skid) propagates here.
+      word('cooling_water_skid_word', 'cooling water skid',
+        cc('cooling_water_skid', 'cooling water skid', 'thermal_transfer_function', 'steel'),
+        [mod('quantity', '×1'), mod('form', 'chiller + dry cooler + circulation pumps + DI water cooling loop'), mod('capacity', p.heatRejectionKw.toFixed(0), 'kW')]),
     ])
   return {
     module: 'cooling_loop',
@@ -292,6 +320,11 @@ function emitControlAvionics(_p: Params): DesignModule {
       word('uninterruptible_psu_word', 'UPS',
         cc('uninterruptible_psu', 'uninterruptible PSU', 'electrochemical_energy_function', 'lithium_iron_phosphate_chemistry'),
         [mod('quantity', '×1'), mod('capacity', '10', 'kWh')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `control_safety_skid` (tokens: control+safety+skid) propagates here.
+      word('control_safety_skid_word', 'control + safety skid',
+        cc('control_safety_skid', 'control + safety skid', 'silicon_semiconductor_function', 'steel'),
+        [mod('quantity', '×1'), mod('form', 'SIL2 safety PLC + ATEX H₂ detection + N₂ purge skid + SCADA HMI')]),
     ])
   return {
     module: 'control_avionics',

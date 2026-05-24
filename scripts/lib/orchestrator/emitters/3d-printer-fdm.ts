@@ -205,6 +205,19 @@ function emitXYAxisMotion(p: FdmParams): DesignModule {
           mod('capacity', '2.0', 'A RMS'),
         ],
       ),
+      // 2026-05-24 (orphan-fix): macro-anchor word for engineering-contract
+      // macro `motion_system_gantry` — strict matcher needs ALL semantic
+      // tokens (motion, system, gantry) in the word_id. This single line
+      // receives the full gantry sub-system macro total.
+      word(
+        'motion_system_gantry_word',
+        'motion system gantry',
+        cc('motion_system_gantry', 'motion system gantry', 'mechanical_actuation_function', 'aluminium_alloy'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'CoreXY belt + linear rail gantry sub-system'),
+        ],
+      ),
     ],
   )
 
@@ -381,6 +394,18 @@ function emitHotEndExtruder(p: FdmParams): DesignModule {
           mod('dimension', String(p.filamentDiameterMm.toFixed(2)), 'mm filament'),
         ],
       ),
+      // 2026-05-24 (orphan-fix): macro-anchor word for engineering-contract
+      // macro `extruder_hotend_assembly` — needs both 'extruder' AND 'hotend'
+      // substrings in word_id for the strict matcher.
+      word(
+        'extruder_hotend_assembly_word',
+        'extruder hotend assembly',
+        cc('extruder_hotend_assembly', 'extruder hotend assembly', 'thermal_transfer_function', 'tool_steel'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'direct-drive extruder + hotend integrated assembly'),
+        ],
+      ),
     ],
   )
 
@@ -445,6 +470,18 @@ function emitHeatedChamberEnclosure(p: FdmParams): DesignModule {
           mod('quantity', '×1'),
           mod('form', 'safety-interlocked'),
           mod('regulatory', 'EN 60204-1'),
+        ],
+      ),
+      // 2026-05-24 (orphan-fix): macro-anchor word for engineering-contract
+      // macro `enclosure_filtration` — needs 'filtration' substring in word_id.
+      word(
+        'enclosure_filtration_word',
+        'enclosure filtration',
+        cc('enclosure_filtration', 'enclosure filtration', 'fluid_flow_state', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'HEPA + activated-carbon VOC filtration sub-system'),
+          mod('regulatory', 'EN ISO 16000-1'),
         ],
       ),
     ],
@@ -585,6 +622,18 @@ function emitControllerPcb(p: FdmParams): DesignModule {
           mod('regulatory', 'UL 60730-2-9'),
         ],
       ),
+      // 2026-05-24 (orphan-fix): macro-anchor word for engineering-contract
+      // macro `control_board_motherboard` — needs both 'control' and 'board'
+      // substrings in word_id.
+      word(
+        'control_board_motherboard_word',
+        'control board motherboard',
+        cc('control_board_motherboard', 'control board motherboard', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×1'),
+          mod('form', '32-bit ARM main control board + motherboard PCB'),
+        ],
+      ),
     ],
   )
 
@@ -655,6 +704,18 @@ function emitFilamentHandling(p: FdmParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('form', 'Capricorn XS 1.9 mm ID'),
+        ],
+      ),
+      // 2026-05-24 (orphan-fix): macro-anchor word for engineering-contract
+      // macro `filament_feed_system` — needs both 'filament' and 'feed'
+      // substrings in word_id.
+      word(
+        'filament_feed_system_word',
+        'filament feed system',
+        cc('filament_feed_system', 'filament feed system', 'mechanical_actuation_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'spool → drybox → runout sensor → Bowden feed sub-system'),
         ],
       ),
     ],

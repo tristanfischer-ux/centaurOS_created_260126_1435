@@ -303,6 +303,17 @@ function emitGasBlendingHumidifier(p: VentParams): DesignModule {
           mod('capacity', '4', 'bar input'),
         ],
       ),
+      // Macro-aligned aggregate (BoM macro: proportional_solenoid_valve, ×2 = O2 + air).
+      word(
+        'proportional_solenoid_valve_word',
+        'proportional solenoid valve pair',
+        cc('proportional_solenoid_valve', 'proportional solenoid valve (O2 + air)', 'fluid_flow_state', 'steel'),
+        [
+          mod('quantity', '×2'),
+          mod('form', 'Asco / IMI medical-rated proportional solenoid valves'),
+          mod('regulatory', 'IEC 60601-1 medical-grade gas pathway'),
+        ],
+      ),
       word(
         'gas_mixing_block_word',
         'gas mixing block',
@@ -475,6 +486,17 @@ function emitSensorsControl(_p: VentParams): DesignModule {
           mod('capacity', '200', 'L/min'),
         ],
       ),
+      // Macro-aligned aggregate (BoM macro: flow_sensor_thermal, ×2 = insp + exp pair).
+      word(
+        'flow_sensor_thermal_word',
+        'thermal flow sensor pair',
+        cc('flow_sensor_thermal', 'thermal hot-wire flow sensors (inspiratory + expiratory)', 'fluid_flow_state', 'silicon'),
+        [
+          mod('quantity', '×2'),
+          mod('form', 'Sensirion SFM3000 hot-wire thermal-mass flow sensors'),
+          mod('capacity', '200', 'L/min each'),
+        ],
+      ),
       word(
         'pip_pressure_transducer_word',
         'PIP pressure transducer',
@@ -501,6 +523,17 @@ function emitSensorsControl(_p: VentParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('form', 'Honeywell 26PC differential'),
+        ],
+      ),
+      // Macro-aligned aggregate (BoM macro: pressure_transducer_low_range, ×3 = PIP + PEEP + circuit).
+      word(
+        'pressure_transducer_low_range_word',
+        'low-range pressure transducer set',
+        cc('pressure_transducer_low_range', 'low-range differential pressure transducers (PIP/PEEP/circuit)', 'pressure_vessel_function', 'silicon'),
+        [
+          mod('quantity', '×3'),
+          mod('form', 'Honeywell 26PC 1 psi differential, low-pressure range'),
+          mod('capacity', '70', 'cmH2O range'),
         ],
       ),
     ],
@@ -540,6 +573,17 @@ function emitSensorsControl(_p: VentParams): DesignModule {
           mod('quantity', '×1'),
           mod('form', 'TI ISO1500-class galvanic isolation'),
           mod('regulatory', 'IEC 60601-1 type BF / CF'),
+        ],
+      ),
+      // Macro-aligned aggregate (BoM macro: control_compute_module — the integrated dual-MCU compute board with watchdog).
+      word(
+        'control_compute_board_word',
+        'control compute board',
+        cc('control_compute_board', 'IEC 60601-1 dual-MCU control compute board with watchdog', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'integrated primary + safety-supervisor MCUs, isolated I/O, watchdog'),
+          mod('regulatory', 'IEC 60601-1 + 62304 Class B'),
         ],
       ),
     ],
@@ -584,6 +628,17 @@ function emitUserInterfaceAlarms(_p: VentParams): DesignModule {
           mod('quantity', '×1'),
           mod('form', '12.1" projected-capacitive touchscreen'),
           mod('regulatory', 'IEC 62366-1 usability'),
+        ],
+      ),
+      // Macro-aligned aggregate (BoM macro: touchscreen_user_interface — the integrated 12.1" touchscreen + bezel + EMC seal assembly).
+      word(
+        'touchscreen_user_interface_word',
+        'touchscreen user interface assembly',
+        cc('touchscreen_user_interface', 'touchscreen user interface assembly (display + bezel + EMC seal)', 'optical_sensing_function', 'glass'),
+        [
+          mod('quantity', '×1'),
+          mod('form', '12.1" capacitive touchscreen + medical bezel + EMC gasket'),
+          mod('regulatory', 'IEC 62366-1 + 60601-1-2 EMC'),
         ],
       ),
       word(

@@ -167,6 +167,19 @@ function emitFrameStructure(p: EbikeParams) {
       word('suspension_fork_word', 'suspension fork',
         cc('suspension_fork', 'suspension fork', 'mechanical_load_function', 'aluminium'),
         [mod('quantity', '×1'), mod('dimension', '80', 'mm travel'), mod('form', 'RockShox Reba 30/SR Suntour SF18')]),
+      // 2026-05-24 (orphan-fix): macro-anchor word for engineering-contract
+      // macro `wheels_tyres_pair` — needs 'wheels' AND 'tyres' substrings
+      // in word_id (qualifier 'pair' not stripped — 4 chars, not in list).
+      // Actually 'pair' (4 chars) is included in semantic tokens so word_id
+      // must contain wheels + tyres + pair. Wheels physically mount on frame.
+      word('wheels_tyres_pair_word', 'wheels tyres pair',
+        cc('wheels_tyres_pair', 'wheels tyres pair', 'mechanical_load_function', 'aluminium'),
+        [mod('quantity', '×1'), mod('form', 'pair of wheels + tyres (rims + spokes + tubes + tyres)')]),
+      // 2026-05-24 (orphan-fix): macro-anchor word for engineering-contract
+      // macro `cockpit_saddle_assembly` — needs 'cockpit' AND 'saddle' in word_id.
+      word('cockpit_saddle_assembly_word', 'cockpit saddle assembly',
+        cc('cockpit_saddle_assembly', 'cockpit saddle assembly', 'mechanical_load_function', 'aluminium'),
+        [mod('quantity', '×1'), mod('form', 'handlebar + stem + headset + saddle + seatpost cockpit assembly')]),
     ],
   )
 
@@ -248,6 +261,12 @@ function emitBatteryPack(p: EbikeParams) {
       word('battery_keylock_word', 'battery keylock',
         cc('battery_keylock', 'battery keylock', 'mechanical_load_function', 'steel'),
         [mod('quantity', '×1'), mod('form', 'Abus Plus key + tamper sensor')]),
+      // 2026-05-24 (orphan-fix): macro-anchor word for engineering-contract
+      // macro `charger_wall_unit` — needs 'charger' AND 'wall' substrings in
+      // word_id ('unit' is a qualifier so stripped from semantic tokens).
+      word('charger_wall_unit_word', 'charger wall unit',
+        cc('charger_wall_unit', 'charger wall unit', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+        [mod('quantity', '×1'), mod('form', 'Level-1 wall charger CC/CV LiNMC/LiNCA, EMC + CE + UKCA')]),
     ],
   )
 

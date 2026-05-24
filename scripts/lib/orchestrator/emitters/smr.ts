@@ -156,14 +156,20 @@ function emitPrimaryLoopPressuriser(_p: SmrParams): DesignModule {
       [mod('quantity', '×3'),
        mod('capacity', '17.2', 'MPa'),
        mod('regulatory', 'ASME III NB-7000')]),
+    word('primary_coolant_pump_word', 'primary coolant pump',
+      cc('primary_coolant_pump', 'primary coolant pump', 'mass_fluid_transport_process' as string, 'steel'),
+      [mod('quantity', '×4'),
+       mod('capacity', '15.5', 'MPa'),
+       mod('form', 'KSB/Flowserve canned-rotor reactor coolant pump, hermetically sealed'),
+       mod('regulatory', 'ASME III NB')]),
   ])
 
   return {
     module: 'mass_fluid_transport_process',
-    module_brief: 'Primary loop pressuriser maintains 15.5 MPa: 60× 30 kW cartridge heaters + 3× ASME-relief valves at 17.2 MPa.',
+    module_brief: 'Primary loop pressuriser maintains 15.5 MPa: 60x 30 kW cartridge heaters + 3x ASME-relief valves at 17.2 MPa + 4x canned-rotor primary coolant pumps.',
     overview_paragraph_en: '',
     derived_parameters: { design_pressure_mpa: 15.5, heater_count: 60 },
-    allowed_radicals: ['pressure_vessel_function', 'thermal_transfer_function', 'steel'],
+    allowed_radicals: ['pressure_vessel_function', 'thermal_transfer_function', 'mass_fluid_transport_process', 'steel'],
     applicability_confidence: 'high',
     sub_modules: [pressuriser],
   }

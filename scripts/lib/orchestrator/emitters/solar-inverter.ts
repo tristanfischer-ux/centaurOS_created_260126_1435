@@ -194,6 +194,11 @@ function emitDcInputMppt(p: SolarInverterParams): DesignModule {
       word('dc_input_fuse_word', 'DC input fuse',
         cc('dc_input_fuse', 'DC input fuse', 'electromechanical_switching_function', 'ceramic'),
         [mod('quantity', fmtQty(p.mpptCount * 2)), mod('capacity', '15', 'A'), mod('form', 'gPV')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `dc_disconnect_switch` (tokens: disconnect+switch) propagates here.
+      word('dc_disconnect_switch_word', 'DC disconnect switch',
+        cc('dc_disconnect_switch', 'DC disconnect switch', 'electromechanical_switching_function', 'polymer_thermoplastic'),
+        [mod('quantity', '×1'), mod('dimension', String(p.dcInputVoltageV), 'V'), mod('form', 'load-break DC isolator'), mod('regulatory', 'UL 98B / IEC 60947-3')]),
     ],
   )
   return {
@@ -262,6 +267,11 @@ function emitSwitchingInverter(p: SolarInverterParams): DesignModule {
       word('dc_link_busbar_word', 'DC link busbar',
         cc('dc_link_busbar', 'DC link busbar', 'electrical_conducting_function', 'copper'),
         [mod('quantity', '×3'), mod('capacity', p.dcContinuousA.toFixed(0), 'A')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `power_module_igbt_sic` (tokens: power+igbt+sic) propagates here.
+      word('igbt_sic_power_module_word', 'IGBT/SiC power module',
+        cc('igbt_sic_power_module', 'IGBT/SiC power module', 'silicon_semiconductor_function', 'silicon_semiconductor_function'),
+        [mod('quantity', '×1'), mod('form', 'Infineon FF / Cree Wolfspeed bridge module'), mod('capacity', p.ratedPowerKw.toFixed(0), 'kW')]),
     ],
   )
   return {
@@ -330,6 +340,11 @@ function emitAcGridInterface(p: SolarInverterParams): DesignModule {
       word('anti_islanding_relay_word', 'anti-islanding relay',
         cc('anti_islanding_relay', 'anti-islanding relay', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [mod('quantity', '×1'), mod('form', 'Active Frequency Shift'), mod('regulatory', 'IEEE 1547 / EN 50549')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `ac_disconnect_switch` (tokens: disconnect+switch) propagates here.
+      word('ac_disconnect_switch_word', 'AC disconnect switch',
+        cc('ac_disconnect_switch', 'AC disconnect switch', 'electromechanical_switching_function', 'polymer_thermoplastic'),
+        [mod('quantity', '×1'), mod('dimension', String(p.acOutputVoltageV), 'V'), mod('form', 'AC isolator + MCB protection'), mod('regulatory', 'IEC 60947-2')]),
     ],
   )
   return {
@@ -461,6 +476,12 @@ function emitProtectionSafety(p: SolarInverterParams): DesignModule {
       word('rcmu_word', 'RCMU',
         cc('rcmu', 'residual current monitoring unit', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [mod('quantity', '×1'), mod('form', 'AC + DC sensitive Type B'), mod('regulatory', 'VDE 0126-1-1')]),
+      // 2026-05-24 orphan-fix: new word so engineering-contract macro
+      // `ground_fault_detection_unit` (tokens: ground+fault+detection)
+      // propagates here.
+      word('ground_fault_detection_word', 'ground fault detection',
+        cc('ground_fault_detection', 'ground fault detection', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+        [mod('quantity', '×1'), mod('form', 'RCMU + arc-fault detection'), mod('regulatory', 'UL 1741 SA / IEC 62109-2')]),
     ],
   )
   return {

@@ -271,6 +271,17 @@ function emitDialysateCircuit(p: DialysisParams): DesignModule {
           mod('capacity', '14', 'mL/min'),
         ],
       ),
+      // Macro-aligned aggregate (BoM macro: dialysate_proportioning_pump — the unified dialysate proportioning pump assembly).
+      word(
+        'dialysate_proportioning_pump_word',
+        'dialysate proportioning pump',
+        cc('dialysate_proportioning_pump', 'dialysate proportioning pump (bicarbonate + acid)', 'fluid_flow_state', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'gear / volumetric pump for bicarbonate + acid proportioning'),
+          mod('capacity', '50', 'mL/min combined'),
+        ],
+      ),
       word(
         'dialysate_heater_word',
         'dialysate heater',
@@ -523,6 +534,17 @@ function emitSensorPanelControl(p: DialysisParams): DesignModule {
           mod('regulatory', 'IEC 60601-1-2 EMC + 60601-1-8 alarms'),
         ],
       ),
+      // Macro-aligned aggregate (BoM macro: control_compute_module — the integrated dual-MCU compute board with watchdog).
+      word(
+        'control_compute_board_word',
+        'control compute board',
+        cc('control_compute_board', 'IEC 60601-1 dual-MCU control compute board with watchdog', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'integrated primary + safety-supervisor MCUs, isolated I/O, Class B watchdog'),
+          mod('regulatory', 'IEC 60601-1 + 62304 Class B'),
+        ],
+      ),
     ],
   )
 
@@ -566,6 +588,17 @@ function emitWaterTreatment(p: DialysisParams): DesignModule {
           mod('quantity', '×1'),
           mod('form', 'Mar Cor Purelab / Better Water 6000 single-pass'),
           mod('capacity', '60', 'L/h'),
+        ],
+      ),
+      // Macro-aligned aggregate (BoM macro: reverse_osmosis_water_module — the complete RO water skid).
+      word(
+        'reverse_osmosis_water_skid_word',
+        'reverse-osmosis water skid',
+        cc('reverse_osmosis_water_skid', 'reverse-osmosis water treatment skid', 'osmotic_transfer_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'single-pass RO + UV + carbon prefilter, frame-mounted skid'),
+          mod('regulatory', 'AAMI RD52 / EN ISO 13959'),
         ],
       ),
       word(
@@ -638,6 +671,17 @@ function emitUserInterface(_p: DialysisParams): DesignModule {
           mod('quantity', '×1'),
           mod('form', '10.1" projected-capacitive touchscreen'),
           mod('regulatory', 'IEC 62366-1 usability'),
+        ],
+      ),
+      // Macro-aligned aggregate (BoM macro: touchscreen_user_interface — the integrated 10.1" touchscreen + bezel assembly).
+      word(
+        'touchscreen_user_interface_word',
+        'touchscreen user interface assembly',
+        cc('touchscreen_user_interface', 'touchscreen user interface assembly (display + bezel)', 'optical_sensing_function', 'glass'),
+        [
+          mod('quantity', '×1'),
+          mod('form', '10.1" capacitive touchscreen + medical bezel + EMC gasket'),
+          mod('regulatory', 'IEC 62366-1 + 60601-1-2 EMC'),
         ],
       ),
       word(
@@ -844,6 +888,17 @@ function emitStructure(p: DialysisParams): DesignModule {
         [
           mod('quantity', '×5'),
           mod('form', '125 mm twin-wheel medical castors, central-lock'),
+        ],
+      ),
+      // Macro-aligned aggregate (BoM macro: enclosure_trolley_chassis — the unified trolley chassis assembly).
+      word(
+        'trolley_chassis_word',
+        'trolley chassis',
+        cc('trolley_chassis', 'medical trolley chassis (ABS enclosure + steel trolley + castors)', 'mechanical_attachment_function', 'steel'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'moulded ABS enclosure on welded steel trolley + medical-grade castors'),
+          mod('regulatory', 'IP21 splash-resistant'),
         ],
       ),
       word(

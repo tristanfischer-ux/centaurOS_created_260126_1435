@@ -962,6 +962,17 @@ function emitDownstreamFiltration(_p: BioreactorParams): DesignModule {
           mod('regulatory', 'HIMA / ASTM F838'),
         ],
       ),
+      // Macro-aligned aggregate (BoM macro: biosafety_filter_assembly — biosafety containment vent + sparger filter assembly).
+      word(
+        'biosafety_filter_word',
+        'biosafety filter assembly',
+        cc('biosafety_filter', 'biosafety containment filter assembly', 'filtration_separation_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×1'),
+          mod('form', '0.2 µm hydrophobic vent + sparger biosafety filters'),
+          mod('regulatory', 'WHO BL2 / EU 2009/41/EC containment'),
+        ],
+      ),
       word(
         'chromatography_column_word',
         'chromatography column',

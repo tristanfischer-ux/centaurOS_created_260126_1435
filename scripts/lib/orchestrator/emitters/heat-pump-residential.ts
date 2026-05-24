@@ -308,6 +308,22 @@ function emitRefrigerantLoop(p: HpParams): DesignModule {
           mod('form', 'Henry CYL-series moisture indicator'),
         ],
       ),
+      // BESS L2 fan-out 2026-05-24: emit refrigerant_circuit_word so the
+      // engineering-contract.ts `refrigerant_circuit` macro can propagate
+      // through scripts/render-minimal-pdf.tsx:885-927 strict matcher.
+      // Aggregate of EEV + 4-way + filter-drier + pressure switches + piping
+      // (matches the £25/kW macro source_detail in the contract).
+      word(
+        'refrigerant_circuit_word',
+        'refrigerant circuit',
+        cc('refrigerant_circuit', 'refrigerant circuit', 'fluid_flow_state', 'copper'),
+        [
+          mod('quantity', '×1'),
+          mod('capacity', p.thermalKw.toFixed(1), 'kW'),
+          mod('form', `EEV + 4-way valve + filter-drier + pressure switches + ${refUpper} piping`),
+          mod('regulatory', `IEC 60335-2-40 ${refUpper}-rated`),
+        ],
+      ),
     ],
   )
 

@@ -172,6 +172,10 @@ function emitAirframeComposite(p: EvtolParams) {
       word('cabin_pressure_bulkhead_word', 'cabin pressure bulkhead',
         cc('cabin_pressure_bulkhead', 'cabin pressure bulkhead', 'mechanical_load_function', 'carbon_fibre_composite'),
         [mod('quantity', '×2'), mod('form', 'AS4/8552 forward + aft bulkheads')]),
+      // Macro-aligned aggregate (BoM macro: composite_airframe_structure — primary structural composite mass).
+      word('composite_airframe_structure_word', 'composite airframe structure',
+        cc('composite_airframe_structure', 'composite airframe primary structure (fuselage + bulkheads)', 'mechanical_load_function', 'carbon_fibre_composite'),
+        [mod('quantity', '×1'), mod('form', 'AS4/8552 prepreg monocoque + Nomex honeycomb primary structure'), mod('regulatory', 'CS-23 / SC-VTOL ultimate factor 1.5')]),
     ],
   )
 
@@ -227,6 +231,10 @@ function emitRotorArraysTilt(p: EvtolParams) {
       word('rotor_hub_assembly_word', 'rotor hub assembly',
         cc('rotor_hub_assembly', 'rotor hub assembly', 'mechanical_load_function', 'titanium_alloy'),
         [mod('quantity', fmtQty(p.numRotors)), mod('form', 'Ti-6Al-4V hub + collective pitch link')]),
+      // Macro-aligned aggregate (BoM macro: composite_propeller_assembly — composite propeller blade set per rotor).
+      word('composite_propeller_word', 'composite propeller',
+        cc('composite_propeller', 'composite propeller assembly (blades + hub)', 'aerodynamic_lift_function', 'carbon_fibre_composite'),
+        [mod('quantity', fmtQty(p.numRotors)), mod('form', 'carbon-fibre composite propeller blades + Ti-6Al-4V hub'), mod('regulatory', 'CS-23/SC-VTOL')]),
     ],
   )
 
@@ -284,6 +292,10 @@ function emitElectricMotorDrives(p: EvtolParams) {
       word('h3x_hpdm_motor_word', 'H3X HPDM motor',
         cc('h3x_hpdm_motor', 'H3X HPDM permanent-magnet motor', 'electromagnetic_force_function', 'rare_earth_magnet'),
         [mod('quantity', fmtQty(p.numRotors)), mod('capacity', String(p.motorContinuousKw.toFixed(0)), 'kW'), mod('form', 'H3X HPDM-250 axial-flux PMM, 13 kW/kg'), mod('regulatory', 'DO-160G')]),
+      // Macro-aligned aggregate (BoM macro: electric_propulsion_motor — distributed electric propulsion motor set).
+      word('electric_propulsion_motor_word', 'electric propulsion motor',
+        cc('electric_propulsion_motor', 'electric propulsion motor (distributed electric propulsion)', 'electromagnetic_force_function', 'rare_earth_magnet'),
+        [mod('quantity', fmtQty(p.numRotors)), mod('capacity', String(p.motorContinuousKw.toFixed(0)), 'kW'), mod('form', 'high-power-density axial-flux PMM electric propulsion motor (EMRAX 348 / H3X HPDM class)'), mod('regulatory', 'DO-160G environmental qualification')]),
     ],
   )
 
@@ -340,6 +352,10 @@ function emitBatteryPacks(p: EvtolParams) {
       word('battery_pack_module_word', 'battery pack module',
         cc('battery_pack_module', 'battery pack module', 'mechanical_load_function', 'aluminium'),
         [mod('quantity', '×8'), mod('capacity', String((p.batteryKwh / 8).toFixed(0)), 'kWh'), mod('form', '50 kWh quick-swap aluminium module')]),
+      // Macro-aligned aggregate (BoM macro: aviation_battery_pack — certified aviation-grade battery pack).
+      word('aviation_battery_word', 'aviation-grade battery',
+        cc('aviation_battery', 'aviation-grade certified battery pack', 'electrochemical_energy_function', 'lithium_nmc_chemistry'),
+        [mod('quantity', '×1'), mod('capacity', String(p.batteryKwh.toFixed(0)), 'kWh'), mod('form', '250 Wh/kg pack-level NMC811/NCA, UL 9540A thermal-runaway tested'), mod('regulatory', 'FAA Part 23 / EASA SC-VTOL pack qualification')]),
     ],
   )
 
@@ -399,6 +415,10 @@ function emitEnergyManagement(p: EvtolParams) {
       word('air_radiator_word', 'air radiator',
         cc('air_radiator', 'air radiator', 'thermal_transfer_function', 'aluminium'),
         [mod('quantity', '×1'), mod('dimension', String(p.radiatorAreaM2.toFixed(1)), 'm²')]),
+      // Macro-aligned aggregate (BoM macro: thermal_management_loop — glycol-cooled battery + inverter loop).
+      word('thermal_management_loop_word', 'thermal management loop',
+        cc('thermal_management_loop', 'glycol thermal management loop (battery + inverter)', 'thermal_transfer_function', 'aluminium'),
+        [mod('quantity', '×1'), mod('capacity', String((p.batteryKwh * 0.5).toFixed(0)), 'kW heat rejection'), mod('form', 'glycol-cooled battery + inverter loop with redundant pumps + UL 9540A propagation barriers'), mod('regulatory', 'UL 9540A thermal-runaway propagation gate')]),
     ],
   )
 
@@ -441,6 +461,10 @@ function emitFlightControlsAvionics(p: EvtolParams) {
       word('garmin_g3000h_pfd_word', 'Garmin G3000H PFD',
         cc('garmin_g3000h_pfd', 'Garmin G3000H PFD', 'silicon_semiconductor_function', 'aluminium'),
         [mod('quantity', '×2'), mod('form', 'PFD + MFD redundant')]),
+      // Macro-aligned aggregate (BoM macro: flight_computer_avionics_suite — integrated flight computer + avionics suite).
+      word('flight_computer_avionics_suite_word', 'flight computer avionics suite',
+        cc('flight_computer_avionics_suite', 'integrated flight computer + avionics suite', 'silicon_semiconductor_function', 'aluminium'),
+        [mod('quantity', '×1'), mod('form', 'triplex flight computer + integrated PFD/MFD + ADS-B Out/In + autoland (Garmin G3000H / BAE FlytX)'), mod('regulatory', 'DO-178C DAL-A + DO-254 DAL-A')]),
     ],
   )
 
@@ -597,6 +621,10 @@ function emitEmergencySystems(p: EvtolParams) {
       word('brs_rocket_motor_word', 'BRS rocket motor',
         cc('brs_rocket_motor', 'BRS rocket deployment motor', 'thermal_chemical_function', 'aluminium'),
         [mod('quantity', '×1'), mod('form', 'solid-propellant rocket, electronic squib')]),
+      // Macro-aligned aggregate (BoM macro: ballistic_recovery_parachute — whole-aircraft BRS).
+      word('ballistic_recovery_parachute_word', 'ballistic recovery parachute',
+        cc('ballistic_recovery_parachute', 'whole-aircraft ballistic recovery parachute system', 'mechanical_load_function', 'polymer_aramid'),
+        [mod('quantity', '×1'), mod('capacity', String(p.mtowKg.toFixed(0)), 'kg MTOW × 1.5 ULS'), mod('form', 'BRS Aerospace / Galaxy whole-aircraft ballistic recovery system'), mod('regulatory', 'EASA SC-VTOL §SVT.2280')]),
     ],
   )
 
