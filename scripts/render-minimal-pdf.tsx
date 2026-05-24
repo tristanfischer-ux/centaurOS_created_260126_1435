@@ -4131,82 +4131,108 @@ function ModuleSection({
       <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 6, marginBottom: 8 }}>
         Sub-modules
       </Text>
-      <View style={{ borderTopWidth: 0.6, borderTopColor: RULE_SOFT }}>
-        {subModules.map(sm => {
-          const proseChunks = break_paragraph(sm.paragraph || '—')
-          // ITER-10.5: clean Chain V2 BoM + numbered Notes block (Tristan ref
-          // image #2). Replaces the cramped 3-deep numbering + 4-letter
-          // status badges of iter-10.
-          const { lines: subBomLines, subtotal: subBomSubtotal } = subModuleBomSubtotal(bomTotals ?? null, moduleSpec.module, sm.id)
-          const notes = state ? noteCollectorForSubModule(subBomLines, recs, badges, state, moduleSpec.module, sm.id, physicsBySubId.get(sm.id) ?? []) : []
-          const noteIndexMap = new Map<string, number>()
-          for (const n of notes) {
-            if (n.word_id) noteIndexMap.set(n.word_id, n.idx)
-          }
-          // 2026-05-24 (bess-l7 user-reported, Section 2 Module 5 sub-module 5.1):
-          // Multi-layer text smear when a sub-module starts in the bottom third
-          // of a page. The title block already had `minPresenceAhead={80}`, but
-          // the WHOLE sub-module (title + prose + BoM header + first rows) had
-          // no joint break-alignment. react-pdf would render title + prose, then
-          // the BoM block's own reserve would push the table to the next page,
-          // leaving prose + notes overlapping at the same Y as the BoM that
-          // already advanced. Fix: add an outer reserve that covers title (~25pt)
-          // + first prose chunk (~60pt) + BoM header (~18pt) + min(rows, 6) rows
-          // (~16pt each) so the next page-break candidate is AFTER the BoM
-          // begins, not in the middle of the prose-to-BoM transition. Cap at
-          // 6 rows so very long tables (e.g. cell_string with 9 lines) don't
-          // force unnecessary page breaks for the whole sub-module.
-          const outerReserve = 120 + Math.min(subBomLines.length, 6) * 14
-          return (
-            <View
-              key={sm.id}
-              style={{ paddingVertical: 11, borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT }}
-              minPresenceAhead={outerReserve}
-            >
-              {/* 2026-05-23 fix (user-reported on windturbine-l5 page 18):
-                  Earlier "wrap={false} around title + full first prose chunk"
-                  caused overlapping-text smear when proseChunks[0] was 3+
-                  sentences (~400+ chars). react-pdf's known behaviour for an
-                  un-fittable wrap={false} block is to draw at the same Y as
-                  existing content rather than pushing a new page — producing
-                  the multi-layer text overlap. Fix: drop wrap={false} entirely
-                  and use `minPresenceAhead` on the title block to keep the
-                  title together with at least 80pt of follow-on content
-                  (~3 prose lines). This prevents BOTH orphaned titles AND
-                  the overlap smear, because react-pdf flows normally and only
-                  the minPresenceAhead constraint forces page-break alignment.
-                  The 2026-05-24 outer-reserve above strengthens this for the
-                  prose → BoM transition specifically. */}
-              <View minPresenceAhead={80}>
-                <View style={{ flexDirection: 'row', marginBottom: 5, alignItems: 'baseline' }}>
-                  <Text style={{ width: 36, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT_SOFT }}>
-                    {index}.{sm.idx}
-                  </Text>
-                  <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK }}>
-                    {britishise(sm.name.charAt(0).toUpperCase() + sm.name.slice(1))}
-                  </Text>
-                </View>
-              </View>
-              {proseChunks.map((chunk, ci) => (
-                <Text
-                  key={ci}
-                  style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.6, paddingLeft: 36, marginBottom: 5, textAlign: 'justify' }}
-                >
-                  {partLinkMap && partLinkMap.size > 0 ? renderProseWithLinks(chunk, partLinkMap) : chunk}
+      {/* 2026-05-24 (bess-l7 audit-detector layout-overlap fix): the
+          sub-modules used to be wrapped in a parent View with `borderTopWidth`
+          for the cosmetic horizontal rule. That wrapper created a fresh
+          layout context where the FIRST sub-module had no prior siblings —
+          and react-pdf's `shouldBreak` heuristic (layout/lib/index.js:1633)
+          gates `minPresenceAhead`-driven page breaks on
+          `breakingImprovesPresence = previousElements.length > 0`. With zero
+          prior siblings inside the wrapper, the first sub-module would
+          ALWAYS render at the current Y regardless of `minPresenceAhead`,
+          collapsing into Yoga overflow + the multi-layer text smear we saw
+          on BESS L7 page 27. Fix: replace the wrapper with a sibling rule
+          View so each sub-module is now a direct sibling of the
+          "Sub-modules" header. `breakingImprovesPresence` becomes TRUE for
+          the first sub-module because it sees the header (and any prior
+          page-level content) as prior siblings. */}
+      <View style={{ borderTopWidth: 0.6, borderTopColor: RULE_SOFT, marginBottom: 0 }} />
+      {subModules.map(sm => {
+        const proseChunks = break_paragraph(sm.paragraph || '—')
+        // ITER-10.5: clean Chain V2 BoM + numbered Notes block (Tristan ref
+        // image #2). Replaces the cramped 3-deep numbering + 4-letter
+        // status badges of iter-10.
+        const { lines: subBomLines, subtotal: subBomSubtotal } = subModuleBomSubtotal(bomTotals ?? null, moduleSpec.module, sm.id)
+        const notes = state ? noteCollectorForSubModule(subBomLines, recs, badges, state, moduleSpec.module, sm.id, physicsBySubId.get(sm.id) ?? []) : []
+        const noteIndexMap = new Map<string, number>()
+        for (const n of notes) {
+          if (n.word_id) noteIndexMap.set(n.word_id, n.idx)
+        }
+        // 2026-05-24 (bess-l7 audit-detector flagged page 27, 253 overlap
+        // findings): the previous outer reserve of `120 + min(rows,6) * 14`
+        // (max 204pt) was way under the actual rendered sub-module height
+        // AND the bug was compounded by the borderTop wrapper above which
+        // suppressed `breakingImprovesPresence` for the first sub-module
+        // (see comment on the rule View above). With the wrapper removed
+        // AND the reserve estimate corrected to real content height,
+        // `minPresenceAhead` now reliably forces a page break when the
+        // remaining space is insufficient.
+        //
+        // True content estimate (worst-case per-element):
+        //   - title block:            ~25pt
+        //   - prose chunks:           proseChunks.length * 55pt (~3 lines/chunk)
+        //   - BoM header + legend:    ~70pt
+        //   - BoM rows:               subBomLines.length * 18pt (no cap)
+        //   - BoM subtotal + spacing: ~30pt
+        //   - notes:                  notes.length * 28pt (~2 lines/note)
+        //
+        // Cap at 600pt — A4 contentArea is ~715pt with our paddings, so a
+        // 600pt reserve still permits 1 sub-module per page in the common
+        // case but forces a break when remaining space < 600pt.
+        const proseHeightEst = proseChunks.length * 55
+        const bomHeightEst = subBomLines.length > 0 ? 70 + subBomLines.length * 18 + 30 : 0
+        const notesHeightEst = notes.length * 28
+        const rawReserve = 25 + proseHeightEst + bomHeightEst + notesHeightEst
+        const outerReserve = Math.min(rawReserve, 600)
+        return (
+          <View
+            key={sm.id}
+            style={{ paddingVertical: 11, borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT }}
+            minPresenceAhead={outerReserve}
+          >
+            {/* 2026-05-23 fix (user-reported on windturbine-l5 page 18):
+                Earlier "wrap={false} around title + full first prose chunk"
+                caused overlapping-text smear when proseChunks[0] was 3+
+                sentences (~400+ chars). react-pdf's known behaviour for an
+                un-fittable wrap={false} block is to draw at the same Y as
+                existing content rather than pushing a new page — producing
+                the multi-layer text overlap. Fix: drop wrap={false} entirely
+                and use `minPresenceAhead` on the title block to keep the
+                title together with at least 80pt of follow-on content
+                (~3 prose lines). This prevents BOTH orphaned titles AND
+                the overlap smear, because react-pdf flows normally and only
+                the minPresenceAhead constraint forces page-break alignment.
+                The 2026-05-24 outer-reserve above strengthens this for the
+                prose → BoM transition specifically. */}
+            <View minPresenceAhead={80}>
+              <View style={{ flexDirection: 'row', marginBottom: 5, alignItems: 'baseline' }}>
+                <Text style={{ width: 36, fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT_SOFT }}>
+                  {index}.{sm.idx}
                 </Text>
-              ))}
-              <SubModuleBomBlock
-                bomLines={subBomLines}
-                subtotal={subBomSubtotal}
-                subModuleName={britishise(sm.name)}
-                noteIndexMap={noteIndexMap}
-                partLinkMap={partLinkMap}
-              />
-              <NotesBlock notes={notes} />
+                <Text style={{ flex: 1, fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK }}>
+                  {britishise(sm.name.charAt(0).toUpperCase() + sm.name.slice(1))}
+                </Text>
+              </View>
             </View>
-          )
-        })}
-      </View>
+            {proseChunks.map((chunk, ci) => (
+              <Text
+                key={ci}
+                style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.6, paddingLeft: 36, marginBottom: 5, textAlign: 'justify' }}
+              >
+                {partLinkMap && partLinkMap.size > 0 ? renderProseWithLinks(chunk, partLinkMap) : chunk}
+              </Text>
+            ))}
+            <SubModuleBomBlock
+              bomLines={subBomLines}
+              subtotal={subBomSubtotal}
+              subModuleName={britishise(sm.name)}
+              noteIndexMap={noteIndexMap}
+              partLinkMap={partLinkMap}
+            />
+            <NotesBlock notes={notes} />
+          </View>
+        )
+      })}
 
       {/* ITER-10.5 Phase F: Per-module Design Trade-offs (folded in from the
           deleted standalone DesignTradeOffsPage per Tristan directive). */}

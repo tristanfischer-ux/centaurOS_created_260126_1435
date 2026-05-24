@@ -354,13 +354,27 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('form', 'tinned electrolytic copper bar, 120 mm² cross-section (2.92 A/mm² @ 350 A continuous, IEC 61439-1)'),
         ],
       ),
+      // BESS L7 (2026-05-24, Physics Critic engineering_plausibility HIGH):
+      // the previous vague form "stainless steel terminal set" left no real
+      // part for the Round 1 critic to lock onto, so the LLM hallucinated
+      // "Phoenix Contact UK-5N-280" — which is a DIN-rail feed-through
+      // terminal block rated 41 A with M3 screws, not a battery terminal
+      // lug. CATL 280 Ah prismatic cells use M8 studs; mainstream BESS
+      // practice for the 200 A nominal per-cell current is a 50 mm² M8
+      // crimp lug to IEC 61238. Klauke RKS 50-8 is the German-manufactured
+      // class equivalent (200 A continuous, copper tinned, M8 stud) used
+      // by Tesla Megapack + Sungrow rack-pack OEMs. Spelling out the part
+      // up-front in the emitter starves the Round 1 critic of the
+      // "enrich thin sub-module" trigger that drove the fabrication.
       word(
         'cell_terminal_hardware_word',
         'cell terminal hardware word',
         cc('cell_terminal_hardware', 'cell terminal hardware', null, 'steel'),
         [
           mod('quantity', fmtQty(p.cellCount)),
-          mod('form', 'stainless steel terminal set'),
+          mod('capacity', '200', 'A'),
+          mod('dimension', '50', 'mm²'),
+          mod('form', 'Klauke RKS 50-8 ring lug, 50 mm² M8 stud, 200 A continuous, IEC 61238'),
         ],
       ),
       // BESS L4 (2026-05-24, Physics Critic engineering_plausibility HIGH):

@@ -664,10 +664,44 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
           const incoming = p.word
           if (Array.isArray(incoming?.modifier_characters)) {
             existing.modifier_characters = existing.modifier_characters ?? []
-            // Append non-duplicate modifiers (kind+value tuple uniqueness)
+            // BESS L7 (2026-05-24, Physics Critic engineering_plausibility HIGH):
+            // The deterministic emitter pre-loads safety-critical modifiers
+            // (capacity = system voltage, regulatory = UL/IEC standard,
+            // dimension = current-carrying cross-section, part_number =
+            // verified real part). Round 1 critics — Grok in particular —
+            // were observed downgrading these via add_word_to_sub_module
+            // with the SAME word.id, exploiting the previous "different
+            // value = not a dupe" merge rule to ALSO add a conflicting
+            // rating_primary or regulatory modifier. The Physics Critic
+            // later reads BOTH modifiers and flags the lower-rated one as
+            // a safety violation (e.g. cell_voltage_tap_wire ended up with
+            // capacity:1000V AND rating_primary:600V DC; cell_terminal_hardware
+            // got hallucinated Phoenix Contact UK-5N-280 fabricated to look
+            // like a real Phoenix Contact part).
+            // Guard: for safety-class modifier kinds + the rating_primary
+            // synonym for capacity, reject any incoming modifier whose
+            // kind already exists with a different value, AND reject
+            // rating_primary when capacity already exists. The deterministic
+            // emitter wins; reviewers can ADD net-new kinds but cannot
+            // downgrade an existing safety spec.
+            const SAFETY_PROTECTED_KINDS = new Set(['capacity', 'regulatory', 'dimension', 'part_number', 'form', 'material'])
+            const existingKinds = new Set(existing.modifier_characters.map((em: any) => em.kind))
             for (const inMod of incoming.modifier_characters) {
               const dupe = existing.modifier_characters.some((em: any) => em.kind === inMod.kind && em.value === inMod.value)
-              if (!dupe) existing.modifier_characters.push(inMod)
+              if (dupe) continue
+              // Synonym guard: rating_primary is the LLM's preferred kind for
+              // voltage / current rating; reject if capacity already pins it.
+              if (inMod.kind === 'rating_primary' && existingKinds.has('capacity')) {
+                reasons.push(`skip merge: ${p.module}.${p.sub_module_id}.${p.word?.id} rating_primary="${inMod.value}" rejected — capacity already pinned by deterministic emitter`)
+                continue
+              }
+              // Same-kind, different-value guard for safety-class modifiers.
+              if (SAFETY_PROTECTED_KINDS.has(inMod.kind) && existingKinds.has(inMod.kind)) {
+                reasons.push(`skip merge: ${p.module}.${p.sub_module_id}.${p.word?.id} ${inMod.kind}="${inMod.value}" rejected — ${inMod.kind} already pinned by deterministic emitter`)
+                continue
+              }
+              existing.modifier_characters.push(inMod)
+              existingKinds.add(inMod.kind)
             }
           }
           if (incoming?.name_human && (incoming.name_human.length > (existing.name_human ?? '').length)) {
