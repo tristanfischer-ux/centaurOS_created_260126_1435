@@ -57,6 +57,7 @@ eventually differ per code (currently uniform: no retry).
 | 12 | Numeric-claim drift detector FAILED — orchestrator-computed count diverges from BoM-emitted quantity > 20% (e.g. PyBaMM bms_slave_count=313 in narrative, BoM word qty=165) | Stage 49.7 (numeric-claim-drift-detector.ts), Tristan-driven 2026-05-24 after BESS L17 council |
 | 13 | Parts-spec validator FAILED — pinned part claims spec ≥1.5× manufacturer datasheet (e.g. Schaltbau C310 claimed 1500 A, real 500 A) | Stage 49.6 (parts-spec-validator.ts), Tristan-driven 2026-05-24 after BESS L17 council |
 | 14 | Sizing-vs-design audit FAILED — component rated < 50% of design continuous load × 1.25 safety factor (e.g. AC filter inductor 100 A on 1804 A continuous AC) | Stage 49.8 (sizing-vs-design-audit.ts), Tristan-driven 2026-05-24 after BESS L18 Physics Critic HIGH |
+| 15 | Slot mis-pin detector FAILED — word pinned to fundamentally wrong TYPE of part (e.g. Eaton M22-DL-G pushbutton pinned as door_switch; Roxtec CF 16 rectangular frame pinned as round HV gland; polycarbonate pinned as deflagration vent panel) | Stage 49.9 (slot-mispin-detector.ts), Tristan-driven 2026-05-24 after BESS L18 Physics Critic MEDs |
 
 Codes 4, 8, 9 are reserved (4: brief-rewrite unfixable distinct from refinement halt; 8 was used pre-P2-5 for integrity, now mapped to 6).
 
@@ -64,9 +65,9 @@ When adding a new fatal exit, allocate the next free code AND update this table.
 
 ---
 
-## Self-reinforcing PDF-quality loop (CANONICAL — codified 2026-05-23 after Tristan-flagged wind L20; gate 3 added 2026-05-24; gates 4+5 added 2026-05-24 after BESS L17 council; gate 6 added 2026-05-24 after BESS L18 Physics Critic HIGH)
+## Self-reinforcing PDF-quality loop (CANONICAL — codified 2026-05-23 after Tristan-flagged wind L20; gate 3 added 2026-05-24; gates 4+5 added 2026-05-24 after BESS L17 council; gates 6+7 added 2026-05-24 after BESS L18 Physics Critic)
 
-**The chain is not acceptable until ALL SIX of these audits PASS:**
+**The chain is not acceptable until ALL SEVEN of these audits PASS:**
 
 1. `scripts/audit-pdf-run.ts` — measures **DESIGN FIDELITY** (Physics Critic dimensions, density, brief-vs-contract scale, visual overlap). Threshold: F-1 brief_to_design_fidelity ≥ 6, no HIGH-severity engineering issues.
 

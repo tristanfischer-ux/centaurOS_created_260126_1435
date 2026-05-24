@@ -4638,6 +4638,46 @@ async function main() {
     console.error(`[chain] sizing-vs-design-audit flagged issues (see AUDIT-SIZING.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
 
+  // 2026-05-24 (Tristan-asked, BESS L18 Physics Critic MED findings):
+  // slot mis-pin detector. The L18 Physics Critic flagged 3 wrong-part-
+  // TYPE pinnings:
+  //   - Eaton M22-DL-G pinned as door_switch (it's a pushbutton)
+  //   - Roxtec CF 16 pinned as mv_cable_gland (it's a rectangular frame)
+  //   - polycarbonate pinned as deflagration_vent_panel (won't rupture)
+  // Distinct from gates 13 + 14: those catch wrong SPEC and wrong SIZING.
+  // Gate 15 catches wrong TYPE — sizing might match, spec might be honest
+  // about the part's real datasheet, but the part is a fundamentally wrong
+  // category for the slot.
+  //
+  // Fix: scripts/lib/slot-mispin-detector.ts. Curated KNOWN_MIS_PINS table
+  // matches character_id × pinned (manufacturer, part_number, name_human,
+  // form) patterns; flags HIGH with suggested alternatives per finding.
+  // Exit 15 on any finding (curated entries are confirmed bugs).
+  try {
+    execFileSync(
+      'npx',
+      ['tsx', resolve(__dirname, 'lib/slot-mispin-detector.ts'), statePath, resolve(outDir, 'AUDIT-MISPIN.md')],
+      { stdio: 'inherit', cwd: resolve(__dirname, '..') },
+    )
+  } catch (err) {
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 15) {
+      console.error('')
+      console.error('╔══════════════════════════════════════════════════════════════════════╗')
+      console.error('║  CHAIN HARD-EXIT — Slot mis-pin detector FAILED (code 15)           ║')
+      console.error('║  At least one word is pinned to a fundamentally WRONG TYPE of part  ║')
+      console.error('║  (e.g. Eaton M22-DL-G pushbutton as door_switch).                   ║')
+      console.error('║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║')
+      console.error('║  See AUDIT-MISPIN.md for the wrong pins + suggested alternatives.   ║')
+      console.error('║  Fix area: scripts/lib/deterministic-emitter.ts — replace the pin   ║')
+      console.error('║  with a part of the correct type (alternatives listed in audit).    ║')
+      console.error('╚══════════════════════════════════════════════════════════════════════╝')
+      logAction({ step: 'fatal_mispin_audit', reason: 'slot-mispin-detector exit 15', status: 15 })
+      process.exit(15)
+    }
+    console.error(`[chain] slot-mispin-detector flagged issues (see AUDIT-MISPIN.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
+  }
+
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
   // try/catch. The renderer's own `open` was guarded; this one was not. In
   // the worker/LaunchAgent path, `open` can fail (no GUI session) and would
