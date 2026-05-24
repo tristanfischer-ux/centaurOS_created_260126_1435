@@ -31,6 +31,18 @@ export function classifyProduct(briefText: string): ProductClassification {
       productClass = 'edge_ai_server'
     } else if (lower.match(/wearable.*medical|\bcgm\b|continuous glucose|blood sugar|biosensor.*patch|on.body.*sensor|skin.worn|diabet/)) {
       productClass = 'wearable_medical'
+    } else if (lower.match(/\bups\b\s+(?:inverter|system|module|product|brief|test)|uninterruptible\s+power|online\s+double[- ]?conversion|static\s+bypass\s+switch|vfi[- ]ss/)) {
+      // 2026-05-24: UPS must beat the pcb_assembly catch — UPS briefs often mention
+      // "PCBA supplier" as a manufacturing partner, which trips \bpcba\b first.
+      productClass = 'ups_inverter'
+    } else if (lower.match(/humanoid|biped(?:al)?\s+robot|legged\s+robot|teleoperat(?:ion|ed)\s+robot/)) {
+      // 2026-05-24: humanoid must beat the generic 'aerospace' catch in the
+      // fallthrough — humanoid briefs commonly say "payload (per arm): N kg"
+      // which trips /payload/ → aerospace.
+      productClass = 'humanoid'
+    } else if (lower.match(/\bsmr\b|small modular reactor|pressuris(?:ed|er)\s+water\s+reactor|\bpwr\b.*reactor|reactor pressure vessel|nuclear\s+(?:island|reactor|fuel\s+assembl)|fission|control\s+rod\s+drive/)) {
+      // 2026-05-24: SMR must beat the generic 'industrial machine' catch.
+      productClass = 'smr'
     } else if (lower.match(/\bpcba\b|\bsmt\b.*assembly|surface mount.*assembly|bga.*reflow|solder paste|pcb.*assembly/)) {
       productClass = 'pcb_assembly'
     }
@@ -112,17 +124,6 @@ export function classifyProduct(briefText: string): ProductClassification {
       productClass = 'ev_charger'
     } else if (lower.match(/bioreactor|fermenter|single[- ]?use bag|cell culture vessel|sterile manufacture/)) {
       productClass = 'bioreactor'
-    } else if (lower.match(/humanoid|biped(?:al)?\s+robot|legged\s+robot|teleoperat(?:ion|ed)\s+robot/)) {
-      // 2026-05-24: humanoid must match BEFORE the generic 'robot' catch.
-      // Distinct signals: 'humanoid', 'bipedal/biped robot', 'legged robot'.
-      productClass = 'humanoid'
-    } else if (lower.match(/\bsmr\b|small modular reactor|pressuris(?:ed|er)\s+water\s+reactor|\bpwr\b.*reactor|reactor pressure vessel|nuclear\s+(?:island|reactor|fuel\s+assembl)|fission|control rod drive/)) {
-      // 2026-05-24: SMR/nuclear must match BEFORE generic 'industrial machine' catch.
-      productClass = 'smr'
-    } else if (lower.match(/\bups\b\s+(?:inverter|system)|uninterruptible\s+power|online\s+double[- ]?conversion|static\s+bypass\s+switch|vfi[- ]ss/)) {
-      // 2026-05-24: UPS must match BEFORE pcb_assembly/consumer_electronics.
-      // VFI-SS-111 is the IEC 62040-3 UPS performance classification.
-      productClass = 'ups_inverter'
     } else if (lower.match(/robot|actuator|manipulator|autonomous/)) {
       productClass = 'robotics'
     } else if (lower.match(/vehicle|car|drivetrain|crash|homologation/)) {
