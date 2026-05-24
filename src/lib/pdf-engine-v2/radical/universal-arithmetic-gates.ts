@@ -156,10 +156,22 @@ const seriesStackVoltageGate: ArithmeticGate = {
   evaluate(modules) {
     for (const m of modules) {
       const dp = m.derived_parameters
-      const cpm = num(dp, 'cells_per_module')
-      const mps = num(dp, 'modules_per_string')
+      // 2026-05-24 BESS L14 fix: prefer the BESS contract's emitted field
+      // names (cells_per_rack, parallel_strings_per_rack) which describe a
+      // rack-as-series-string topology. Old field names (cells_per_module,
+      // modules_per_string) describe nested module-of-modules topology and
+      // an LLM repair iter occasionally re-injects them; the math goes
+      // wrong because parallel_strings_total gets read as modules_per_string
+      // and the gate computes 250×15×3.2=12000V instead of 250×1×3.2=800V.
+      // Fallback chain: prefer series_cells_per_string (most explicit) →
+      // cells_per_rack → cells_per_module. modules_per_string falls back to
+      // 1 if neither it nor parallel_strings_per_rack is set (rack-IS-string
+      // topology is the default).
+      const cpm = num(dp, 'series_cells_per_string', 'cells_per_rack', 'cells_per_module')
+      const mpsRaw = num(dp, 'modules_per_string', 'parallel_strings_per_rack')
+      const mps = mpsRaw === null ? 1 : mpsRaw
       const V = num(dp, 'cell_voltage_v', 'cell_voltage_nominal_v')
-      const bus = num(dp, 'dc_bus_voltage_v', 'dc_bus_voltage_nominal_v', 'nominal_voltage_v')
+      const bus = num(dp, 'string_voltage_nominal_v', 'dc_bus_voltage_v', 'dc_bus_voltage_nominal_v', 'nominal_voltage_v')
       // Trigger: bus voltage OR cells_per_module declared on a module signals
       // electrochemical stack topology. Either alone is enough to demand the
       // series-V arithmetic be verifiable.
