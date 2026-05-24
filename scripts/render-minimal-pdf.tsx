@@ -5731,7 +5731,29 @@ function ModuleSection({
                 const tail = isProperOrAcronym ? purposeText : `${purposeText.charAt(0).toLowerCase()}${purposeText.slice(1)}`
                 return `This module (${moduleName}) ${tail}`
               })()}
+            </Text>
+            <Text style={{ fontSize: 8.5, color: MUTED, letterSpacing: 0.4, marginBottom: 4 }}>
+              HOW ITS SUB-MODULES INTERACT
+            </Text>
+            {subInteractionChunks.map((chunk, ci) => (
+              <Text
+                key={`sm-int-${ci}`}
+                style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.6, marginBottom: 6 }}
+              >
+                {chunk}
+              </Text>
+            ))}
+          </View>
+        )
+      })()}
 
+      {/* 2026-05-24: image, tools callout, narrative paragraphs and
+          module-level physics findings MUST be siblings of the Module
+          Summary box — never nested inside its purpose <Text>. react-pdf
+          does not properly support <View>/<Image> nested inside <Text>;
+          the layout engine silently mis-routes such children and the
+          image overlaps the surrounding prose. Universal fix — applies to
+          every module render in every class. */}
       {moduleImagePath ? (
         <View style={{ marginBottom: 14, alignItems: 'center' }}>
           <Image src={moduleImagePath} style={{ width: 515, height: 360, objectFit: 'contain' }} />
@@ -5800,22 +5822,6 @@ function ModuleSection({
           )
         })}
       </View>
-
-            </Text>
-            <Text style={{ fontSize: 8.5, color: MUTED, letterSpacing: 0.4, marginBottom: 4 }}>
-              HOW ITS SUB-MODULES INTERACT
-            </Text>
-            {subInteractionChunks.map((chunk, ci) => (
-              <Text
-                key={`sm-int-${ci}`}
-                style={{ fontSize: 10, color: INK_SOFT, lineHeight: 1.6, marginBottom: 6 }}
-              >
-                {chunk}
-              </Text>
-            ))}
-          </View>
-        )
-      })()}
 
       <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 6, marginBottom: 8 }}>
         Sub-modules
