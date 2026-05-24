@@ -120,8 +120,8 @@ const HAIKU_4_5 = 'anthropic/claude-haiku-4.5'
 // in a different vendor family from R1 (Grok) / R2 (GLM) / R4 (Flash-Lite)
 // preserving review diversity.
 // (iter-57 BESS-qwen FATAL'd on initial `qwen/qwen-3.6-plus` — invalid model
-// ID. Correct OpenRouter slug confirmed against brainstorming-council usage.)
-const QWEN_3_6_MAX = 'qwen/qwen3.6-max-preview'
+// ID. Upgraded to Qwen 3.7 Max 2026-05-24.)
+const QWEN_3_7_MAX = 'qwen/qwen3.7-max'
 
 // Per-model max_tokens caps. iter-17 discovered GLM truncates above ~64 K
 // output even when we request 150 K — provider-side cap. Cap GLM lower so
@@ -132,7 +132,7 @@ const MAX_TOKENS_BY_MODEL: Record<string, number> = {
   [GROK_4_3]:       150_000,
   [GLM_5_1]:         60_000,   // iter-17 GLM truncated >64K (provider-side cap)
   [HAIKU_4_5]:       80_000,   // iter-38 HP hit 200K total-context cap (53K input + 150K requested out = 203K). With ~70K input after R1+R2 enrichment, 80K out keeps total ≤ 150K (well under cap).
-  [QWEN_3_6_MAX]:   32_000,   // Qwen 3.6 Max output cap is ~32K; that's plenty for an R3 reviewer (which emits a delta, not a full design). 1M context window absorbs upstream R1+R2 enrichment without the Haiku total-context squeeze.
+  [QWEN_3_7_MAX]:   32_000,   // Qwen 3.6 Max output cap is ~32K; that's plenty for an R3 reviewer (which emits a delta, not a full design). 1M context window absorbs upstream R1+R2 enrichment without the Haiku total-context squeeze.
 }
 
 // ─── Action log ─────────────────────────────────────────────────────────────
@@ -2789,7 +2789,7 @@ async function main() {
   // and only adds 1-2 score points over a single strong reviewer. Replaced
   // with one Grok 4.3 pass (fallback Qwen 3.6 Max). Loops 22-28 evidence:
   // the cascade's value-add was marginal. Saving the time/cost.
-  const r1 = await runReviewerStep({ label: 'STEP 5: Single reviewer (Grok 4.3)', model: GROK_4_3, fallbackModel: QWEN_3_6_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics, toolOutputsBlock: toolOutputsBlock + skeletonCriticAppend, libraryCandidatesBlock })
+  const r1 = await runReviewerStep({ label: 'STEP 5: Single reviewer (Grok 4.3)', model: GROK_4_3, fallbackModel: QWEN_3_7_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics, toolOutputsBlock: toolOutputsBlock + skeletonCriticAppend, libraryCandidatesBlock })
   design = r1.design
   writeFileSync(resolve(outDir, '5-r1-grok.json'), JSON.stringify(design, null, 2))
 
@@ -4594,6 +4594,48 @@ async function main() {
       process.exit(12)
     }
     console.error(`[chain] numeric-claim-drift-detector flagged issues (see AUDIT-DRIFT.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
+  }
+
+  // 2026-05-24 (Tristan-asked, BESS L18 Physics Critic HIGH): sizing-vs-design
+  // audit. The L18 chain Physics Critic flagged PCS AC filter inductor as
+  // rated 100 A for a 1 MW PCS at 400 V 3-phase (continuous AC = 1443 A,
+  // required with 1.25× UL/IEC margin = 1804 A; 18× undersized). Root cause:
+  // deterministic-emitter.ts has HARDCODED current ratings on many components
+  // that should be CALCULATED from state.orchestratorContract.quantities
+  // (bus_continuous_current_a, continuous_power_kw, dc_bus_voltage_v).
+  //
+  // Fix: scripts/lib/sizing-vs-design-audit.ts walks every word with a
+  // current rating, matches against SIZING_RULES (sub_module pattern →
+  // continuous load source + safety factor), computes the expected rating,
+  // and flags any word under the threshold. Exit 14 on HIGH. Distinct from
+  // parts-spec-validator (gate 13): that gate catches WRONG SPEC CLAIM
+  // (Schaltbau C310 claimed 1500 A but real is 500 A); this gate catches
+  // UNDERSIZED component (AC filter claimed 100 A but design needs 1804 A).
+  // Both gates necessary.
+  try {
+    execFileSync(
+      'npx',
+      ['tsx', resolve(__dirname, 'lib/sizing-vs-design-audit.ts'), statePath, resolve(outDir, 'AUDIT-SIZING.md')],
+      { stdio: 'inherit', cwd: resolve(__dirname, '..') },
+    )
+  } catch (err) {
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 14) {
+      console.error('')
+      console.error('╔══════════════════════════════════════════════════════════════════════╗')
+      console.error('║  CHAIN HARD-EXIT — Sizing-vs-design audit FAILED (code 14)          ║')
+      console.error('║  At least one component rated < 50% of design continuous load       ║')
+      console.error('║  (e.g. AC filter inductor 100 A on 1804 A continuous AC).           ║')
+      console.error('║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║')
+      console.error('║  See AUDIT-SIZING.md for the undersized components + required.      ║')
+      console.error('║  Fix area: scripts/lib/deterministic-emitter.ts — replace hardcoded ║')
+      console.error('║  rating with a calculation from state.orchestratorContract.        ║')
+      console.error('║  quantities (e.g. ceil(1.25 × bus_continuous_current_a / 100) ×100).║')
+      console.error('╚══════════════════════════════════════════════════════════════════════╝')
+      logAction({ step: 'fatal_sizing_audit', reason: 'sizing-vs-design-audit exit 14', status: 14 })
+      process.exit(14)
+    }
+    console.error(`[chain] sizing-vs-design-audit flagged issues (see AUDIT-SIZING.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
 
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
