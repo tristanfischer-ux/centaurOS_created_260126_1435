@@ -43,6 +43,12 @@ import { readFileSync } from 'node:fs'
 export interface SlotSizingRule {
   /** Match a sub_module by id (case-insensitive). */
   match_sub_module: RegExp
+  /** Optional word-id INCLUSION — if set, ONLY words matching this regex
+   * are evaluated by this rule. Useful for narrow rules that override a
+   * broader sub_module rule (e.g. per-rack fuses inside a dc_distribution
+   * sub_module). Specific rules with match_word_id should be listed
+   * BEFORE the broad sub_module rule so the matcher picks them first. */
+  match_word_id?: RegExp
   /** Optional word-id EXCLUSION — words whose id matches this regex are
    * skipped by this rule (e.g. pre-charge contactors carry only inrush
    * current, not bus continuous; they should not be sized against bus_
@@ -64,18 +70,37 @@ export interface SlotSizingRule {
 }
 
 export const SIZING_RULES: SlotSizingRule[] = [
+  // BESS per-rack DC HRC fuse → string_continuous_current_a (more specific
+  // than the generic DC bus rule below; must come FIRST so the matcher picks
+  // it for hrc_fuse / rack_fuse / per_rack_fuse word_ids).
+  // Rationale: a BESS dc_distribution sub_module typically holds BOTH a 1×
+  // main bus contactor (1250 A class) AND N× per-rack fuses (~100 A class).
+  // The chain's phase-2 grammar-repair loop sometimes strips the `quantity`
+  // modifier when collapsing duplicate-kind modifiers, leaving the audit
+  // unable to distinguish bus-level from per-rack components by quantity
+  // alone. The word_id pattern is therefore the disambiguator: `*hrc_fuse`
+  // or `rack_fuse` or `per_rack_*` → per-rack sizing.
+  {
+    match_sub_module: /dc_distribution|dc_bus|main_bus|dc_switchgear/i,
+    match_word_id: /hrc_fuse|rack_fuse|per_rack|string_fuse/i,
+    continuous_load_source: [{ design_param: 'string_continuous_current_a' }],
+    safety_factor: 1.25,
+    applies_to_classes: ['energy_storage', 'bess', 'solar_inverter', 'ev_charger'],
+    description:
+      'Per-rack DC fuse / per-string protection components must be sized to ≥ 1.25 × string_continuous_current_a (the rack-level current, not the bus total). Universal across multi-rack BESS architectures.',
+  },
   // BESS DC bus / main contactor / DC switchgear → bus_continuous_current_a
   // EXCLUDES: pre-charge contactors (carry inrush current only, sized ~100 A
   // for capacitor-bank pre-charge timing), busbar (sized by ampacity not by
   // bus continuous current), isolation monitor (low-current measurement).
   {
     match_sub_module: /dc_distribution|dc_bus|main_bus|dc_switchgear/i,
-    exclude_word_id: /precharge|pre_charge|inrush|busbar|iso_?monitor|isolation_monitor/i,
+    exclude_word_id: /precharge|pre_charge|inrush|busbar|iso_?monitor|isolation_monitor|hrc_fuse|rack_fuse|per_rack|string_fuse/i,
     continuous_load_source: [{ design_param: 'bus_continuous_current_a' }],
     safety_factor: 1.25,
     applies_to_classes: ['energy_storage', 'bess', 'solar_inverter', 'ev_charger'],
     description:
-      'DC bus + main contactor + DC HRC fuse components must be sized to ≥ 1.25 × bus_continuous_current_a (IEC 60947-2 + UL 9540A 13.2.4 for utility BESS). Pre-charge contactors (inrush only), busbars (sized by ampacity), and isolation monitors (low-current measurement) are excluded — they have separate sizing rules.',
+      'DC bus + main contactor components must be sized to ≥ 1.25 × bus_continuous_current_a (IEC 60947-2 + UL 9540A 13.2.4 for utility BESS). Pre-charge contactors (inrush only), per-rack fuses (separate string-level rule above), busbars (sized by ampacity), and isolation monitors (low-current measurement) are excluded.',
   },
   // BESS AC switchgear / PCS inverter output side / AC filter →
   // continuous current computed from continuous_power_kw at 400 V 3-phase.
@@ -108,6 +133,15 @@ interface EmittedRating {
   module_id: string
   sub_module_id: string
   claimed_a: number
+  /** Quantity modifier — used for per-unit sizing when a single sub_module
+   * holds N replicated units (e.g. 15× rack-level fuses inside the
+   * dc_distribution sub-module: each fuse sees per-rack current, not bus
+   * total current). */
+  quantity: number
+  /** content_character.character_id — used to exclude derived-metric pseudo-
+   * words (e.g. `current`, `power`, `voltage`, `efficiency`) that the chain
+   * sometimes emits as BoM rows but which aren't real procurement items. */
+  character_id: string
 }
 
 function parseCurrentA(value: string): number | null {
@@ -116,6 +150,13 @@ function parseCurrentA(value: string): number | null {
   const cleaned = value.replace(/,(?=\d{3}\b)/g, '')
   const m = cleaned.match(/(\d+(?:\.\d+)?)\s*A\b/i)
   return m ? parseFloat(m[1]) : null
+}
+
+function parseQuantityModifier(value: string): number {
+  if (typeof value !== 'string') return 1
+  const m = value.replace(/[×x,\s]/g, '').match(/(\d+)/)
+  const n = m ? parseInt(m[1], 10) : 1
+  return Number.isFinite(n) && n > 0 ? n : 1
 }
 
 function collectEmittedRatings(state: any): EmittedRating[] {
@@ -143,17 +184,55 @@ function collectEmittedRatings(state: any): EmittedRating[] {
         if (claimedA == null) continue
         const wordId = String(w?.id ?? w?.content_character?.character_id ?? 'unknown')
         const nameHuman = String(w?.name_human ?? w?.content_character?.name_human ?? wordId)
+        const charId = String(w?.content_character?.character_id ?? '')
+        const qtyMod = mods.find((mc) => mc.kind === 'quantity')
+        const quantity = qtyMod ? parseQuantityModifier(String(qtyMod.value)) : 1
         out.push({
           word_id: wordId,
           word_name_human: nameHuman,
           module_id: moduleId,
           sub_module_id: subId,
           claimed_a: claimedA,
+          quantity,
+          character_id: charId,
         })
       }
     }
   }
   return out
+}
+
+// ── UNIVERSAL EXCLUSIONS ─────────────────────────────────────────────────────
+// Applied across ALL rules. Components that match these patterns are skipped
+// entirely — they're either signal-level (don't carry load current), derived
+// metrics (not real procurement items), or sized by a different physical
+// principle (ampacity for busbars; thermal for heatsinks).
+
+const GLOBAL_EXCLUDE_WORD_ID = new RegExp(
+  // Signal-level components (carry control/measurement current, not load)
+  'bms_slave|cell_monitor|cell_voltage_sense|voltage_sense|aux_contact|auxiliary_contact|' +
+    'signal_contact|control_relay|control_signal|isolation_signal|ct_signal|pt_signal|' +
+    // Busbars (sized by copper cross-section + ventilation, not breaker rating)
+    'busbar|bus_bar|copper_bar|distribution_bar|' +
+    // Connectors / terminals / lugs (passive, sized by IEC 61238 ampacity table)
+    'crimp_lug|terminal_lug|cable_lug|ferrule|connector_housing',
+  'i',
+)
+
+// content_character.character_id values that are SCALAR METRICS, not parts.
+// The chain's phase-2 grammar-repair loop sometimes adds these as BoM words
+// to satisfy "module_prose_subset_of_sub_modules" — but they have no
+// procurement reality and shouldn't be sizing-audited.
+const GLOBAL_EXCLUDE_CHARACTER_ID = new RegExp(
+  '^(current|power|voltage|efficiency|thermal|frequency|temperature|mass|capacity|' +
+    'pressure|flow|speed|torque|altitude|range|throughput|dissipation)$',
+  'i',
+)
+
+function isGloballyExcluded(emitted: EmittedRating): boolean {
+  if (GLOBAL_EXCLUDE_WORD_ID.test(emitted.word_id)) return true
+  if (GLOBAL_EXCLUDE_CHARACTER_ID.test(emitted.character_id)) return true
+  return false
 }
 
 // ── EXPECTED LOAD COMPUTATION ────────────────────────────────────────────────
@@ -206,6 +285,7 @@ function matchingRule(emitted: EmittedRating, ctx: DesignContext): SlotSizingRul
       if (!matches) continue
     }
     if (!rule.match_sub_module.test(emitted.sub_module_id)) continue
+    if (rule.match_word_id && !rule.match_word_id.test(emitted.word_id)) continue
     if (rule.exclude_word_id && rule.exclude_word_id.test(emitted.word_id)) continue
     return rule
   }
@@ -241,11 +321,23 @@ export function auditSizing(state: any): SizingAuditResult {
   const findings: SizingFinding[] = []
   let words_matched_to_rule = 0
   for (const e of emitted) {
+    // Universal exclusions (BMS slaves, busbars, scalar metrics, etc.)
+    if (isGloballyExcluded(e)) continue
     const rule = matchingRule(e, ctx)
     if (!rule) continue
-    const continuous = expectedLoadFromRule(rule, ctx)
-    if (continuous == null) continue
+    const continuousTotal = expectedLoadFromRule(rule, ctx)
+    if (continuousTotal == null) continue
     words_matched_to_rule += 1
+    // Quantity-aware sizing: PARALLEL DC components (15× rack fuses share
+    // the total bus current) divide the load by quantity. AC 3-phase
+    // components (3× per-phase inductors) REPLICATE the per-phase current
+    // each (every phase carries the full line current). Determine which
+    // case by examining the source: design_param-based loads are typically
+    // TOTAL bus currents → divide by quantity for per-unit sizing;
+    // compute_ac_from loads are typically PER-PHASE currents already →
+    // don't divide.
+    const isTotalBusLoad = rule.continuous_load_source.some((s) => 'design_param' in s)
+    const continuous = isTotalBusLoad && e.quantity > 1 ? continuousTotal / e.quantity : continuousTotal
     const required = continuous * rule.safety_factor
     const ratio = e.claimed_a / required
     if (ratio >= 1.0) continue

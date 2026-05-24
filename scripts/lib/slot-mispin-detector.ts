@@ -57,8 +57,15 @@ export interface MisPinRule {
     name_human?: RegExp
     /** Matches the `form` modifier value — often the material/finish field
      * (e.g. "polycarbonate" for a deflagration panel; "polished stainless"
-     * for a coldplate substrate). */
+     * for a coldplate substrate). NOTE: free-text — can false-positive on
+     * negations ("NOT polycarbonate"). Prefer `material_radical` when
+     * checking material correctness. */
     form?: RegExp
+    /** Matches content_character.material_radical_primary — the canonical
+     * material taxonomy field, e.g. "aluminium", "polymer_thermoplastic",
+     * "polymer_thermoset", "ceramic", "copper". Safer than `form` for
+     * material-mismatch detection because it's not free text. */
+    material_radical?: RegExp
   }
   /** Why this pin is wrong (engineering reason, cited to a standard if
    * possible). */
@@ -112,7 +119,10 @@ export const KNOWN_MIS_PINS: MisPinRule[] = [
   // Disc Corp BS-B technical bulletin.
   {
     character_id_pattern: /deflagration|burst_disc|rupture_disc|explosion_vent|pressure_relief_disc/i,
-    forbidden_match: { form: /polycarbonate|acrylic|polymer|polymeric|plexiglas|lexan|makrolon/i },
+    // Use material_radical (canonical taxonomy) instead of form (free text)
+    // — form fields can contain negations like "NOT polycarbonate" that
+    // false-positive on a substring match.
+    forbidden_match: { material_radical: /^polymer|^polycarbonate|^acrylic|^plastic|^glass$/i },
     reason:
       'Polycarbonate / acrylic / polymer panels are HIGH-IMPACT MATERIALS designed to RESIST impact. NFPA 68 deflagration vents must RUPTURE at low pressure (typically 5-50 mbar) to release overpressure. A polycarbonate panel would resist the explosion and the container would over-pressurise, risking structural failure. Required: a thin metallic burst disc or composite rupture disc rated to the NFPA 68 calculated vent area at the specific Pred.',
     suggested_alternatives: [
@@ -141,6 +151,10 @@ interface CandidatePart {
   /** Value of the `form` modifier — often material / finish (e.g.
    * "polycarbonate", "aluminium", "polished stainless"). */
   form: string | null
+  /** content_character.material_radical_primary — canonical material from
+   * the taxonomy ("aluminium", "polymer_thermoplastic", "ceramic", etc.).
+   * Safer than `form` for material-mismatch detection. */
+  material_radical: string | null
 }
 
 function collectCandidates(state: any): CandidatePart[] {
@@ -159,6 +173,7 @@ function collectCandidates(state: any): CandidatePart[] {
         const pn = mods.find((mc) => mc.kind === 'part_number')?.value ?? null
         const formMod = mods.find((mc) => mc.kind === 'form')?.value
         const nameHuman = String(w?.name_human ?? w?.content_character?.name_human ?? '')
+        const materialRadical = w?.content_character?.material_radical_primary
         out.push({
           word_id: String(w?.id ?? charId),
           module_id: moduleId,
@@ -173,6 +188,7 @@ function collectCandidates(state: any): CandidatePart[] {
           // form modifier exposed independently so mis-pin rules can check
           // material/finish fields (e.g. polycarbonate as deflagration panel).
           form: typeof formMod === 'string' ? formMod : null,
+          material_radical: typeof materialRadical === 'string' ? materialRadical : null,
         })
       }
     }
@@ -184,15 +200,16 @@ function collectCandidates(state: any): CandidatePart[] {
 
 function ruleMatchesPart(rule: MisPinRule, p: CandidatePart): boolean {
   // ALL set fields in forbidden_match must match for the rule to fire.
-  // Single field matches are allowed (e.g. just `form` for the
-  // polycarbonate-deflagration-panel case where part_number isn't set).
+  // Single field matches are allowed (e.g. just `material_radical` for the
+  // polycarbonate-deflagration-panel case).
   const f = rule.forbidden_match
   if (f.manufacturer && (!p.manufacturer || !f.manufacturer.test(p.manufacturer))) return false
   if (f.part_number && (!p.part_number || !f.part_number.test(p.part_number))) return false
   if (f.name_human && (!p.name_human || !f.name_human.test(p.name_human))) return false
   if (f.form && (!p.form || !f.form.test(p.form))) return false
+  if (f.material_radical && (!p.material_radical || !f.material_radical.test(p.material_radical))) return false
   // At least one field had to be set + matched — otherwise empty rule matches everything.
-  return Boolean(f.manufacturer || f.part_number || f.name_human || f.form)
+  return Boolean(f.manufacturer || f.part_number || f.name_human || f.form || f.material_radical)
 }
 
 // ── MAIN ─────────────────────────────────────────────────────────────────────
