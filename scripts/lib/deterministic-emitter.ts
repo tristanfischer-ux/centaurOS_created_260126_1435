@@ -363,37 +363,61 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('form', 'tinned electrolytic copper bar, 120 mm² cross-section (2.92 A/mm² @ 350 A continuous, IEC 61439-1)'),
         ],
       ),
-      // BESS L7 (2026-05-24, Physics Critic engineering_plausibility HIGH):
-      // the previous vague form "stainless steel terminal set" left no real
-      // part for the Round 1 critic to lock onto, so the LLM hallucinated
-      // "Phoenix Contact UK-5N-280" — which is a DIN-rail feed-through
-      // terminal block rated 41 A with M3 screws, not a battery terminal
-      // lug. CATL 280 Ah prismatic cells use M8 studs; mainstream BESS
-      // practice for the 200 A nominal per-cell current is a 50 mm² M8
-      // crimp lug to IEC 61238. Klauke RKS 50-8 is the German-manufactured
-      // class equivalent (200 A continuous, copper tinned, M8 stud) used
-      // by Tesla Megapack + Sungrow rack-pack OEMs. Spelling out the part
-      // up-front in the emitter starves the Round 1 critic of the
-      // "enrich thin sub-module" trigger that drove the fabrication.
+      // BESS L19 (2026-05-25, Physics Critic engineering_plausibility HIGH —
+      // /tmp/bess-l19-validate/7-5-physics-critique.json issue #2):
+      // the previous Klauke RKS 50-8 (50 mm² M8) word was specified as
+      // "cell-to-cell busbar fastening" but real prismatic-cell BESS
+      // (Tesla Megapack, CATL EnerC+, Sungrow PowerStack) bolt the
+      // Mersen TCB-120-30x4 copper busbar DIRECTLY to the CATL 280 Ah
+      // cell's integral M8 terminal stud — there is no intermediate crimp
+      // lug on the high-current path. Forcing a 50 mm² ring lug between
+      // cell terminal and busbar would (a) add an unnecessary contact
+      // resistance (~50 µΩ per lug × 2 lugs × 3,735 joints ≈ +0.37 V drop
+      // and +375 W extra Joule heat per rack at 350 A continuous), and
+      // (b) the 50 mm² Klauke RKS 50-8 cannot physically crimp around the
+      // 120 mm² × 4 mm rectangular busbar tab anyway (the lug barrel is
+      // sized for round 50 mm² stranded conductor, not rectangular bar).
+      //
+      // The slot IS still needed — for the 22 AWG voltage-sense wires
+      // (and 4-wire NTC thermistor cables) that terminate on the same
+      // cell stud via piggy-back small-gauge ring terminals. Re-spec the
+      // word as a 1.5 mm² M8 ring terminal labelled as voltage-sense
+      // termination, quantity = one per sense-wire connection (cells +
+      // thermistors). Pin to Klauke 16308 (real DIN 46234 part: solderless
+      // ring terminal, 1.5-2.5 mm² copper tin-plated, 8.5 mm M8 stud
+      // hole, IEC 61238/DIN 46234 — manufacturer pages:
+      // https://www.klauke.com/gb/en/solderless-terminals-to-din-cu
+      // and https://www.cablectrix.com/Products/Klauke-un-insulated-ring-terminals/16308).
+      //
+      // No per-cell fuse word is emitted (NO Bussmann 170M1315, NO
+      // any-per-cell fuse) — see slot-mispin-detector.ts cell_fuse_link
+      // rule for the engineering reason: in a 1P × NS series string,
+      // every cell carries the FULL string current, so a per-cell fuse
+      // can never open selectively for a single-cell fault — it would
+      // have to open the entire string, which the rack-level Bussmann
+      // 170M1811 already does. Per-cell fuses on series strings add
+      // mass, cost, voltage drop and points-of-failure for zero
+      // protective benefit. Real utility BESS (Tesla Megapack 2 XL,
+      // CATL EnerC+, Sungrow PowerStack) all rely solely on rack-level
+      // semiconductor fusing for string protection.
       word(
         'cell_terminal_hardware_word',
         'cell terminal hardware word',
-        cc('cell_terminal_hardware', 'cell terminal hardware', null, 'steel'),
+        cc('cell_terminal_hardware', 'cell terminal hardware', null, 'copper'),
         [
-          mod('quantity', fmtQty(p.cellCount)),
-          mod('capacity', '200', 'A'),
-          mod('dimension', '50', 'mm²'),
-          // BESS L9 (2026-05-24, Physics Critic engineering_plausibility HIGH):
-          // Round 1 critic mis-paired this 50 mm² power lug with the 22 AWG
-          // voltage-sense wire word that lives in the same sub_module. They
-          // serve different circuits — this lug terminates the cell-to-cell
-          // busbar carrying 200 A; the 22 AWG sense conductor carries ≤1 mA
-          // to the BMS slave. Calling out "POWER terminal ... separate from
-          // voltage-sense circuit" in the form modifier prevents the false
-          // cross-section-mismatch flag.
+          // Quantity = sense-wire count + thermistor count.
+          // sense_wire_count = cell_count (one per cell to BMS slave).
+          // thermistor_count = tempSensorCount (4 per rack).
+          // Sized 1× per sense point per IEC 61140 working-voltage class.
+          mod('quantity', fmtQty(p.cellCount + tempSensorCount)),
+          mod('capacity', '25', 'A'),
+          mod('dimension', '1.5', 'mm²'),
+          mod('manufacturer', 'Klauke'),
+          mod('part_number', '16308'),
+          mod('regulatory', 'DIN 46234 + IEC 61238-1'),
           mod(
             'form',
-            'Klauke RKS 50-8 ring lug, 50 mm² M8 stud, 200 A continuous (POWER terminal for cell-to-cell busbar fastening; separate from voltage-sense circuit), IEC 61238',
+            'Klauke 16308 solderless ring terminal, 1.5-2.5 mm² copper tin-plated, 8.5 mm M8 stud hole (VOLTAGE-SENSE wire termination — one per cell sense lead + one per NTC thermistor lead; NOT a cell-to-cell power lug; the Mersen TCB-120-30x4 busbar bolts DIRECTLY to the CATL cell M8 stud per Tesla Megapack / CATL EnerC+ / Sungrow PowerStack practice)',
           ),
         ],
       ),
@@ -1593,39 +1617,73 @@ function emitOperatorInterface(_p: BessParams): DesignModule {
 //     14-module taxonomy — used here for AC grid + metering connections)
 // ---------------------------------------------------------------------------
 
-function emitInterconnect(_p: BessParams): DesignModule {
+function emitInterconnect(p: BessParams): DesignModule {
+  // BESS L19 (2026-05-25, Physics Critic engineering_plausibility HIGH —
+  // /tmp/bess-l19-validate/7-5-physics-critique.json issue #3):
+  // the previous hardcoded ×3 gland count was physically impossible. At
+  // 1 MW continuous on a 400 V 3-phase LV PCS output, the continuous AC
+  // current is I_continuous = P_kW × 1000 / (V_LL × √3) =
+  // 1,000,000 / (400 × 1.732) = 1443 A per phase, requiring a single
+  // copper conductor > 1000 mm² per phase if forced through one gland —
+  // not commercially available and not bendable in the container exit
+  // bend radius. Real utility-BESS practice is parallel conductors per
+  // phase, one gland per conductor: with 240 mm² Cu XLPE 90 °C
+  // ground-mounted (~500 A per cable per Lapp Tannehill / NEC Table
+  // 310.15(B)(16) for 500 kcmil = 430 A in raceway, 700 A in free air),
+  // the cable count per phase = ceil(I_continuous / 500). Add one
+  // neutral gland (for unbalanced load return) + one PE bonding gland
+  // (per IEC 62933-5-2 §6.4 + UL 9540 §17). The calculation is the
+  // universal fix: any change to continuous_power_kw (from the
+  // engineering Contract) automatically recomputes the count. Cable
+  // ampacity assumption documented inline so future class porters can
+  // adjust the constant (e.g. 95 mm² → 250 A for shorter runs).
+  //
+  // Pinned to Hawke 501/421 (Hubbell/Hawke International) — a real,
+  // dual-cert (Exd + Exe) compression-style single-seal cable gland in
+  // nickel-plated brass with M63 entry threads, suitable for non-armoured
+  // HV cables in Zone 1/21 and Zone 2/22 hazardous areas. Source: Hawke
+  // 501/421 datasheet
+  // (https://www.hubbell.com/hawke/en/products/501421-ex-d-ex-e-cable-gland/p/3913698
+  // and https://www.powerandcables.com/wp-content/uploads/2017/07/Hawke-501-421-Cable-Gland-Specification.pdf).
+  // Alternative real-part pins (also HV-rated round glands) — kept as
+  // commented reference for future swaps:
+  //   - CMP A2RC METRIC (brass, BS 6121:Part 1 / EN 50262, M-thread)
+  //   - Cortem ICRSTC11 (Italian, 11 kV armoured)
+  //   - Prysmian CCG-RA series (HV when ordered with the cable run)
+  // For larger systems (≥2 MW) a Roxtec RS/CF rectangular transit frame
+  // becomes more space-efficient than parallel round glands — but that
+  // is a DIFFERENT slot (cable_transit_frame / cable_entry_frame), NOT
+  // a cable_gland slot. The slot-mispin-detector flags Roxtec parts
+  // pinned to cable_gland / hv_gland / mv_gland slots as HIGH.
+  const PHASES = 3
+  const NEUTRAL_GLANDS = 1
+  const PE_GLANDS = 1
+  // Per-cable continuous ampacity assumption: 240 mm² Cu XLPE 90 °C
+  // ground-mounted single conductor (~500 A per Lapp Tannehill /
+  // Olex 240 mm² XLPE datasheet for buried / outdoor underground install).
+  const AMPS_PER_CABLE = 500
+  const acLineToLineV = 400
+  const continuousAcA = (p.continuousPowerKw * 1000) / (acLineToLineV * Math.sqrt(3))
+  const cablesPerPhase = Math.max(1, Math.ceil(continuousAcA / AMPS_PER_CABLE))
+  const totalGlands = PHASES * cablesPerPhase + NEUTRAL_GLANDS + PE_GLANDS
   const acGridInterconnect = makeSubModule(
     'ac_grid_interconnect',
     'AC grid interconnect',
     'connects',
-    'MV cable gland + 0.5S metering CTs at the PCC',
+    `${totalGlands}× MV cable glands (3 phases × ${cablesPerPhase} parallel cables/phase + 1N + 1PE for ${continuousAcA.toFixed(0)} A continuous AC) + 0.5S metering CTs at the PCC`,
     [
-      // BESS L18 (2026-05-24, Physics Critic part_realism MED):
-      // previous pin had only generic "ATEX EEx-d" form text — leaving the
-      // slot incompletely specified, which the downstream LLM emitter then
-      // back-filled with the WRONG type of part (Roxtec CF 16, a RECTANGULAR
-      // cable transit FRAME for through-wall cable runs, not a round HV
-      // gland that mates with M-thread enclosure entries). Pinned to
-      // Hawke 501/421 — a real, dual-cert (Exd + Exe) compression-style
-      // single-seal cable gland in nickel-plated brass with M63 entry
-      // threads, suitable for non-armoured HV cables in Zone 1/21 and
-      // Zone 2/22 hazardous areas. Source: Hawke 501/421 datasheet
-      // (Hubbell/Hawke International,
-      // https://www.hubbell.com/hawke/en/products/501421-ex-d-ex-e-cable-gland/p/3913698).
-      // Alternative real-part pins (also HV-rated round glands) — kept as
-      // commented reference for future swaps:
-      //   - CMP A2RC METRIC (brass, BS 6121:Part 1 / EN 50262, M-thread)
-      //   - Cortem ICRSTC11 (Italian, 11 kV armoured)
-      //   - Prysmian CCG-RA series (HV when ordered with the cable run)
       word(
         'mv_cable_gland_word',
         'MV cable gland word',
         cc('mv_cable_gland', 'MV cable gland', 'electrical_conducting_function', 'copper'),
         [
-          mod('quantity', '×3'),
+          mod('quantity', `×${totalGlands}`),
           mod('manufacturer', 'Hawke'),
           mod('part_number', '501/421/Universal'),
-          mod('form', 'compression-style HV cable gland, nickel-plated brass, M63 entry (round, NOT a Roxtec rectangular cable transit frame)'),
+          mod(
+            'form',
+            `compression-style HV cable gland, nickel-plated brass, M63 entry (round, NOT a Roxtec rectangular cable transit frame); count CALCULATED: 3 phases × ceil(${continuousAcA.toFixed(0)} A / ${AMPS_PER_CABLE} A per ${240} mm² Cu cable) = 3 × ${cablesPerPhase} = ${PHASES * cablesPerPhase} phase glands + 1 neutral + 1 PE bond = ${totalGlands} total`,
+          ),
           mod('rating_primary', '11 kV'),
           mod('regulatory', 'IEC 60079-0 + IEC 60079-1 + IEC 60079-7 (Exd + Exe)'),
         ],
@@ -1649,10 +1707,13 @@ function emitInterconnect(_p: BessParams): DesignModule {
 
   return {
     module: 'maintenance_serviceability',
-    module_brief: 'Terminates the AC export at the grid point of common coupling via MV glands and 0.5S accuracy CTs for revenue metering. Provides service-side electrical access to PCC for inspection + isolation.',
+    module_brief: `Terminates the AC export at the grid point of common coupling via ${totalGlands}× MV Hawke 501/421 M63 cable glands (3 phases × ${cablesPerPhase} parallel 240 mm² Cu cables + 1 neutral + 1 PE bond, sized for ${continuousAcA.toFixed(0)} A continuous AC per IEC 60364-5-52 ampacity tables) and 0.5S accuracy CTs for revenue metering. Provides service-side electrical access to PCC for inspection + isolation.`,
     overview_paragraph_en: '',
     derived_parameters: {
-      phase_count: 3,
+      phase_count: PHASES,
+      cables_per_phase: cablesPerPhase,
+      total_cable_glands: totalGlands,
+      continuous_ac_current_a: continuousAcA,
     },
     allowed_radicals: [
       'electrical_conducting_function',

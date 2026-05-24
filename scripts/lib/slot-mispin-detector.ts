@@ -95,20 +95,38 @@ export const KNOWN_MIS_PINS: MisPinRule[] = [
     ],
   },
   // ── BESS L18 council finding #4: HV cable gland mis-pinned ──
-  // Roxtec CF / CFB series is a RECTANGULAR cable transit FRAME with
-  // wedge-and-module sealing. It is NOT a round gland and does NOT mate with
-  // round M-thread entry hardware (M16, M40, M63, M75). Source: Roxtec
-  // CF Frames datasheet (RM00010-EN).
+  // Roxtec CF / CFB / CM / MCT / RM / RS series is a RECTANGULAR or round
+  // cable transit FRAME with wedge-and-module sealing. It is NOT a single
+  // threaded gland and does NOT mate with round M-thread enclosure entry
+  // hardware (M16, M40, M63, M75). Source: Roxtec CF Frames datasheet
+  // (RM00010-EN).
+  //
+  // BESS L19 (2026-05-25) refinement: the regex is anchored with
+  // `(?!_frame)` look-ahead so the rule does NOT fire on slots whose
+  // character_id ends in `_frame` (e.g. cable_transit_frame,
+  // cable_entry_frame) — those slots are legitimate Roxtec targets when
+  // the design uses a transit frame instead of parallel round glands
+  // (industry practice for ≥2 MW BESS where parallel-gland count gets
+  // unwieldy). Likewise excluded: `gland_seal` (a generic seal slot
+  // that can take Roxtec compression-module fillers). Strictness rule:
+  // ONLY `cable_transit_frame` and `cable_entry_frame` are valid
+  // Roxtec slots; everything else with "gland" / "cable_entry" in the
+  // name must still use a round threaded gland (Hawke / CMP / Cortem).
   {
-    character_id_pattern: /cable_gland|cable_entry|hv_gland|11kv_gland|mv_gland|gland_(11|33)kv/i,
-    forbidden_match: { manufacturer: /^Roxtec$/i, part_number: /^(CF|CFB|CM|MCT)/i },
+    // Substring match on gland-style slot keywords, with a negative
+    // lookahead `(?!.*_frame$)` so character_ids ending in `_frame`
+    // (e.g. cable_transit_frame, cable_entry_frame) are EXEMPT. Those
+    // are the legitimate Roxtec slots per BESS L19 (2026-05-25).
+    character_id_pattern: /^(?!.*_frame$).*(cable_gland|hv_gland|mv_gland|11kv_gland|cable_entry|gland_(11|33)kv).*$/i,
+    forbidden_match: { manufacturer: /^Roxtec$/i, part_number: /^(CF|CFB|CM|MCT|RM|RS)/i },
     reason:
-      'Roxtec CF/CFB/CM/MCT series is a RECTANGULAR cable transit FRAME (wedge-and-module sealing for through-wall cable runs), not a round threaded gland. Cannot mate with M-thread entry hardware. For 11 kV cable entry through a round enclosure boss, use a compression-style HV gland with metric M-thread.',
+      'Roxtec CF/CFB/CM/MCT/RM/RS series is a cable transit FRAME (wedge-and-module sealing for through-wall cable runs), not a round threaded gland. Cannot mate with single M-thread entry hardware. For 11 kV cable entry through a round enclosure boss, use a compression-style HV gland with metric M-thread. If the design has so much parallel-cable count that a transit frame is needed, change the slot character_id to cable_transit_frame or cable_entry_frame so the architectural intent is explicit.',
     suggested_alternatives: [
-      'Hawke 501/421/Universal (single-compression HV gland, BASEEFA + IECEx)',
+      'Hawke 501/421/Universal (single-compression HV gland, BASEEFA + IECEx, Hubbell/Hawke International)',
       'CMP A2RC + HV cable gland (UK)',
       'Cortem ICRSTC11 (Italian, 11 kV armoured)',
       'Prysmian CCG-RA series (when ordering with cable)',
+      'OR — if a transit frame is genuinely needed, rename the slot character_id to cable_transit_frame and re-pin Roxtec CF / RM / RS there',
     ],
   },
   // ── BESS L18 council finding #2: deflagration panel mis-pinned ──
