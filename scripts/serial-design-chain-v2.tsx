@@ -4277,6 +4277,9 @@ async function main() {
   try {
     const mmdPath = resolve(outDir, 'tools-flow.mmd')
     const pngPath = resolve(outDir, 'tools-flow.png')
+    // 2026-05-24 fix: re-read state.json — previous `liveState` was block-scoped
+    // inside the recompute-summary try block at line 4011 and not visible here.
+    const liveState = JSON.parse(readFileSync(statePath, 'utf-8'))
     const mermaidRes = generateToolsFlowMermaid(liveState)
     if (mermaidRes.empty) {
       console.error('[chain] tools-flow: no orchestrator tools — skipping mermaid render')
