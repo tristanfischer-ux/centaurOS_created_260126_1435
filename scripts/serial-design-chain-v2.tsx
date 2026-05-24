@@ -16,10 +16,10 @@
  * Usage:
  *   npx tsx scripts/serial-design-chain-v2.tsx <brief.md> <out-dir>
  */
-import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync, statSync } from 'fs'
+import { readFileSync, writeFileSync, appendFileSync, existsSync, mkdirSync, statSync, openSync } from 'fs'
 import { resolve } from 'path'
 import { homedir } from 'os'
-import { execFileSync } from 'child_process'
+import { execFileSync, spawn } from 'child_process'
 
 for (const envPath of [
   resolve(process.cwd(), '.env.local'),
@@ -2934,6 +2934,39 @@ async function main() {
         // the latency + applied=true here; structural detail lives in the
         // STEP 8.5 LLM record emitted by runReviewerStep itself.
         logAction({ step: 'specialist_review', class: currentProductClass, specialist_key: specialist.key, applied: true, latency_ms: r45.latency_ms })
+
+        // 2026-05-24 phase 5 (Tristan-asked): fire the Blender pipeline as a
+        // detached background process NOW, in parallel with the remaining
+        // chain stages. state.moduleDecomposition is geometrically final after
+        // Stage 8.5 specialist. The bg runner writes a sentinel that
+        // generate-hero-images.tsx polls + waits-on. By the time [hero] fires,
+        // the blender PNGs are typically already complete, so the chain
+        // finishes ~10 min faster (no serial Blender block). Disable via
+        // CHAIN_SKIP_BLENDER_BG=1 to use the synchronous fallback in
+        // generate-hero-images.tsx. Mempalace:
+        // drawer_forgeos_decisions_3f18c3cae92fe29e.
+        if (process.env.CHAIN_SKIP_BLENDER_BG !== '1') {
+          try {
+            const bgRunner = resolve(__dirname, 'blender-bg-runner.tsx')
+            const bgLog = resolve(outDir, 'blender-bg.log')
+            const bgStdoutFd = openSync(bgLog, 'a')
+            const bgStderrFd = openSync(bgLog, 'a')
+            const bgChild = spawn('npx', ['tsx', bgRunner, statePath, outDir], {
+              detached: true,
+              stdio: ['ignore', bgStdoutFd, bgStderrFd],
+              cwd: resolve(__dirname, '..'),
+              env: process.env,
+            })
+            bgChild.unref()
+            console.error(`[chain] phase 5: blender bg pipeline spawned (PID ${bgChild.pid}) → ${bgLog}`)
+            logAction({ step: 'blender_bg_spawned', ok: true, pid: bgChild.pid })
+          } catch (err) {
+            console.error(`[chain] blender bg spawn failed: ${(err as Error).message.slice(0, 120)}; falling back to in-line synchronous Blender at [hero] stage`)
+            logAction({ step: 'blender_bg_spawned', ok: false, error: String(err).slice(0, 200) })
+          }
+        } else {
+          console.error('[chain] CHAIN_SKIP_BLENDER_BG=1 — Blender will run serially inside [hero] stage')
+        }
       } catch (err) {
         console.error(`[chain] specialist review threw: ${(err as Error).message}; continuing without`)
         logAction({ step: 'specialist_review', class: currentProductClass, specialist_key: specialist.key, applied: false, error: String(err).slice(0, 200) })
@@ -4482,6 +4515,47 @@ async function main() {
     console.error(`[chain] audit-pdf-layout flagged issues (see AUDIT-LAYOUT.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
 
+  // 2026-05-24 (Tristan-asked, council L17 root-cause fix): parts-spec
+  // validator. The L17 council found Schaltbau C310 mis-rated 3× (1500 A
+  // claimed, real 500 A); Pfannenberg CC 90.000 mis-rated 5.5× (50 kW
+  // claimed, real 9 kW); Bussmann 170M6810 wrong part for 200 A class.
+  // Root cause: deterministic-emitter.ts emits `mod('form', ...)` strings
+  // pinning a real manufacturer + part_number AND inline-claiming specs;
+  // nothing cross-checks the claim against the manufacturer datasheet.
+  // Fix: scripts/lib/parts-spec-validator.ts. Cross-checks every emitted
+  // word's modifier_characters (manufacturer + part_number + rating_primary
+  // / capacity / cooling) against a curated KNOWN_PART_AUTHORITATIVE table.
+  // Universal across all 35 archetypes — new pinned parts get one entry in
+  // the table and every future chain across every class benefits.
+  //
+  // HARD GATE: exit 13 on any HIGH finding (≥ 1.5× spec deviation). LOW
+  // findings (part-number-matches-but-oversized) surface in AUDIT-PARTS.md
+  // for cost-stack review but don't block the chain.
+  try {
+    execFileSync(
+      'npx',
+      ['tsx', resolve(__dirname, 'lib/parts-spec-validator.ts'), statePath, resolve(outDir, 'AUDIT-PARTS.md')],
+      { stdio: 'inherit', cwd: resolve(__dirname, '..') },
+    )
+  } catch (err) {
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 13) {
+      console.error('')
+      console.error('╔══════════════════════════════════════════════════════════════════════╗')
+      console.error('║  CHAIN HARD-EXIT — Parts-spec validator FAILED (code 13)            ║')
+      console.error('║  One or more pinned parts claim a spec ≥ 1.5× the manufacturer      ║')
+      console.error('║  datasheet (e.g. Schaltbau C310 claimed 1500 A, real 500 A).        ║')
+      console.error('║  PDF + state.json saved to disk for inspection but chain is BLOCKED.║')
+      console.error('║  See AUDIT-PARTS.md for the offending parts + suggested fixes.      ║')
+      console.error('║  Fix area: scripts/lib/deterministic-emitter.ts — correct the pin   ║')
+      console.error('║  (claim the real spec, OR pick a different part for the load).      ║')
+      console.error('╚══════════════════════════════════════════════════════════════════════╝')
+      logAction({ step: 'fatal_parts_audit', reason: 'parts-spec-validator exit 13', status: 13 })
+      process.exit(13)
+    }
+    console.error(`[chain] parts-spec-validator flagged issues (see AUDIT-PARTS.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
+  }
+
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
   // try/catch. The renderer's own `open` was guarded; this one was not. In
   // the worker/LaunchAgent path, `open` can fail (no GUI session) and would
@@ -4496,6 +4570,41 @@ async function main() {
     }
   }
   logAction({ step: 'render', path: pdfPath })
+
+  // 2026-05-24 (Tristan-asked): live background enrichment of parts +
+  // suppliers. The chain has already produced a shippable PDF + passed all
+  // three audits (run/bom/layout) — anything we can still glean from the
+  // state (reviewer Library-override parts, web-fallback suppliers waiting
+  // on Brave + Flash-Lite snippet extraction) shouldn't BLOCK chain exit.
+  // We fork a detached, unref'd child so the parent process can return to
+  // the worker (or terminal) immediately while the enrichment job carries
+  // on in the background, writing to background-enrichment.{jsonl,log}.
+  // Non-fatal on every error — a failed spawn just means the next chain
+  // run won't have the discovered rows in the library yet. CHAIN_SKIP_
+  // BACKGROUND_ENRICHMENT=1 to disable entirely.
+  if (process.env.CHAIN_SKIP_BACKGROUND_ENRICHMENT !== '1') {
+    try {
+      const enrichBin = resolve(__dirname, 'lib/background-enrichment.ts')
+      const logFile = resolve(outDir, 'background-enrichment.log')
+      const stdoutFd = openSync(logFile, 'a')
+      const stderrFd = openSync(logFile, 'a')
+      const child = spawn('npx', ['tsx', enrichBin, statePath, outDir], {
+        detached: true,
+        stdio: ['ignore', stdoutFd, stderrFd],
+        cwd: resolve(__dirname, '..'),
+        env: process.env,
+      })
+      child.unref()
+      console.error(`[chain] background enrichment spawned (PID ${child.pid}) → ${logFile}`)
+      logAction({ step: 'background_enrichment_spawned', ok: true, pid: child.pid })
+    } catch (err) {
+      console.error(`[chain] background enrichment spawn failed: ${(err as Error).message.slice(0, 120)}; non-fatal`)
+      logAction({ step: 'background_enrichment_spawned', ok: false, error: String(err).slice(0, 200) })
+    }
+  } else {
+    console.error('[chain] CHAIN_SKIP_BACKGROUND_ENRICHMENT=1 — skipping live background enrichment')
+  }
+
   console.error(`\n[chain] === FINAL ===  state: ${statePath}  pdf: ${pdfPath}  status=${acceptanceStatus}  gates_passed=${allPassed}  design_decisions=${designDecisions.length}`)
 }
 

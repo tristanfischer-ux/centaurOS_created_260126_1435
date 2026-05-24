@@ -54,16 +54,17 @@ eventually differ per code (currently uniform: no retry).
 | 7 | Orchestrator hard fail (when engineeringContract present but tool plan crashed) | Stage 17.5, line ~2360 |
 | 10 | BoM-quality audit FAILED — macros orphaned, line totals absurd, cover ≠ sub-totals | Stage 49b (audit-pdf-bom.ts), Tristan-driven 2026-05-23 |
 | 11 | Layout overlap audit FAILED — text spans render at same X+Y position | Stage 49.5 (audit-pdf-layout.py), Option B 2026-05-24 |
+| 13 | Parts-spec validator FAILED — pinned part claims spec ≥1.5× manufacturer datasheet (e.g. Schaltbau C310 claimed 1500 A, real 500 A) | Stage 49.6 (parts-spec-validator.ts), Tristan-driven 2026-05-24 after BESS L17 council |
 
-Codes 4, 8, 9 are reserved (4: brief-rewrite unfixable distinct from refinement halt; 8 was used pre-P2-5 for integrity, now mapped to 6).
+Codes 4, 8, 9, 12 are reserved (4: brief-rewrite unfixable distinct from refinement halt; 8 was used pre-P2-5 for integrity, now mapped to 6; 12 reserved for the upcoming narrative-vs-BoM drift detector).
 
 When adding a new fatal exit, allocate the next free code AND update this table.
 
 ---
 
-## Self-reinforcing PDF-quality loop (CANONICAL — codified 2026-05-23 after Tristan-flagged wind L20; gate 3 added 2026-05-24)
+## Self-reinforcing PDF-quality loop (CANONICAL — codified 2026-05-23 after Tristan-flagged wind L20; gate 3 added 2026-05-24; gate 4 added 2026-05-24 after BESS L17 council)
 
-**The chain is not acceptable until ALL THREE of these audits PASS:**
+**The chain is not acceptable until ALL FOUR of these audits PASS:**
 
 1. `scripts/audit-pdf-run.ts` — measures **DESIGN FIDELITY** (Physics Critic dimensions, density, brief-vs-contract scale, visual overlap). Threshold: F-1 brief_to_design_fidelity ≥ 6, no HIGH-severity engineering issues.
 
@@ -76,14 +77,16 @@ When adding a new fatal exit, allocate the next free code AND update this table.
 
 3. `scripts/audit-pdf-layout.py` — measures **LAYOUT INTEGRITY** via PyMuPDF bbox geometry. Threshold: zero overlap findings. Flags any pair of text spans whose bounding boxes intersect by >50% X-share AND >40% Y-share. Distinguishes legitimate side-by-side column layouts (table headers at same Y but different X — pass) from real overlaps (two text lines at the same Y AND same X — fail). Substring-inside ligature artefacts filtered. Codified 2026-05-24 after BESS L7 surfaced the wrap={false} smear for the 4th time despite three incremental render-minimal-pdf.tsx patches (lines 3742, 4144, P1-6 sweep); option B (build detector) replaces option A (patch per incident).
 
-**Why all three are required**: Physics Critic measures _design fidelity to brief_ — does the design honour stated rated_power, voltage, geometry? It does NOT audit BoM LINE TOTALS or whether cover-page total reconciles with the BoM section. The wind L20 chain scored F-1 9/10 on fidelity while shipping foundation £24k for a 6 MW gravity base, blade £15, hub £45. The BoM-quality audit catches LINE-TOTAL bugs but does NOT measure whether the rendered PDF is readable — BESS L7 passed gates 1+2 while page 24 showed multi-line text stacked at the same Y coordinate (the sub-module title + the prose + the BoM header all rendered at y~771). Three independent quality dimensions: fidelity, cost-stack reconciliation, layout integrity; all three must gate.
+4. `scripts/lib/parts-spec-validator.ts` — measures **PIN-CLAIM CORRECTNESS** of every emitted real industrial part. Threshold: zero HIGH findings (claim ≥ 1.5× authoritative datasheet spec). Reads modifier_characters from each word (manufacturer + part_number + rating_primary / capacity / dimension / form) and cross-checks against a curated KNOWN_PART_AUTHORITATIVE table seeded from manufacturer datasheets. Codified 2026-05-24 after BESS L17 council found Schaltbau C310 mis-rated 3× (1500 A claimed, real 500 A), Pfannenberg CC 90.000 mis-rated 5.5× (50 kW claimed, real 9 kW @ 35°C), Bussmann 170M6810 wrong part for 200 A class (real 1250 A fuse). Root cause: deterministic-emitter.ts inline-claims specs without datasheet cross-check; the validator closes that gap universally across all 35 archetypes.
+
+**Why all four are required**: Physics Critic measures _design fidelity to brief_ — does the design honour stated rated_power, voltage, geometry? It does NOT audit BoM LINE TOTALS or whether cover-page total reconciles with the BoM section. The wind L20 chain scored F-1 9/10 on fidelity while shipping foundation £24k for a 6 MW gravity base, blade £15, hub £45. The BoM-quality audit catches LINE-TOTAL bugs but does NOT measure whether the rendered PDF is readable — BESS L7 passed gates 1+2 while page 24 showed multi-line text stacked at the same Y coordinate. The layout-integrity audit catches that smear but does NOT verify pinned-part claims match manufacturer datasheets — BESS L17 passed gates 1+2+3 while shipping Schaltbau C310 at 1500 A (real 500 A) and Pfannenberg CC 90.000 at 50 kW (real 9 kW). Four independent quality dimensions: fidelity, cost-stack reconciliation, layout integrity, pin-claim correctness; all four must gate.
 
 **The agent must NEVER trust chain stdout logs alone**. Every chain run:
 
 1. Open the resulting `chain-v2.pdf` (via pdftotext extraction of cover lines + BoM sub-totals + sample line items per module).
 2. Verify cover Raw materials BoM ≈ Σ of module sub-totals shown in the BoM table.
 3. Verify per-line items pass class-specific industry floors (e.g. utility wind blade ≥ £100k each — anything 1000× under is wrong).
-4. Confirm `audit-pdf-run.ts`, `audit-pdf-bom.ts`, AND `audit-pdf-layout.py` all exit 0.
+4. Confirm `audit-pdf-run.ts`, `audit-pdf-bom.ts`, `audit-pdf-layout.py`, AND `parts-spec-validator.ts` all exit 0.
 5. Only THEN declare the chain validated.
 
 When `audit-pdf-bom` reports orphaned macros, the macro→word matcher in `scripts/render-minimal-pdf.tsx:885-927` is the first suspect — it uses fuzzy token-matching that fails when macro names contain qualifier tokens (assembly, drivetrain, gravity, onshore, bedplate, scale, panel). Fix paths: (a) lower matcher threshold + strip qualifier tokens, (b) rename macros in engineering-contract.ts to match word_ids exactly, (c) widen cost-repair UP-cap for the class.
