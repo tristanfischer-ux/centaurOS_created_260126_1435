@@ -165,22 +165,19 @@ def palette_for(module_id: str) -> tuple[float, float, float]:
     return (val, p, q)
 
 
-GREY = (0.62, 0.62, 0.62)  # greyscale colour for non-focal modules
-SHELL_TINT = (0.78, 0.82, 0.88)  # envelope shell tint (visible enough
-# to read as the container outline without obscuring the boxes inside)
-SHELL_ALPHA = 0.40  # transparent enough to see modules inside,
-# solid enough that the envelope reads unambiguously as "the box"
-# (2026-05-21 Tristan feedback: 0.22 was too faint at the small inset
-# sizes used for per-module images; 0.40 keeps the box legible)
-GROUND_TINT = (0.96, 0.96, 0.97)
-FOCAL_BOX_ALPHA = 0.12  # focal module's enclosing box is a near-invisible
-# shell — Freestyle silhouette outlines give it the "box" boundary while
-# the CONTENTS (components in identity colour) read as the primary signal.
-# 0.65 was too opaque: the tinted shell obscured the internal components.
-# Phase8 reference: focal shells read as wire-frame outlines only; the
-# vivid identity-colour geometry inside is what identifies the module.
-# (2026-05-22 phase8 analysis: battery module shell is nearly invisible,
-# blue cell arrays inside are the dominant visual — alpha ~0.12 matches.)
+GREY = (0.72, 0.74, 0.78)  # cool-grey for non-focal sibling modules
+# (2026-05-24 phase 20 reference: siblings read as subtle cool-grey
+# silhouettes, not invisible — lighter than 0.62 so they don't blend
+# into the focal at distance; slight blue tint to feel "engineering-cad"
+# rather than "warm grey carpet".)
+SHELL_TINT = (0.72, 0.78, 0.86)  # envelope shell tint, cooler blue-grey
+SHELL_ALPHA = 0.20  # subtle wireframe — Freestyle outlines do the heavy
+# lifting; the fill is light so the focal pops against it (phase 20: the
+# enclosure reads as wireframe lines only, not a tinted box).
+GROUND_TINT = (1.00, 1.00, 1.00)  # pure white, no studio-grey wash
+FOCAL_BOX_ALPHA = 0.0  # focal shell is fully invisible — Freestyle gives
+# the boundary outline; the saturated identity-coloured components inside
+# are the visual signal. Any positive alpha tints them paler.
 
 
 # ── Component shape heuristics (universal, class-agnostic) ─────────────
@@ -883,13 +880,10 @@ def build_scene(
             mat = make_flat_material(f"Mod_{it['id']}", it["rgb"], alpha=1.0)
             add_box(f"box_{it['id']}", it["centre"], it["size"], mat)
         else:
-            # Per-module shot — siblings rendered as TRANSLUCENT GHOST
-            # boxes so they don't visually dominate the saturated focal.
-            # (2026-05-22 Tristan phase8 reference: sibling modules read
-            # as faint grey ghost geometry, not as opaque grey distractor
-            # boxes.) Alpha 0.35 provides visible spatial context while
-            # keeping siblings clearly subordinate to the saturated focal.
-            mat = make_flat_material(f"Mod_{it['id']}", GREY, alpha=0.35)
+            # Per-module sibling: cool-grey silhouette at alpha 0.55
+            # (2026-05-24 phase 20 reference: siblings are clearly
+            # visible structural context, not ghosted-to-invisible).
+            mat = make_flat_material(f"Mod_{it['id']}", GREY, alpha=0.55)
             add_box(f"box_{it['id']}", it["centre"], it["size"], mat)
 
     # Ground plane — flat off-white, gives a subtle scale reference.
@@ -939,7 +933,7 @@ def place_camera(env_w: float, env_d: float, env_h: float,
     diag = math.sqrt(env_w * env_w + env_d * env_d + env_h * env_h)
     target_extent = diag / 2.0
     if look_at is not None and focal_size is not None:
-        fit = 0.30
+        fit = 0.45
     elif wide:
         fit = 0.26
     else:
@@ -1004,7 +998,7 @@ def add_lighting(env_w: float, env_d: float, env_h: float) -> None:
     world.use_nodes = True
     bg = world.node_tree.nodes.get("Background")
     if bg:
-        bg.inputs["Color"].default_value = (*_to_linear((0.85, 0.85, 0.87)), 1.0)
+        bg.inputs["Color"].default_value = (*_to_linear((1.00, 1.00, 1.00)), 1.0)
         bg.inputs["Strength"].default_value = 1.0
 
 
