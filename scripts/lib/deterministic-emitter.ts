@@ -485,7 +485,10 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         cc('insulation_monitor', 'insulation monitor', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
-          mod('form', 'Bender ISOMETER IR427-D6'),
+          // 2026-05-24 L7: IR427-D6 rated 250 V DC only — for 800 V DC bus use
+          // ISOMETER iso685-D-B (DC up to 1000 V, IEC 61557-8 + UL 508).
+          mod('form', 'Bender ISOMETER iso685-D-B (1000 V DC, IEC 61557-8)'),
+          mod('dimension', '1000', 'V'),
         ],
       ),
       word(
@@ -848,7 +851,10 @@ function emitPowerDistribution(p: BessParams): DesignModule {
         [
           mod('quantity', fmtQty(p.rackCount)),
           mod('capacity', '200', 'A'),
-          mod('form', 'Bussmann FWP (sized to per-string current)'),
+          // 2026-05-24 L7: FWP series rated 700 V — too low for 800 V DC bus.
+          // Use Bussmann 170M (1100 V DC, IEC 60269-4 + UL 248-13).
+          mod('form', 'Bussmann 170M6810 (200 A / 1100 V DC, IEC 60269-4 ar-class)'),
+          mod('dimension', '1100', 'V'),
         ],
       ),
       word(
