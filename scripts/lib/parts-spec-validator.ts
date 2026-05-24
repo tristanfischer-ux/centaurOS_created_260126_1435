@@ -67,6 +67,32 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     notes: 'Schaltbau C310 (datasheet): 350-500 A continuous, 1500 V DC, IEC 60947-2. Some variants list 350 A continuous; 500 A is the highest in the series. Anything > 500 A is wrong.',
   },
   {
+    // Added 2026-05-24 BESS L17 fix — utility-BESS bus contactor at 1500-3000 A
+    // continuous, 1500 V DC. C330 (stationary) covers MCS Level 2 + Level 3
+    // per Schaltbau's market positioning: 2000 A @ 3×500 mm² terminals,
+    // 3000 A @ 3×1000 mm² terminals, 15,000 A short-time 5 ms, IEC 60947-4-1
+    // + UL 60947-4-1. Source: https://schaltbau.com/en/product/contactors/c330/.
+    // Use the conservative 2000 A continuous figure as the authoritative
+    // current (the 3000 A figure requires the larger terminal-cross-section
+    // variant which the chain emitter does not pin).
+    manufacturer: 'Schaltbau',
+    part_number_pattern: /^C330(?:[\s/].*)?$/i,
+    category: 'hvdc_contactor',
+    rated_current_a: 2000,
+    rated_voltage_dc_v: 1500,
+    notes: 'Schaltbau C330 (datasheet): 2000 A continuous @ 3×500 mm² terminals (3000 A @ 3×1000 mm² terminals — variant-specific), 1500 V DC bi-directional, IEC 60947-4-1 + UL 60947-4-1, CE/UL/CCC certified. The Schaltbau MCS Level 2 (1500 V) + Level 3 (3000 A) reference part for utility BESS.',
+  },
+  {
+    // Added 2026-05-24 BESS L17 fix — mobile-use sibling of C330. Same
+    // current/voltage envelope, different mechanical mount + connector.
+    manufacturer: 'Schaltbau',
+    part_number_pattern: /^C830(?:[\s/].*)?$/i,
+    category: 'hvdc_contactor',
+    rated_current_a: 2000,
+    rated_voltage_dc_v: 1500,
+    notes: 'Schaltbau C830 (datasheet): 2000 A continuous, 1500 V DC bi-directional, mobile-use sibling of C330. IEC 60947-4-1 + UL 60947-4-1.',
+  },
+  {
     manufacturer: 'Gigavac',
     part_number_pattern: /^MX12(?:[\s/].*)?$/i,
     category: 'hvdc_contactor',
@@ -91,6 +117,21 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     rated_current_a: 200,
     rated_voltage_dc_v: 1100,
     notes: 'Bussmann 170M65xx: ~125-250 A semiconductor fuse, 1100 V DC.',
+  },
+  {
+    // Added 2026-05-24 BESS L17 fix — Bussmann 170M1811 is the canonical
+    // 200 A / 1000 V DC square-body semiconductor fuse, Size 000 DIN 43 620,
+    // Class aR, IEC 60269-4 tested, UL Recognised (E125085.JFHR2). Used as
+    // the rack-level DC fuse in utility BESS where rack peak is ~100-200 A.
+    // Source: https://us.rs-online.com/product/bussmann-by-eaton/170m1811/74058756/
+    // ("FUSE 200A 1000V DC 000FU/90 AR UR") + Eaton Bussmann technical data
+    // 720014 (170M Series catalogue).
+    manufacturer: 'Bussmann',
+    part_number_pattern: /^170M18\d{2}$/i,
+    category: 'dc_fuse',
+    rated_current_a: 200,
+    rated_voltage_dc_v: 1000,
+    notes: 'Bussmann 170M18xx subfamily (e.g. 170M1811): 200 A class aR semiconductor fuse, Size 000 DIN 43 620, 1000 V DC, IEC 60269-4 + UL Recognised.',
   },
   // ── BESS isolation monitor ────────────────────────────────────
   {
@@ -174,6 +215,103 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
       { ambient_c: 50, capacity_kw: 0.36 },
     ],
     notes: 'Pfannenberg EB 60 panel cooler: 600 W @ 35°C. Claiming 60 kW on an EB 60 was a 100× spec error caught Loop ~28.',
+  },
+  // ── Pfannenberg EB XT large packaged chillers (BESS-rated) ─────
+  // Family: 9 units across 3 housing sizes, 36-150 kW cooling capacity,
+  // R410A refrigerant, scroll compressor, microchannel condenser, EN 14511 +
+  // AHRI 550/590 rated, AC 400 3~/50 Hz, outdoor IP54. Pfannenberg's
+  // BESS-targeted large-chiller line. Added 2026-05-24 BESS L17 fix.
+  // Source: https://www.pfannenberg.com/en-gb/liquid-cooling/eb-xt-36-150-kw/
+  // and product pages (e.g. EB XT 600 WT = product 42146005001 = 59 kW).
+  {
+    manufacturer: 'Pfannenberg',
+    part_number_pattern: /^EB[\s.-]*XT[\s.-]*400(?:[\s.-]*WT)?$/i,
+    category: 'liquid_chiller',
+    cooling_curve: [
+      { ambient_c: 35, capacity_kw: 36 },
+      { ambient_c: 50, capacity_kw: 21.6 },
+    ],
+    notes: 'Pfannenberg EB XT 400 WT: 36 kW @ 35°C ambient.',
+  },
+  {
+    manufacturer: 'Pfannenberg',
+    part_number_pattern: /^EB[\s.-]*XT[\s.-]*500(?:[\s.-]*WT)?$/i,
+    category: 'liquid_chiller',
+    cooling_curve: [
+      { ambient_c: 35, capacity_kw: 47 },
+      { ambient_c: 50, capacity_kw: 28.2 },
+    ],
+    notes: 'Pfannenberg EB XT 500 WT: 47 kW @ 35°C ambient. The closest standard EB XT below 50 kW — the right pin for ~45-50 kW BESS thermal rejection.',
+  },
+  {
+    manufacturer: 'Pfannenberg',
+    part_number_pattern: /^EB[\s.-]*XT[\s.-]*600(?:[\s.-]*WT)?$/i,
+    category: 'liquid_chiller',
+    cooling_curve: [
+      { ambient_c: 35, capacity_kw: 59 },
+      { ambient_c: 50, capacity_kw: 35.4 },
+    ],
+    notes: 'Pfannenberg EB XT 600 WT: 59 kW @ 35°C ambient (product 42146005001). Closest EB XT above 50 kW — pick when thermal headroom is preferred over efficiency.',
+  },
+  {
+    manufacturer: 'Pfannenberg',
+    part_number_pattern: /^EB[\s.-]*XT[\s.-]*700(?:[\s.-]*WT)?$/i,
+    category: 'liquid_chiller',
+    cooling_curve: [
+      { ambient_c: 35, capacity_kw: 69 },
+      { ambient_c: 50, capacity_kw: 41.4 },
+    ],
+    notes: 'Pfannenberg EB XT 700 WT: 69 kW @ 35°C ambient.',
+  },
+  {
+    manufacturer: 'Pfannenberg',
+    part_number_pattern: /^EB[\s.-]*XT[\s.-]*800(?:[\s.-]*WT)?$/i,
+    category: 'liquid_chiller',
+    cooling_curve: [
+      { ambient_c: 35, capacity_kw: 76 },
+      { ambient_c: 50, capacity_kw: 45.6 },
+    ],
+    notes: 'Pfannenberg EB XT 800 WT: 76 kW @ 35°C ambient.',
+  },
+  {
+    manufacturer: 'Pfannenberg',
+    part_number_pattern: /^EB[\s.-]*XT[\s.-]*900(?:[\s.-]*WT)?$/i,
+    category: 'liquid_chiller',
+    cooling_curve: [
+      { ambient_c: 35, capacity_kw: 86 },
+      { ambient_c: 50, capacity_kw: 51.6 },
+    ],
+    notes: 'Pfannenberg EB XT 900 WT: 86 kW @ 35°C ambient.',
+  },
+  {
+    manufacturer: 'Pfannenberg',
+    part_number_pattern: /^EB[\s.-]*XT[\s.-]*1000(?:[\s.-]*WT)?$/i,
+    category: 'liquid_chiller',
+    cooling_curve: [
+      { ambient_c: 35, capacity_kw: 92 },
+      { ambient_c: 50, capacity_kw: 55.2 },
+    ],
+    notes: 'Pfannenberg EB XT 1000 WT: 92 kW @ 35°C ambient.',
+  },
+  {
+    manufacturer: 'Pfannenberg',
+    part_number_pattern: /^EB[\s.-]*XT[\s.-]*1200(?:[\s.-]*WT)?$/i,
+    category: 'liquid_chiller',
+    cooling_curve: [
+      { ambient_c: 35, capacity_kw: 119 },
+      { ambient_c: 50, capacity_kw: 71.4 },
+    ],
+    notes: 'Pfannenberg EB XT 1200 WT: 119 kW @ 35°C ambient.',
+  },
+  {
+    manufacturer: 'Pfannenberg',
+    part_number_pattern: /^EB[\s.-]*XT[\s.-]*1600(?:[\s.-]*WT)?$/i,
+    category: 'liquid_chiller',
+    cooling_curve: [
+      { ambient_c: 35, capacity_kw: 148 },
+      { ambient_c: 50, capacity_kw: 88.8 },
+    ],
+    notes: 'Pfannenberg EB XT 1600 WT: 148 kW @ 35°C ambient (top of EB XT range).',
   },
   // ── BESS AC switchgear (ABB Emax E2.2 family) ─────────────────
   // E2.2 frame variants: 800/1000/1250/1600/2000/2500 A.

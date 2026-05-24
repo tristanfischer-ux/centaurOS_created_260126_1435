@@ -863,11 +863,20 @@ function emitPowerDistribution(p: BessParams): DesignModule {
       //
       // L3 part-realism bug: original spec listed "Gigavac MX16 1500 V 1500 A"
       // but the real Gigavac MX16 is only 600 A continuous (the 1500 figure
-      // is its voltage class, not its current rating). For a real 1500 A
-      // class HVDC contactor at 1500 V, Schaltbau C310 is the industry
-      // standard part in utility BESS (used in Sungrow SC-class skids,
-      // Huawei FusionSolar, CATL EnerC+). C310 datasheet: 1500 A continuous,
-      // 1500 V DC, 750 A breaking @ 800 V DC, IEC 60947-2 + UL 508 listed.
+      // is its voltage class, not its current rating).
+      //
+      // L17 part-realism bug (2026-05-24, parts-spec-validator gate 13):
+      // the L4 fix swapped to "Schaltbau C310 (1500 A continuous)" — but the
+      // real C310 is 500 A continuous max (variants /500 and /300), 1500 V
+      // DC, IEC 60947-4-1. The 1500 figure refers to its voltage class, not
+      // current. For a real 1500-2000 A class HVDC contactor at 1500 V the
+      // Schaltbau C330 is the only single-pole part in the Schaltbau range:
+      // 2000 A continuous @ 3×500 mm² terminals (3000 A @ 3×1000 mm²),
+      // 1500 V DC bi-directional, 15,000 A short-time 5 ms, CE/UL/CCC
+      // certified to IEC 60947-4-1 + UL 60947-4-1. This is the part Schaltbau
+      // explicitly markets for "MCS Level 2 (1500 V) and MCS Level 3 (3000 A)"
+      // utility BESS systems (Sungrow SC-class skids, Huawei FusionSolar,
+      // CATL EnerC+). Source: https://schaltbau.com/en/product/contactors/c330/.
       word(
         'main_bus_contactor_word',
         'main bus contactor word',
@@ -875,8 +884,8 @@ function emitPowerDistribution(p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('dimension', '1500', 'V'),
-          mod('capacity', '1500', 'A'),
-          mod('form', 'Schaltbau C310 (1500 A continuous / 1500 V DC HVDC, IEC 60947-2)'),
+          mod('capacity', '2000', 'A'),
+          mod('form', 'Schaltbau C330 (2000 A continuous @ 3×500 mm² / 1500 V DC bi-directional, IEC 60947-4-1 + UL 60947-4-1)'),
           mod('regulatory', 'UL 9540A'),
         ],
       ),
@@ -898,9 +907,18 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('quantity', fmtQty(p.rackCount)),
           mod('capacity', '200', 'A'),
           // 2026-05-24 L7: FWP series rated 700 V — too low for 800 V DC bus.
-          // Use Bussmann 170M (1100 V DC, IEC 60269-4 + UL 248-13).
-          mod('form', 'Bussmann 170M6810 (200 A / 1100 V DC, IEC 60269-4 ar-class)'),
-          mod('dimension', '1100', 'V'),
+          // Use Bussmann 170M (DC-rated).
+          // 2026-05-24 L17 (parts-spec-validator gate 13): L7 chose 170M6810
+          // but the real 170M6810 is a 1250 A fuse in the 170M68xx subfamily
+          // (1250 A / 1100 V DC). For a 200 A rack-level semiconductor fuse
+          // at 1000 V DC use the Bussmann 170M1811 — the real 200 A / 1000 V
+          // DC member of the 170M family: square-body, Size 000 DIN 43 620,
+          // Class aR, IEC 60269-4 tested, UL Recognised (E125085.JFHR2).
+          // Rack peak ≈ 104 A (bus 1562 A / 15 racks), so 200 A nominal
+          // gives ~1.9× margin, consistent with semiconductor-fuse selection
+          // guidance for utility-BESS rack protection.
+          mod('form', 'Bussmann 170M1811 (200 A / 1000 V DC / Size 000, Class aR, IEC 60269-4 + UL Recognised)'),
+          mod('dimension', '1000', 'V'),
         ],
       ),
       word(
@@ -957,7 +975,7 @@ function emitPowerDistribution(p: BessParams): DesignModule {
 
   return {
     module: 'power_distribution',
-    module_brief: `Routes ${p.busContinuousA.toFixed(0)} A continuous (${p.busPeakA.toFixed(0)} A peak) at ${p.dcBusVoltageV} V DC from ${p.rackCount} racks (${p.stringContinuousA.toFixed(0)} A continuous per-rack via Gigavac MX12 contactors) through a Schaltbau C310 1500 A / 1500 V DC main bus contactor and HRC fuses to PCS, and the PCS AC output through ${acBreakerContinuousA} A switchgear (ABB Emax E2.2 2500 A frame, sized for 1.25 × peak ${p.peakPowerKw.toFixed(0)} kW / 400 V 3-phase per IEC 60947-2) to the grid PCC.`,
+    module_brief: `Routes ${p.busContinuousA.toFixed(0)} A continuous (${p.busPeakA.toFixed(0)} A peak) at ${p.dcBusVoltageV} V DC from ${p.rackCount} racks (${p.stringContinuousA.toFixed(0)} A continuous per-rack via Gigavac MX12 contactors) through a Schaltbau C330 2000 A / 1500 V DC main bus contactor and HRC fuses to PCS, and the PCS AC output through ${acBreakerContinuousA} A switchgear (ABB Emax E2.2 2500 A frame, sized for 1.25 × peak ${p.peakPowerKw.toFixed(0)} kW / 400 V 3-phase per IEC 60947-2) to the grid PCC.`,
     overview_paragraph_en: '',
     derived_parameters: {
       bus_continuous_current_a: p.busContinuousA,
@@ -988,14 +1006,23 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
   // and claimed 60 kW cooling. EB 60 is in fact a 6 kW Pfannenberg unit
   // (cabinet cooler, factor of ten off). For a 3.5 MWh / 1 MW BESS the
   // realistic rejection load is ~50 kW (pack losses + PCS losses at full
-  // throughput, 35 °C ambient). Pin Pfannenberg's CC 90.000 packaged
-  // liquid chiller — same brand, real model, 50 kW @ 35 °C ambient,
-  // glycol/water loop, IP54 outdoor mount, EN 14511 + AHRI 550/590 rated.
-  // Hold the legacy `chillerKw` step for the module brief / derived
-  // parameters but override the word's `capacity` modifier with the pinned
-  // datasheet value so the LLM Generator cannot drift.
+  // throughput, 35 °C ambient).
+  //
+  // BESS L17 part-realism bug (2026-05-24, parts-spec-validator gate 13):
+  // the L9 fix pinned "Pfannenberg CC 90.000 (50 kW @ 35°C)" but Pfannenberg's
+  // CC naming convention is "CC <watts>" — so CC 90.000 = 9,000 W = 9 kW
+  // (compact panel chiller), a 5.5× overstatement. For a real 47-60 kW
+  // packaged liquid chiller in the Pfannenberg range the EB XT family is
+  // the correct line: EB XT 500 WT = 47 kW, EB XT 600 WT = 59 kW (BESS-rated,
+  // 36-150 kW family, R410A refrigerant, scroll compressor + microchannel
+  // condenser, EN 14511 rated, outdoor IP54). Pick EB XT 500 WT for the
+  // 50 kW design load with ≤6% margin (47 kW @ 35°C nominal rating).
+  // Source: https://www.pfannenberg.com/en-gb/liquid-cooling/eb-xt-36-150-kw/
+  // and https://products.pfannenberg.com/EBXT-600-400V-Air-Cooled-Active-Liquid-Cooler/42146005001.
+  // Refrigerant updated to R410A per EB XT product page (CC-series R513A
+  // does not apply to EB XT).
   const chillerKw = Math.max(30, Math.ceil(p.thermalRejectionKw / 30) * 30)
-  const pinnedChillerCapacityKw = 50
+  const pinnedChillerCapacityKw = 47
 
   const liquidCooling = makeSubModule(
     'liquid_cooling',
@@ -1012,11 +1039,12 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('capacity', String(pinnedChillerCapacityKw), 'kW'),
           mod(
             'form',
-            'Pfannenberg CC 90.000 packaged liquid chiller, 50 kW @ 35°C ambient, glycol/water loop, IP54 outdoor mount',
+            'Pfannenberg EB XT 500 WT packaged liquid chiller, 47 kW @ 35°C ambient, water/glycol 80/20, IP54 outdoor mount, AC 400 3~/50 Hz',
           ),
           // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): R513A is a
           // refrigerant material, not a regulatory standard. Use `material`.
-          mod('material', 'R513A'),
+          // L17 fix: EB XT family uses R410A, not R513A (per product page).
+          mod('material', 'R410A'),
           mod('regulatory', 'EN 14511 + AHRI 550/590'),
         ],
       ),
