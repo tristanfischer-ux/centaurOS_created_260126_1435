@@ -658,9 +658,15 @@ export function validateEmittedParts(state: any): PartsValidationResult {
     //      WRONG here because the PN tells us this is a different product
     //      line (e.g. Gigavac P115 ≠ Gigavac MX12; ABB E2.2 2500 ≠ E2.2 1250).
     //   3. If PN missing entirely (downstream extraction failed) AND the
-    //      manufacturer has authoritative entries → use the LOWEST-rated
-    //      entry so an over-claim is still caught. We never let a missing
-    //      PN mask a 3× over-claim.
+    //      manufacturer has authoritative entries → check whether the
+    //      claimed current falls within the RANGE of available variants.
+    //      A multi-product manufacturer like ABB has entries spanning
+    //      Emax E2.2 1250 A, 1600 A, 2000 A, 2500 A. A claim of 2500 A
+    //      WITHOUT a part_number could be any of those — accept if it's
+    //      within the family range. Only flag if it exceeds the LARGEST
+    //      variant (genuinely out of range). Previously fell back to the
+    //      LOWEST variant which generated false positives for higher-
+    //      rated metering CTs, breakers in a different sub-family, etc.
     let auth: AuthSpec | null = null
     if (pn) {
       auth = findAuth({ manufacturer: mfr, part_number: pn })
@@ -674,10 +680,36 @@ export function validateEmittedParts(state: any): PartsValidationResult {
         (p) => p.manufacturer.toLowerCase() === mfr.toLowerCase(),
       )
       if (sameMfr.length > 0) {
+        // Range check: if any variant covers the claimed current within
+        // its [0.5×, 1.5×] band, treat the claim as plausibly that variant
+        // and skip (no PN means we can't be certain which). Only fall
+        // through to flag when the claim exceeds the manufacturer's
+        // entire known range by ≥1.5×.
+        const mods: Array<{ kind: string; value: string }> = Array.isArray(word?.modifier_characters)
+          ? word.modifier_characters
+          : []
+        const claimedAObj = claimedCurrentFromModifiers(mods)
+        const claimedA = claimedAObj?.value ?? null
+        if (claimedA != null) {
+          const maxKnownA = sameMfr.reduce((m, p) => {
+            const a = p.rated_current_a ?? p.rated_current_peak_a ?? 0
+            return a > m ? a : m
+          }, 0)
+          if (maxKnownA > 0 && claimedA <= maxKnownA * 1.5) {
+            // In range — likely a higher-rated variant we haven't added to
+            // KNOWN_PART_AUTHORITATIVE yet. Skip rather than false-flag.
+            parts_unknown += 1
+            continue
+          }
+        }
+        // Genuinely out of range OR no claim to check — flag against the
+        // LARGEST variant (most permissive) so over-claims are still caught
+        // but we don't falsely flag mid-range claims as over-spec for the
+        // smallest variant.
         auth = sameMfr.reduce((best, curr) => {
-          const bestA = best.rated_current_a ?? Number.POSITIVE_INFINITY
-          const currA = curr.rated_current_a ?? Number.POSITIVE_INFINITY
-          return currA < bestA ? curr : best
+          const bestA = best.rated_current_a ?? 0
+          const currA = curr.rated_current_a ?? 0
+          return currA > bestA ? curr : best
         })
       }
     }

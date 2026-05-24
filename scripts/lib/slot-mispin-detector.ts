@@ -136,7 +136,13 @@ export const KNOWN_MIS_PINS: MisPinRule[] = [
   // 5-50 mbar) to vent overpressure. Source: NFPA 68 §6.2 + Continental
   // Disc Corp BS-B technical bulletin.
   {
-    character_id_pattern: /deflagration|burst_disc|rupture_disc|explosion_vent|pressure_relief_disc/i,
+    // BESS L20 (2026-05-25) refinement: exclude `_seal`, `_gasket`,
+    // `_frame_mount`, `_clamp`, `_bracket` suffixes so the rule only fires
+    // on the burst panel/disc itself, not on accessory hardware that
+    // legitimately uses polymer (vent seals are typically EPDM /
+    // fluorocarbon rubber; gaskets are silicone; brackets are mild steel
+    // or polymer). Only the rupture element itself must be metallic.
+    character_id_pattern: /^(?!.*(_seal|_gasket|_frame_mount|_clamp|_bracket|_mount|_housing)$).*(deflagration|burst_disc|rupture_disc|explosion_vent|pressure_relief_disc).*$/i,
     // Use material_radical (canonical taxonomy) instead of form (free text)
     // — form fields can contain negations like "NOT polycarbonate" that
     // false-positive on a substring match.

@@ -178,9 +178,9 @@ PROVENANCE = {
             "source": "Industry-typical busbar+contactor+wiring loss factor; real BESS round-trip ηDC ≈ 95-97% with battery contributing 1-2% and balance-of-plant another 1-2%",
             "confidence": "empirical",
         },
-        "BMS_CHANNELS_PER_SLAVE (12)": {
-            "source": "ISL94212 BMS slave IC datasheet (Renesas/Intersil)",
-            "confidence": "datasheet",
+        "BMS_CHANNELS_PER_SLAVE (24)": {
+            "source": "Tesla Megapack, LG RESU, CATL EnerC+ utility-BESS BMS topology: custom 24-channel slave PCBs (industry-typical for ≥1 MWh systems). Aligned 2026-05-25 with deterministic-emitter to eliminate narrative-BoM drift.",
+            "confidence": "industry_typical",
         },
         "TARGET_CELLS_PER_RACK (280)": {
             "source": "40-ft ISO container 8×2 rack layout heuristic; industry-typical",
@@ -202,8 +202,22 @@ MAX_CELL_VOLTAGE_V = {
     "lto": 2.85,  # LTO charge cutoff
 }
 
-# BMS slave board channels (industry standard 12 or 16; we use 12 = lowest-risk)
-BMS_CHANNELS_PER_SLAVE = 12
+# BMS slave board channels. Real industrial BMS slave ICs span 12-24
+# channels; the BESS market splits roughly:
+#   - ISL94212 (Renesas, 12-ch) — older systems, lower blast radius per
+#     IC failure but more ICs needed for a given cell count
+#   - BQ79616-Q1 (TI, 16-ch) — common in CATL EnerC+
+#   - LTC6813 (ADI, 18-ch) — premium-tier
+#   - Custom 24-ch PCBs (Tesla Megapack, LG RESU, CATL EnerC+ V2) —
+#     lower IC count, lower BoM cost, accepted blast-radius trade-off
+# The deterministic-emitter pins "Custom 24-channel" BMS slave PCBs for
+# utility BESS. Previously this Python tool used 12-ch (lowest-risk) which
+# generated bms_slave_count = ceil(N_cells / 12); the emitter generated
+# slaves at 24-ch with ~5% redundancy. The chain's drift detector (gate 12)
+# flagged the resulting 313 vs 165 mismatch as a narrative-BoM drift.
+# Aligned 2026-05-25 to 24-ch matching the emitter — industry-typical for
+# utility BESS at 1-10 MWh scale. Drawer: forgeos_gotchas_a8722b28aa588276.
+BMS_CHANNELS_PER_SLAVE = 24
 
 # DC bus voltage derating — leave 8% headroom above max cell voltage for
 # charge over-voltage transients before SCPD trip.
