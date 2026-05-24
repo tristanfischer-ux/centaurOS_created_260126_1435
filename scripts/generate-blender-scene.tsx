@@ -164,7 +164,17 @@ ${digest}
     \`fl.make_world_white()\`
     \`fl.run_render_pipeline(OUT, MO, structure_module_id="structure_containment")\`
 11. Target length: 250–400 lines. Keep it concrete — explicit fl.add_box calls beat clever loops.
-12. Primitive budget: TARGET 80, MAX 120 fl.add_* calls total across all modules. Each primitive adds ~3 s to total render time (Freestyle outline cost). Group small components into representative arrays rather than instantiating each one. For ×N quantities, draw 1-4 representative items, not N.
+12. Primitive budget: TARGET 80-120 fl.add_* calls. Each primitive adds ~3 s to render. Group small components into representative arrays rather than instantiating each one. For ×N quantities, draw 1-4 representative items, not N — BUT see rule 13 below.
+
+## STRICT FIDELITY RULES (Tristan 2026-05-24 visual review iteration)
+
+13. RACK / COMPONENT COUNTS FROM derived_parameters ARE MANDATORY. If the brief digest says rack_count=15, render EXACTLY 15 racks (arrange as 9 cols × 2 rows OR 5 cols × 3 rows — match what the existing template does). Do NOT collapse 15 racks to 5 for visual clarity. The viewer cares about engineering fidelity; visual simplicity is the WRONG trade-off. Same rule for module_count, cells_per_module, fan_count, sensor_count, etc.
+
+14. IDENTITY COLOURS MUST POP, NOT WASH OUT. fl.make_default_palette() returns SATURATED colours by design (e.g. battery = (0.02, 0.18, 0.95) — vivid pure blue). When you add a class-specific MAT entry, use SATURATED rgb values. Keep one channel high and others low for vivid colour. GOOD: (1.00, 0.10, 0.10) fire red, (0.02, 0.18, 0.95) battery blue, (0.95, 0.84, 0.55) chiller cream. BAD: (0.7, 0.7, 0.6) or (0.8, 0.5, 0.5) — too pale.
+
+15. EXTERNAL COMPONENTS AT BOTH ENDS OF THE CONTAINER (where the class allows). BESS: external chiller skid at -X end, external transformer / MV switchgear at +X end. Heat pump: outdoor fan unit + indoor air handler. EV charger: dispenser + utility cabinet. Bioreactor: external chiller + media prep tanks. Anything in the brief that's NOT inside the main enclosure must be drawn OUTSIDE as its own ghosted primitives.
+
+16. COMPONENTS SHOULD FILL THEIR MODULE BBOXES — chunky volumes, not tiny dots in empty cabinets. Battery racks = rectangular volumes occupying most of their cell. Tanks = proper cylinders. The viewer should read "this module IS this coloured thing", not "tiny coloured sensor floating in space".
 
 Generate the complete Python file now.`
 }
