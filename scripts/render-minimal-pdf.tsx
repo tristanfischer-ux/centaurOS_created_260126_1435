@@ -6101,17 +6101,19 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
 
       {page.tools.map((tool: any, ti: number) => {
         const claims: any[] = Array.isArray(tool.claims) ? tool.claims : []
-        const visibleClaims = claims.slice(0, 12)
-        const extraClaims = claims.length - visibleClaims.length
+        // 2026-05-24 (Tristan flagged "why did you not include all 6 other claims?"):
+        // dropped the slice(0,12) cap — show ALL claims. Reserve enough vertical
+        // space to keep the card from page-breaking mid-claim by scaling
+        // minPresenceAhead with the claim count (12pt per claim row + 200pt for
+        // narrative + heading).
+        const visibleClaims = claims
+        const extraClaims = 0
+        const reserveHeight = 200 + claims.length * 12
         return (
-          // 2026-05-23 P1-6 (Seat C Q5 + Seat D #6): replaced wrap={false} with
-          // minPresenceAhead — Tools-Used card carries up to 12 claims + 4
-          // narrative paragraphs; wrap=false caused page-18 wind-turbine
-          // overlap bug. 200pt reserves enough space for safe fit.
           <View
             key={tool.tool_id || `tool-${ti}`}
             style={{ marginBottom: 14, padding: 12, backgroundColor: '#f8fafc', borderLeftWidth: 3, borderLeftColor: ACCENT, borderRadius: 4 }}
-            minPresenceAhead={200}
+            minPresenceAhead={reserveHeight}
           >
             <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
               <Text style={{ flex: 1, fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK }}>
