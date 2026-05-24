@@ -91,6 +91,15 @@ export interface Word {
   name_human: string
   content_character: ContentCharacter
   modifier_characters: ModifierCharacter[]
+  /** Stage 17.6 (2026-05-24) — optional reviewer-set field. When a
+   *  reviewer (or specialist) picks a manufacturer / part_number for this
+   *  word OUTSIDE the library-candidate advisory it received in the
+   *  prompt, it sets this field to "Library override: <one-sentence
+   *  justification>" so the renderer surfaces a "LIB OVR" badge in the
+   *  BoM. Empty string / undefined = no override (the pick aligns with
+   *  the library or no library advisory existed). Universal across
+   *  product classes. */
+  source_detail?: string
 }
 
 export interface SubModule {

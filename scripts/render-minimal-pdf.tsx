@@ -653,6 +653,14 @@ type BomPartRow = {
   // Both optional; legacy state.json files predate the field.
   part_verified?: boolean
   part_verify_reason?: string
+  // Stage 17.6 (2026-05-24) — library-override badge. When a reviewer picks
+  // a part NOT in the library-candidate advisory, it sets word.source_detail
+  // to start with "Library override:" + justification. The renderer surfaces
+  // a small "LIB OVR" tag next to the part name so the reader knows the
+  // pick was outside the shipped-designs library. The justification text
+  // is preserved verbatim for the Notes / appendix.
+  library_override?: boolean
+  library_override_reason?: string
 }
 type BomSub = { id: string; name: string; parts: BomPartRow[]; subtotal_gbp: number }
 // 2026-05-20 (Tristan cost-overrun forensic): display_name is the
@@ -1032,6 +1040,19 @@ function computeBomTotals(state: any): BomTotals | null {
           price_tier: tier,
           part_verified: typeof v?.verified === 'boolean' ? v.verified : undefined,
           part_verify_reason: typeof v?.verification_reason === 'string' ? v.verification_reason : undefined,
+          // Stage 17.6 (2026-05-24) library-override detection. The reviewer
+          // is instructed (per the chain's libraryCandidatesBlock prompt) to
+          // set the word's source_detail field starting "Library override:"
+          // when it picks a part outside the library-candidate advisory.
+          // Read that field defensively (the word may or may not carry it
+          // — older designs predate Stage 17.6).
+          ...(() => {
+            const sd = String((w as any)?.source_detail ?? '').trim()
+            if (sd.toLowerCase().startsWith('library override:')) {
+              return { library_override: true, library_override_reason: sd.slice('library override:'.length).trim() }
+            }
+            return {}
+          })(),
           // Engine B (2026-05-18) attribution — present when the part was
           // priced via the volume curve in `estimate-missing-prices.tsx`.
           // P6 fix (2026-05-18): when the verification row lacks the field
@@ -5310,8 +5331,17 @@ function BillOfMaterialsPage({
       v.source_method || '—'
     return (
       <View key={keyHint} wrap={false} style={{ flexDirection: 'row', paddingTop: 3, paddingBottom: 3, borderBottomWidth: 0.5, borderBottomColor: '#f0f0f3', alignItems: 'baseline' }}>
-        <View style={{ flex: 2.6, paddingRight: 6 }}>
+        <View style={{ flex: 2.6, paddingRight: 6, flexDirection: 'row', alignItems: 'baseline' }}>
           <Text style={{ fontSize: 9.5, color: INK }}>{title_case(String(v.word_name ?? ''))}</Text>
+          {/* Stage 17.6 (2026-05-24) — library-override badge. Surfaces */}
+          {/* when the reviewer picked a part NOT in the library-candidate */}
+          {/* advisory and tagged the override via                          */}
+          {/* word.source_detail = "Library override: <reason>". Small      */}
+          {/* slate-grey label so the reader knows the pick is engineer-    */}
+          {/* originated rather than library-grounded.                       */}
+          {v.library_override ? (
+            <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#475569', backgroundColor: '#e2e8f0', marginLeft: 4, paddingLeft: 2, paddingRight: 2 }}>LIB OVR</Text>
+          ) : null}
         </View>
         <View style={{ flex: 2.0, paddingRight: 6 }}>
           <Text style={{ fontSize: 9.5, color: v.manufacturer ? INK_SOFT : MUTED }}>{v.manufacturer ? clean_prose(String(v.manufacturer)) : 'to be sourced'}</Text>
@@ -6397,6 +6427,551 @@ function SystemLevelRisksPage({ state, project }: { state: any; project: string 
 
 
 
+// ─── 2026-05-24 (task #113) · Engineering-Tools-Flow front-of-PDF section ──
+//
+// Tristan ask: "show clearly what the inputs to the tools were and the
+// outputs of the tools. that way the reader can see up front how the
+// report is based off real engineering / physics."
+//
+// Renders a per-tool block (3 columns: INPUTS → tool box → OUTPUTS) for
+// every tool in state.toolsUsedPage.tools, in the order the orchestrator
+// ran them (state.orchestratorContract._tools_run preferred; falls back
+// to alphabetical from toolsUsedPage if the order field is missing).
+//
+// INPUTS column derivation — per-tool input keys are explicit interfaces
+// in scripts/lib/orchestrator/tools/*.ts but the chain currently strips
+// invocation_input from per-quantity provenance (aggregator splits one
+// tool result into N claims). We reconstruct inputs from two honest
+// sources:
+//   (a) brief envelope + brief constraints (target_performance, etc.) —
+//       these are universal inputs every tool consumes;
+//   (b) upstream tools' OUTPUT field names that match this tool's known
+//       INPUT field names — that's a real data-flow edge from the
+//       orchestrator's tool ordering.
+//
+// OUTPUTS column: tool's claims, truncated to top-8 most-important by
+// the heuristic in pickTopOutputs() (outputs that feed downstream tools
+// first, then outputs that appear as BoM fields).
+//
+// Downstream "feeds into" annotation: for each output, search the inputs
+// of EVERY downstream tool (those after this one in _tools_run). If any
+// downstream tool's input list contains a key matching this output, the
+// edge is shown as "→ feeds: ngspice, mass-aggregator".
+
+interface ToolIoHint {
+  /** Field names this tool consumes — used to match against upstream
+   *  tools' output field names, and against brief envelope keys. */
+  inputs: string[]
+  /** Output field names this tool emits — used to detect downstream
+   *  consumers. Pulled from the tool's claim fields at render time if
+   *  this list is empty; otherwise this list overrides. */
+  outputs?: string[]
+  /** Short one-line role for the box (override of tool-narrative
+   *  description; kept short for the 3-column layout). */
+  short_role?: string
+}
+
+/**
+ * Per-tool I/O hints. Keys are tool_ids. inputs[] lists the field names
+ * this tool consumes — used to build the inputs column AND to detect
+ * which OTHER tools feed it.
+ *
+ * Keep this in sync with scripts/lib/orchestrator/tools/*.ts input
+ * interfaces. Adding a new tool wrapper? Add the I/O hint here at the
+ * same time. The renderer falls back to envelope-only inputs if a tool
+ * is missing from this map.
+ */
+const TOOL_IO_HINTS: Record<string, ToolIoHint> = {
+  'pybamm:cell-sizing': {
+    inputs: ['target_energy_kwh', 'dod_fraction', 'cell_chemistry', 'cell_capacity_ah', 'cell_voltage_v', 'dc_bus_voltage_v', 'rated_power_kw', 'cell_count_authoritative'],
+    short_role: 'Doyle-Fuller-Newman electrochemical cell sim.',
+  },
+  'ngspice:pcs-simulation': {
+    inputs: ['rated_power_kw', 'dc_bus_voltage_v', 'ac_voltage_v', 'switching_frequency_hz', 'target_efficiency_pct'],
+    short_role: 'SPICE transient + DC operating-point analysis.',
+  },
+  'pandapower:grid-integration': {
+    inputs: ['rated_power_kw', 'connection_voltage_kv', 'transformer_kva', 'fault_level_ka', 'grid_code'],
+    short_role: 'Newton-Raphson AC power-flow + IEC 60909 SC.',
+  },
+  'coolprop:refrigerant-properties': {
+    inputs: ['fluid_id', 'temperature_c', 'pressure_pa', 'heat_load_kw', 'inverter_dissipated_kw_x_1_5'],
+    short_role: 'Reference EoS thermophysical fluid properties.',
+  },
+  'mass-aggregator:envelope-check': {
+    inputs: ['bom_line_masses_kg', 'envelope_max_mass_kg', 'form_factor', 'cell_count', 'transformer_kva', 'cells_per_rack'],
+    short_role: 'Sums BoM masses vs envelope cap.',
+  },
+  'iec-standards:lookup': {
+    inputs: ['product_class', 'voltage_tier', 'application', 'region', 'safety_standards'],
+    short_role: 'IEC + UL + EN compliance lookup.',
+  },
+  'octopart:parts-lookup': {
+    inputs: ['mpn_list', 'manufacturer_list', 'category', 'voltage_rating_v', 'current_rating_a'],
+    short_role: 'Live distributor availability + price.',
+  },
+  // ── Heat-pump / thermal cluster ──
+  'refrigeration-cycle:cop': { inputs: ['fluid_id', 'evaporator_temp_c', 'condenser_temp_c', 'compressor_eff_pct'], short_role: '4-stage Carnot-bounded COP.' },
+  'scop:seasonal': { inputs: ['heat_load_kw', 'climate_zone', 'cop_at_rating_points', 'flow_temp_c'], short_role: 'EN 14825 seasonal COP rollup.' },
+  'eer-seer:calc': { inputs: ['cooling_kw', 'eer_at_rating_points', 'climate_zone'], short_role: 'ASHRAE SEER/EER rollup.' },
+  'building-envelope:heat-loss': { inputs: ['floor_area_m2', 'envelope_u_w_m2k', 'design_dt_k', 'air_change_per_hr'], short_role: 'Steady-state envelope conduction + infiltration.' },
+  'hvac:load-sizing': { inputs: ['floor_area_m2', 'occupancy', 'led_heat_kw', 'transpiration_kg_h', 'design_dt_k'], short_role: 'Sensible + latent cooling load.' },
+  'dehumidification:sizing': { inputs: ['transpiration_kg_h', 'rh_setpoint_pct', 'coil_condensation_kg_h'], short_role: 'Latent moisture-removal sizing.' },
+  'co2-enrichment:sizing': { inputs: ['canopy_area_m2', 'co2_setpoint_ppm', 'air_change_per_hr', 'leakage_coefficient'], short_role: 'CO2 mass-balance for sealed envelope.' },
+  'fan-coil:sizing': { inputs: ['cooling_kw', 'supply_dt_k', 'face_velocity_m_s', 'filter_class'], short_role: 'AHU coil geometry + fan-power sizing.' },
+  'fluids:pipe-sizing': { inputs: ['mass_flow_kg_s', 'fluid_id', 'pipe_diameter_mm', 'pipe_length_m'], short_role: 'Pressure drop + pipe-size selection.' },
+  'ht:ntu-heat-exchanger': { inputs: ['hot_inlet_c', 'cold_inlet_c', 'mass_flow_kg_s', 'overall_u_w_m2k'], short_role: 'Effectiveness-NTU HX sizing.' },
+  'thermo:fluid-properties': { inputs: ['fluid_id', 'temperature_c', 'pressure_pa'], short_role: 'DIPPR pure-component property lookup.' },
+  'psychrolib:humid-air': { inputs: ['dry_bulb_c', 'rh_pct', 'pressure_pa'], short_role: 'ASHRAE moist-air state calcs.' },
+  'thermal-envelope:ladder': { inputs: ['source_kw', 'r_junction_w_k', 'r_case_w_k', 'r_sink_w_k', 'ambient_c'], short_role: 'Series thermal-resistance ladder solver.' },
+  'pcm:thermal-storage': { inputs: ['heat_load_kwh', 'phase_change_temp_c', 'latent_heat_kj_kg'], short_role: 'PCM mass + container sizing.' },
+  'heat-pipe:sizing': { inputs: ['heat_kw', 'length_mm', 'orientation_deg'], short_role: 'Capillary-limit heat-pipe sizing.' },
+  'thermal-strap:conduction': { inputs: ['heat_kw', 'length_mm', 'cross_section_mm2', 'k_w_mk'], short_role: '1-D Fourier conduction sizing.' },
+  'mli:multi-layer-insulation': { inputs: ['hot_temp_k', 'cold_temp_k', 'layer_count', 'emittance_e'], short_role: 'Radiative N-layer insulation.' },
+  // ── Photonics / power ──
+  'led-par:efficacy': { inputs: ['installed_watts', 'fixture_efficacy_umol_j', 'mounting_height_m', 'canopy_area_m2'], short_role: 'PPFD + DLI from LED watts.' },
+  'plant-growth:yield': { inputs: ['dli_mol_m2_day', 'co2_ppm', 'temp_c', 'crop_type'], short_role: 'Yield + transpiration model.' },
+  'pvlib:solar-irradiance': { inputs: ['latitude', 'longitude', 'tilt_deg', 'azimuth_deg', 'time_index'], short_role: 'Sandia + clear-sky irradiance models.' },
+  'mppt:sandia-tracking': { inputs: ['irradiance_w_m2', 'cell_temp_c', 'panel_voc_v', 'panel_isc_a'], short_role: 'Sandia PV efficiency model.' },
+  // ── Cabling / electrical ──
+  'cable:ampacity': { inputs: ['current_a', 'voltage_v', 'ambient_c', 'install_method'], short_role: 'NEC/IEC ampacity sizing.' },
+  'cable:thermal-rating': { inputs: ['current_a', 'duty_cycle', 'ambient_c', 'jacket_temp_c'], short_role: 'IEC 62893 thermal-rating check.' },
+  'arc-flash:ieee-1584': { inputs: ['fault_current_ka', 'voltage_v', 'arc_distance_mm', 'enclosure_type'], short_role: 'IEEE 1584 incident-energy calc.' },
+  'grounding-lightning:ieee-998': { inputs: ['fault_current_ka', 'soil_resistivity_ohm_m', 'rod_length_m'], short_role: 'IEEE 998 grounding sizing.' },
+  // ── Aero / propulsion ──
+  'aerosandbox:airfoil-analysis': { inputs: ['airfoil_id', 'reynolds_number', 'mach_number', 'alpha_deg'], short_role: 'Airfoil polars at flight-Re.' },
+  'ambiance:isa-atmosphere': { inputs: ['altitude_m'], short_role: 'ISA atmosphere lookup.' },
+  'propeller:low-re-bemt': { inputs: ['diameter_m', 'rpm', 'thrust_n', 'airspeed_m_s'], short_role: 'Low-Re BEMT propeller analysis.' },
+  'bemt-propeller:thrust': { inputs: ['diameter_m', 'rpm', 'pitch_deg', 'airspeed_m_s'], short_role: 'BEMT propeller thrust/torque.' },
+  'motor:altitude-derating': { inputs: ['rated_power_kw', 'altitude_m', 'ambient_c'], short_role: 'Density-corrected motor derate.' },
+  'motor-prop:matching': { inputs: ['prop_curve', 'motor_curve', 'battery_voltage_v'], short_role: 'Static + dynamic match point.' },
+  'gust-response:haps-atmospheric': { inputs: ['wing_area_m2', 'mass_kg', 'altitude_m', 'gust_velocity_m_s'], short_role: 'HAPS gust-load envelope.' },
+  'aeroelastic-flutter:wing': { inputs: ['wing_area_m2', 'span_m', 'eiy_n_m2', 'gj_n_m2'], short_role: 'Flutter speed via Theodorsen.' },
+  'airframe-fea:landing': { inputs: ['landing_load_g', 'mass_kg', 'gear_geometry'], short_role: 'Linear-elastic landing FEA.' },
+  // ── AUV / marine ──
+  'auv-hydro:drag-buoyancy': { inputs: ['length_m', 'diameter_m', 'velocity_m_s', 'depth_m'], short_role: 'Hull drag + buoyancy.' },
+  'pressure-vessel:design': { inputs: ['internal_pressure_pa', 'diameter_m', 'material_yield_mpa'], short_role: 'ASME BPVC Sec VIII Div 1.' },
+  'sonar:acoustic-attenuation': { inputs: ['frequency_khz', 'range_m', 'depth_m', 'salinity_ppt'], short_role: 'Francois-Garrison attenuation.' },
+  'corrosion:anode-sizing': { inputs: ['hull_area_m2', 'design_life_yr', 'water_type'], short_role: 'Sacrificial-anode mass sizing.' },
+  // ── Wind ──
+  'wind-resource:iec61400': { inputs: ['mean_wind_m_s', 'turbulence_intensity', 'class_iec'], short_role: 'IEC 61400-1 wind class fit.' },
+  'gearbox-load:spectrum': { inputs: ['rotor_torque_nm', 'speed_rpm', 'duty_cycle'], short_role: 'DIN 743 fatigue spectrum.' },
+  // ── BoP common ──
+  'noise-emission:dba': { inputs: ['source_pwl_db', 'distance_m', 'directivity'], short_role: 'Outdoor unit dBA-at-distance.' },
+  'reliability-fmea:system': { inputs: ['fmea_table', 'warranty_yr', 'failure_rate_fit'], short_role: 'FMEA + warranty-cost rollup.' },
+  'cybersecurity-threat-model:stride': { inputs: ['component_list', 'interface_list'], short_role: 'STRIDE/DREAD threat model.' },
+  'lifecycle-co2:assessment': { inputs: ['mass_by_material', 'energy_grid_co2_g_kwh', 'transport_km'], short_role: 'Lifecycle CO2 assessment.' },
+  // ── Bioreactor ──
+  'biosteam:fermentation-stoich': { inputs: ['carbon_source_kg', 'yield_g_g', 'stoichiometry'], short_role: 'Mass-balance fermentation stoich.' },
+  'kla-oxygen:transfer': { inputs: ['volume_m3', 'agitator_power_w', 'gas_flow_vvm'], short_role: 'Van\'t Riet kLa correlation.' },
+  'agitation:power': { inputs: ['impeller_diameter_m', 'rpm', 'fluid_density', 'fluid_viscosity'], short_role: 'Rushton turbine power number.' },
+  'monod:growth-kinetics': { inputs: ['substrate_g_l', 'umax_h', 'ks_g_l'], short_role: 'Monod growth-rate model.' },
+  // ── EV charger ──
+  'ev-charging-curve:taper': { inputs: ['battery_capacity_kwh', 'rated_current_a', 'soc_window_pct'], short_role: 'CCS-protocol charging curve.' },
+  'ccs-protocol:compliance': { inputs: ['voltage_class_v', 'current_class_a', 'comm_protocol'], short_role: 'IEC 61851 / ISO 15118 lookup.' },
+  'power-module:sizing': { inputs: ['rated_power_kw', 'efficiency_pct', 'thermal_kw'], short_role: 'Modular DC power-module rollup.' },
+}
+
+/**
+ * Resolve the orchestrator's actual run order. Returns the canonical
+ * `_tools_run` list when present; otherwise falls back to the alphabetical
+ * toolsUsedPage.tools ordering so the section still renders.
+ */
+function resolveToolRunOrder(state: any, tools: any[]): string[] {
+  const runOrder = state?.orchestratorContract?._tools_run
+  if (Array.isArray(runOrder) && runOrder.every((s) => typeof s === 'string')) {
+    return runOrder as string[]
+  }
+  return tools.map((t) => String(t.tool_id ?? ''))
+}
+
+/**
+ * For a given tool, derive the most likely upstream inputs.
+ *
+ * Returns a list of {label, value, unit, source} rows where:
+ *   - label: human-readable input name (humanise(key))
+ *   - value: the actual value pulled from envelope/brief/upstream-claim
+ *   - unit: stringified unit if known
+ *   - source: 'brief' | 'envelope' | 'upstream:<tool_id>'
+ *
+ * Up to 6 rows. When the tool has no I/O hint, we list the envelope as
+ * the inputs (the universal upstream every tool consumes).
+ */
+function deriveToolInputs(
+  toolId: string,
+  upstreamClaimsByTool: Map<string, any[]>,
+  envelope: Record<string, any>,
+  briefConstraints: Record<string, any>,
+): Array<{ label: string; value: string; source: string }> {
+  const hint = TOOL_IO_HINTS[toolId]
+  const rows: Array<{ label: string; value: string; source: string }> = []
+  const seen = new Set<string>()
+  const push = (label: string, value: string | number, source: string) => {
+    if (rows.length >= 6) return
+    if (seen.has(label)) return
+    seen.add(label)
+    const v = typeof value === 'number'
+      ? value.toLocaleString(undefined, { maximumFractionDigits: 4 })
+      : String(value)
+    rows.push({ label, value: v, source })
+  }
+
+  // 1. Try upstream tool outputs first — strongest signal for data flow.
+  if (hint && hint.inputs.length > 0) {
+    for (const inKey of hint.inputs) {
+      if (rows.length >= 6) break
+      for (const [upToolId, claims] of upstreamClaimsByTool) {
+        for (const c of claims) {
+          const f = String(c?.field ?? '').toLowerCase()
+          if (f === inKey.toLowerCase() || f.includes(inKey.toLowerCase()) || inKey.toLowerCase().includes(f)) {
+            push(humanise(inKey), c.value != null ? `${c.value}${c.unit ? ' ' + c.unit : ''}` : '—', `from ${upToolId.split(':')[0]}`)
+          }
+        }
+      }
+    }
+  }
+
+  // 2. Brief envelope — universal upstream every tool receives.
+  if (hint) {
+    for (const inKey of hint.inputs) {
+      if (rows.length >= 6) break
+      const camel = inKey
+      const snake = inKey
+      // envelope often uses snake_case; try exact + a few variants
+      const envCandidates = [envelope[snake], envelope[camel], envelope[inKey.replace(/_/g, '')]]
+      for (const v of envCandidates) {
+        if (v != null && (typeof v === 'string' || typeof v === 'number')) {
+          push(humanise(inKey), v, 'brief envelope')
+          break
+        }
+      }
+    }
+  }
+
+  // 3. Brief constraints — target_performance metrics often supply key inputs.
+  const tgtPerf = briefConstraints?.target_performance
+  if (tgtPerf && Array.isArray(tgtPerf?.metrics)) {
+    for (const m of tgtPerf.metrics) {
+      if (rows.length >= 6) break
+      const k = String(m?.key_metric ?? '')
+      if (!k) continue
+      if (hint && hint.inputs.some((h) => k.toLowerCase().includes(h.toLowerCase()) || h.toLowerCase().includes(k.toLowerCase()))) {
+        push(humanise(k), `${m.value ?? '—'}${m.unit ? ' ' + m.unit : ''}`, 'brief target')
+      }
+    }
+  } else if (tgtPerf && tgtPerf.value != null) {
+    push(humanise(String(tgtPerf.key_metric ?? 'target')), `${tgtPerf.value}${tgtPerf.unit ? ' ' + tgtPerf.unit : ''}`, 'brief target')
+  }
+
+  // 4. Class + envelope-level identifying fields are always shown for
+  //    tools with no I/O hint OR if rows are still sparse.
+  if (rows.length < 3) {
+    for (const k of ['class', 'application', 'voltage_tier', 'scale_tier', 'form_factor', 'nameplate_kwh', 'nameplate_mw']) {
+      if (rows.length >= 6) break
+      if (envelope[k] != null) push(humanise(k), envelope[k], 'brief envelope')
+    }
+  }
+
+  // Last-resort: at least one row so the column isn't empty.
+  if (rows.length === 0) {
+    push('Product class', String(envelope.class ?? '—'), 'brief envelope')
+  }
+
+  return rows
+}
+
+/**
+ * Pick the top N outputs to show for a tool, prioritising:
+ *   1. Outputs whose field name matches an input of any DOWNSTREAM tool
+ *      (those are the load-bearing edges in the data-flow graph).
+ *   2. Remaining outputs in declaration order.
+ *
+ * If the tool emits fewer than N claims, all are returned.
+ */
+function pickTopOutputs(
+  claims: any[],
+  toolId: string,
+  toolRunOrder: string[],
+  maxCount: number,
+): { selected: any[]; truncated: number } {
+  if (!Array.isArray(claims) || claims.length === 0) return { selected: [], truncated: 0 }
+  if (claims.length <= maxCount) return { selected: claims, truncated: 0 }
+
+  // Downstream input names — anything a downstream tool consumes.
+  const idx = toolRunOrder.indexOf(toolId)
+  const downstreamTools = idx >= 0 ? toolRunOrder.slice(idx + 1) : toolRunOrder
+  const downstreamInputs = new Set<string>()
+  for (const dt of downstreamTools) {
+    const hint = TOOL_IO_HINTS[dt]
+    if (!hint) continue
+    for (const inp of hint.inputs) downstreamInputs.add(inp.toLowerCase())
+  }
+
+  const scored = claims.map((c, i) => {
+    const f = String(c?.field ?? '').toLowerCase()
+    let score = 0
+    for (const d of downstreamInputs) {
+      if (f === d || f.includes(d) || d.includes(f)) { score = 2; break }
+    }
+    return { c, i, score }
+  })
+  scored.sort((a, b) => (b.score - a.score) || (a.i - b.i))
+  const selected = scored.slice(0, maxCount).sort((a, b) => a.i - b.i).map((s) => s.c)
+  return { selected, truncated: claims.length - selected.length }
+}
+
+/**
+ * For a given output field on the current tool, return the names of
+ * downstream tools that consume a matching input field. Empty array
+ * if no downstream consumer.
+ */
+function downstreamConsumers(outputField: string, toolId: string, toolRunOrder: string[]): string[] {
+  const idx = toolRunOrder.indexOf(toolId)
+  if (idx < 0) return []
+  const f = String(outputField ?? '').toLowerCase()
+  const consumers: string[] = []
+  for (const dt of toolRunOrder.slice(idx + 1)) {
+    const hint = TOOL_IO_HINTS[dt]
+    if (!hint) continue
+    for (const inp of hint.inputs) {
+      const i = inp.toLowerCase()
+      if (i === f || i.includes(f) || f.includes(i)) {
+        consumers.push(dt.split(':')[0])
+        break
+      }
+    }
+  }
+  return consumers
+}
+
+function EngineeringToolsFlowPage({ state, project }: { state: any; project: string }) {
+  const page = readToolsUsedPage(state)
+  if (!page) return null
+  const tools: any[] = Array.isArray(page.tools) ? page.tools : []
+  if (tools.length === 0) return null
+
+  const envelope: Record<string, any> = state?.orchestratorContract?.envelope ?? {}
+  const briefConstraints: Record<string, any> = state?.parsedBrief?.constraints ?? {}
+
+  // Resolve the orchestrator's actual run order. The aggregator emits the
+  // tools list sorted alphabetically (see attribution.ts:215), so we always
+  // override with _tools_run when available.
+  const toolById = new Map<string, any>(tools.map((t) => [String(t.tool_id ?? ''), t]))
+  const runOrderIds = resolveToolRunOrder(state, tools).filter((id) => toolById.has(id))
+  // Any tools present in toolsUsedPage but not in _tools_run get appended.
+  for (const t of tools) {
+    const id = String(t.tool_id ?? '')
+    if (!runOrderIds.includes(id)) runOrderIds.push(id)
+  }
+  const orderedTools = runOrderIds.map((id) => toolById.get(id))
+
+  // Group claims by tool — for the "upstream outputs to inputs" lookup
+  // we need to walk the tools earlier in the run order.
+  const claimsByTool = new Map<string, any[]>()
+  for (const t of orderedTools) {
+    claimsByTool.set(String(t.tool_id ?? ''), Array.isArray(t.claims) ? t.claims : [])
+  }
+
+  // BoM-bound output fields — outputs whose names appear in module
+  // engineering-contract macros. For the final "feeds into BoM" callout
+  // at the end. Best-effort: pull from contract.macro_assembly_prices.
+  const bomBoundFields = new Set<string>()
+  const macros = state?.orchestratorContract?.macro_assembly_prices
+  if (Array.isArray(macros)) {
+    for (const m of macros) {
+      if (typeof m?.field === 'string') bomBoundFields.add(m.field.toLowerCase())
+      if (typeof m?.id === 'string') bomBoundFields.add(m.id.toLowerCase())
+    }
+  }
+
+  // Column widths inside the printable area (210mm A4 minus 64pt left/right
+  // padding = ~468pt). 3 columns: 130 / 200 / 130 with 4pt gaps.
+  const COL_IN = 130
+  const COL_MID = 198
+  const COL_OUT = 130
+
+  const renderInputsCol = (rows: ReturnType<typeof deriveToolInputs>): React.ReactNode => (
+    <View style={{ width: COL_IN, padding: 7, backgroundColor: '#fafafa', borderRadius: 3, borderWidth: 0.5, borderColor: RULE_SOFT }}>
+      <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.5, marginBottom: 4 }}>INPUTS</Text>
+      {rows.map((r, i) => (
+        <View key={`in-${i}`} style={{ marginBottom: 3 }}>
+          <Text style={{ fontSize: 7.5, color: INK_SOFT, lineHeight: 1.35 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{r.label}</Text>
+            {`  ${r.value}`}
+          </Text>
+          <Text style={{ fontSize: 6.5, color: MUTED, fontStyle: 'italic' }}>{r.source}</Text>
+        </View>
+      ))}
+    </View>
+  )
+
+  const renderToolBox = (tool: any): React.ReactNode => {
+    const narrative = getToolNarrative(String(tool.tool_id ?? ''))
+    const hint = TOOL_IO_HINTS[String(tool.tool_id ?? '')]
+    const description = hint?.short_role
+      || narrative?.description
+      || page.intro
+      || `Engineering tool ${tool.tool_id}.`
+    return (
+      <View style={{ width: COL_MID, padding: 8, backgroundColor: '#f0f6ff', borderRadius: 4, borderWidth: 1, borderColor: ACCENT_SOFT }}>
+        <Text style={{ fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>
+          {tool.tool_name || tool.tool_id}
+        </Text>
+        <Text style={{ fontSize: 7.5, color: MUTED, marginBottom: 4 }}>
+          {tool.tool_version ? `v${tool.tool_version}` : ''}
+          {tool.tool_license ? `  ·  ${tool.tool_license}` : ''}
+          {tool.confidence_class ? `  ·  ${String(tool.confidence_class).toUpperCase()}` : ''}
+        </Text>
+        <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.45 }}>
+          {normalise_unicode(description)}
+        </Text>
+        {tool.physics_basis ? (
+          <Text style={{ fontSize: 7, color: MUTED, lineHeight: 1.4, marginTop: 4, fontStyle: 'italic' }}>
+            {normalise_unicode(tool.physics_basis).slice(0, 200)}
+            {tool.physics_basis.length > 200 ? '…' : ''}
+          </Text>
+        ) : null}
+      </View>
+    )
+  }
+
+  const renderOutputsCol = (tool: any, toolId: string): React.ReactNode => {
+    const claims = Array.isArray(tool.claims) ? tool.claims : []
+    const { selected, truncated } = pickTopOutputs(claims, toolId, runOrderIds, 8)
+    const allConsumers = new Set<string>()
+    for (const c of claims) {
+      for (const cons of downstreamConsumers(String(c?.output_field ?? c?.field ?? ''), toolId, runOrderIds)) {
+        allConsumers.add(cons)
+      }
+    }
+    return (
+      <View style={{ width: COL_OUT, padding: 7, backgroundColor: '#fafafa', borderRadius: 3, borderWidth: 0.5, borderColor: RULE_SOFT }}>
+        <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: MUTED, letterSpacing: 0.5, marginBottom: 4 }}>OUTPUTS</Text>
+        {selected.map((c, i) => {
+          const v = Number.isFinite(c.value)
+            ? c.value.toLocaleString(undefined, { maximumFractionDigits: 4 })
+            : String(c.value ?? '—')
+          return (
+            <Text key={`out-${i}`} style={{ fontSize: 7.5, color: INK_SOFT, lineHeight: 1.35, marginBottom: 1.5 }}>
+              <Text style={{ fontFamily: 'Helvetica-Bold', color: INK }}>{String(c.field ?? '—')}</Text>
+              {`  ${v}${c.unit ? ' ' + c.unit : ''}`}
+            </Text>
+          )
+        })}
+        {truncated > 0 ? (
+          <Text style={{ fontSize: 6.5, color: MUTED, fontStyle: 'italic', marginTop: 2 }}>
+            {`+ ${truncated} more output${truncated === 1 ? '' : 's'}`}
+          </Text>
+        ) : null}
+        {allConsumers.size > 0 ? (
+          <Text style={{ fontSize: 7, color: ACCENT_SOFT, marginTop: 5, lineHeight: 1.35 }}>
+            <Text style={{ fontFamily: 'Helvetica-Bold' }}>{'>> feeds: '}</Text>
+            {Array.from(allConsumers).join(', ')}
+          </Text>
+        ) : (
+          <Text style={{ fontSize: 7, color: MUTED, marginTop: 5, fontStyle: 'italic' }}>
+            {'>> flows to BoM'}
+          </Text>
+        )}
+      </View>
+    )
+  }
+
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section 1c · Engineering Tools Flow" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Engineering tools — how the design was computed
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>
+        Every spec in the bill of materials traces to one of the tools below.
+      </Text>
+      <Text style={{ fontSize: 9, color: INK_SOFT, marginBottom: 14, lineHeight: 1.55, fontStyle: 'italic' }}>
+        Inputs come from the brief or from an upstream tool's output. Each tool
+        runs in the order shown; its outputs flow into the next tool that needs
+        them, or directly into the bill of materials.
+      </Text>
+
+      {orderedTools.map((tool: any, ti: number) => {
+        const toolId = String(tool.tool_id ?? '')
+        // Upstream claims = every tool earlier in the run order.
+        const upstreamClaims = new Map<string, any[]>()
+        for (let j = 0; j < ti; j++) {
+          const upId = String(orderedTools[j]?.tool_id ?? '')
+          const claims = claimsByTool.get(upId) ?? []
+          if (claims.length > 0) upstreamClaims.set(upId, claims)
+        }
+        const inputs = deriveToolInputs(toolId, upstreamClaims, envelope, briefConstraints)
+        // Reserve enough vertical space so a tool block stays together on
+        // one page when feasible. Block height ≈ 110-150pt depending on row
+        // counts. Use minPresenceAhead per Option B detector codification —
+        // never wrap={false} (the layout audit gate will flag it).
+        const blockReserveHeight = 140
+        return (
+          <View key={toolId || `tool-${ti}`} minPresenceAhead={blockReserveHeight}>
+            <View style={{ flexDirection: 'row', alignItems: 'stretch', marginBottom: 4 }}>
+              {renderInputsCol(inputs)}
+              {/* horizontal arrow into the tool box */}
+              <View style={{ width: 8, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, color: ACCENT_SOFT, fontFamily: 'Helvetica-Bold' }}>{'>'}</Text>
+              </View>
+              {renderToolBox(tool)}
+              <View style={{ width: 8, justifyContent: 'center', alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, color: ACCENT_SOFT, fontFamily: 'Helvetica-Bold' }}>{'>'}</Text>
+              </View>
+              {renderOutputsCol(tool, toolId)}
+            </View>
+            {/* downward arrow to next tool — drawn for all but last */}
+            {ti < orderedTools.length - 1 ? (
+              <View style={{ alignItems: 'center', marginBottom: 4 }}>
+                <View style={{ width: 0.8, height: 14, backgroundColor: ACCENT_SOFT }} />
+                <Text style={{ fontSize: 11, color: ACCENT_SOFT, fontFamily: 'Helvetica-Bold', marginTop: -3 }}>v</Text>
+              </View>
+            ) : null}
+          </View>
+        )
+      })}
+
+      {/* Final block: all OUTPUTS that flow into the BoM. */}
+      <View minPresenceAhead={70} style={{ marginTop: 12, padding: 10, backgroundColor: '#f0fdf4', borderRadius: 4, borderLeftWidth: 3, borderLeftColor: '#065f46' }}>
+        <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
+          {'Final tool outputs >> bill of materials'}
+        </Text>
+        <Text style={{ fontSize: 8.5, color: INK_SOFT, lineHeight: 1.5 }}>
+          {(() => {
+            // Quick summary line listing the highest-impact field totals.
+            const summaryFields: string[] = []
+            for (const t of orderedTools) {
+              const claims = Array.isArray(t.claims) ? t.claims : []
+              for (const c of claims) {
+                const f = String(c?.field ?? '').toLowerCase()
+                // Heuristic: highlight count + total mass + total power fields.
+                if (
+                  f.includes('count') || f.includes('total') || f.includes('nameplate')
+                  || f.includes('rated') || f.includes('voltage') || f.includes('capacity')
+                  || bomBoundFields.has(f)
+                ) {
+                  const v = Number.isFinite(c.value)
+                    ? c.value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+                    : String(c.value ?? '—')
+                  summaryFields.push(`${String(c.field)}=${v}${c.unit ? ' ' + c.unit : ''}`)
+                }
+                if (summaryFields.length >= 12) break
+              }
+              if (summaryFields.length >= 12) break
+            }
+            if (summaryFields.length === 0) return 'Outputs above are consumed by the bill of materials, the cost stack, and the per-module engineering checks.'
+            return `Key values that flow into the BoM table: ${summaryFields.join(' · ')}.`
+          })()}
+        </Text>
+      </View>
+
+      <PageFooter />
+    </Page>
+  )
+}
+
+
 // ─── Build #19e (2026-05-22) · Tools-Used end-page ─────────────────────────
 //
 // Lists every verified engineering tool that contributed at least one
@@ -6805,6 +7380,15 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
           Sits AFTER BriefPage so the reader meets the high-level brief
           first, then drops into the audit-trail. */}
       <BriefProvenancePage state={state} project={project} />
+      {/* Engineering Tools Flow (universal — task #113, 2026-05-24): per-tool
+          3-column block showing the INPUTS each engineering tool consumed,
+          a short description of the tool, and the OUTPUTS it produced. The
+          orchestrator's _tools_run order is the data-flow sequence; each
+          output is annotated with the downstream tool that consumes it (or
+          "→ flows to BoM" for terminal outputs). Renders null when the
+          orchestrator did not run for this chain. Sits AFTER Brief Provenance
+          so the reader sees the brief first, then how it was computed. */}
+      <EngineeringToolsFlowPage state={state} project={project} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
       {/* ITER-10.5 fourth review (Tristan 2026-05-20): Cost-by-module
           summary lives directly after the Module Map so the reader meets

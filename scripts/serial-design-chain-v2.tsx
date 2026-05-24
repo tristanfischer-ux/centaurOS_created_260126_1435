@@ -56,6 +56,17 @@ import { buildContractForChain, type EngineeringContract } from './lib/engineeri
 import './lib/orchestrator/register-all'
 import { orchestrateDesign } from './lib/orchestrator/orchestrate'
 import type { ContractInProgress as OrchestratorContract } from './lib/orchestrator/types'
+// Stage 17.6 — LIBRARY-INFORMED CANDIDATE QUERY (2026-05-24).
+// After Stage 17.5 orchestrator computes physics + emitter populates the
+// design with words, query ~/.forge-truth/forge-truth.db
+// pretraining_extracted_parts (31,625 real-world parts, embedded with
+// text-embedding-3-small @ 1536 dims) for the top-N candidates per
+// (component_class, physics_specs) tuple. Surface as ADVISORY block in
+// the reviewer prompt — "STRONGLY PREFER picks from this list; if you
+// pick outside, justify via source_detail starting with 'Library override:'".
+// Universal across product classes. Graceful degradation when DB missing
+// or OPENAI_API_KEY unset (class-only filter, no semantic match).
+import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator/library-candidate-query'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { translate } from '../src/lib/pdf-engine-v2/radical/universal-translator'
@@ -1760,6 +1771,12 @@ async function runReviewerStep(opts: {
   // Build #18k: precomputed verified-tool outputs block to inject into
   // the reviewer prompt. Empty string when the orchestrator did not run.
   toolOutputsBlock?: string
+  // Stage 17.6 (2026-05-24): precomputed library-candidate advisory block.
+  // Lists top-5 real parts per detected component_class so the reviewer is
+  // told STRONGLY PREFER picks from the list (and tag overrides via
+  // source_detail = "Library override: ..."). Empty string when the
+  // helper found no classifiable words or the DB was unavailable.
+  libraryCandidatesBlock?: string
 }): Promise<any> {
   const system = REVIEWER_TEMPLATE + (opts.systemAppend ?? '')
   const densityTargets = computeDensityTargets(opts.currentDesign)
@@ -1784,6 +1801,12 @@ async function runReviewerStep(opts: {
   // in the relevant module overview_paragraph_en. Per Tristan 2026-05-22:
   // "use them usefully in the report."
   const toolOutputsBlock = opts.toolOutputsBlock ?? ''
+  // Stage 17.6 (2026-05-24): inject library-candidate advisory. Reviewer
+  // is told STRONGLY PREFER picks from this list when emitting manufacturer
+  // / part_number / part_name; overrides go in source_detail prefixed
+  // "Library override:". Empty when the helper had no input or the DB
+  // was unavailable (graceful degradation).
+  const libraryCandidatesBlock = opts.libraryCandidatesBlock ?? ''
 
   const user = `PRODUCT BRIEF (raw):
 ${opts.brief}
@@ -1797,7 +1820,7 @@ ${opts.research ? JSON.stringify(opts.research) : '(not available)'}
 CURRENT DESIGN (apply your 3-concern review to this whole block):
 ${JSON.stringify(opts.currentDesign)}
 ${kmBlock}
-${densityTargets}${contractMissesBlock}${toolOutputsBlock}
+${densityTargets}${contractMissesBlock}${toolOutputsBlock}${libraryCandidatesBlock}
 Return the corrected JSON.`
 
   const before = summarise(opts.currentDesign.modules ?? [])
@@ -2240,6 +2263,17 @@ async function main() {
   // Build #18k: precomputed verified-tool outputs block to feed reviewers.
   // Populated when ORCHESTRATOR=1 ran successfully.
   let toolOutputsBlock = ''
+  // Stage 17.6 (2026-05-24): library-informed candidate block. Populated AFTER
+  // the orchestrator emits the design — we walk design.modules[].sub_modules[].
+  // words[], infer a component_class per word (via name-token classifier
+  // against ~/.forge-truth/forge-truth.db.pretraining_extracted_parts), semantic-
+  // query the library for the top-5 real parts that shipped in similar designs,
+  // and surface as ADVISORY in the reviewer prompt. The reviewer is told to
+  // STRONGLY PREFER picks from the list; if it overrides, it sets the word's
+  // source_detail to start with "Library override:" so the renderer can show
+  // a "LIB OVR" tag in the BoM. Universal across product classes; graceful
+  // degradation when the DB is missing or OPENAI_API_KEY is unset.
+  let libraryCandidatesBlock = ''
   // Build #19e/f (2026-05-22): capture orchestrator outputs so they can be
   // attached to chain state below the chain's state-init block (line ~3136).
   // The PDF renderer reads state.toolsUsedPage (end-page) and
@@ -2369,6 +2403,156 @@ async function main() {
         toolOutputsBlock = `\n\nVERIFIED-TOOL OUTPUTS (Build #18 orchestrator — these values were computed by reputable open-source engineering tools and are AUTHORITATIVE. You MUST reference each one explicitly in the relevant module's overview_paragraph_en when discussing that quantity. DO NOT silently override these values with your own estimates):\n${blocks.join('\n\n')}\n\nCRITICAL CONSISTENCY RULES (Build #18r — physics critic catches violations):\n  1. The pack topology values (cell_count, rack_count, cells_per_rack, series_cells_per_string, parallel_strings_per_rack) MUST satisfy series_cells_per_string × parallel_strings_per_rack × rack_count = cell_count EXACTLY. The design TEXT, the BoM ROW QUANTITIES, and the rack/string discussion must all use these same values — if pybamm output says 15 racks, the BoM line item for "rack frame" must list ×15, not ×16 or ×18.\n  2. The BMS slave count MUST cover every cell: bms_total_channels ≥ cell_count. If the tool says 418 slaves × 12 channels = 5016 channels for 5010 cells, the BoM must list ×418 slave boards. Do NOT downgrade to fewer slaves or a higher channel count.\n  3. The cold-plate aggregate capacity MUST equal or exceed the system thermal dissipation × 1.25. Use cold_plate_total_capacity_min_kw and cold_plate_per_rack_min_capacity_kw from the tool output. Round UP — never substitute a smaller plate.\n  4. **VOLTAGE HEADROOM EXPLANATION RULE (Build #18r-fix2 2026-05-22, Loop 28 Bug 2)**: The pybamm output's series_cells_per_string and string_voltage_nominal_v are AUTHORITATIVE. pybamm intentionally picks a series count BELOW the brief's "nominal" voltage to leave headroom for end-of-charge voltage rise (typically 15-20%). For example, if the brief says "800 V nominal DC bus" and pybamm picks 167 series cells × 3.2 V = 534 V nominal, that is CORRECT — 167 × 3.65 V max charge = 610 V, which fits a 670 V DC bus rating without exceeding 92% of the bus. The series count was constrained DOWN by the bus voltage rating, not UP by the nominal label. DO NOT write prose that contradicts this:\n     a. NEVER say "the battery string was reconfigured to N series cells to match the X V bus" — pybamm picked the series count FIRST, then derived the nominal voltage. There is no reconfiguration.\n     b. NEVER claim a different series count later in the same paragraph than the one in the tool output. If pybamm says 167 series, the entire overview MUST say 167 (or its arithmetic equivalent), never 250 or 244 or any "rebalanced" figure.\n     c. If the brief's "800 V nominal" disagrees with pybamm's computed nominal voltage, EXPLAIN the headroom: e.g. "PyBaMM picked 167 series cells (534 V nominal, 610 V end-of-charge) to fit within the 670 V DC bus rating implied by the brief's 800 V class designation, leaving 9% headroom for cell aging and balance variance." — DO NOT silently "fix" the inconsistency by re-balancing the topology.\n     The prose phrase "reconfigured to ... series cells" is FORBIDDEN — the chain's Build #19c content validator will reject patches containing this phrase.\n  5. Current-carrying components MUST be rated for the tool-derived currents: LCL filter ≥ lcl_filter_rating_a, DC contactor ≥ dc_contactor_rating_a, DC breaker ≥ dc_breaker_rating_a, AC contactor ≥ ac_contactor_rating_a. The ratings primary AND capacity modifier on each component must BOTH meet this minimum — Loop 22 specced a 100A LCL filter against 1443A continuous (14× under-rated).\n  6. **CONTAINER SPLIT IS MANDATORY WHEN recommended_container_count ≥ 2.** If the mass-aggregator tool output shows recommended_container_count = 2 (i.e. total system mass exceeds the 28 t road-transport envelope), you MUST emit the design as TWO interconnected containers — typically one battery container (cells + BMS + cooling) and one power container (PCS + transformer + switchgear). DO NOT stuff everything into one container and ignore the mass breach. Loop 27 ignored a recommended_container_count = 2 and emitted a single 39 t container, which fails the brief's mass constraint.\n  7. **NO INVENTED DERATING / EFFICIENCY CLAIMS (Build #18r-fix2 2026-05-22, Loop 28 Bug 3)**: prose MUST NOT introduce numeric claims about derating, round-trip efficiency, capacity-fade margin, or loss factors UNLESS the figure traces to a specific tool output. pybamm emits capacity_fade_at_6000_cycles_pct (this IS sourced); it does NOT emit a "12-15% derating" range. If you want to discuss round-trip efficiency, cite ngspice's inverter_efficiency_pct (single number, not a range). If you want to discuss SoC margins, cite pybamm's dod_fraction × nameplate. The phrases "12-15% derating", "round-trip efficiency of X%" (without ngspice citation), "loss factor", or any percentage paired with "derating" / "round-trip" / "efficiency" / "loss" MUST be either backed by a tool number or stripped. The chain's Build #19c content validator will reject patches containing un-sourced derating ranges.\n\nFor each tool-sourced quantity above, ensure the module overview text says e.g. "PyBaMM Prada2013 LFP DFN simulation confirms 5010 cells = 15 racks × 2 strings × 167 series cells, 4.49 MWh nameplate" rather than just stating the number. The reader needs to know which tool produced which claim so they can independently reproduce it.\n`
         console.error(`[chain] Build #18k: toolOutputsBlock built (${blocks.length} tools, ${toolOutputsBlock.length} chars) — will be injected into reviewer prompts`)
       }
+
+      // ── Stage 17.6 (2026-05-24): LIBRARY-INFORMED CANDIDATES (advisory).
+      //
+      // Tristan's architecture statement: "Physics defines the space; library
+      // populates the options within that space; LLM picks from options with
+      // override allowed; tools verify the pick." Stage 17.5 (orchestrator)
+      // just computed the physics; Stage 4+ (reviewers) will refine the BoM
+      // prose / part numbers. Between them, query ~/.forge-truth/forge-truth.db
+      // pretraining_extracted_parts (31,625 real-world parts) for the top-5
+      // candidates per (component_class, physics_specs) tuple. Surface as
+      // ADVISORY in the reviewer prompt — reviewers are told to STRONGLY
+      // PREFER picks from the list and tag overrides via
+      // source_detail = "Library override: <reason>".
+      //
+      // Universal across product classes. Graceful degradation: when the DB
+      // is missing or OPENAI_API_KEY is unset the helper returns class-only
+      // filtered rows (no semantic match) and the chain proceeds normally.
+      try {
+        const tLibQ = Date.now()
+        // Inline part-name → component_class classifier. Mirrors the render-
+        // time classifier in render-minimal-pdf.tsx (line ~721) but kept local
+        // here so the chain doesn't have a render-side dependency. Reads the
+        // same forge-truth.db with COUNT(*) GROUP BY component_class for a
+        // lowercased part-name token. Memoised across the chain.
+        const Database = (await import('better-sqlite3')).default
+        const { homedir } = await import('os')
+        const { join: joinPath } = await import('path')
+        const { existsSync } = await import('fs')
+        const dbPath = joinPath(homedir(), '.forge-truth', 'forge-truth.db')
+        let classMemo = new Map<string, string | null>()
+        let classStmt: any = null
+        let classDb: any = null
+        if (existsSync(dbPath)) {
+          classDb = new Database(dbPath, { readonly: true })
+          classStmt = classDb.prepare(`
+            SELECT component_class, COUNT(*) AS n
+            FROM pretraining_extracted_parts
+            WHERE component_class IS NOT NULL AND component_class != 'unknown'
+              AND part_name IS NOT NULL
+              AND LOWER(part_name) LIKE ?
+            GROUP BY component_class
+            ORDER BY n DESC
+            LIMIT 1
+          `)
+        }
+        const STOP_TOKENS = new Set(['the','a','an','for','of','with','to','and','or','in','on','at','from','by','word','assembly','pack','unit','module','board','main','primary','secondary'])
+        const tokenise = (s: string): string[] => String(s).toLowerCase().split(/[^a-z0-9]+/).filter((t) => t && t.length > 2 && !STOP_TOKENS.has(t))
+        const inferClass = (partName: string): string | null => {
+          if (!classStmt) return null
+          const key = partName.toLowerCase().trim()
+          if (classMemo.has(key)) return classMemo.get(key) ?? null
+          // Try full phrase first.
+          let row: any = null
+          try { row = classStmt.get(`%${key}%`) } catch { /* ignore */ }
+          if (row?.component_class) { classMemo.set(key, row.component_class); return row.component_class }
+          // Token fallback — longest tokens first.
+          const tokens = tokenise(key).sort((a, b) => b.length - a.length)
+          for (const t of tokens) {
+            try { row = classStmt.get(`%${t}%`) } catch { row = null }
+            if (row?.component_class) { classMemo.set(key, row.component_class); return row.component_class }
+          }
+          classMemo.set(key, null)
+          return null
+        }
+
+        // Walk the design + collect unique (component_class, sample word
+        // names, sub_module name) tuples. Group by component_class so we
+        // query the library at most once per class (else 100-word designs
+        // would fire 100 OpenAI embed calls = ~£0.02 per chain just for
+        // this advisory).
+        const classToContext = new Map<string, { sampleNames: Set<string>; firstSubModule: string; moduleBrief: string }>()
+        const modules = Array.isArray(design?.modules) ? design.modules : []
+        for (const m of modules) {
+          const moduleBrief = String(m?.module_brief ?? m?.display_name ?? m?.module ?? '')
+          for (const sm of (m?.sub_modules ?? [])) {
+            const subName = String(sm?.name_human ?? sm?.id ?? '')
+            for (const w of (sm?.words ?? [])) {
+              const wname = String(w?.name_human ?? w?.id ?? w?.content_character?.name_human ?? '')
+              if (!wname) continue
+              const cls = inferClass(wname)
+              if (!cls) continue
+              if (!classToContext.has(cls)) {
+                classToContext.set(cls, { sampleNames: new Set(), firstSubModule: subName, moduleBrief })
+              }
+              const ctx = classToContext.get(cls)!
+              if (ctx.sampleNames.size < 6) ctx.sampleNames.add(wname)
+            }
+          }
+        }
+
+        if (classToContext.size === 0) {
+          libraryCandidatesBlock = ''
+          console.error(`[chain] Stage 17.6: no classifiable words in design (forge-truth.db likely missing OR every word in 'unknown' class) — block empty, reviewers will pick freely`)
+        } else {
+          // Pull a class-level physics summary from the engineering contract
+          // for biasing the semantic match. Compact — top 4 quantities.
+          const physicsSummaryGlobal: string = (() => {
+            if (!engineeringContract) return ''
+            const top = Object.entries(engineeringContract.quantities ?? {})
+              .filter(([, v]) => v && typeof (v as any).value === 'number')
+              .slice(0, 4)
+              .map(([k, v]) => `${k}=${(v as any).value}${(v as any).unit ? ' ' + (v as any).unit : ''}`)
+              .join(', ')
+            return top
+          })()
+
+          const candidateLines: string[] = []
+          const libraryCandidatesByClass: Record<string, any[]> = {}
+          let nClassesWithMatch = 0
+          let nClassesEmpty = 0
+          for (const [cls, ctx] of classToContext.entries()) {
+            const sampleSummary = `${ctx.moduleBrief} :: ${ctx.firstSubModule} :: ${Array.from(ctx.sampleNames).slice(0, 4).join(', ')}`
+            const res = await queryLibraryCandidates(cls, {
+              summary: `${sampleSummary}${physicsSummaryGlobal ? '; physics: ' + physicsSummaryGlobal : ''}`,
+            }, 5)
+            candidateLines.push(renderCandidateBlock(cls, res))
+            if (res.candidates.length > 0) nClassesWithMatch++; else nClassesEmpty++
+            libraryCandidatesByClass[cls] = res.candidates.map((c) => ({
+              part_name: c.part_name,
+              manufacturer: c.manufacturer,
+              part_number: c.part_number,
+              raw_excerpt: c.raw_excerpt,
+              confidence: c.confidence,
+              similarity: Number.isFinite(c.similarity) ? c.similarity : null,
+              unit_price_gbp: c.unit_price_gbp,
+            }))
+          }
+
+          if (candidateLines.length > 0) {
+            libraryCandidatesBlock = `\n\nLIBRARY CANDIDATES (Stage 17.6 advisory — ~/.forge-truth/forge-truth.db pretraining_extracted_parts, 31,625 real-world parts from Tesla / CATL / Schneider / ABB / etc. datasheets and distributor catalogues):\nThese are REAL PARTS observed in similar designs. STRONGLY PREFER picks from this list when emitting manufacturer / part_number / part_name for each word. If you pick a part NOT in the list (e.g. newer release, vendor preference, alternative chemistry), set the word's source_detail field to start with "Library override: " followed by your one-sentence justification (technology shift, vendor preference, new release, brief override, etc.). Empty list for a class means no library match for that category — pick freely. Library candidates are NOT mandatory; they are a starting point grounded in shipped designs.\n\n${candidateLines.join('\n\n')}\n`
+            console.error(`[chain] Stage 17.6: library candidates built — ${classToContext.size} component_classes covered (${nClassesWithMatch} with match, ${nClassesEmpty} empty), ${libraryCandidatesBlock.length} chars (${Date.now() - tLibQ}ms)`)
+            // Persist for diagnostics + downstream consumption.
+            writeFileSync(resolve(outDir, '4-library-candidates.json'), JSON.stringify({
+              built_at: new Date().toISOString(),
+              classes: classToContext.size,
+              classes_with_match: nClassesWithMatch,
+              classes_empty: nClassesEmpty,
+              candidates_by_class: libraryCandidatesByClass,
+            }, null, 2))
+            logAction({ step: 'library_candidates', latency_ms: Date.now() - tLibQ, classes: classToContext.size, classes_with_match: nClassesWithMatch, classes_empty: nClassesEmpty, block_chars: libraryCandidatesBlock.length })
+          }
+        }
+        if (classDb) { try { classDb.close() } catch { /* ignore */ } }
+      } catch (err) {
+        // Graceful degradation — DB missing, embedding fails, anything.
+        // Chain proceeds without the advisory; reviewers pick freely.
+        console.error(`[chain] Stage 17.6: library-candidate query failed: ${(err as Error).message.slice(0, 200)} — continuing without advisory`)
+        libraryCandidatesBlock = ''
+      }
+
       logAction({
         step: 'generator',
         model: 'universal_orchestrator',
@@ -2604,7 +2788,7 @@ async function main() {
   // and only adds 1-2 score points over a single strong reviewer. Replaced
   // with one Grok 4.3 pass (fallback Qwen 3.6 Max). Loops 22-28 evidence:
   // the cascade's value-add was marginal. Saving the time/cost.
-  const r1 = await runReviewerStep({ label: 'STEP 5: Single reviewer (Grok 4.3)', model: GROK_4_3, fallbackModel: QWEN_3_6_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics, toolOutputsBlock: toolOutputsBlock + skeletonCriticAppend })
+  const r1 = await runReviewerStep({ label: 'STEP 5: Single reviewer (Grok 4.3)', model: GROK_4_3, fallbackModel: QWEN_3_6_MAX, brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design, rawDumpPath: resolve(outDir, "5-r1-grok.raw.txt"), keyMetrics, toolOutputsBlock: toolOutputsBlock + skeletonCriticAppend, libraryCandidatesBlock })
   design = r1.design
   writeFileSync(resolve(outDir, '5-r1-grok.json'), JSON.stringify(design, null, 2))
 
@@ -2672,6 +2856,7 @@ async function main() {
     rawDumpPath: resolve(outDir, '8-r4-flashlite.raw.txt'),
     keyMetrics,
     toolOutputsBlock,
+    libraryCandidatesBlock,
   })
   design = r4.design
   writeFileSync(resolve(outDir, '8-r4-flashlite.json'), JSON.stringify(design, null, 2))
@@ -2739,6 +2924,7 @@ async function main() {
           rawDumpPath: resolve(outDir, '8-5-specialist.raw.txt'),
           keyMetrics,
           toolOutputsBlock,
+          libraryCandidatesBlock,
         })
         design = r45.design
         writeFileSync(resolve(outDir, '8-5-specialist.json'), JSON.stringify(design, null, 2))
