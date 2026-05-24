@@ -3076,6 +3076,324 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
   )
 }
 
+// ─── Brief Provenance (universal — codified 2026-05-24) ───────────────────
+//
+// The LLM-interpreted brief is the origin of everything downstream — every
+// module decomposition, every contract macro, every BoM line is derived
+// from the parsed brief, not the raw user text. This page surfaces both
+// side-by-side so the reader can audit the parse: did the LLM honour the
+// user's intent, or did it silently re-interpret a constraint?
+//
+// Field paths (universal across all 35 archetypes — confirmed against
+// bess-l8-validate + spotcheck-smr-v2 state.json):
+//
+//   Original brief verbatim:
+//     primary  → state.brief.original_text                    (chain default)
+//     fallback → state.parsedBrief.original_text              (legacy shape)
+//
+//   LLM-interpreted brief (structured parser output):
+//     primary  → state.brief.parsed_revised   (when was_revised)
+//     fallback → state.brief.parsed_original  (default — every chain run)
+//     fallback → state.parsedBrief            (legacy single-blob shape)
+//
+// If was_revised is true, the revision is shown in the LLM-interpreted
+// column (because that's what the engineering pipeline actually consumed);
+// the verbatim original is still the user's raw text, unchanged.
+
+function BriefProvenancePage({ state, project }: { state: any; project: string }) {
+  const brief = state.brief ?? {}
+  const originalText: string = (
+    typeof brief.original_text === 'string' && brief.original_text.trim().length > 0
+      ? brief.original_text
+      : typeof state.parsedBrief?.original_text === 'string'
+        ? state.parsedBrief.original_text
+        : ''
+  )
+
+  // Pick the structured interpretation the pipeline actually consumed.
+  // `was_revised` flag (set by Stage 2.6 brief-refinement loop) tells us
+  // which version downstream stages read. The chain's briefBlock contract
+  // (scripts/lib/.../brief-block-contract.ts) always populates parsed_original;
+  // parsed_revised only exists when the plausibility critic forced a relax.
+  const wasRevised = !!brief.was_revised
+  const parsedInterpretation =
+    (wasRevised && brief.parsed_revised && typeof brief.parsed_revised === 'object')
+      ? brief.parsed_revised
+      : (brief.parsed_original && typeof brief.parsed_original === 'object')
+        ? brief.parsed_original
+        : (state.parsedBrief && typeof state.parsedBrief === 'object')
+          ? state.parsedBrief
+          : null
+
+  // Word-count delta — single sentence describing whether the LLM expanded,
+  // contracted, or restated the brief. The verbatim diff is what matters;
+  // this is just a one-line orientation cue at the top of the page.
+  const originalWordCount = originalText.trim().split(/\s+/).filter(Boolean).length
+  const interpretedJsonText = parsedInterpretation
+    ? JSON.stringify(parsedInterpretation, null, 2)
+    : ''
+  const interpretedWordCount = interpretedJsonText
+    .replace(/[{}\[\],"]/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean).length
+  const summarisedFromCount = state.brief?.parsed_original?.missing_mandatory_fields?.length ?? 0
+  const inferredStandards = Array.isArray(parsedInterpretation?.constraints?.safety_standards)
+    ? parsedInterpretation.constraints.safety_standards.filter((s: any) => s?.source === 'inferred').length
+    : 0
+
+  // Split paragraphs of the verbatim text on a blank-line boundary so
+  // react-pdf can break gracefully between paragraphs across pages.
+  const originalParagraphs = originalText.length > 0
+    ? originalText.split(/\n\s*\n/).map((p: string) => p.trim()).filter((p: string) => p.length > 0)
+    : []
+
+  // Render the structured interpretation. The parser emits nested JSON;
+  // we surface it as field/value pairs rather than raw JSON because the
+  // reader wants to see what the LLM ACTUALLY interpreted, not its
+  // serialisation format. Constants/arrays are rendered structurally.
+  const renderInterpretedFields = (): React.ReactNode[] => {
+    if (!parsedInterpretation) {
+      return [
+        <Text key="empty" style={{ fontSize: 10, color: MUTED, fontStyle: 'italic' }}>
+          No parsed brief available in state.
+        </Text>,
+      ]
+    }
+    const out: React.ReactNode[] = []
+    const flatFields: Array<{ label: string; value: string }> = []
+    const ORDERED_KEYS: Array<{ key: string; label: string }> = [
+      { key: 'project_id', label: 'Project ID' },
+      { key: 'product_description', label: 'Product description' },
+      { key: 'mission_statement', label: 'Mission' },
+      { key: 'target_customers', label: 'Target customers' },
+      { key: 'why_now', label: 'Why now' },
+      { key: 'confidence', label: 'Parser confidence' },
+    ]
+    for (const { key, label } of ORDERED_KEYS) {
+      const raw = (parsedInterpretation as any)[key]
+      if (raw == null || (typeof raw === 'string' && raw.trim().length === 0)) continue
+      flatFields.push({ label, value: String(raw) })
+    }
+    if (Array.isArray(parsedInterpretation.missing_mandatory_fields) && parsedInterpretation.missing_mandatory_fields.length > 0) {
+      flatFields.push({
+        label: 'Missing mandatory fields',
+        value: parsedInterpretation.missing_mandatory_fields.join(', '),
+      })
+    }
+
+    for (const f of flatFields) {
+      out.push(
+        <View key={`fld-${f.label}`} style={{ flexDirection: 'row', marginBottom: 5 }}>
+          <View style={{ width: 110, paddingRight: 8 }}>
+            <Text style={{ fontSize: 8.5, color: MUTED, letterSpacing: 0.4 }}>{f.label.toUpperCase()}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.5 }}>{f.value}</Text>
+          </View>
+        </View>,
+      )
+    }
+
+    // Constraints sub-block — the parser's structured numeric output.
+    const constraints = parsedInterpretation.constraints
+    if (constraints && typeof constraints === 'object') {
+      out.push(
+        <Text key="constraints-h" style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 8, marginBottom: 4, letterSpacing: 0.4 }}>
+          CONSTRAINTS (PARSED)
+        </Text>,
+      )
+      const constraintRows: Array<{ key: string; rendered: string; source: string }> = []
+      for (const [ckey, cval] of Object.entries(constraints)) {
+        if (cval == null) continue
+        if (ckey === 'safety_standards' || ckey === 'additional_constraints') continue
+        if (typeof cval !== 'object') {
+          constraintRows.push({ key: ckey, rendered: String(cval), source: 'user' })
+          continue
+        }
+        const obj = cval as Record<string, any>
+        const src = String(obj.source ?? 'user')
+        // Handle the target_performance nested-metrics shape (parser P1-1).
+        if (ckey === 'target_performance' && Array.isArray(obj.metrics)) {
+          for (const m of obj.metrics) {
+            const v = m?.value
+            const u = m?.unit ? ` ${m.unit}` : ''
+            constraintRows.push({
+              key: String(m?.key_metric ?? 'metric'),
+              rendered: `${v}${u}`,
+              source: String(m?.source ?? 'user'),
+            })
+          }
+          continue
+        }
+        // Single-value constraint (unit_cost_ceiling, max_mass_kg, etc.).
+        if ('value' in obj && obj.value != null) {
+          const unit = obj.currency ? ` ${obj.currency}` : obj.unit ? ` ${obj.unit}` : ''
+          constraintRows.push({ key: ckey, rendered: `${obj.value}${unit}`, source: src })
+          continue
+        }
+        // Dimension constraint (w/d/h).
+        if ('w' in obj || 'd' in obj || 'h' in obj) {
+          const dims = [obj.w, obj.d, obj.h].filter((x: any) => x != null).join(' × ')
+          constraintRows.push({ key: ckey, rendered: `${dims} mm`, source: src })
+          continue
+        }
+        // Range constraint (temp_min_c / temp_max_c).
+        if ('temp_min_c' in obj || 'temp_max_c' in obj) {
+          constraintRows.push({
+            key: ckey,
+            rendered: `${obj.temp_min_c ?? '—'} °C to ${obj.temp_max_c ?? '—'} °C`,
+            source: src,
+          })
+          continue
+        }
+        // Fallback — serialise compactly.
+        constraintRows.push({ key: ckey, rendered: JSON.stringify(obj), source: src })
+      }
+      for (const r of constraintRows) {
+        const isInferred = r.source === 'inferred'
+        const isMissing = r.source === 'missing'
+        out.push(
+          <View key={`cr-${r.key}`} style={{ flexDirection: 'row', marginBottom: 2.5 }}>
+            <View style={{ width: 140, paddingRight: 6 }}>
+              <Text style={{ fontSize: 8.5, color: INK_SOFT }}>{r.key}</Text>
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 9, color: isMissing ? '#9a3412' : INK, fontFamily: isInferred ? 'Helvetica-Oblique' : 'Helvetica' }}>
+                {r.rendered}
+                {isInferred ? <Text style={{ fontSize: 7.5, color: '#9a3412' }}>  · inferred by LLM</Text> : null}
+                {isMissing ? <Text style={{ fontSize: 7.5, color: '#9a3412' }}>  · not specified in brief</Text> : null}
+              </Text>
+            </View>
+          </View>,
+        )
+      }
+
+      // Safety standards (array) — show user-provided vs LLM-inferred.
+      if (Array.isArray(constraints.safety_standards) && constraints.safety_standards.length > 0) {
+        out.push(
+          <Text key="safety-h" style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 8, marginBottom: 4, letterSpacing: 0.4 }}>
+            SAFETY STANDARDS (PARSED)
+          </Text>,
+        )
+        for (const s of constraints.safety_standards) {
+          const isInferred = s?.source === 'inferred'
+          out.push(
+            <View key={`ss-${s?.code ?? Math.random()}`} style={{ flexDirection: 'row', marginBottom: 2 }}>
+              <View style={{ width: 140, paddingRight: 6 }}>
+                <Text style={{ fontSize: 8.5, color: INK_SOFT, fontFamily: 'Helvetica-Bold' }}>{String(s?.code ?? '—')}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 9, color: INK, fontFamily: isInferred ? 'Helvetica-Oblique' : 'Helvetica' }}>
+                  {String(s?.standard ?? '—')}
+                  {isInferred ? <Text style={{ fontSize: 7.5, color: '#9a3412' }}>  · inferred</Text> : null}
+                </Text>
+              </View>
+            </View>,
+          )
+        }
+      }
+
+      // Additional constraints (free-text array).
+      if (Array.isArray(constraints.additional_constraints) && constraints.additional_constraints.length > 0) {
+        out.push(
+          <Text key="addl-h" style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 8, marginBottom: 4, letterSpacing: 0.4 }}>
+            ADDITIONAL CONSTRAINTS (PARSED)
+          </Text>,
+        )
+        for (const a of constraints.additional_constraints) {
+          out.push(
+            <Text key={`ac-${Math.random()}`} style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5, marginBottom: 1.5 }}>
+              • {String(a?.description ?? a ?? '—')}
+            </Text>,
+          )
+        }
+      }
+    }
+
+    return out
+  }
+
+  return (
+    <Page size="A4" style={PAGE_STYLE}>
+      <PageHeader section="Section 1b · Brief Provenance" project={project} />
+      <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
+        Brief provenance
+      </Text>
+      <Text style={{ fontSize: 10, color: MUTED, marginBottom: 4 }}>
+        What you asked for, and how we interpreted it.
+      </Text>
+      <Text style={{ fontSize: 9, color: INK_SOFT, marginBottom: 14, lineHeight: 1.55, fontStyle: 'italic' }}>
+        The original brief drives every downstream decision. The LLM-parsed brief shown alongside is
+        what the engineering pipeline actually consumed — every module, BoM line, and compliance
+        check is derived from that interpretation, not from the raw text.
+      </Text>
+
+      {originalText.length > 0 || parsedInterpretation ? (
+        <View style={{ marginBottom: 14, padding: 10, backgroundColor: '#f3f4f6', borderLeftWidth: 3, borderLeftColor: ACCENT }} minPresenceAhead={60}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 4 }}>
+            Parse summary
+          </Text>
+          <Text style={{ fontSize: 9, color: INK_SOFT, lineHeight: 1.5 }}>
+            Original brief: {originalWordCount.toLocaleString('en-GB')} words.
+            {' '}LLM parsed it into a structured object with {interpretedWordCount.toLocaleString('en-GB')} tokens of content.
+            {summarisedFromCount > 0
+              ? ` Parser flagged ${summarisedFromCount} mandatory field${summarisedFromCount === 1 ? '' : 's'} as missing from the original brief.`
+              : ''}
+            {inferredStandards > 0
+              ? ` LLM inferred ${inferredStandards} additional safety standard${inferredStandards === 1 ? '' : 's'} (shown italicised below).`
+              : ''}
+            {wasRevised ? ' Brief was auto-revised by the plausibility critic — the revised interpretation is shown.' : ''}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* 2.1 Original brief verbatim. Monospace-feel via tighter letter spacing
+          + neutral background so it reads as a quoted source document. */}
+      <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 8, marginBottom: 6 }}>
+        2.1 Original brief, as submitted
+      </Text>
+      <Text style={{ fontSize: 9, color: MUTED, marginBottom: 8, fontStyle: 'italic' }}>
+        Verbatim text from the submitted brief file. No edits, no normalisation.
+      </Text>
+      {originalParagraphs.length > 0 ? (
+        <View style={{ padding: 10, backgroundColor: '#fafafa', borderLeftWidth: 2, borderLeftColor: RULE_SOFT, marginBottom: 16 }}>
+          {originalParagraphs.map((para: string, i: number) => (
+            <Text
+              key={`origp-${i}`}
+              style={{ fontSize: 9.5, color: INK, lineHeight: 1.55, marginBottom: i === originalParagraphs.length - 1 ? 0 : 8, fontFamily: 'Helvetica' }}
+            >
+              {para}
+            </Text>
+          ))}
+        </View>
+      ) : (
+        <Text style={{ fontSize: 10, color: MUTED, fontStyle: 'italic', marginBottom: 16 }}>
+          No verbatim original brief found in state (state.brief.original_text was empty).
+        </Text>
+      )}
+
+      {/* 2.2 LLM-interpreted brief. Structured rendering — the reader sees the
+          parser's actual output, not a re-prosed version. Italics mark
+          LLM-inferred fields (source !== 'user') so the user can audit which
+          constraints came from them vs which the LLM added. */}
+      <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: ACCENT, marginTop: 6, marginBottom: 6 }}>
+        2.2 LLM-interpreted brief, as consumed by the pipeline
+      </Text>
+      <Text style={{ fontSize: 9, color: MUTED, marginBottom: 8, fontStyle: 'italic' }}>
+        Structured parse output. Every field shown here is what the downstream
+        engineering stages actually read. Italicised values were inferred by the LLM,
+        not stated in the original brief.
+      </Text>
+      <View style={{ padding: 10, backgroundColor: '#f7faff', borderLeftWidth: 2, borderLeftColor: ACCENT_SOFT }}>
+        {renderInterpretedFields()}
+      </View>
+
+      <PageFooter />
+    </Page>
+  )
+}
+
 // ─── Section 2 opener: numbered module connection map ──────────────────────
 
 function ModuleConnectionMapPage({
@@ -6479,6 +6797,14 @@ function MinimalDocument({ state, subject }: { state: any; subject: string }) {
           adds much value". SystemLevelRisksPage moves to AFTER modules. */}
       {state.brief?.was_revised ? <BriefRevisionNoticePage state={state} project={project} /> : null}
       <BriefPage state={state} project={project} manualReviewBadges={manualReviewBadges} />
+      {/* Brief Provenance (universal — codified 2026-05-24): verbatim
+          original brief + LLM-interpreted structured parse, side-by-side
+          so the reader can audit how the LLM read the user's intent.
+          Tristan: "the LLM brief is the origin of everything downstream
+          of that". Renders for every archetype — universal contract.
+          Sits AFTER BriefPage so the reader meets the high-level brief
+          first, then drops into the audit-trail. */}
+      <BriefProvenancePage state={state} project={project} />
       <ModuleConnectionMapPageWithExploded modules={modules} links={links} project={project} explodedImagePath={heroImages.exploded} manualReviewBadges={manualReviewBadges} />
       {/* ITER-10.5 fourth review (Tristan 2026-05-20): Cost-by-module
           summary lives directly after the Module Map so the reader meets
