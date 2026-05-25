@@ -4723,6 +4723,107 @@ async function main() {
     console.error(`[chain] thermal-derating-audit flagged issues (see AUDIT-THERMAL.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
 
+  // 2026-05-25 (Tristan-asked, BESS L22 council): brief-constraint completeness
+  // audit (gate 17). The renderer's _buildComplianceRows in render-minimal-
+  // pdf.tsx walks brief constraints through a curated METRIC_MAP + a handful
+  // of hardcoded conditionals. Anything the brief states but the renderer
+  // doesn't know about is SILENTLY DROPPED from the rendered Brief Compliance
+  // table. L22 trigger: cover claimed PASS on usable energy 3.5 MWh while
+  // the design only closed at 2.69 MWh — the compliance table didn't include
+  // a usable-energy row at all (renderer's METRIC_MAP knows nameplate_
+  // capacity_mwh, brief used usable_energy_mwh). Cycle life (achieved qty
+  // missing from contract) and the 5-day deployment constraint (in
+  // additional_constraints, never iterated by the renderer) were also
+  // silently absent. Gate 17 enumerates every brief constraint and flags
+  // any that won't appear as a compliance row. Exit 17 on HIGH (HARD
+  // constraint missing: cost / mass / scale|durability metrics / voltage /
+  // grid-tie / safety codes in additional_constraints). MED + LOW are
+  // informational and do not block the chain.
+  //
+  // Distinct from gate 12 (numeric-claim drift): gate 12 catches NARRATIVE-
+  // vs-BoM disagreement on a single quantity. Gate 17 catches MISSING ROWS
+  // entirely - the compliance table doesn't even attempt PASS/FAIL on a
+  // constraint the brief explicitly stated.
+  try {
+    execFileSync(
+      'npx',
+      ['tsx', resolve(__dirname, 'lib/brief-constraint-completeness-audit.ts'), statePath, resolve(outDir, 'AUDIT-COMPLETENESS.md')],
+      { stdio: 'inherit', cwd: resolve(__dirname, '..') },
+    )
+  } catch (err) {
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 17) {
+      console.error('')
+      console.error('======================================================================')
+      console.error('  CHAIN HARD-EXIT - Brief constraint completeness audit FAILED (17)')
+      console.error('  At least one HARD brief constraint (cost ceiling / mass cap /')
+      console.error('  scale metric / voltage / safety code) is missing from the rendered')
+      console.error('  Brief Compliance table. The reader cannot see whether the design')
+      console.error('  honoured or breached the constraint - it is silently absent.')
+      console.error('  PDF + state.json saved to disk for inspection but chain is BLOCKED.')
+      console.error('  See AUDIT-COMPLETENESS.md for the missing constraints + fixes.')
+      console.error('  Fix area: scripts/render-minimal-pdf.tsx _buildComplianceRows -')
+      console.error('  extend METRIC_MAP for any missing brief metric key; add an')
+      console.error('  additional_constraints walker for the voltage/grid-tie/safety')
+      console.error('  bullets the brief author included; OR update the orchestrator to')
+      console.error('  emit the missing achieved-quantity field the renderer reads.')
+      console.error('======================================================================')
+      logAction({ step: 'fatal_completeness_audit', reason: 'brief-constraint-completeness-audit exit 17', status: 17 })
+      process.exit(17)
+    }
+    console.error(`[chain] brief-constraint-completeness-audit flagged issues (see AUDIT-COMPLETENESS.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
+  }
+
+  // 2026-05-25 (Tristan-asked, BESS L22 council universal-fix #4): jurisdictional-
+  // standards audit (gate 19). The L22 BESS PDF was generated for a UK
+  // grid-scale brief (parsedBrief.target_customers: "UK grid-scale frequency
+  // response and capacity market") but the deterministic emitter + Chase
+  // research extraction left "NEC 706.10" - a US National Electrical Code
+  // citation - in the step-up-transformer sub-module's topology_clause and
+  // english_sentence, plus 50+ UL/ANSI/ASTM US-only citations across modifier_
+  // characters. Mixing jurisdictions destroys cover credibility with any UK
+  // reviewer who knows what NEC stands for. Gate 19 walks every regulatory
+  // modifier + module narrative + topology_clause + natural-language-layer
+  // prose + briefOverviewProse, extracts standards citations, maps each to
+  // a standards family (NEC, UL, BS, EN, G99, IEC, ...), and flags HIGH any
+  // citation whose family is not in the brief jurisdiction's accepted-families
+  // set. UL 9540A + NFPA 855 + NFPA 68 are universally accepted (UK BESS
+  // practice has no equivalent fire-test method). Exit 19 on HIGH. Distinct
+  // from gates 13-16: those audit COMPONENT-LEVEL correctness (spec / sizing /
+  // type / thermal); gate 19 audits DOCUMENT-LEVEL standards hygiene -
+  // a part can be correctly spec'd, sized, typed, thermal-rated AND still be
+  // cited under a foreign-jurisdiction standard.
+  try {
+    execFileSync(
+      'npx',
+      ['tsx', resolve(__dirname, 'lib/jurisdictional-standards-audit.ts'), statePath, resolve(outDir, 'AUDIT-JURISDICTION.md')],
+      { stdio: 'inherit', cwd: resolve(__dirname, '..') },
+    )
+  } catch (err) {
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 19) {
+      console.error('')
+      console.error('======================================================================')
+      console.error('  CHAIN HARD-EXIT - Jurisdictional-standards audit FAILED (code 19)')
+      console.error('  At least one standards citation belongs to a family the brief\'s')
+      console.error('  inferred jurisdiction does NOT accept (e.g. NEC 706.10 in a UK doc,')
+      console.error('  BS EN 61439 in a US doc, CSA on a non-Canadian product).')
+      console.error('  Mixing jurisdictions destroys reviewer credibility - a UK engineer')
+      console.error('  who reads "NEC 706.10" knows the document was generated by an')
+      console.error('  un-supervised model that pulled US references into a UK brief.')
+      console.error('  PDF + state.json saved to disk for inspection but chain is BLOCKED.')
+      console.error('  See AUDIT-JURISDICTION.md for the foreign-jurisdiction citations.')
+      console.error('  Fix area: scripts/lib/deterministic-emitter.ts + Chase research')
+      console.error('  extraction - strip foreign-family citations OR substitute with the')
+      console.error('  jurisdiction-equivalent (e.g. NEC 706.10 -> IEC 62933-5-2 §6.4 in')
+      console.error('  UK/EU BESS docs; G99 -> IEEE 1547 in US docs).')
+      console.error('======================================================================')
+      logAction({ step: 'fatal_jurisdiction_audit', reason: 'jurisdictional-standards-audit exit 19', status: 19 })
+      process.exit(19)
+    }
+    console.error(`[chain] jurisdictional-standards-audit flagged issues (see AUDIT-JURISDICTION.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
+  }
+
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
   // try/catch. The renderer's own `open` was guarded; this one was not. In
   // the worker/LaunchAgent path, `open` can fail (no GUI session) and would

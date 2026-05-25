@@ -545,6 +545,37 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     (n) => `${n} " word" suffix violations: ${wordSuffixViolations.slice(0, 5).join('; ')}`,
   ))
 
+  // I12. Gate 17 brief-constraint completeness audit (2026-05-25, BESS L22
+  // council): every brief target_performance.metrics[] key must be present in
+  // the renderer's METRIC_MAP (mirrored in
+  // scripts/lib/brief-constraint-completeness-audit.ts::KNOWN_METRIC_MAP).
+  // If a brief metric key isn't in that map the renderer silently skips it
+  // → the Brief Compliance table omits the row → the reader sees PASS when
+  // the design may have violated the constraint (L22 usable_energy_mwh).
+  // This invariant is the source-truth backstop: if a chain emits a metric
+  // key the renderer doesn't know about, the harness fails fast so iter-N
+  // catches iter-(N+1) regressions without waiting for council inspection.
+  const RENDERER_KNOWN_METRIC_KEYS = new Set([
+    'nameplate_capacity_mwh', 'rated_power_mw', 'peak_power_mw', 'cycle_life',
+    'dc_bus_voltage_v', 'ac_output_voltage_v', 'rated_power_kw',
+    'annual_energy_mwh', 'thermal_output_kw', 'cop', 'yield_kg_per_year',
+  ])
+  const briefMetricsArr: any[] = Array.isArray(state?.parsedBrief?.constraints?.target_performance?.metrics)
+    ? state.parsedBrief.constraints.target_performance.metrics
+    : []
+  const unmappedKeys: string[] = []
+  for (const m of briefMetricsArr) {
+    const k = typeof m?.key_metric === 'string' ? m.key_metric : ''
+    if (k && !RENDERER_KNOWN_METRIC_KEYS.has(k)) unmappedKeys.push(k)
+  }
+  assertions.push(assertEq(
+    'I12.brief_metric_keys_renderer_known',
+    'Every brief target_performance.metrics[] key is in the renderer METRIC_MAP (gate 17 prerequisite)',
+    unmappedKeys.length,
+    (n) => n === 0,
+    (n) => `${n} brief metric key(s) not in renderer METRIC_MAP: ${unmappedKeys.join(', ')} — gate 17 will fail HIGH. Either add these keys to METRIC_MAP in scripts/render-minimal-pdf.tsx + scripts/lib/brief-constraint-completeness-audit.ts::KNOWN_METRIC_MAP, OR change the parser to emit a known synonym.`,
+  ))
+
   // VF.scale_fallback_audit — P1-4 (2026-05-23): VF emitter logs
   // SCALE_FALLBACK_FIRED when the orchestrator's tool plan didn't populate a
   // scale-determining quantity. Future enhancement: read the chain log if
