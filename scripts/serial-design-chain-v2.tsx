@@ -2766,7 +2766,7 @@ async function main() {
   // here so the reviewer cascade can see it. The post-Phase-2 re-derive below
   // refreshes with any Phase 2 mutations. WIRING_GAPS cross-cut #10.
   try {
-    const earlyDerived = deriveHeadlineFromModules(design.modules ?? [], parsedResult.data, productClass, currentBriefText)
+    const earlyDerived = deriveHeadlineFromModules(design.modules ?? [], parsedResult.data, productClass, currentBriefText, engineeringContract ?? undefined)
     keyMetrics = earlyDerived as KeyMetrics
     const ho = earlyDerived.headline_output
     console.error(`[chain] keyMetrics seeded early (pre-reviewer): ${ho ? `${ho.label}=${ho.value} ${ho.unit ?? ''}` : '(no headline yet)'}`)
@@ -3465,7 +3465,7 @@ async function main() {
   // knows what was computed vs what's an estimate.
   const tDerive = Date.now()
   try {
-    const derived = deriveHeadlineFromModules(design.modules ?? [], parsedResult.data, productClass, currentBriefText)
+    const derived = deriveHeadlineFromModules(design.modules ?? [], parsedResult.data, productClass, currentBriefText, engineeringContract ?? undefined)
     keyMetrics = derived as KeyMetrics
     writeFileSync(resolve(outDir, '9-headline-derived.json'), JSON.stringify(derived, null, 2))
     const ho = derived.headline_output

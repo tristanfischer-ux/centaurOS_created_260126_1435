@@ -39,6 +39,7 @@
 import { readFileSync, existsSync, statSync } from 'fs'
 import { execFileSync } from 'child_process'
 import { resolve, dirname } from 'path'
+import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 
 interface Assertion {
   id: string
@@ -206,6 +207,36 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       (n) => n === 0,
       (n) => `${n} required fields missing: ${missing.join(', ')}`,
     ))
+
+    // BESS L28 invariant (2026-05-25, council determinism fix): headline-derived
+    // cell_count MUST equal orchestratorContract.quantities.cell_count.value.
+    // Root cause: deny-list isCellAdjacent regex missed cell_heater_pad (+15) and
+    // previously cell_electrolyte (+3750). Fix: headline-deriver now reads the
+    // contract value directly. This invariant re-derives the headline live against
+    // the snapshot (NOT from saved keyMetrics) so it catches future regressions
+    // in the deriver code itself, not just stale saved state.
+    const contractCellCount = state?.orchestratorContract?.quantities?.cell_count?.value
+    if (contractCellCount != null) {
+      try {
+        const freshHeadline = deriveHeadlineFromModules(
+          state?.moduleDecomposition?.modules ?? [],
+          state?.parsedBrief,
+          'energy_storage',
+          null,
+          state?.orchestratorContract,
+        )
+        const freshCellCount = freshHeadline?.supporting_metrics?.find((m: any) => m.id === 'cell_count')?.value
+        assertions.push(assertEq(
+          'BESS.cell_count_contract_vs_headline',
+          'fresh-derived headline cell_count === orchestratorContract.quantities.cell_count.value',
+          Math.abs(Number(freshCellCount ?? 0) - Number(contractCellCount)),
+          (delta) => delta === 0,
+          (delta) => `cell_count diverges by ${delta}: headline=${freshCellCount} contract=${contractCellCount}`,
+        ))
+      } catch (err) {
+        assertions.push({ id: 'BESS.cell_count_contract_vs_headline', description: 'fresh-derived headline cell_count === orchestratorContract.quantities.cell_count.value', passed: false, detail: `deriveHeadlineFromModules threw: ${err}` })
+      }
+    }
 
     // Build #18r-fix2 invariant (2026-05-22 Loop 28 Bugs 1 + 5): all rack-count
     // mentions across the BESS design must collapse to a single value. Loop 28
@@ -465,6 +496,39 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       emcGroundingNoPn,
       (n) => n === 0,
       (n) => `${n} nVent ERIFLEX word(s) in emc_grounding missing part_number — inheritPartNumberFromDeterministicSibling may have regressed`,
+    ))
+
+    // BESS.enclosure_fan_part_number — L28 council fix (2026-05-25).
+    // The enclosure_ventilation_fan_word in the enclosure_climate sub_module
+    // MUST carry a part_number modifier (W2E200-HK38-01 pinned by the
+    // deterministic emitter). Without the MPN, the distributor cascade falls
+    // back to Engine B's thermal-class curve which returns ~£21 — a 6-12×
+    // under-quote vs real catalogue price (£133.78 Mouser, £253.78 Farnell).
+    // With the MPN present, the cascade returns the cached Mouser price.
+    const envInterfaceModule = state?.moduleDecomposition?.modules?.find(
+      (m: any) => m.module === 'environmental_interface'
+    )
+    let fanMissingPn = 0
+    if (envInterfaceModule) {
+      const enclimateSm = (envInterfaceModule as any).sub_modules?.find(
+        (sm: any) => sm.id === 'enclosure_climate'
+      )
+      if (enclimateSm) {
+        for (const w of (enclimateSm.words ?? [])) {
+          const wid = String(w?.id ?? w?.word_id ?? '')
+          if (!/enclosure_ventilation_fan/.test(wid)) continue
+          const mods: Array<{ kind: string; value: string }> = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+          const hasPn = mods.some(m => m.kind === 'part_number' && String(m.value ?? '').trim().length > 0)
+          if (!hasPn) fanMissingPn++
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'BESS.enclosure_fan_part_number',
+      'enclosure_ventilation_fan_word carries a part_number modifier (W2E200-HK38-01) so distributor cascade prices at £133.78 not Engine B ~£21',
+      fanMissingPn,
+      (n) => n === 0,
+      (n) => `${n} enclosure_ventilation_fan word(s) missing part_number — will be priced by Engine B thermal curve (~£21) instead of Mouser cached £133.78`,
     ))
 
     // Suppress unused-var warning for the eosCheck (kept for future invariants)

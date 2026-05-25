@@ -142,20 +142,37 @@ function buildDeploymentContextDefault(parsedBrief: any, unitYieldPerYear: numbe
 
 // ─── BESS deriver ──────────────────────────────────────────────────────────
 
-function deriveEnergyStorageHeadline(modules: ModuleSpec[], parsedBrief: any, briefText?: string | null): Record<string, any> {
+function deriveEnergyStorageHeadline(modules: ModuleSpec[], parsedBrief: any, briefText?: string | null, orchestratorContract?: any): Record<string, any> {
   // Cells live in energy_storage_source. Aggregate count, find per-cell V and Ah.
   const esm = findModule(modules, 'energy_storage_source')
   let totalCells = 0
   let cellV: number | null = null
   let cellAh: number | null = null
+
+  // ── Authoritative cell_count from orchestratorContract (single source of truth).
+  // The contract derives cell_count as rack_count × cells_per_rack from the
+  // physics tool (PyBaMM) output — it is the canonical integer-clean value.
+  // The BoM walk below is a deny-list approach that ALWAYS risks missing a new
+  // per-cell ancillary word (cell_electrolyte was missed in L26; cell_heater_pad
+  // was missed in L28 causing +15 discrepancy). Reading the contract avoids this
+  // whack-a-mole entirely. Fall back to the BoM walk ONLY if the contract is
+  // absent (pre-contract runs or non-BESS product classes reusing this deriver).
+  const contractCellCount: number | null =
+    typeof orchestratorContract?.quantities?.cell_count?.value === 'number'
+      ? orchestratorContract.quantities.cell_count.value
+      : null
+
   // Match cells: character_id contains "cell" as a standalone word component,
   // but exclude cell-adjacent components (busbars, terminals, tap wires, etc.)
   const isCellRegex = /(^|_)cell(_|$)/
   // cell_electrolyte added 2026-05-25 (BESS L26 council fix 1): electrolyte is
   // an ancillary per-cell sub-component (×N_cells in BoM) and was being counted
   // as N additional cells, producing exactly 2× the true cell count (7501 vs 3750).
-  // Also skip no-qty cell words (spec/template header rows, default qty=1).
-  const isCellAdjacent = /cell_balanc|cell_to_cell|cell_terminal|cell_voltage_tap|cell_insulat|cell_string|cell_holder|cell_separator|cell_electrolyte/
+  // cell_heater_pad added 2026-05-25 (BESS L28 council fix): heater pads are
+  // thermal management ancillaries (×N_subset in BoM, NOT full cell_count) and
+  // were adding +15 to the count. Deny-list approach is whack-a-mole — prefer
+  // contractCellCount above. Also skip no-qty cell words (spec/template rows).
+  const isCellAdjacent = /cell_balanc|cell_to_cell|cell_terminal|cell_voltage_tap|cell_insulat|cell_string|cell_holder|cell_separator|cell_electrolyte|cell_heater/
   for (const sm of (esm?.sub_modules ?? [])) {
     for (const w of (sm.words ?? [])) {
       const charId = String(w.content_character?.character_id ?? w.id ?? '').toLowerCase()
@@ -201,6 +218,15 @@ function deriveEnergyStorageHeadline(modules: ModuleSpec[], parsedBrief: any, br
         if (cellAh != null && (cellAh < 5 || cellAh > 10000)) cellAh = null
       }
     }
+  }
+
+  // Contract takes precedence over the BoM walk for cell_count.
+  // If the contract has a value, use it unconditionally — it is derived from
+  // rack_count × cells_per_rack via the physics tool and is the single source
+  // of truth. The BoM walk value (totalCells) is kept as a fallback for runs
+  // that pre-date the engineering contract or for non-BESS classes.
+  if (contractCellCount !== null) {
+    totalCells = contractCellCount
   }
 
   // Brief target performance: usable energy in MWh (BESS-typical)
@@ -682,7 +708,7 @@ function deriveHapsHeadline(modules: ModuleSpec[], parsedBrief: any, briefText?:
 
 // ─── Registry ──────────────────────────────────────────────────────────────
 
-type Deriver = (modules: ModuleSpec[], parsedBrief: any, briefText?: string | null) => Record<string, any>
+type Deriver = (modules: ModuleSpec[], parsedBrief: any, briefText?: string | null, orchestratorContract?: any) => Record<string, any>
 
 const DERIVERS: Record<string, Deriver> = {
   energy_storage:    deriveEnergyStorageHeadline,
@@ -706,11 +732,17 @@ const DERIVERS: Record<string, Deriver> = {
  * the deployment_context helper can search the source-of-truth, not just the
  * lossy parsedBrief. Brief-parser drops detail like "shipping container" or
  * narrow size ranges; reading the raw brief captures them.
+ *
+ * `orchestratorContract` (optional) is the engineering contract emitted at
+ * Stage 17 of the chain. When present, class-specific derivers MAY read
+ * authoritative quantities from it instead of re-deriving from the BoM.
+ * For BESS: quantities.cell_count.value is the single source of truth for the
+ * cell count (derived from rack_count × cells_per_rack by the physics tool).
  */
-export function deriveHeadlineFromModules(modules: ModuleSpec[], parsedBrief: any, productClass: string, briefText?: string | null): any {
+export function deriveHeadlineFromModules(modules: ModuleSpec[], parsedBrief: any, productClass: string, briefText?: string | null, orchestratorContract?: any): any {
   const deriver = DERIVERS[productClass]
   if (deriver) {
-    const out = deriver(modules, parsedBrief, briefText)
+    const out = deriver(modules, parsedBrief, briefText, orchestratorContract)
     return {
       ...out,
       generated_by: 'deterministic_deriver',
