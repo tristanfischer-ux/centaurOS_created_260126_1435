@@ -4678,6 +4678,51 @@ async function main() {
     console.error(`[chain] slot-mispin-detector flagged issues (see AUDIT-MISPIN.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
 
+  // 2026-05-25 (Tristan-asked, task #122 universal thermal subsystem ambient-
+  // derating contract): thermal-derating audit (gate 16). Real chillers DERATE
+  // at higher ambient — Pfannenberg's published cooling_curve shows ~40%
+  // capacity loss at +50°C vs +35°C nominal. A 47 kW chiller sized for the
+  // +35°C nominal rating delivers only ~28 kW at +50°C; for a brief that
+  // specifies operating_environment.temp_max_c = 50, the chiller must still
+  // cover the design's system_thermal_dissipation_kw at THAT ambient. Gate 16
+  // walks every chiller word in the design, looks up its authoritative
+  // cooling_curve (parts-spec-validator's KNOWN_PART_AUTHORITATIVE), inter-
+  // polates capacity at the brief's ambient, compares against design load ×
+  // 1.20 engineering margin. Exit 16 on HIGH (derated < 60% of required).
+  //
+  // Distinct from gate 13 (parts-spec validator): gate 13 catches WRONG-
+  // CLAIM (chain says "Pfannenberg CC 90.000 = 50 kW" but datasheet says
+  // 9 kW). Gate 16 catches DATASHEET-TRUE-BUT-UNDERSIZED at the brief's
+  // ambient (chain says "Pfannenberg EB XT 500 WT = 47 kW @ 35°C" — datasheet
+  // says yes, but the brief specifies +50°C ambient where the same chiller
+  // delivers only 28 kW which may be < design load × safety).
+  try {
+    execFileSync(
+      'npx',
+      ['tsx', resolve(__dirname, 'lib/thermal-derating-audit.ts'), statePath, resolve(outDir, 'AUDIT-THERMAL.md')],
+      { stdio: 'inherit', cwd: resolve(__dirname, '..') },
+    )
+  } catch (err) {
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 16) {
+      console.error('')
+      console.error('======================================================================')
+      console.error('  CHAIN HARD-EXIT - Thermal-derating audit FAILED (code 16)')
+      console.error('  At least one chiller delivers < 60% of design thermal load at')
+      console.error('  the brief operating_environment.temp_max_c ambient.')
+      console.error('  PDF + state.json saved to disk for inspection but chain is BLOCKED.')
+      console.error('  See AUDIT-THERMAL.md for the undersized chillers + required kW.')
+      console.error('  Fix area: scripts/lib/deterministic-emitter.ts -')
+      console.error('  selectPfannenbergEbXt should upsize at higher ambient; if the top-')
+      console.error('  of-family chiller still underperforms, the design needs N+1 parallel')
+      console.error('  units or a different brand for >150 kW @ +50C BESS.')
+      console.error('======================================================================')
+      logAction({ step: 'fatal_thermal_audit', reason: 'thermal-derating-audit exit 16', status: 16 })
+      process.exit(16)
+    }
+    console.error(`[chain] thermal-derating-audit flagged issues (see AUDIT-THERMAL.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
+  }
+
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
   // try/catch. The renderer's own `open` was guarded; this one was not. In
   // the worker/LaunchAgent path, `open` can fail (no GUI session) and would

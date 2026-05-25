@@ -538,6 +538,24 @@ registerArchetype('bess', (brief: any) => {
   const dissipatedKw = continuousKw * (1 - inverterEfficiency)  // 20 kW
   // Heatsink/thermal-rejection minimum capacity (1.5× margin)
   const thermalRejectionMinKw = dissipatedKw * 1.5  // 30 kW
+  // BESS L22 fix (2026-05-25, task #122 universal thermal subsystem ambient-
+  // derating contract): the brief's `operating_environment.temp_max_c` is the
+  // authoritative design ambient for thermal-subsystem sizing. Default 35°C
+  // matches the chiller-industry nominal rating point (EN 14511 / AHRI 550/590).
+  // Real BESS sites commonly specify +50°C (desert / Middle East utility) or
+  // +45°C (Mediterranean / Southern Europe utility); +35°C is the Northern
+  // Europe / temperate-climate floor. Chiller capacity must be sized AT this
+  // ambient (using each model's published derating curve), NOT at the 35°C
+  // nominal — otherwise the cooling subsystem is underspec'd in the field.
+  //
+  // Pattern for adding to OTHER classes (haps_gondola, vertical_farm,
+  // heat_pump, drone, ev_charger, etc.): emit the same `ambient_design_temp_c`
+  // quantity from each class's contract builder; the deterministic emitter
+  // and gate 16 audit are universal — they read `ambient_design_temp_c` from
+  // whichever class contract emits it. Adding the field to a new class
+  // automatically wires up ambient-aware chiller sizing + audit for that
+  // class. See drawer pattern: universal-thermal-contract-2026-05-25.
+  const ambientDesignTempC = Number(brief?.constraints?.operating_environment?.temp_max_c ?? 35)
 
   const quantities: Record<string, Quantity> = {
     // BESS L3 (2026-05-24): usable_capacity_kwh now emits ACHIEVED value
@@ -575,6 +593,11 @@ registerArchetype('bess', (brief: any) => {
     string_peak_current_a: q(stringPeakA, 'A', 'dimensionless', 'peak', 'rack', 'calculator'),
     inverter_dissipated_kw: q(dissipatedKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'continuous_kw × (1 - 0.98 efficiency)' }),
     thermal_rejection_min_kw: q(thermalRejectionMinKw, 'kW', 'power', 'min', 'system', 'calculator', { source_detail: 'dissipated × 1.5 margin' }),
+    // BESS L22 (2026-05-25, task #122): brief-driven design ambient for
+    // thermal-subsystem sizing. The deterministic emitter selects a chiller
+    // whose DERATED capacity at this ambient ≥ thermal load × margin (gate 16
+    // audit verifies). Default 35°C matches EN 14511 / AHRI 550/590 nominal.
+    ambient_design_temp_c: q(ambientDesignTempC, '°C', 'temperature', 'max', 'system', 'brief', { source_detail: 'parsedBrief.constraints.operating_environment.temp_max_c (default 35°C)' }),
     // BESS L3 (2026-05-24, issue #1): expose brief target feasibility as a
     // scalar flag (1=feasible, 0=shortfall) for downstream consumers + the
     // cover-page narrator to surface the trade-off transparently. Per task

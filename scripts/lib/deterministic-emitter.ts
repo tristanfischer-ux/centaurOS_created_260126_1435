@@ -230,6 +230,112 @@ function makeSubModule(
 }
 
 // ---------------------------------------------------------------------------
+// PFANNENBERG EB XT AMBIENT-DERATING TABLE (universal across all classes that
+// pin Pfannenberg liquid chillers). Codified 2026-05-25, task #122.
+//
+// Source: Pfannenberg EB XT 36-150 kW BESS-rated packaged liquid chiller line.
+//   - Product family page: https://www.pfannenberg.com/en-gb/liquid-cooling/eb-xt-36-150-kw/
+//   - Individual product page (EB XT 600 WT, product 42146005001) confirms
+//     50°C ambient operating envelope + ~60% capacity at +50°C vs +35°C
+//     nominal rating (40% derate at the top of the envelope).
+//   - Same curve form is cross-referenced in parts-spec-validator.ts cooling
+//     curves (lines 416-505): every EB XT variant lists the same 35°C
+//     nominal capacity and 50°C derated capacity (×0.60 at +50°C).
+//
+// The Pfannenberg compact CC series uses the same derating slope (per parts-
+// spec-validator CC entries lines 370-398). All Pfannenberg LIQUID chillers
+// share this derating slope by construction — it's the EN 14511 / AHRI 550/590
+// reference rating at +35°C with a manufacturer-published linear derate to
+// +50°C. Anchor points: { 35°C → 1.00, 50°C → 0.60 }. For ambients between
+// the two anchors we linearly interpolate; below 35°C we clamp to 1.00
+// (chillers don't over-perform below nominal); above 50°C we clamp to 0.60
+// (we don't extrapolate beyond the published envelope — see gate 16 audit
+// for >50°C ambient handling).
+//
+// Data-driven, NOT hand-tuned: the same slope applies to every EB XT and CC
+// model in parts-spec-validator's KNOWN_PART_AUTHORITATIVE. When a new
+// Pfannenberg model is added there with its own cooling_curve, the universal
+// slope below stays valid because it's the family-level derating profile.
+//
+// Pattern for adding OTHER manufacturers (Rittal, Hitema, Trane utility, ...):
+// each gets its own derating function; the chiller-selection logic below
+// picks the cheapest model whose derated capacity at ambient ≥ requirement,
+// across all available manufacturers.
+// ---------------------------------------------------------------------------
+
+const PFANNENBERG_AMBIENT_DERATE_ANCHORS: Array<{ ambient_c: number; capacity_factor: number }> = [
+  { ambient_c: 35, capacity_factor: 1.00 },  // EN 14511 / AHRI 550/590 nominal
+  { ambient_c: 50, capacity_factor: 0.60 },  // top of published envelope; 40% derate
+]
+
+/**
+ * Linear interpolation between the published derating anchors. Clamps below
+ * 35°C to 1.00 (no over-performance) and above 50°C to 0.60 (no extrapolation).
+ * Pure function — deterministic by construction.
+ */
+export function pfannenbergAmbientDerateFactor(ambientC: number): number {
+  if (!Number.isFinite(ambientC)) return 1.00
+  if (ambientC <= PFANNENBERG_AMBIENT_DERATE_ANCHORS[0].ambient_c) {
+    return PFANNENBERG_AMBIENT_DERATE_ANCHORS[0].capacity_factor
+  }
+  if (ambientC >= PFANNENBERG_AMBIENT_DERATE_ANCHORS[PFANNENBERG_AMBIENT_DERATE_ANCHORS.length - 1].ambient_c) {
+    return PFANNENBERG_AMBIENT_DERATE_ANCHORS[PFANNENBERG_AMBIENT_DERATE_ANCHORS.length - 1].capacity_factor
+  }
+  // Linear interpolation between adjacent anchors.
+  for (let i = 0; i < PFANNENBERG_AMBIENT_DERATE_ANCHORS.length - 1; i++) {
+    const a = PFANNENBERG_AMBIENT_DERATE_ANCHORS[i]
+    const b = PFANNENBERG_AMBIENT_DERATE_ANCHORS[i + 1]
+    if (ambientC >= a.ambient_c && ambientC <= b.ambient_c) {
+      const t = (ambientC - a.ambient_c) / (b.ambient_c - a.ambient_c)
+      return a.capacity_factor + t * (b.capacity_factor - a.capacity_factor)
+    }
+  }
+  return 1.00
+}
+
+/**
+ * Pfannenberg EB XT family (BESS-rated 36-150 kW liquid chillers). The
+ * `nominal_capacity_kw` is the EN 14511 +35°C rating; the derated capacity
+ * at any other ambient = nominal × pfannenbergAmbientDerateFactor(ambient).
+ * Source: parts-spec-validator KNOWN_PART_AUTHORITATIVE (kept in sync there).
+ */
+const PFANNENBERG_EB_XT_FAMILY: Array<{ part_number: string; nominal_capacity_kw: number }> = [
+  { part_number: 'EB XT 400 WT', nominal_capacity_kw: 36 },
+  { part_number: 'EB XT 500 WT', nominal_capacity_kw: 47 },
+  { part_number: 'EB XT 600 WT', nominal_capacity_kw: 59 },
+  { part_number: 'EB XT 700 WT', nominal_capacity_kw: 69 },
+  { part_number: 'EB XT 800 WT', nominal_capacity_kw: 76 },
+  { part_number: 'EB XT 900 WT', nominal_capacity_kw: 86 },
+  { part_number: 'EB XT 1000 WT', nominal_capacity_kw: 92 },
+  { part_number: 'EB XT 1200 WT', nominal_capacity_kw: 119 },
+  { part_number: 'EB XT 1600 WT', nominal_capacity_kw: 148 },
+]
+
+/**
+ * Pick the smallest EB XT model whose DERATED capacity at `ambientC` is
+ * ≥ `requiredKwAtAmbient`. Returns the model record + its derated capacity.
+ * Falls back to the largest EB XT (1600 WT, 148 kW nominal / 88.8 kW @ 50°C)
+ * if no single unit can cover the load — the gate 16 audit will then flag
+ * the residual undersize and the design must add a redundant unit or pick a
+ * different brand (e.g. Trane utility chiller for >150 kW BESS).
+ */
+export function selectPfannenbergEbXt(
+  requiredKwAtAmbient: number,
+  ambientC: number,
+): { part_number: string; nominal_capacity_kw: number; derated_capacity_kw: number } {
+  const factor = pfannenbergAmbientDerateFactor(ambientC)
+  for (const model of PFANNENBERG_EB_XT_FAMILY) {
+    const derated = model.nominal_capacity_kw * factor
+    if (derated >= requiredKwAtAmbient) {
+      return { ...model, derated_capacity_kw: derated }
+    }
+  }
+  // Saturated — return the top-of-family unit; gate 16 will surface the gap.
+  const top = PFANNENBERG_EB_XT_FAMILY[PFANNENBERG_EB_XT_FAMILY.length - 1]
+  return { ...top, derated_capacity_kw: top.nominal_capacity_kw * factor }
+}
+
+// ---------------------------------------------------------------------------
 // BESS TEMPLATE — module emitters
 // ---------------------------------------------------------------------------
 
@@ -257,6 +363,13 @@ interface BessParams {
   stringPeakA: number
   cellCapacityAh: number
   cellVoltageV: number
+  // BESS L22 (2026-05-25, task #122): universal thermal subsystem ambient-
+  // derating. The chiller selector below uses these two fields to pick the
+  // right EB XT model — the design's actual thermal load (pybamm-computed
+  // when orchestrator ran, else legacy thermal_rejection_min_kw fallback)
+  // and the brief's design ambient (default 35°C, +50°C utility BESS).
+  ambientDesignTempC: number
+  systemThermalDissipationKw: number
 }
 
 function deriveBessParams(contract: ContractShape): BessParams {
@@ -287,6 +400,19 @@ function deriveBessParams(contract: ContractShape): BessParams {
   const stringContinuousA = q(contract, 'string_continuous_current_a', busContinuousA / parallelStringsTotal)
   const stringPeakA = q(contract, 'string_peak_current_a', busPeakA / parallelStringsTotal)
   const cellCapacityAh = q(contract, 'cell_capacity_ah', 280)
+  // BESS L22 (2026-05-25, task #122): ambient + actual thermal load.
+  // ambient_design_temp_c default 35°C (EN 14511 nominal); legacy contracts
+  // without the field land on the nominal rating point.
+  // system_thermal_dissipation_kw is pybamm's computed load when orchestrator
+  // ran; legacy contracts fall back to thermal_rejection_min_kw / 1.5 (which
+  // approximates the raw load before the previous 1.5× safety factor was
+  // baked in — keeps legacy chains sized identically).
+  const ambientDesignTempC = q(contract, 'ambient_design_temp_c', 35)
+  const systemThermalDissipationKw = q(
+    contract,
+    'system_thermal_dissipation_kw',
+    thermalRejectionKw / 1.5,
+  )
   return {
     cellCount,
     rackCount,
@@ -308,6 +434,8 @@ function deriveBessParams(contract: ContractShape): BessParams {
     stringPeakA,
     cellCapacityAh,
     cellVoltageV,
+    ambientDesignTempC,
+    systemThermalDissipationKw,
   }
 }
 
@@ -1218,14 +1346,37 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
   // packaged liquid chiller in the Pfannenberg range the EB XT family is
   // the correct line: EB XT 500 WT = 47 kW, EB XT 600 WT = 59 kW (BESS-rated,
   // 36-150 kW family, R410A refrigerant, scroll compressor + microchannel
-  // condenser, EN 14511 rated, outdoor IP54). Pick EB XT 500 WT for the
-  // 50 kW design load with ≤6% margin (47 kW @ 35°C nominal rating).
+  // condenser, EN 14511 rated, outdoor IP54). Refrigerant updated to R410A
+  // per EB XT product page (CC-series R513A does not apply to EB XT).
   // Source: https://www.pfannenberg.com/en-gb/liquid-cooling/eb-xt-36-150-kw/
   // and https://products.pfannenberg.com/EBXT-600-400V-Air-Cooled-Active-Liquid-Cooler/42146005001.
-  // Refrigerant updated to R410A per EB XT product page (CC-series R513A
-  // does not apply to EB XT).
+  //
+  // BESS L22 (2026-05-25, task #122 universal thermal subsystem ambient-
+  // derating contract): the chiller selection is now a function of (design
+  // thermal load, brief ambient). At +35°C nominal we previously HARDCODED
+  // EB XT 500 WT (47 kW) because the static load was ~30-50 kW. With ambient
+  // pulled into the contract, a +50°C-ambient brief now correctly upsizes
+  // because EB XT 500 WT @ +50°C drops to 28.2 kW (60% of nominal per the
+  // Pfannenberg published derating curve). The selector chooses the smallest
+  // EB XT whose DERATED capacity ≥ system_thermal_dissipation_kw × 1.20
+  // engineering margin. Gate 16 audit then verifies the chosen pin is
+  // adequate. Universal — adding the same field to HAPS / VF / heat pump /
+  // EV charger contracts wires up ambient-aware chiller sizing for those
+  // classes too. Pattern: `ambient_design_temp_c` from the contract → here.
+  const thermalMarginFactor = 1.20  // engineering practice: 20% headroom above raw dissipation
+  const requiredChillerKwAtAmbient = p.systemThermalDissipationKw * thermalMarginFactor
+  const selected = selectPfannenbergEbXt(requiredChillerKwAtAmbient, p.ambientDesignTempC)
+  // Legacy derived parameter — sized to the next 30 kW step from raw thermal
+  // rejection. Kept for downstream prose / cover-page parity (Physics Critic
+  // L9 cited this value). The AUTHORITATIVE figures for the BoM word + audit
+  // come from `selected` above.
   const chillerKw = Math.max(30, Math.ceil(p.thermalRejectionKw / 30) * 30)
-  const pinnedChillerCapacityKw = 47
+  const pinnedChillerCapacityKw = selected.nominal_capacity_kw
+  const deratedCapacityKw = selected.derated_capacity_kw
+  const chillerFormText =
+    `Pfannenberg ${selected.part_number} packaged liquid chiller, ${pinnedChillerCapacityKw} kW @ 35°C ambient ` +
+    `(${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C design ambient per EN 14511 derate curve), ` +
+    `water/glycol 80/20, IP54 outdoor mount, AC 400 3~/50 Hz`
 
   const liquidCooling = makeSubModule(
     'liquid_cooling',
@@ -1240,15 +1391,16 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('capacity', String(pinnedChillerCapacityKw), 'kW'),
-          mod(
-            'form',
-            'Pfannenberg EB XT 500 WT packaged liquid chiller, 47 kW @ 35°C ambient, water/glycol 80/20, IP54 outdoor mount, AC 400 3~/50 Hz',
-          ),
+          mod('form', chillerFormText),
           // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): R513A is a
           // refrigerant material, not a regulatory standard. Use `material`.
           // L17 fix: EB XT family uses R410A, not R513A (per product page).
           mod('material', 'R410A'),
           mod('regulatory', 'EN 14511 + AHRI 550/590'),
+          // BESS L22 (2026-05-25, task #122): explicit design-ambient +
+          // derated-capacity modifiers so the downstream gate 16 audit can
+          // read them deterministically without re-parsing the form string.
+          mod('performance', `derated to ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient`),
         ],
       ),
       word(
@@ -1316,12 +1468,21 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
 
   return {
     module: 'environmental_interface',
-    module_brief: `Rejects ${p.thermalRejectionKw.toFixed(0)} kW of inverter + pack losses via a ${chillerKw} kW glycol/water chiller and four enclosure ventilation fans.`,
+    module_brief: `Rejects ${p.thermalRejectionKw.toFixed(0)} kW of inverter + pack losses via a Pfannenberg ${selected.part_number} (${pinnedChillerCapacityKw} kW @ 35°C / ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient) glycol/water chiller and four enclosure ventilation fans.`,
     overview_paragraph_en: '',
     derived_parameters: {
       cooling_capacity_kw: chillerKw,
       thermal_rejection_required_kw: p.thermalRejectionKw,
-      max_ambient_c: 50,
+      // BESS L22 (2026-05-25, task #122): expose the contract's design
+      // ambient AND the chiller's derated capacity at that ambient for
+      // downstream consumers (gate 16 audit, cover-page narrator, physics
+      // critic). max_ambient_c was previously hardcoded to 50 — it now
+      // tracks the brief's operating_environment.temp_max_c.
+      max_ambient_c: p.ambientDesignTempC,
+      ambient_design_temp_c: p.ambientDesignTempC,
+      chiller_nominal_capacity_kw: pinnedChillerCapacityKw,
+      chiller_derated_capacity_kw: deratedCapacityKw,
+      system_thermal_dissipation_kw: p.systemThermalDissipationKw,
     },
     allowed_radicals: [
       'thermal_transfer_function',

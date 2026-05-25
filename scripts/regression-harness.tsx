@@ -411,6 +411,27 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       () => `in_container=${inContainerMassVal} kg vs cap=${briefMassCapVal} kg but mass_feasibility=${massFeasibilityVal} (expected 0)`,
     ))
 
+    // BESS.thermal_ambient_contract — task #122 (2026-05-25) regression guard.
+    // The BESS engineering contract MUST emit `ambient_design_temp_c` (read
+    // from parsedBrief.constraints.operating_environment.temp_max_c, default
+    // 35°C). The deterministic emitter's chiller selector + gate 16 audit
+    // both depend on this field. If a refactor accidentally drops it (e.g.
+    // by reverting the contract builder), iter-N catches iter-(N+1) here
+    // instead of silently shipping a chiller sized for +35°C when the brief
+    // specified +50°C. Universal pattern — when other classes (HAPS, VF,
+    // heat pump, EV charger) adopt the same field, extend this invariant to
+    // cover them too. Drawer pattern: `pre-change mempalace search:
+    // ambient derating chiller -> 5 drawers; loop for the same gap class`.
+    const contractQ = state?.orchestratorContract?.quantities as Record<string, any> | undefined
+    const ambientDesignTempPresent = typeof contractQ?.ambient_design_temp_c?.value === 'number'
+    assertions.push(assertEq(
+      'BESS.thermal_ambient_contract',
+      'orchestratorContract.quantities.ambient_design_temp_c is present and numeric (task #122 universal thermal subsystem)',
+      ambientDesignTempPresent ? 1 : 0,
+      (n) => n === 1,
+      () => `ambient_design_temp_c missing from orchestratorContract.quantities — gate 16 audit + selectPfannenbergEbXt will silently fall back to 35°C default for non-+35°C briefs`,
+    ))
+
     // Suppress unused-var warning for the eosCheck (kept for future invariants)
     void eosCheck
   }
