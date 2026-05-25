@@ -16,6 +16,8 @@
  * call any of them interchangeably.
  */
 
+import { recordDistributorHit } from './library-writeback'
+
 export interface DistributorResult {
   source: 'mouser' | 'digikey' | 'farnell' | 'lcsc' | 'nexar' | 'rs' | 'eriks' | 'zoro'
   mpn: string
@@ -136,7 +138,7 @@ export async function lookupSkuMouser(mpn: string): Promise<DistributorResult | 
         : null)
     )
 
-    return {
+    const result: DistributorResult = {
       source: 'mouser',
       mpn: best.ManufacturerPartNumber || mpn,
       manufacturer: best.Manufacturer || '',
@@ -148,6 +150,8 @@ export async function lookupSkuMouser(mpn: string): Promise<DistributorResult | 
       leadWeeks,
       fetchedAt: new Date().toISOString(),
     }
+    recordDistributorHit(result)
+    return result
   } catch (err) {
     console.warn(`[mouser] lookup failed for ${mpn}:`, (err as Error).message)
     return null

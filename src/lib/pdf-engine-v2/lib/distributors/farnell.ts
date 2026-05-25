@@ -17,6 +17,7 @@
 
 import type { DistributorResult } from './mouser'
 import { parseLeadTimeWeeks } from './mouser'
+import { recordDistributorHit } from './library-writeback'
 
 const FARNELL_URL = 'https://api.element14.com/catalog/products'
 const STORE = 'uk.farnell.com'
@@ -118,7 +119,7 @@ export async function lookupSkuFarnell(mpn: string): Promise<DistributorResult |
       }
     }
 
-    return {
+    const result: DistributorResult = {
       source: 'farnell',
       mpn: returnedMpn,
       manufacturer,
@@ -130,6 +131,8 @@ export async function lookupSkuFarnell(mpn: string): Promise<DistributorResult |
       leadWeeks,
       fetchedAt: new Date().toISOString(),
     }
+    recordDistributorHit(result)
+    return result
   } catch (err) {
     console.warn(`[farnell] lookup failed for ${mpn}:`, (err as Error).message)
     return null

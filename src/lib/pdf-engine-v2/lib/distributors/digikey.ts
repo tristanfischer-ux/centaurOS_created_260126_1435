@@ -12,6 +12,7 @@
 
 import type { DistributorResult } from './mouser'
 import { parseLeadTimeWeeks } from './mouser'
+import { recordDistributorHit } from './library-writeback'
 
 const DK_TOKEN_URL = 'https://api.digikey.com/v1/oauth2/token'
 const DK_SEARCH_URL = 'https://api.digikey.com/products/v4/search/keyword'
@@ -122,7 +123,7 @@ export async function lookupSkuDigikey(mpn: string): Promise<DistributorResult |
       }
     }
 
-    return {
+    const result: DistributorResult = {
       source: 'digikey',
       mpn: best.ManufacturerProductNumber || mpn,
       manufacturer: best.Manufacturer?.Name || '',
@@ -136,6 +137,8 @@ export async function lookupSkuDigikey(mpn: string): Promise<DistributorResult |
       leadWeeks,
       fetchedAt: new Date().toISOString(),
     }
+    recordDistributorHit(result)
+    return result
   } catch (err) {
     console.warn(`[digikey] lookup failed for ${mpn}:`, (err as Error).message)
     return null

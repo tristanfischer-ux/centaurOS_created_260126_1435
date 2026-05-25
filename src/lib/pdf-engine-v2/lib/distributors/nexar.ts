@@ -20,6 +20,7 @@
  */
 
 import type { DistributorResult } from './mouser'
+import { recordDistributorHit } from './library-writeback'
 
 const NEXAR_GRAPHQL_ENDPOINT = 'https://api.nexar.com/graphql'
 const NEXAR_TOKEN_ENDPOINT = 'https://identity.nexar.com/connect/token'
@@ -164,7 +165,7 @@ export async function lookupSkuNexar(mpn: string): Promise<DistributorResult | n
     if (!part) return null
 
     const { qty1Gbp, productUrl, stockUK } = bestGbpPrice(part)
-    return {
+    const result: DistributorResult = {
       source: 'nexar',
       mpn: part.mpn ?? mpn,
       manufacturer: part.manufacturer?.name ?? '',
@@ -176,6 +177,8 @@ export async function lookupSkuNexar(mpn: string): Promise<DistributorResult | n
       leadWeeks: null,
       fetchedAt: new Date().toISOString(),
     }
+    recordDistributorHit(result)
+    return result
   } catch (err) {
     console.warn(`[nexar] fetch error for mpn=${mpn}: ${(err as Error).message}`)
     return null
