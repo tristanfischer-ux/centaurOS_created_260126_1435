@@ -17,7 +17,7 @@
  */
 
 export interface DistributorResult {
-  source: 'mouser' | 'digikey' | 'farnell' | 'lcsc' | 'rs' | 'eriks' | 'zoro'
+  source: 'mouser' | 'digikey' | 'farnell' | 'lcsc' | 'nexar' | 'rs' | 'eriks' | 'zoro'
   mpn: string
   manufacturer: string
   description: string

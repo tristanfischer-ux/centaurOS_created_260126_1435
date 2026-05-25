@@ -18,6 +18,7 @@ import { lookupSkuMouser } from './mouser'
 import { lookupSkuDigikey } from './digikey'
 import { lookupSkuFarnell } from './farnell'
 import { lookupSkuLcsc } from './lcsc'
+import { lookupSkuNexar } from './nexar'
 import type { DistributorResult } from './mouser'
 
 export type { DistributorResult } from './mouser'
@@ -35,7 +36,8 @@ export interface AggregateResult {
 }
 
 // 'lcsc' added — API pending approval, stub returns null when key absent.
-export type CostSource = 'mouser' | 'farnell' | 'digikey' | 'lcsc' | 'supplier' | 'estimated' | 'database'
+// 'nexar' added 2026-05-25 — Octopart aggregator, additional enrichment layer.
+export type CostSource = 'mouser' | 'farnell' | 'digikey' | 'lcsc' | 'nexar' | 'supplier' | 'estimated' | 'database'
 
 function qty1Price(r: DistributorResult): number {
   if (!r.priceGBP || r.priceGBP.length === 0) return Infinity
@@ -57,11 +59,22 @@ function qty1Price(r: DistributorResult): number {
 export async function findSkuForPart(mpn: string, manufacturer?: string | null): Promise<AggregateResult | null> {
   if (!mpn || mpn.length < 2) return null
 
-  const [mouser, digikey, farnell, lcsc] = await Promise.all([
+  // Cascade policy (per mempalace decision part-verification.ts + url-resolves.ts):
+  // Tier 1: native distributor APIs (Mouser, Digi-Key, Farnell, LCSC) — primary
+  //         catalogue lookup, URLs trusted by construction (no HEAD-check).
+  // Tier 1.5 (NEW 2026-05-25): Nexar (Octopart) added as an ADDITIONAL LAYER ON
+  //         TOP — its supSearchMpn aggregates across 60+ distributors including
+  //         RS, Avnet, Newark, TTI; runs in parallel as a 5th hit and provides
+  //         cross-validation + extra coverage when one of the native four
+  //         misses an OEM-direct or region-specific part. Free tier 100
+  //         matched parts/month so it's an OPPORTUNISTIC enrichment, not a
+  //         replacement for the native four.
+  const [mouser, digikey, farnell, lcsc, nexar] = await Promise.all([
     lookupSkuMouser(mpn).catch(() => null),
     lookupSkuDigikey(mpn).catch(() => null),
     lookupSkuFarnell(mpn).catch(() => null),
     lookupSkuLcsc(mpn).catch(() => null),
+    lookupSkuNexar(mpn).catch(() => null),
   ])
 
   // Manufacturer-strict filter: when the BoM line declares a manufacturer,
@@ -90,6 +103,7 @@ export async function findSkuForPart(mpn: string, manufacturer?: string | null):
   if (digikey && manufacturerMatches(digikey)) hits.push(digikey); else misses.push('digikey')
   if (farnell && manufacturerMatches(farnell)) hits.push(farnell); else misses.push('farnell')
   if (lcsc && manufacturerMatches(lcsc)) hits.push(lcsc); else misses.push('lcsc')
+  if (nexar && manufacturerMatches(nexar)) hits.push(nexar); else misses.push('nexar')
 
   if (hits.length === 0) return null
 
