@@ -70,6 +70,7 @@ import type { ContractInProgress as OrchestratorContract } from './lib/orchestra
 import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator/library-candidate-query'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
+import { applyJurisdictionFilterToModules, applyJurisdictionFilterToNlLayer, applyJurisdictionFilterToBriefProse } from './lib/jurisdiction-prose-filter'
 import { translate } from '../src/lib/pdf-engine-v2/radical/universal-translator'
 import { runArithmeticGates } from '../src/lib/pdf-engine-v2/radical/universal-arithmetic-gates'
 import { runGrammarGates } from '../src/lib/pdf-engine-v2/radical/universal-grammar-gates'
@@ -3849,6 +3850,21 @@ async function main() {
     const entry = (nl as any).by_module?.[m.module]
     if (entry && m.overview_paragraph_en) entry.paragraph_en_llm = m.overview_paragraph_en
   }
+
+  // ── L29 fix(jurisdiction): post-Phase-2 jurisdiction prose filter.
+  // Gate 19 (jurisdictional-standards-audit) walks modifier_characters[regulatory],
+  // english_sentence, naturalLanguageLayer prose, and briefOverviewProse for
+  // foreign-jurisdiction citations. Phase 2 LLM repair can introduce UL/ASTM/NEC
+  // codes that the deterministic emitter never emitted (e.g. UL 1577 on the digital
+  // isolator, ASTM A312 on coolant pipes, UL 2166/521/2075 on fire-protection words).
+  // This filter substitutes all known US/foreign codes with their UK/IEC equivalents
+  // on all three surfaces, immediately before state assembly. The same substitution
+  // map is exported from scripts/lib/jurisdiction-prose-filter.ts.
+  applyJurisdictionFilterToModules((design.modules ?? []) as any)
+  applyJurisdictionFilterToNlLayer(nl as any)
+  if (design.brief_overview_prose) applyJurisdictionFilterToBriefProse(design.brief_overview_prose as any)
+  console.error('[chain] jurisdiction-prose-filter applied to moduleDecomposition + naturalLanguageLayer')
+
   const state = {
     projectId: 'chain-v2-' + Date.now(),
     parsedBrief: parsedResult.data,

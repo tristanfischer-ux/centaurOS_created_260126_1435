@@ -149,17 +149,23 @@ function deriveEnergyStorageHeadline(modules: ModuleSpec[], parsedBrief: any, br
   let cellV: number | null = null
   let cellAh: number | null = null
 
-  // ── Authoritative cell_count from orchestratorContract (single source of truth).
-  // The contract derives cell_count as rack_count × cells_per_rack from the
-  // physics tool (PyBaMM) output — it is the canonical integer-clean value.
-  // The BoM walk below is a deny-list approach that ALWAYS risks missing a new
-  // per-cell ancillary word (cell_electrolyte was missed in L26; cell_heater_pad
-  // was missed in L28 causing +15 discrepancy). Reading the contract avoids this
-  // whack-a-mole entirely. Fall back to the BoM walk ONLY if the contract is
-  // absent (pre-contract runs or non-BESS product classes reusing this deriver).
+  // ── Authoritative cell_count / cell_capacity_ah / cell_voltage_v from
+  // orchestratorContract (single source of truth for all three).
+  // The contract derives these from the physics tool (PyBaMM) output — they are
+  // canonical, integer-clean values not susceptible to the BoM deny-list
+  // whack-a-mole (cell_electrolyte missed L26; cell_heater_pad missed L28).
+  // Fall back to the BoM walk ONLY if the contract is absent.
   const contractCellCount: number | null =
     typeof orchestratorContract?.quantities?.cell_count?.value === 'number'
       ? orchestratorContract.quantities.cell_count.value
+      : null
+  const contractCellAh: number | null =
+    typeof orchestratorContract?.quantities?.cell_capacity_ah?.value === 'number'
+      ? orchestratorContract.quantities.cell_capacity_ah.value
+      : null
+  const contractCellV: number | null =
+    typeof orchestratorContract?.quantities?.cell_voltage_v?.value === 'number'
+      ? orchestratorContract.quantities.cell_voltage_v.value
       : null
 
   // Match cells: character_id contains "cell" as a standalone word component,
@@ -220,13 +226,17 @@ function deriveEnergyStorageHeadline(modules: ModuleSpec[], parsedBrief: any, br
     }
   }
 
-  // Contract takes precedence over the BoM walk for cell_count.
-  // If the contract has a value, use it unconditionally — it is derived from
-  // rack_count × cells_per_rack via the physics tool and is the single source
-  // of truth. The BoM walk value (totalCells) is kept as a fallback for runs
-  // that pre-date the engineering contract or for non-BESS classes.
+  // Contract takes precedence over the BoM walk for cell_count / Ah / V.
+  // These are derived from the physics tool (PyBaMM) and are the single source
+  // of truth. BoM walk values are fallbacks for pre-contract runs only.
   if (contractCellCount !== null) {
     totalCells = contractCellCount
+  }
+  if (contractCellAh !== null) {
+    cellAh = contractCellAh
+  }
+  if (contractCellV !== null) {
+    cellV = contractCellV
   }
 
   // Brief target performance: usable energy in MWh (BESS-typical)
@@ -276,7 +286,7 @@ function deriveEnergyStorageHeadline(modules: ModuleSpec[], parsedBrief: any, br
       'Annual MWh throughput (estimated)',
       Math.round(briefMwh * dod * cyclesPerYear),
       'MWh / year',
-      `Cells not yet specified in the design; estimated from brief target ${briefMwh} MWh × ${dod} DoD × ${cyclesPerYear} cycles/year. Will tighten once cell components are emitted.`,
+      `Annual energy throughput estimated from brief constraints: target usable capacity × ${Math.round(dod * 100)}% DoD × ${cyclesPerYear} daily cycles/year. Cell components not yet emitted — throughput will be recalculated once cell topology is specified.`,
       'derived_from_brief',
     )
   }
