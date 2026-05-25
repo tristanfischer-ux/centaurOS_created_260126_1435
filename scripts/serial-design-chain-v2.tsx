@@ -3542,6 +3542,79 @@ async function main() {
     logAction({ step: 'structural_gate_routing', count: surfacedFromGates })
   }
 
+  // ── Stage 10.5: Part Reality Check (council item #2, 2026-05-25).
+  //
+  // Walks every BoM word BEFORE the renderer ingests the design, queries
+  // the distributor cascade (cached — no quota burn), and either:
+  //   PASS  — MPN confirmed real → continue as-is
+  //   SUBSTITUTE — MPN fictional + a real Stage 17.6 library candidate exists
+  //                → patch manufacturer + part_number in-place
+  //   WARN  — MPN fictional + no real library candidate → log HIGH warning,
+  //           gate 20 (fictional-pn-audit.ts) remains as the post-render backstop
+  //
+  // Root cause: BESS L23 emitted Sungrow SC1000UD-MV (fictional 1 MW PCS) which
+  // is the CORE subsystem. Gate 20 caught it post-render after 137 Nexar calls
+  // and one PDF render had already been spent. This stage intercepts at emission
+  // time. Council item #2 from BESS L23 verdict.
+  //
+  // SOFT stage: non-zero exit → log warning and continue. Gate 20 is the hard
+  // backstop so the chain does not need to halt here.
+  // Skip via CHAIN_SKIP_PART_REALITY_CHECK=1.
+  if (process.env.CHAIN_SKIP_PART_REALITY_CHECK !== '1') {
+    const tRealityCheck = Date.now()
+    const libCandidatesPath = resolve(outDir, '4-library-candidates.json')
+    if (existsSync(libCandidatesPath)) {
+      try {
+        const { runPartRealityCheck } = await import('./lib/part-reality-check')
+        let libCandidates: any = {}
+        try {
+          libCandidates = JSON.parse(require('fs').readFileSync(libCandidatesPath, 'utf-8'))
+        } catch { /* continue with empty candidates */ }
+        const realityResult = await runPartRealityCheck(design, libCandidates)
+        console.error(
+          `[chain] Stage 10.5 Part Reality Check: ${realityResult.words_checked} checked, ` +
+          `${realityResult.words_real} real, ${realityResult.words_substituted} substituted, ` +
+          `${realityResult.words_warned} warned (no substitute available). ` +
+          `Nexar calls used: ${realityResult.nexar_calls}.`,
+        )
+        if (realityResult.substitutions.length > 0) {
+          console.error(`[chain] Stage 10.5 substitutions:`)
+          for (const s of realityResult.substitutions) {
+            console.error(`  • ${s.word_id}: "${s.original_manufacturer ?? '?'} ${s.original_mpn}" → "${s.substitute_manufacturer} ${s.substitute_mpn}" (${s.substitute_part_name})`)
+          }
+        }
+        if (realityResult.warnings.length > 0) {
+          console.error(`[chain] Stage 10.5 HIGH warnings (no substitute — gate 20 backstop applies):`)
+          for (const w of realityResult.warnings) {
+            console.error(`  ⚠ ${w.word_id}: "${w.manufacturer ?? '?'} ${w.mpn}" [class=${w.component_class ?? 'unknown'}, library_class=${w.library_class ?? 'none'}]`)
+          }
+        }
+        // runPartRealityCheck mutates `design` in-place — state picks up the
+        // substitutions automatically when the state object is assembled below.
+        logAction({
+          step: 'part_reality_check',
+          latency_ms: Date.now() - tRealityCheck,
+          words_checked: realityResult.words_checked,
+          words_real: realityResult.words_real,
+          words_substituted: realityResult.words_substituted,
+          words_warned: realityResult.words_warned,
+          nexar_calls: realityResult.nexar_calls,
+          substitutions: realityResult.substitutions,
+          warnings: realityResult.warnings,
+          ok: true,
+        })
+      } catch (err) {
+        console.error(`[chain] Stage 10.5 Part Reality Check threw: ${(err as Error).message}; continuing without (gate 20 backstop applies)`)
+        logAction({ step: 'part_reality_check', latency_ms: Date.now() - tRealityCheck, ok: false, error: String(err).slice(0, 200) })
+      }
+    } else {
+      console.error(`[chain] Stage 10.5 Part Reality Check: no 4-library-candidates.json found at ${libCandidatesPath} — skipping (Stage 17.6 library query must have run first)`)
+      logAction({ step: 'part_reality_check', latency_ms: Date.now() - tRealityCheck, ok: false, reason: 'no_library_candidates_file' })
+    }
+  } else {
+    console.error('[chain] CHAIN_SKIP_PART_REALITY_CHECK=1 — skipping Stage 10.5 Part Reality Check')
+  }
+
   // ── Manual-review badge wires (Tristan v3 gap closure 2026-05-19).
   // The renderer's collectManualReviewBadges() at render-minimal-pdf.tsx:954
   // surfaces 6 gate badges on the cover + inline + appendix. Until now only G0
