@@ -36,6 +36,7 @@ import type { DistributorResult } from './mouser'
 
 let dbHandle: Database.Database | null | undefined = undefined
 let insertStmt: Database.Statement | null = null
+let cascadeDocId: number = 0
 let warnedMissing = false
 
 function getDb(): Database.Database | null {
@@ -57,6 +58,25 @@ function getDb(): Database.Database | null {
     const db = new Database(dbPath)
     db.pragma('journal_mode = WAL')
     db.pragma('busy_timeout = 2000')
+
+    // pretraining_extracted_parts requires NOT NULL document_id with FK to
+    // pretraining_spec_documents.id (background-enrichment.ts uses the same
+    // get-or-create pattern). Lazy-create one synthetic row per source_type.
+    const docRow = db.prepare(`
+      SELECT id FROM pretraining_spec_documents
+      WHERE source_type = 'distributor_cascade' AND distributor IS NULL
+      ORDER BY id ASC LIMIT 1
+    `).get() as { id: number } | undefined
+    if (docRow?.id) {
+      cascadeDocId = docRow.id
+    } else {
+      const r = db.prepare(`
+        INSERT INTO pretraining_spec_documents (source_type, document_type, extraction_status)
+        VALUES ('distributor_cascade', 'distributor_catalogue_hit', 'done')
+      `).run()
+      cascadeDocId = Number(r.lastInsertRowid)
+    }
+
     insertStmt = db.prepare(`
       INSERT OR IGNORE INTO pretraining_extracted_parts
       (document_id, part_name, manufacturer, part_number,
@@ -92,7 +112,7 @@ export function recordDistributorHit(result: DistributorResult | null): void {
     const description = (result.description || `${mfg} ${mpn}`).slice(0, 1024)
     const productUrl = result.productUrl || ''
     insertStmt.run(
-      null,                                    // document_id (no source doc)
+      cascadeDocId,                            // document_id — synthetic 'distributor_cascade' row
       description.slice(0, 256),               // part_name
       mfg,                                     // manufacturer
       mpn,                                     // part_number
