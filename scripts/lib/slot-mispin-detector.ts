@@ -171,6 +171,105 @@ export const KNOWN_MIS_PINS: MisPinRule[] = [
       'Rembe DDS deflagration vent (NFPA 68 + EN 14797 certified)',
     ],
   },
+  // ── BESS L21 Physics Critic finding #1: AC-rated 170M fuse on DC bus ──
+  // Bussmann 170M family covers many subfamily voltage classes:
+  //  - 170M10xx / 170M11xx / 170M12xx / 170M13xx / 170M14xx / 170M15xx
+  //    / 170M16xx / 170M17xx / 170M50xx / 170M51xx / 170M52xx / 170M53xx
+  //    / 170M54xx / 170M55xx / 170M56xx / 170M57xx / 170M65xx / 170M66xx
+  //    / 170M67xx / 170M68xx / 170M69xx — primarily 690 V AC (IEC) / 700 V AC
+  //    (UL) on the canonical Eaton 720014 datasheet.
+  //  - 170M18xx / 170M19xx — also rated 1000 V DC per the IGBT-protection
+  //    catalogue, but the standard datasheet leads with AC ratings, leaving
+  //    physics-review readers uncertain.
+  //
+  // For a DC bus pin (slot pattern dc_*_fuse, *dc_hrc_fuse, *_dc_fuse, etc.)
+  // the safest practice is to swap to a part whose CANONICAL datasheet
+  // explicitly states a DC rating — Eaton Bussmann PV-NH series is the
+  // industry-standard DC-PV / battery-storage line (PV-200ANH1 etc.).
+  // This rule fires on EVERY 170M variant pinned to a DC fuse slot,
+  // including the 170M18xx + 170M19xx subfamilies that ARE in fact
+  // 1000 V DC rated — because picking those requires the reader to know
+  // which subfamily exception applies and read the supplementary IGBT
+  // catalogue, slowing physics review. Forcing PV-NH eliminates the
+  // ambiguity. Bug class: "AC-rated fuse pinned to DC bus".
+  //
+  // Source for ambiguity: Eaton 720014 datasheet
+  // https://www.eaton.com/content/dam/eaton/products/electrical-circuit-protection/bussmann-iec-high-speed-semi-conductors-fuses/bussmann-iec-square-body-fuses/eaton-bussmann-series-40-2000a-170m-high-speed-fuses-datasheet-720014-en-gb.pdf
+  // (lists 690 V AC IEC / 700 V AC UL on standard pages) + RS Components
+  // listing for 170M1811 https://us.rs-online.com/product/bussmann-by-eaton/170m1811/74058756/
+  // (shows 1000 V DC supplemental rating that requires opening a separate
+  // application note to verify).
+  {
+    character_id_pattern: /^(?:.*_)?(dc_hrc_fuse|dc_string_fuse|dc_rack_fuse|dc_bus_fuse|dc_main_fuse|dc_fuse|hrc_fuse_dc|rack_dc_fuse|string_dc_fuse|battery_dc_fuse|pv_dc_fuse|pack_fuse)$/i,
+    forbidden_match: { manufacturer: /^(Eaton\s+)?Bussmann$|^Eaton$/i, part_number: /^170M\d{4}[A-Z]?$/i },
+    reason:
+      'Bussmann 170M-series square-body high-speed fuses are PRIMARILY documented under their 690 V AC (IEC) / 700 V AC (UL) rating on the canonical Eaton 720014 datasheet. The 170M18xx + 170M19xx subfamilies ARE in fact 1000 V DC rated per the supplementary IGBT-protection catalogue, but selecting them requires the physics reviewer to know which subfamily exception applies and cross-reference a non-primary application note. For a DC bus pin, swap to the Eaton Bussmann PV-NH series (PV-200ANH1, PV-160ANH1, etc.) — the EXPLICIT DC-PV / battery-storage line, Class gPV per IEC 60269-6, 1000 V DC unambiguously stated on the primary product page. AC-rated fuses on a DC bus that cannot extinguish DC arcs would cause catastrophic fire or explosion during a fault.',
+    suggested_alternatives: [
+      'Eaton Bussmann PV-200ANH1 (200 A / 1000 V DC / NH1, Class gPV per IEC 60269-6, 50 kAIC) — canonical 200 A BESS rack-fuse',
+      'Eaton Bussmann PV-160ANH1 (160 A / 1000 V DC / NH1, Class gPV)',
+      'Eaton Bussmann PV-125ANH1 (125 A / 1000 V DC / NH1, Class gPV)',
+      'Eaton Bussmann PV-100ANH1 (100 A / 1000 V DC / NH1, Class gPV) — for low-current per-rack protection',
+      'Eaton Bussmann PV-400ANH2 (400 A / 1000 V DC / NH2) — for higher-current bus protection',
+      'OR — if the 170M18xx/19xx subfamily is genuinely required for a non-PV application, leave a comment citing the IGBT-protection catalogue page so reviewers can verify the 1000 V DC rating directly',
+    ],
+  },
+  // ── BESS L21 Physics Critic finding #4: heat-shrink boot pinned as
+  // grounding braid. TE Connectivity / Raychem 202K142-25 is a moulded
+  // heat-shrinkable transition boot (size 42, polyolefin elastomer), NOT
+  // a copper grounding braid. Pinning a polymer boot as a chassis-bond
+  // braid means there is ZERO current-carrying capacity in the safety
+  // earth path — a PCS fault could drive >2 kA chassis current with no
+  // bond to dissipate it. Generalised to all 202Kxxx + 202Pxxx +
+  // RNF-100 + WCSM heat-shrink families pinned to grounding slots.
+  //
+  // Source: DigiKey listing https://www.digikey.com/en/products/detail/te-connectivity-aerospace-defense-and-marine/202K142-25-0/2394220
+  // ("HEATSHRINK BOOT SZ42 BLACK").
+  {
+    character_id_pattern: /^(?:.*_)?(emc_ground_braid|chassis_bond|grounding_braid|ground_braid|earth_bond|bonding_braid|grounding_strap|earth_strap|chassis_ground|safety_earth_bond|equipotential_bond)$/i,
+    forbidden_match: { manufacturer: /^TE\s*(?:Connectivity)?$|^Raychem$/i, part_number: /^(202[KP]\d{3}-\d{2}|RNF-?100|WCSM[\w-]*|WPK[\w-]*)/i },
+    reason:
+      'TE Connectivity / Raychem 202K/202P-series, RNF-100, WCSM, WPK families are HEAT-SHRINKABLE MOULDED TRANSITION BOOTS / TUBING (polyolefin or fluorocarbon elastomer). They have ZERO copper conductor and ZERO current-carrying capacity. A chassis-bond / EMC grounding strap must carry potential fault current (typically 200-500 A continuous capacity for utility BESS) — a polymer boot would not bond ANY current and the chassis would float to bus potential during a fault. Required: a tinned copper braid with integral palms or crimp lugs and an explicit ampacity rating.',
+    suggested_alternatives: [
+      'nVent ERIFLEX MBJ50-300-10 (catalog 556860): 50 mm² tinned copper braid, 250 A continuous, 300 mm c-c, M10 palms — the canonical utility-BESS chassis-bond part',
+      'nVent ERIFLEX MBJ50-200-10 / MBJ50-500-10 — same family, different lengths',
+      'nVent ERIFLEX MBJ95-300-10 — 95 mm² / 400 A for higher-fault applications',
+      'Mersen FLEXIBAR FFB-50 — 50 mm² tinned copper flat braid (legacy alternative)',
+      'OR — if a polymer transition boot is genuinely needed (e.g. for cable strain relief), rename the slot character_id to cable_transition_boot / cable_strain_relief and re-pin the heat-shrink boot there',
+    ],
+  },
+  // ── BESS L21 Physics Critic finding #2: NTC thermistor lead bolted
+  // to cell power terminal. Real BESS practice (Tesla Megapack 2 XL,
+  // CATL EnerC+, Sungrow PowerStack) ALWAYS bonds insulated-bead
+  // thermistors to the BUSBAR SURFACE with thermal epoxy and wires
+  // them to a SEPARATE BMS thermistor input that is galvanically
+  // isolated from the cell taps. Pinning an NTC thermistor lead OR
+  // a ring-terminal-with-NTC-role to a cell terminal hardware slot
+  // shorts the low-voltage BMS temperature input to the 800 V DC
+  // pack bus — instant slave-board destruction + Class C fire +
+  // shock hazard.
+  //
+  // This rule fires when:
+  //  (a) the slot character_id is a cell_terminal_hardware / cell_stud /
+  //      cell_post / pack_terminal_hardware / cell_terminal_lug /
+  //      cell_terminal_fastener etc., AND
+  //  (b) the part is an NTC thermistor (any TDK/EPCOS/Vishay/Murata
+  //      B5xxxx / NTCxxxx / TMP series), OR the form modifier
+  //      explicitly mentions "NTC" / "thermistor".
+  //
+  // Bug class: "NTC thermistor pinned to cell power stud".
+  {
+    character_id_pattern: /^(?:.*_)?(cell_terminal_hardware|cell_stud|cell_post|pack_terminal_hardware|cell_terminal_lug|cell_terminal_fastener|cell_terminal_bolt|cell_terminal_screw|cell_m8_stud|cell_busbar_lug)$/i,
+    forbidden_match: { form: /\b(NTC\s+thermistor|thermistor\s+(lead|wire|cable|probe))\b/i },
+    reason:
+      'NTC thermistor leads MUST NOT terminate on a cell power terminal (M8 stud or similar). Bolting an analog thermistor lead directly to an 800 V DC pack stud shorts the low-voltage BMS temperature-sensing input to the high-voltage bus — the slave board is destroyed instantly and a Class C electrical fire + shock hazard is created. Real utility BESS (Tesla Megapack 2 XL, CATL EnerC+, Sungrow PowerStack, BYD HVS) bond insulated-bead thermistors to the BUSBAR SURFACE (chassis-ground reference) with thermal epoxy, and wire them to a SEPARATE BMS thermistor connector with a 2.5 kV isolation barrier on the temperature ADC. Required: split the role — voltage-sense lug stays on the cell stud (one per cell to the BMS slave at ≤1 mA quiescent), thermistor bead bonds to the busbar SURFACE (not the terminal) and routes to the BMS isolated thermistor input via a separate harness.',
+    suggested_alternatives: [
+      'EPCOS / TDK B57703M0103G040 NTC bead probe (10 kΩ, PTFE-insulated 45 mm leads) bonded to BUSBAR SURFACE with 3M Scotch-Cast 4444 thermal epoxy',
+      'TDK NTCS Mini-K NTC bead (insulated, busbar-surface mount)',
+      'Amphenol C503-NTC (insulated-bead probe with 2.5 kV barrier connector)',
+      'Murata NXFT15XH103FE2B (insulated-bead, lead-wire isolated)',
+      'OR — if the slot is genuinely meant to carry both functions, split it into TWO words: a `cell_terminal_hardware_word` (voltage sense ONLY, e.g. Klauke 16208 ring terminal) and a separate `thermistor_attachment_word` (bead on busbar surface, separate harness)',
+    ],
+  },
   // ── BESS gotcha (from MEMORY.md `wren_means_dutch_haps_company`-style
   //    discoveries): if a future chain pins a 'Wren' part for a BESS slot,
   //    it's probably Wren Aerospace (HAPS), not a BESS part. Flag here.

@@ -126,12 +126,59 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     // Source: https://us.rs-online.com/product/bussmann-by-eaton/170m1811/74058756/
     // ("FUSE 200A 1000V DC 000FU/90 AR UR") + Eaton Bussmann technical data
     // 720014 (170M Series catalogue).
+    //
+    // BESS L21 (2026-05-25) note: although 170M1811 IS in fact rated 1000 V
+    // DC per the IGBT-protection catalogue + RS Components, the standard
+    // Eaton 720014 datasheet describes the 170M family primarily under its
+    // 690 V AC / 700 V AC ratings. The PV-200ANH1 below is the EXPLICIT
+    // DC-PV / battery-storage replacement — same 200 A / 1000 V DC envelope
+    // but unambiguously DC on the canonical product page. This row stays
+    // so legacy chains pinning 170M18xx still pass validation; new emissions
+    // route through PV-200ANH1 / PV-XXXANH1 / PV-XXXANH2 below.
     manufacturer: 'Bussmann',
     part_number_pattern: /^170M18\d{2}$/i,
     category: 'dc_fuse',
     rated_current_a: 200,
     rated_voltage_dc_v: 1000,
-    notes: 'Bussmann 170M18xx subfamily (e.g. 170M1811): 200 A class aR semiconductor fuse, Size 000 DIN 43 620, 1000 V DC, IEC 60269-4 + UL Recognised.',
+    notes: 'Bussmann 170M18xx subfamily (e.g. 170M1811): 200 A class aR semiconductor fuse, Size 000 DIN 43 620, 1000 V DC, IEC 60269-4 + UL Recognised. NOTE: the canonical Eaton 720014 datasheet primarily lists 690 V AC / 700 V AC ratings for the 170M family — prefer Eaton Bussmann PV-200ANH1 for new BESS pins (unambiguously DC-PV per IEC 60269-6).',
+  },
+  // ── BESS L21 fix (2026-05-25): Eaton Bussmann PV-ANH series ───
+  // The explicit DC-PV / battery-storage fuse line in the Bussmann
+  // catalogue: 1000 V DC rating, NH1 body, Class gPV per IEC 60269-6
+  // (gPV is the IEC class specifically for solar PV strings + battery
+  // storage), UL Listed, CSA Certified, CE/RoHS, 50 kAIC interrupt.
+  // The "PV-" prefix removes any AC-vs-DC ambiguity that surrounds the
+  // 170M family on the standard datasheet. Universal across the
+  // 80-630 A range — pattern matches PV-80ANH1, PV-100ANH1,
+  // PV-125ANH1, PV-160ANH1, PV-200ANH1, PV-250ANH1, PV-315ANH1,
+  // PV-400ANH1, PV-500ANH1, PV-630ANH1.
+  // Source: Eaton product page https://www.eaton.com/us/en-us/skuPage.PV-200ANH1.html
+  // + RS Components https://us.rs-online.com/product/bussmann-by-eaton/pv-200anh1/74058757/
+  // + Wholesale Supply Group https://catalog.wholesalesupply.us/brand-eaton-bussmann/fuse-200a-1000v-dc-pv-size-1-dual-ind/sku-V3908-pv-200anh1
+  // + Cooper Electric https://www.cooper-electric.com/product/detail/869495/bussmann-mfg-pv-200anh1.
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-(80|100|125|160|200|250|315|400|500|630)A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    // Current rating varies by variant — set to the largest in the family
+    // (630 A) so the manufacturer-range fallback path doesn't false-flag
+    // smaller variants at < 1.5× the variant's own rating. The current
+    // claim check then catches genuine over-claims (e.g. claiming 1500 A
+    // on a PV-200ANH1 would be 7.5× over the family's largest variant).
+    rated_current_a: 630,
+    rated_voltage_dc_v: 1000,
+    notes: 'Eaton Bussmann PV-NH series (e.g. PV-200ANH1): photovoltaic / battery-storage fuse line, 1000 V DC unambiguous on canonical datasheet, NH1 or NH2 body per current rating, Class gPV per IEC 60269-6, 50 kAIC interrupt, UL Listed + CSA + CE/RoHS. The EXPLICIT DC-PV variant — preferred over 170M family for new BESS chains. Currents span 80-630 A in standard increments.',
+  },
+  // Also add a manufacturer alias for the bare "Bussmann" prefix so the
+  // parser catches PV-200ANH1 when the form modifier says just "Bussmann
+  // PV-200ANH1" instead of the full "Eaton Bussmann".
+  {
+    manufacturer: 'Bussmann',
+    part_number_pattern: /^PV-(80|100|125|160|200|250|315|400|500|630)A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 630,
+    rated_voltage_dc_v: 1000,
+    notes: 'Bussmann PV-NH series (alias for Eaton Bussmann PV-NH — same family). See "Eaton Bussmann" entry for spec details.',
   },
   // ── BESS isolation monitor ────────────────────────────────────
   {
@@ -362,6 +409,127 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     part_number_pattern: /^RKS\s*95-10$/i,
     category: 'crimp_lug',
     rated_current_a: 350,
+  },
+  // ── BESS L21 fix (2026-05-25): solderless DIN 46234 ring terminals ──
+  // Klauke 16208 — 0.5-1.0 mm² M8 (8.4 mm) ring terminal, copper ETP
+  // tin-plated, hard-soldered crimp area with grooved profile. The
+  // correct part for 22 AWG (0.326 mm²) BESS voltage-sense leads — NOT
+  // Klauke 16308 (1.5-2.5 mm², would produce an under-sized crimp
+  // violating IPC-A-620). Source: Klauke catalogue page
+  // https://www.klauke.com/gb/en/solderless-terminals-to-din-cu and
+  // distributor confirmation https://www.cablectrix.com/Products/Klauke-un-insulated-ring-terminals/16208
+  // (Cablectrix lists 16208 as DIN-46234 0.5-1mm² ring terminal with
+  // d2 = 8.4 mm hole — the 0.5-1.0 mm² M8 variant).
+  {
+    manufacturer: 'Klauke',
+    part_number_pattern: /^16208$/i,
+    category: 'voltage_sense_ring_terminal',
+    rated_current_a: 6,
+    notes: 'Klauke 16208: 0.5-1.0 mm² M8 (8.4 mm) DIN 46234 solderless ring terminal, copper ETP tin-plated, ~6 A continuous. The correct ring terminal for 22 AWG (~0.33 mm²) BESS voltage-sense leads — sits at the lower edge of the 0.5-1.0 mm² barrel range for an IPC-A-620 compliant hex-die crimp. Distinct from Klauke 16308 (1.5-2.5 mm², would under-crimp a 22 AWG lead).',
+  },
+  {
+    manufacturer: 'Klauke',
+    part_number_pattern: /^16308$/i,
+    category: 'voltage_sense_ring_terminal',
+    rated_current_a: 20,
+    notes: 'Klauke 16308: 1.5-2.5 mm² M8 (8.5 mm) DIN 46234 solderless ring terminal, copper ETP tin-plated, ~20 A continuous. Correct for 14-16 AWG conductors — NOT for 22 AWG (which under-crimps; use Klauke 16208 instead).',
+  },
+  // ── BESS L21 fix (2026-05-25): EMC grounding / bonding braid ──────
+  // nVent ERIFLEX MBJ50-300-10 (catalog 556860) — 50 mm² tinned copper
+  // grounding + bonding braid with integral pressed copper palms, 10.5 mm
+  // hole for M10 stud, 250 A continuous ampacity, 300 mm centre-to-centre,
+  // no separate crimp lugs required, vibration + fatigue resistant.
+  // Canonical industry part for utility BESS chassis bonding.
+  // Pattern matches MBJ50-100-10, MBJ50-150-10, MBJ50-200-10, MBJ50-300-10,
+  // MBJ50-500-10, MBJ50-500-12, MBJ50-300-16 — full MBJ50 family.
+  // Source: nVent product page https://www.nvent.com/en-us/eriflex/products/efsmbj50-300-10
+  // + Cooper Electric https://www.cooper-electric.com/product/detail/1660484/erico-inc-556860
+  // + datasheet PDF https://tlauk.net/document/42930/Eriflex_MBJ50-300-10_556860_Earth_Ground_Copper_Braid.pdf.
+  {
+    manufacturer: 'nVent ERIFLEX',
+    part_number_pattern: /^MBJ50-(100|150|200|300|500)-(10|12|16)$/i,
+    category: 'grounding_braid',
+    rated_current_a: 250,
+    notes: 'nVent ERIFLEX MBJ50 series (e.g. MBJ50-300-10 / cat 556860): 50 mm² tinned copper grounding + bonding braid, 250 A continuous, integral pressed copper palms with 10.5 mm (or 13 mm / 16.5 mm) hole, no separate crimp lugs required. The canonical BESS chassis-bond part — distinct from TE Connectivity 202K142-25 (heat-shrink boot, NOT a grounding braid).',
+  },
+  // Alias for "ERIFLEX" without the nVent prefix (some chains drop the
+  // brand owner). Also covers Mersen-era MBJ pins (Mersen sold ERIFLEX
+  // to nVent in 2018; many catalogues still list the legacy Mersen
+  // manufacturer name).
+  {
+    manufacturer: 'ERIFLEX',
+    part_number_pattern: /^MBJ50-(100|150|200|300|500)-(10|12|16)$/i,
+    category: 'grounding_braid',
+    rated_current_a: 250,
+    notes: 'ERIFLEX MBJ50 (alias for nVent ERIFLEX MBJ50 — same family). See nVent ERIFLEX entry for spec details.',
+  },
+  // INTENTIONALLY NO Mersen MBJ50 alias entry — Mersen is also the
+  // manufacturer of the BESS DC busbar (Mersen TCB-2000 series, 2000 A
+  // tinned electrolytic copper), and adding a low-current MBJ50 entry
+  // under the bare "Mersen" manufacturer would route the manufacturer-
+  // only fallback path to the wrong family (treating a 2000 A busbar
+  // claim as a 250 A grounding-braid over-claim). If a future chain
+  // emits Mersen MBJ50-XXX-YY with an EXPLICIT part_number, the
+  // pn-keyed lookup hits the nVent ERIFLEX entry above and validates
+  // correctly. Without a part_number, the chain's claim is ambiguous —
+  // could be a busbar or a grounding braid — and the validator
+  // legitimately skips it (parts_unknown) rather than misattribute.
+  // ── BESS L21 fix (2026-05-25): NTC thermistor bead probe ──────────
+  // EPCOS / TDK B57703M0103G040 — 10 kΩ NTC bead probe with 45 mm
+  // PTFE-insulated silver-plated nickel leads, -20…+125 °C operating
+  // range, B25/100 = 3988 K ±1 %, 150 mW power dissipation, glass-
+  // encapsulated bead. Canonical insulated-bead probe for utility BESS
+  // busbar surface temperature sensing — the PTFE jacket provides the
+  // galvanic isolation required so the bead can be bonded to the
+  // busbar surface (and read by the BMS slave's isolated thermistor
+  // input) without shorting to the cell power studs.
+  // Source: TDK product page
+  // https://product.tdk.com/en/search/sensor/ntc/ntc_assy/info?part_no=B57703M0103G040
+  // + datasheet https://www.tdk-electronics.tdk.com/inf/50/db/ntc/NTC_Probe_ass_M703.pdf
+  // + distributor (TME) https://www.tme.com/us/en-us/details/b57703m0103g040/temperature-sensors-ntc/epcos/.
+  // No current / voltage check (NTC thermistor — temperature-only).
+  {
+    manufacturer: 'EPCOS / TDK',
+    part_number_pattern: /^B57703M0\d{3}[GFA]0\d{2}$/i,
+    category: 'ntc_thermistor_probe',
+    notes: 'EPCOS / TDK B57703M series: 10 kΩ NTC bead probe with 45 mm PTFE-insulated silver-plated nickel leads, -20…+125 °C, B25/100 = 3988 K ±1 %, glass-encapsulated bead. PTFE-insulated leads provide the galvanic isolation required for BESS busbar-surface sensing.',
+  },
+  // Aliases for bare EPCOS / TDK prefix (some chains emit one but not both).
+  {
+    manufacturer: 'EPCOS',
+    part_number_pattern: /^B57703M0\d{3}[GFA]0\d{2}$/i,
+    category: 'ntc_thermistor_probe',
+    notes: 'EPCOS B57703M (alias for EPCOS / TDK — same part family). See EPCOS / TDK entry for spec details.',
+  },
+  {
+    manufacturer: 'TDK',
+    part_number_pattern: /^B57703M0\d{3}[GFA]0\d{2}$/i,
+    category: 'ntc_thermistor_probe',
+    notes: 'TDK B57703M (alias for EPCOS / TDK — same part family). See EPCOS / TDK entry for spec details.',
+  },
+  // ── BESS L21 fix (2026-05-25): mis-pin SCREEN for TE Connectivity
+  // 202K142-25 (heatshrink boot pinned as grounding braid). This is
+  // primarily caught by gate 15 slot-mispin-detector, but listing it
+  // here too means gate 13 surfaces the mis-attribution under a
+  // proper "wrong PART CLASS" finding if the LLM tries to claim a
+  // current rating on it. The 202K142-25 has NO copper conductor and
+  // no current carrying capacity — any current claim on it is wrong.
+  // Source: DigiKey listing
+  // https://www.digikey.com/en/products/detail/te-connectivity-aerospace-defense-and-marine/202K142-25-0/2394220
+  // ("HEATSHRINK BOOT SZ42 BLACK").
+  {
+    manufacturer: 'TE Connectivity',
+    part_number_pattern: /^202K142-25(?:-\d+)?$/i,
+    category: 'heatshrink_boot',
+    rated_current_a: 0,
+    notes: 'TE Connectivity / Raychem 202K142-25: heat-shrinkable moulded transition boot, size 42, polyolefin elastomer, ZERO current-carrying capacity. NOT a grounding braid — any current claim on this part is a mis-pin. Use nVent ERIFLEX MBJ50 series for grounding braids.',
+  },
+  {
+    manufacturer: 'TE',
+    part_number_pattern: /^202K142-25(?:-\d+)?$/i,
+    category: 'heatshrink_boot',
+    rated_current_a: 0,
+    notes: 'TE (alias for TE Connectivity) 202K142-25: heat-shrinkable moulded transition boot. See TE Connectivity entry.',
   },
   // ── BESS L18 fix (2026-05-24): AC LCL output filter ──────────────
   // Schaffner FN6840 series — LCL filter for Active Front End motor drives
