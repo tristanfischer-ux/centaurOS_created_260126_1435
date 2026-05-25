@@ -3949,8 +3949,11 @@ function _generateBriefRewrites(
         title: `IF prioritise CAPEX (max ${_fmtGBPFull(briefCost)} unit cost):`,
         bullets: [
           `Unit cost ceiling: ${_fmtGBPFull(briefCost)} ex-works`,
-          `Usable energy: ${feasibleEnergyMwh} MWh minimum at 25 °C, 80% DoD, BoL`,
-          `Maximum gross mass: ${feasibleMassKg.toLocaleString('en-GB')} kg (single-rack containerised)`,
+          // 2026-05-25 BESS L23 council item #5 — "(alternative scenario)"
+          // qualifier keeps gate-18 clustering from treating these values as
+          // contradictions of the main design's usable-energy / mass figures.
+          `Usable energy (alternative scenario): ${feasibleEnergyMwh} MWh minimum at 25 °C, 80% DoD, BoL`,
+          `Maximum gross mass (alternative scenario): ${feasibleMassKg.toLocaleString('en-GB')} kg (single-rack containerised)`,
           `All other constraints unchanged.`,
         ],
         tradeOffSummary: floorBound
@@ -3984,9 +3987,10 @@ function _generateBriefRewrites(
       out.push({
         title: `IF prioritise OUTPUT (${targetEnergyMwh} MWh usable energy):`,
         bullets: [
-          `Usable energy: ${targetEnergyMwh} MWh minimum at 25 °C, 80% DoD, BoL`,
-          `Unit cost ceiling: ${_fmtGBPFull(targetCost)} ex-works`,
-          `Maximum gross mass: ${targetMassKg.toLocaleString('en-GB')} kg (allow 4-axle low-loader transport)`,
+          // 2026-05-25 BESS L23 council item #5 — qualifier isolates these.
+          `Usable energy (alternative scenario): ${targetEnergyMwh} MWh minimum at 25 °C, 80% DoD, BoL`,
+          `Unit cost ceiling (alternative scenario): ${_fmtGBPFull(targetCost)} ex-works`,
+          `Maximum gross mass (alternative scenario): ${targetMassKg.toLocaleString('en-GB')} kg (allow 4-axle low-loader transport)`,
           `External envelope: container_40hc + allow external transformer pad-mount`,
           `All other constraints unchanged.`,
         ],
@@ -4016,11 +4020,12 @@ function _generateBriefRewrites(
       out.push({
         title: `IF prioritise MASS (${briefMassKg.toLocaleString('en-GB')} kg road-transportable):`,
         bullets: [
-          `Maximum gross mass: ${briefMassKg.toLocaleString('en-GB')} kg`,
+          // 2026-05-25 BESS L23 council item #5 — qualifier isolates these.
+          `Maximum gross mass (alternative scenario): ${briefMassKg.toLocaleString('en-GB')} kg`,
           feasibleEnergyMwh != null
-            ? `Usable energy: ${feasibleEnergyMwh} MWh minimum at 25 °C, 80% DoD, BoL`
-            : `Reduce usable energy proportionally to fit mass cap`,
-          `Unit cost ceiling: ${_fmtGBPFull(feasibleCost)} ex-works`,
+            ? `Usable energy (alternative scenario): ${feasibleEnergyMwh} MWh minimum at 25 °C, 80% DoD, BoL`
+            : `Reduce usable energy proportionally to fit mass cap (alternative scenario)`,
+          `Unit cost ceiling (alternative scenario): ${_fmtGBPFull(feasibleCost)} ex-works`,
           `Add: External MV transformer pad-mounted (NOT in container)`,
           `All other constraints unchanged.`,
         ],
@@ -4050,7 +4055,8 @@ function _generateBriefRewrites(
       out.push({
         title: `IF prioritise CAPEX (hold ${failedRow.briefTarget} unit cost):`,
         bullets: [
-          `Unit cost ceiling: ${failedRow.briefTarget} ex-works (HOLD)`,
+          // 2026-05-25 BESS L23 council item #5 — qualifier isolates these.
+          `Unit cost ceiling (alternative scenario): ${failedRow.briefTarget} ex-works (HOLD)`,
           `Reduce stated performance targets proportionally (output / capacity / efficiency)`,
           `Accept a simpler topology — fewer redundant modules, simpler control electronics`,
           `Relax any non-mandatory certifications if commercially acceptable`,
@@ -4062,7 +4068,7 @@ function _generateBriefRewrites(
       out.push({
         title: `IF prioritise MASS (hold ${failedRow.briefTarget}):`,
         bullets: [
-          `Maximum gross mass: ${failedRow.briefTarget} (HOLD — transport-class constraint)`,
+          `Maximum gross mass (alternative scenario): ${failedRow.briefTarget} (HOLD — transport-class constraint)`,
           `Reduce stated performance targets so a smaller, lighter system meets the cap`,
           `Allow alternative materials in load-bearing modules (aluminium / composites in place of steel)`,
           `Consider splitting the system across multiple lighter units instead of one heavy unit`,
@@ -4073,7 +4079,7 @@ function _generateBriefRewrites(
       out.push({
         title: `IF prioritise OUTPUT (hold ${failedRow.briefTarget}):`,
         bullets: [
-          `Stated performance target: ${failedRow.briefTarget} (HOLD)`,
+          `Stated performance target (alternative scenario): ${failedRow.briefTarget} (HOLD)`,
           `Raise the cost ceiling sufficient to honour the target (see achieved-vs-target ratio above)`,
           `Allow the next-larger envelope class if dimensions are limiting`,
           `Allow a higher-density technology generation (cost-up, output-up)`,
@@ -4344,38 +4350,52 @@ function BriefComplianceTradeOffsPage({ state, project, bomTotals }: { state: an
             into the next brief revision.
           </Text>
           {briefRewrites.map((rw, i) => (
+            // 2026-05-25 BESS L23 council item #5 — gate 18 cross-page
+            // consistency audit flagged alternative-brief energy values
+            // (0.45 MWh CAPEX pivot, 2.34 MWh MASS pivot) as contradicting
+            // the main design value. Two-part fix:
+            // (a) Visual callout box with an "ALTERNATIVE BRIEF" header so
+            //     human readers immediately know the numbers are hypothetical.
+            // (b) Strong qualifier in bullet text (see _generateBriefRewrites)
+            //     so gate-18 pdftotext clustering sees "alternative scenario"
+            //     in the noun-phrase qualifier set and splits the cluster.
             <View
               key={`brief-rewrite-${i}`}
               style={{
-                marginBottom: 12,
-                padding: 10,
-                backgroundColor: '#f5f3ff',
-                borderLeftWidth: 3,
-                borderLeftColor: ACCENT,
+                marginBottom: 14,
+                borderWidth: 1,
+                borderColor: '#c4b5fd',
+                borderRadius: 4,
+                overflow: 'hidden',
               }}
               minPresenceAhead={80}
             >
-              <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT, marginBottom: 4 }}>
-                {rw.title}
-              </Text>
-              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK_SOFT, marginBottom: 3 }}>
-                Change brief to:
-              </Text>
-              {rw.bullets.map((bullet, bi) => (
-                <Text
-                  key={`brief-rewrite-${i}-b-${bi}`}
-                  style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 1, paddingLeft: 8 }}
-                >
-                  {/* ASCII hyphen — Helvetica's U+2022 bullet renders fine
-                      but the layout-overlap audit's substring filter is
-                      tighter on hyphens than on bullets; matches the
-                      existing "->" convention used in trade-off blocks. */}
-                  {`- ${bullet}`}
+              {/* Callout header strip — visually scopes as alternative scenario */}
+              <View style={{ backgroundColor: '#ede9fe', paddingHorizontal: 10, paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#c4b5fd' }}>
+                <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: '#5b21b6', letterSpacing: 0.8 }}>
+                  ALTERNATIVE BRIEF — {rw.title.replace(/:$/, '').toUpperCase()}
                 </Text>
-              ))}
-              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#7c2d12', marginTop: 5 }}>
-                {`Trade-off accepted: ${rw.tradeOffSummary}.`}
-              </Text>
+              </View>
+              <View style={{ padding: 10, backgroundColor: '#faf8ff' }}>
+                <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK_SOFT, marginBottom: 3 }}>
+                  Change brief to:
+                </Text>
+                {rw.bullets.map((bullet, bi) => (
+                  <Text
+                    key={`brief-rewrite-${i}-b-${bi}`}
+                    style={{ fontSize: 9.5, color: INK_SOFT, lineHeight: 1.55, marginBottom: 1, paddingLeft: 8 }}
+                  >
+                    {/* ASCII hyphen — Helvetica's U+2022 bullet renders fine
+                        but the layout-overlap audit's substring filter is
+                        tighter on hyphens than on bullets; matches the
+                        existing "->" convention used in trade-off blocks. */}
+                    {`- ${bullet}`}
+                  </Text>
+                ))}
+                <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#7c2d12', marginTop: 5 }}>
+                  {`Trade-off accepted: ${rw.tradeOffSummary}.`}
+                </Text>
+              </View>
             </View>
           ))}
         </View>
@@ -5329,9 +5349,13 @@ function SubModuleBomBlock({
         <Text style={{ flex: 2.6, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>PART</Text>
         <Text style={{ flex: 1.4, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>MANUFACTURER</Text>
         <Text style={{ flex: 1.6, fontSize: 7.5, color: MUTED, letterSpacing: 0.6 }}>PART NUMBER</Text>
-        <Text style={{ width: 30, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>QTY</Text>
-        <Text style={{ width: 50, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>UNIT (£)</Text>
-        <Text style={{ width: 55, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>LINE (£)</Text>
+        <Text style={{ width: 24, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>QTY</Text>
+        {/* 2026-05-25 BESS L23 council item #4 — T-1 detector flagged ×1 £10,000.00
+            overflows the UNIT(£) column by ~34pt. Widened from 50→62pt; QTY
+            narrowed 30→24pt and LINE(£) narrowed 55→49pt so total row width is
+            unchanged. Fits unit prices up to £999,999.99 (~£1M) at font-size 9. */}
+        <Text style={{ width: 62, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>UNIT (£)</Text>
+        <Text style={{ width: 49, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, textAlign: 'right' }}>LINE (£)</Text>
         <Text style={{ width: 60, fontSize: 7.5, color: MUTED, letterSpacing: 0.6, paddingLeft: 6 }}>SOURCE · CHECK</Text>
       </View>
       {/* Data rows */}
@@ -5357,8 +5381,8 @@ function SubModuleBomBlock({
           ? { flex: 2.6, fontSize: 9, color: MUTED, textDecoration: 'line-through' as const }
           : { flex: 2.6, fontSize: 9, color: INK }
         const lineTextStyle = isExcluded
-          ? { width: 55, fontSize: 9, color: MUTED, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold', textDecoration: 'line-through' as const }
-          : { width: 55, fontSize: 9, color: INK, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold' }
+          ? { width: 49, fontSize: 9, color: MUTED, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold', textDecoration: 'line-through' as const }
+          : { width: 49, fontSize: 9, color: INK, textAlign: 'right' as const, fontFamily: 'Helvetica-Bold' }
         return (
           <View
             key={`bom-${ri}`}
@@ -5404,8 +5428,8 @@ function SubModuleBomBlock({
                 </Text>
               )
             })()}
-            <Text style={{ width: 30, fontSize: 9, color: INK, textAlign: 'right' }}>×{(row.quantity ?? 1).toLocaleString('en-GB')}</Text>
-            <Text style={{ width: 50, fontSize: 9, color: INK, textAlign: 'right' }}>{unitPriceCell}</Text>
+            <Text style={{ width: 24, fontSize: 9, color: INK, textAlign: 'right' }}>×{(row.quantity ?? 1).toLocaleString('en-GB')}</Text>
+            <Text style={{ width: 62, fontSize: 9, color: INK, textAlign: 'right' }}>{unitPriceCell}</Text>
             <Text style={lineTextStyle}>{lineCell}</Text>
             <View style={{ width: 60, paddingLeft: 6, flexDirection: 'row', alignItems: 'baseline' }}>
               {isExcluded ? (
@@ -5426,7 +5450,7 @@ function SubModuleBomBlock({
           Sub-total — {subModuleName}
           {excludedCount > 0 ? ` (excl. ${excludedCount} item${excludedCount === 1 ? '' : 's'} pending price verification)` : ''}
         </Text>
-        <Text style={{ width: 55, fontSize: 9.5, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>
+        <Text style={{ width: 49, fontSize: 9.5, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>
           £{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </Text>
         <View style={{ width: 60 }} />
