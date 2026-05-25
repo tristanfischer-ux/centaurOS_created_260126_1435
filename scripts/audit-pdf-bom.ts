@@ -63,6 +63,49 @@ const CLASS_MODULE_SHARES: Record<string, Record<string, { min: number; typical:
   // Other classes added incrementally as their BoM-audit baseline gets surveyed.
 }
 
+/** Class-specific cost-per-output-unit bands (£/kWh, £/kW, £/m³ etc.) for
+ * the WHOLE BoM total. Triggers B-7 when the actual BoM / output ratio
+ * falls outside [low, high]. Source: 2024 BNEF + IRENA market data for raw
+ * materials only (not installed cost). The output_param key matches
+ * state.orchestratorContract.quantities. */
+const CLASS_COST_PER_OUTPUT_BAND: Record<
+  string,
+  { output_param: string; output_unit: string; low_gbp_per_unit: number; typical_gbp_per_unit: number; high_gbp_per_unit: number; notes: string }
+> = {
+  bess: {
+    output_param: 'nameplate_capacity_kwh',
+    output_unit: 'kWh',
+    low_gbp_per_unit: 100,
+    typical_gbp_per_unit: 220,
+    high_gbp_per_unit: 500,
+    notes: 'Utility-scale LFP BESS raw materials 2024-2025: £150-£300/kWh typical (BNEF 2024, IRENA), £100/kWh aggressive (Chinese second-tier), £500/kWh premium (Tesla/Sungrow tier-1 with full BoP).',
+  },
+  energy_storage: {
+    output_param: 'nameplate_capacity_kwh',
+    output_unit: 'kWh',
+    low_gbp_per_unit: 100,
+    typical_gbp_per_unit: 220,
+    high_gbp_per_unit: 500,
+    notes: 'BESS alias — same band as bess class.',
+  },
+  wind_turbine: {
+    output_param: 'rated_power_kw',
+    output_unit: 'kW',
+    low_gbp_per_unit: 500,
+    typical_gbp_per_unit: 1000,
+    high_gbp_per_unit: 1800,
+    notes: 'Utility wind turbine raw materials 2024-2025: £700-£1500/kW typical (IRENA Wind Cost Trends 2024), £500/kW for >10 MW low-spec, £1800/kW for offshore premium.',
+  },
+  solar_inverter: {
+    output_param: 'rated_power_kw',
+    output_unit: 'kW',
+    low_gbp_per_unit: 30,
+    typical_gbp_per_unit: 60,
+    high_gbp_per_unit: 150,
+    notes: 'Utility solar central inverter raw materials: £40-£90/kW typical (Wood Mackenzie 2024).',
+  },
+}
+
 /** Class-specific minimum unit price floors. A line item priced below this
  * for the given class triggers B-4. Built from real industry catalogue
  * prices at the indicated rated-power band. */
@@ -381,6 +424,52 @@ async function audit(outDir: string): Promise<{ findings: Finding[]; bom: BomExt
           severity: 'HIGH',
           check_id: 'B-5',
           detail: `Module "${moduleKey}" is ${(actualShare * 100).toFixed(2)}% of BoM total — industry min ${(share.min * 100).toFixed(0)}%, typical ${(share.typical * 100).toFixed(0)}%. Macro likely orphaned OR module under-emitted by emitter.`,
+        })
+      }
+    }
+  }
+
+  // ── B-7 cost-per-output-unit sanity (2026-05-25, Tristan-asked #4) ──
+  // Catches BoM totals that are wildly outside industry-typical £/output-unit
+  // bands (£/kWh for BESS, £/kW for wind/solar). Universal across classes
+  // that define an output_param in CLASS_COST_PER_OUTPUT_BAND.
+  if (classId && CLASS_COST_PER_OUTPUT_BAND[classId] && bom.cover_raw_materials_bom_gbp != null) {
+    const band = CLASS_COST_PER_OUTPUT_BAND[classId]
+    const outputValue = state?.orchestratorContract?.quantities?.[band.output_param]?.value
+    if (typeof outputValue === 'number' && outputValue > 0) {
+      const ratio = bom.cover_raw_materials_bom_gbp / outputValue
+      const overFactor = ratio / band.high_gbp_per_unit
+      const underFactor = band.low_gbp_per_unit / ratio
+      if (ratio > band.high_gbp_per_unit) {
+        const severity = overFactor > 2.0 ? 'HIGH' : 'MED'
+        findings.push({
+          severity,
+          check_id: 'B-7',
+          detail:
+            `BoM total £${bom.cover_raw_materials_bom_gbp.toLocaleString()} / ${outputValue} ${band.output_unit} ` +
+            `= £${ratio.toFixed(0)}/${band.output_unit} — exceeds industry-typical high band ` +
+            `(£${band.high_gbp_per_unit}/${band.output_unit}) by ${overFactor.toFixed(1)}×. ` +
+            `Cost likely inflated by premium-tier pin choices, over-engineering, or class-rule miscalibration. ${band.notes}`,
+        })
+      } else if (ratio < band.low_gbp_per_unit) {
+        const severity = underFactor > 2.0 ? 'HIGH' : 'MED'
+        findings.push({
+          severity,
+          check_id: 'B-7',
+          detail:
+            `BoM total £${bom.cover_raw_materials_bom_gbp.toLocaleString()} / ${outputValue} ${band.output_unit} ` +
+            `= £${ratio.toFixed(0)}/${band.output_unit} — below industry-typical low band ` +
+            `(£${band.low_gbp_per_unit}/${band.output_unit}) by ${underFactor.toFixed(1)}×. ` +
+            `Cost likely missing line items, wrong unit price, or class-rule miscalibration. ${band.notes}`,
+        })
+      } else {
+        findings.push({
+          severity: 'INFO',
+          check_id: 'B-7',
+          detail:
+            `BoM total £${bom.cover_raw_materials_bom_gbp.toLocaleString()} / ${outputValue} ${band.output_unit} ` +
+            `= £${ratio.toFixed(0)}/${band.output_unit} — within industry band ` +
+            `[£${band.low_gbp_per_unit}–£${band.high_gbp_per_unit}, typical £${band.typical_gbp_per_unit}].`,
         })
       }
     }
