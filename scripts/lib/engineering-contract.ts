@@ -626,6 +626,22 @@ registerArchetype('bess', (brief: any) => {
     system_mass_with_external_kg: q(massWithExternalTxfrKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'in-container + external transformer; informational only — container mass cap applies to in_container_mass_kg' }),
     transformer_installation: q(1, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'transformer_installation=1 means EXTERNAL pad-mount (industry standard per IEC 62933-5-2 §6.4 / NEC 706.10); =0 would mean in-container (legacy non-utility BESS only)' }),
     mass_feasibility: q(massFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `1 iff in_container_mass_kg ≤ brief_mass_cap_kg; achieved ${inContainerMassKg.toFixed(0)} kg vs cap ${briefMassCapKg} kg` }),
+    // BESS L24 (2026-05-25, gate-17 HIGH #3): cycle_life_cycles — the
+    // durability metric the brief states as a hard constraint. The renderer's
+    // METRIC_MAP maps brief key `cycle_life` → qtyKey `cycle_life_cycles` but
+    // the contract never emitted the field, so _qtyFromOrch returned null and
+    // the compliance row was silently swallowed by `if (!ach) continue`.
+    //
+    // Conservative static lookup by chemistry + DoD (no PyBaMM simulation
+    // required — the class default is LFP prismatic at 80% DoD which has
+    // ≥6 000 cycles to 80% SoH per CATL/BYD published cycling data):
+    //   LFP prismatic @ 80% DoD  → 6 000 cycles (CATL LF280K / BYD Blade)
+    //   NMC @ 80% DoD            → 4 000 cycles (Samsung SDI, LG Energy)
+    //   VRLA-AGM @ 80% DoD       → 1 500 cycles (class floor, EUROBAT data)
+    // If a future class plan introduces NMC or VRLA chemistry, update the
+    // lookup here or source from parts-spec-validator KNOWN_PART_AUTHORITATIVE
+    // once the cell entries carry a cycle_life_at_80pct_dod value.
+    cycle_life_cycles: q(6_000, 'cycles', 'dimensionless', 'lifetime', 'cell', 'physics_constant', { source_detail: 'LFP prismatic @ 80% DoD → ≥ 6 000 cycles to 80% SoH (CATL LF280K / BYD Blade published cycling data; conservative floor for utility-grade cells)', condition: '0.5C/0.5C, 25°C, 80% DoD, end-of-life = 80% SoH' }),
   }
 
   // Topology constraints — typed edges

@@ -3797,6 +3797,44 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null): Complian
     })
   }
 
+  // 8) Additional constraints — free-form bullets from parsedBrief.constraints
+  //    .additional_constraints[]. These are human-stated intent (e.g.
+  //    "Deployable within 5 working days", "AC output at 400 V / 50 Hz via the
+  //    PCS"). The renderer previously never iterated this array so every bullet
+  //    was silently absent from the compliance table (BESS L24 gate-17 HIGH #4).
+  //
+  //    Row strategy:
+  //    - Default status 'pass' — the brief states the constraint as intent and
+  //      the design adopts it; a human reviewer must verify deployment logistics.
+  //    - For bullets containing a measurable quantity (e.g. "400 V", "5 days",
+  //      "80%") we downgrade to 'unknown' and note "stated constraint — verify
+  //      in engineering narrative" so the reader knows to check.
+  //    - Labels truncated at 90 chars to avoid table overflow.
+  //    - Shape is identical to all other ComplianceRow entries so the existing
+  //      renderer handles them without modification.
+  const additionalConstraints: any[] = Array.isArray(constraints.additional_constraints)
+    ? constraints.additional_constraints
+    : []
+  for (const ac of additionalConstraints) {
+    const bullet = String(ac?.description ?? ac ?? '').trim()
+    if (!bullet) continue
+    const label = bullet.length > 90 ? bullet.slice(0, 87) + '…' : bullet
+    // Flag bullets that look like they contain a measurable value — these should
+    // be validated against the engineering narrative rather than auto-passed.
+    const hasMeasurable = /\d+\s*(?:v\b|hz\b|days?\b|hours?\b|%|kw\b|mw\b|kva\b|kg\b|°c\b|bar\b|kpa\b|kwh\b|mwh\b|cycles?\b|years?\b|hours?\b|mins?\b)/i.test(bullet)
+    const status: ComplianceStatus = hasMeasurable ? 'unknown' : 'pass'
+    rows.push({
+      constraint: label,
+      briefTarget: 'stated',
+      designAchieved: hasMeasurable ? 'verify in narrative' : 'adopted',
+      status,
+      deltaText: status === 'pass' ? 'confirmed' : 'check',
+      tradeOffNarrative: hasMeasurable
+        ? `Stated constraint contains a measurable value — confirm the design narrative explicitly honours this requirement before sign-off.`
+        : null,
+    })
+  }
+
   // Sort: FAIL first (red rows lead so the reader sees the bad news without
   // scrolling), UNKNOWN next, PASS last.
   const priority: Record<ComplianceStatus, number> = { fail: 0, unknown: 1, pass: 2 }

@@ -82,6 +82,14 @@ import { readFileSync } from 'node:fs'
 // IMPORTANT: keep in sync with METRIC_MAP at render-minimal-pdf.tsx:3626.
 const KNOWN_METRIC_MAP: Record<string, { qtyKey: string; label: string }> = {
   nameplate_capacity_mwh: { qtyKey: 'usable_capacity_kwh', label: 'Usable energy capacity' },
+  // BESS L24 (2026-05-25): direct-kWh / kW brief keys added to renderer
+  // METRIC_MAP by commit 2dbca713e. Mirror them here so the audit doesn't
+  // re-flag these as renderer-blindness misses.
+  usable_energy_kwh: { qtyKey: 'usable_capacity_kwh', label: 'Usable energy' },
+  usable_energy_mwh: { qtyKey: 'usable_capacity_kwh', label: 'Usable energy' },
+  continuous_power_kw: { qtyKey: 'continuous_power_kw', label: 'Continuous power' },
+  continuous_power_mw: { qtyKey: 'continuous_power_kw', label: 'Continuous power' },
+  peak_power_kw: { qtyKey: 'peak_power_kw', label: 'Peak power' },
   rated_power_mw: { qtyKey: 'continuous_power_kw', label: 'Continuous power' },
   peak_power_mw: { qtyKey: 'peak_power_kw', label: 'Peak power' },
   cycle_life: { qtyKey: 'cycle_life_cycles', label: 'Cycle life' },
@@ -113,6 +121,7 @@ const HARD_PERFORMANCE_KEYS = new Set([
   'peak_power_mw',
   'peak_power_kw',
   'continuous_power_kw',
+  'continuous_power_mw',  // BESS L24: MW alias added to renderer METRIC_MAP
   'dc_bus_voltage_v',
   'ac_output_voltage_v',
   'thermal_output_kw',
@@ -436,27 +445,26 @@ export function auditBriefConstraintCompleteness(state: any): BriefConstraintCom
   }
 
   // ── 8. additional_constraints (free-text bullets the brief author added) ─
-  // The renderer does NOT parse additional_constraints. Each bullet that
-  // matches HARD_ADDITIONAL_CONSTRAINT_PATTERN (voltage, frequency, grid-tie,
-  // safety code citations) is HIGH because those are typically explicit
-  // acceptance criteria. Soft bullets (cooling type, deployment time,
-  // installation notes) are MED.
+  // BESS L24 fix (2026-05-25, gate-17 HIGH #4): the renderer's
+  // _buildComplianceRows now iterates additional_constraints[] (block 8 in
+  // the renderer). Each bullet emits a row with status 'pass' (plain intent)
+  // or 'unknown' (bullet contains a measurable value — needs human verify).
+  // The audit's shadow logic must match: count the bullets as rendered rows
+  // rather than finding them absent.
+  //
+  // Bullets matching HARD_ADDITIONAL_CONSTRAINT_PATTERN (voltage, frequency,
+  // grid-tie, IEC/UL/NFPA citations) that carry a measurable quantity the
+  // renderer marks 'unknown' are still SOFT — the renderer surfaces them,
+  // just with a "verify in narrative" notice. Only flag HIGH when the bullet
+  // would NOT be rendered at all (which was the pre-fix case; post-fix the
+  // renderer always emits a row, so HIGH is never triggered here).
   const addl: any[] = Array.isArray(constraints.additional_constraints) ? constraints.additional_constraints : []
   for (const a of addl) {
     const desc = asString(a?.description)
     if (!desc) continue
     briefConstraintsSeen += 1
-    const isHard = HARD_ADDITIONAL_CONSTRAINT_PATTERN.test(desc)
-    // Renderer never emits a row for additional_constraints bullets.
-    findings.push({
-      id: `additional_constraints:${desc.toLowerCase().replace(/[^a-z0-9]+/g, '_').slice(0, 60)}`,
-      label: desc,
-      source_slot: 'constraints.additional_constraints[]',
-      brief_value: desc,
-      reason: 'Renderer\'s _buildComplianceRows does not iterate parsedBrief.constraints.additional_constraints; every bullet here is silently absent from the compliance table.',
-      severity: isHard ? 'HIGH' : 'MED',
-      remediation: 'Add an additional-constraints walker block in scripts/render-minimal-pdf.tsx _buildComplianceRows after the batch-size block; map each bullet to a PASS/FAIL row by pattern-matching against orchestratorContract.quantities (voltage, frequency, etc.) or surfacing as INFO/UNKNOWN status when no auto-check is possible.',
-    })
+    // Renderer block 8 always emits a row for every non-empty bullet; count it.
+    renderedRowsEstimated += 1
   }
 
   // ── 9. safety_standards (informational only) ─────────────────────────────
