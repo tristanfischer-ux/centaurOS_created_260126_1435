@@ -238,6 +238,71 @@ ${digest}
 
 20. TALL/NARROW ENVELOPES (one dim >5× others, e.g. wind-turbine 5×5×25). The default camera fits the bounding box, so a 25 m tower with nacelle-only-at-top renders as a thin line with a dot. To avoid empty-frame syndrome: emit primitives ALONG THE FULL LENGTH of the long axis (tower segments every 2 m with reinforcement rings, ladder rails, climb safety lines, lightning conductor, transition piece flange, aviation lights). Each long-axis primitive adds vertical anchor points the eye can track. Same applies to long-axis containers — emit racks/components along the full length, not clustered at one end.
 
+21. MODULE VISUAL DIFFERENTIATION — MANDATORY (BESS L22 fix #6). Every module must be visually IDENTIFIABLE in 1 second from its render alone. A reader must NOT confuse battery-rack with BMS with inverter at a glance. Apply the MODULE_VISUAL_PROFILE table below: each module's focal geometry and accent colour MUST match the profile entry. Use fl.get_module_profile(module_id) at runtime OR follow the table statically here.
+
+MODULE_VISUAL_PROFILE (sRGB accent, dominant feature to foreground):
+• energy_storage_source / battery_rack / battery_module
+  → accent (0.02, 0.18, 0.95) vivid blue
+  → dominant: vertical columns of prismatic cells — emit 4–8 distinct cell-column boxes per rack, each coloured battery-blue, visible from the 3/4 camera angle
+  → camera: three_quarter (NOT front-on — loses depth of cell columns)
+
+• control_compute_communication / bms / battery_management
+  → accent (0.00, 0.75, 0.15) vivid green
+  → dominant: flat PCB board geometry (wide thin box) + rows of chip rectangles + connector strip along one edge
+  → camera: front (show the face of the board with chips)
+  → emit: 1–3 large PCB slabs (green, wide, thin) with 4–8 small chip cubes on the surface + a connector strip box along the front edge
+
+• energy_conversion_transduction / inverter / pcs
+  → accent (1.00, 0.45, 0.00) vivid amber/orange
+  → dominant: heatsink fin array on top + cooling fans on side
+  → camera: three_quarter high angle (fins visible from above)
+  → emit: use fl.add_compound_finned_heatsink() — a base box + N vertical fins. Also add 2–3 fan cylinders on the side face.
+
+• environmental_interface / hvac / thermal_management
+  → accent (0.00, 0.80, 0.95) vivid cyan
+  → dominant: round duct cylinder + grille box at intake + fan shroud
+  → camera: front (grille face visible)
+  → emit: 1–2 large cylinders (duct/fan-shroud, cyan), a flat grille box at the front, compressor box
+
+• safety_protection / fire_suppression / fire_safety
+  → accent (1.00, 0.00, 0.00) vivid red
+  → dominant: array of red suppression cylinders with nozzle stubs on top
+  → camera: three_quarter (shows row of cylinders + nozzles)
+  → emit: 4–8 red cylinders arranged in a row (add_cyl, safety-red), each with a small black valve cylinder + narrow horn cylinder on top
+
+• hmi_ergonomics / controls / scada / bms_controller
+  → accent (0.05, 0.42, 1.00) vivid blue-purple
+  → dominant: rack-mounted display panel face with LED indicator dots
+  → camera: front (panel face visible)
+  → emit: large flat HMI-colour panel box + 3–6 small LED cylinders in a row (use safety/maint/sensor colours for contrast)
+
+• power_distribution
+  → accent (0.18, 0.20, 0.24) near-black metallic
+  → dominant: busbar array (flat copper strips) + fuse/breaker panel boxes
+  → emit: 2 flat copper busbar boxes (copper mat) + 1–2 dark breaker panel boxes
+
+• mass_fluid_transport_process
+  → accent (1.00, 0.45, 0.05) orange (coolant)
+  → dominant: manifold header box + orange supply/return pipes (add_pipe or thin boxes) + expansion tank cylinder
+  → emit visible orange pipe runs across the module zone
+
+• maintenance_serviceability
+  → accent (1.00, 0.10, 0.55) magenta
+  → dominant: access door panel + magenta service LED strip along the top
+  → emit: a large flat enclosure-coloured door panel + 1–2 magenta LED strip boxes along the roofline
+
+CROSS-CLASS SLUGS (apply same rule):
+• lighting_array → (1.00, 0.92, 0.10) warm yellow — LED bar array, emit 4–8 yellow rectangular bar boxes
+• climate_control → (0.00, 0.80, 0.95) cyan — HVAC duct + fan, same as hvac above
+• water_irrigation → (0.10, 0.40, 0.85) blue — pipe network + nozzle cylinders
+• propulsion → (0.15, 0.50, 1.00) motor blue — motor cylinder + propeller disc torus
+• solar_array → (0.02, 0.04, 0.10) near-black — flat panel grid, top-down angle best
+• sensing_instrumentation → (0.00, 0.92, 0.10) bright green — sensor probe array
+
+FALLBACK: if the module_id is not in the list above, keep the existing generic enclosure render. Do NOT crash. Print to stderr: [blender] module slug "X" has no visual profile — using generic enclosure.
+
+IMPLEMENTATION: for EVERY module in this brief, check module_id against the table above. If matched, place the dominant-feature geometry as the MOST VISUALLY PROMINENT objects in that module's zone — they must be LARGER or MORE COLOURFUL than the supporting infrastructure geometry, so the identity reads immediately.
+
 Generate the complete Python file now.`
 }
 

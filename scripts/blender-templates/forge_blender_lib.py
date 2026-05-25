@@ -265,6 +265,170 @@ def make_default_palette():
     }
 
 
+# ─── Module visual profiles (BESS L22 fix #6 — visual differentiation) ──
+#
+# Maps canonical module-type slugs to per-module visual contracts.  Any
+# LLM-generated blender-scene.py can call fl.get_module_profile(module_id)
+# to retrieve the accent colour and dominant-feature hint for that module.
+#
+# Keys are substring-matched (longest match wins) so "energy_storage_source"
+# matches "energy_storage" and also the more-specific "battery_rack".
+# Returns None if no profile found — callers must handle the fallback.
+#
+# Accent colour: sRGB tuple, SATURATED.  Apply _to_linear() if assigning
+# directly to a Principled BSDF Base Color input.
+# dominant_feature: human-readable hint for the LLM / template author about
+#   what geometry to foreground (cells visible, PCB prominent, fins, etc.).
+# camera_hint: "front" | "three_quarter" | "top_down" — preferred angle to
+#   foreground the dominant feature.
+#
+# Populated for BESS (6 canonical slugs), common HAPS, drone, VF, EV-charger,
+# heat-pump, and AUV slugs.  Slug not found → generic enclosure + logged.
+#
+# Usage in a generated script:
+#   profile = fl.get_module_profile(module_id)
+#   if profile:
+#       accent_rgb = profile["accent_rgb"]
+#       print(f"[blender] module {module_id}: {profile['dominant_feature']}")
+
+_MODULE_VISUAL_PROFILES: dict = {
+    # ── BESS / Battery energy storage ────────────────────────────────────
+    # Battery rack / energy storage: vertical columns of prismatic cells.
+    # Camera: 3/4 angle showing cell columns depth.
+    "energy_storage_source":   {"accent_rgb": (0.02, 0.18, 0.95), "dominant_feature": "vertical_columns_prismatic_cells", "camera_hint": "three_quarter"},
+    "battery_rack":            {"accent_rgb": (0.02, 0.18, 0.95), "dominant_feature": "vertical_columns_prismatic_cells", "camera_hint": "three_quarter"},
+    "battery_module":          {"accent_rgb": (0.02, 0.18, 0.95), "dominant_feature": "vertical_columns_prismatic_cells", "camera_hint": "three_quarter"},
+    # BMS / battery management: green PCB board + connector strip.
+    # Camera: front-on close-up to show connectors.
+    "control_compute_communication": {"accent_rgb": (0.00, 0.75, 0.15), "dominant_feature": "green_pcb_chip_array_connector_strip", "camera_hint": "front"},
+    "bms":                     {"accent_rgb": (0.00, 0.75, 0.15), "dominant_feature": "green_pcb_chip_array_connector_strip", "camera_hint": "front"},
+    "battery_management":      {"accent_rgb": (0.00, 0.75, 0.15), "dominant_feature": "green_pcb_chip_array_connector_strip", "camera_hint": "front"},
+    # Inverter / PCS / power conversion: large heatsink fins + cooling fans.
+    # Camera: 3/4 high angle showing fins on top.
+    "energy_conversion_transduction": {"accent_rgb": (1.00, 0.45, 0.00), "dominant_feature": "heatsink_fins_cooling_fans", "camera_hint": "three_quarter"},
+    "inverter":                {"accent_rgb": (1.00, 0.45, 0.00), "dominant_feature": "heatsink_fins_cooling_fans", "camera_hint": "three_quarter"},
+    "pcs":                     {"accent_rgb": (1.00, 0.45, 0.00), "dominant_feature": "heatsink_fins_cooling_fans", "camera_hint": "three_quarter"},
+    # HVAC / thermal / environmental: round duct + grille at front.
+    # Camera: front-on to show duct intake.
+    "environmental_interface": {"accent_rgb": (0.00, 0.80, 0.95), "dominant_feature": "round_duct_grille_fan_shroud", "camera_hint": "front"},
+    "hvac":                    {"accent_rgb": (0.00, 0.80, 0.95), "dominant_feature": "round_duct_grille_fan_shroud", "camera_hint": "front"},
+    "thermal_management":      {"accent_rgb": (0.00, 0.80, 0.95), "dominant_feature": "round_duct_grille_fan_shroud", "camera_hint": "front"},
+    # Fire suppression / safety: red cylinder + nozzle on top.
+    # Camera: 3/4 angle showing cylinder array.
+    "safety_protection":       {"accent_rgb": (1.00, 0.00, 0.00), "dominant_feature": "red_cylinder_nozzle_array", "camera_hint": "three_quarter"},
+    "fire_suppression":        {"accent_rgb": (1.00, 0.00, 0.00), "dominant_feature": "red_cylinder_nozzle_array", "camera_hint": "three_quarter"},
+    "fire_safety":             {"accent_rgb": (1.00, 0.00, 0.00), "dominant_feature": "red_cylinder_nozzle_array", "camera_hint": "three_quarter"},
+    # Controls / SCADA / HMI: rack-mounted display panel + LED indicators.
+    # Camera: front-on to show panel face.
+    "power_distribution":      {"accent_rgb": (0.18, 0.20, 0.24), "dominant_feature": "busbar_array_fuse_panel", "camera_hint": "front"},
+    "hmi_ergonomics":          {"accent_rgb": (0.05, 0.42, 1.00), "dominant_feature": "display_panel_led_indicators", "camera_hint": "front"},
+    "controls":                {"accent_rgb": (0.05, 0.42, 1.00), "dominant_feature": "display_panel_led_indicators", "camera_hint": "front"},
+    "scada":                   {"accent_rgb": (0.05, 0.42, 1.00), "dominant_feature": "display_panel_led_indicators", "camera_hint": "front"},
+    "bms_controller":          {"accent_rgb": (0.05, 0.42, 1.00), "dominant_feature": "display_panel_led_indicators", "camera_hint": "front"},
+    # Fluid / cooling pipework: orange coolant manifold + expansion tank.
+    "mass_fluid_transport_process": {"accent_rgb": (1.00, 0.45, 0.05), "dominant_feature": "manifold_pipes_expansion_tank", "camera_hint": "three_quarter"},
+    # Sensing / instrumentation: green sensor array.
+    "sensing_instrumentation": {"accent_rgb": (0.00, 0.92, 0.10), "dominant_feature": "sensor_array_probes", "camera_hint": "three_quarter"},
+    # Maintenance / serviceability: magenta door panels + service LEDs.
+    "maintenance_serviceability": {"accent_rgb": (1.00, 0.10, 0.55), "dominant_feature": "access_door_service_led_strip", "camera_hint": "front"},
+    # Structure / containment: always enclosure colour, no accent.
+    "structure_containment":   {"accent_rgb": (0.55, 0.56, 0.58), "dominant_feature": "enclosure_shell_wireframe", "camera_hint": "three_quarter"},
+
+    # ── HAPS ─────────────────────────────────────────────────────────────
+    "propulsion":              {"accent_rgb": (0.15, 0.50, 1.00), "dominant_feature": "propeller_motor_pods", "camera_hint": "three_quarter"},
+    "solar_array":             {"accent_rgb": (0.02, 0.04, 0.10), "dominant_feature": "solar_panel_array_cells", "camera_hint": "top_down"},
+    "payload":                 {"accent_rgb": (0.00, 0.55, 0.65), "dominant_feature": "sensor_gimbal_housing", "camera_hint": "front"},
+    "avionics":                {"accent_rgb": (1.00, 0.55, 0.00), "dominant_feature": "flight_computer_pcb_rack", "camera_hint": "front"},
+    "comms":                   {"accent_rgb": (0.10, 0.12, 0.18), "dominant_feature": "antenna_array_radome", "camera_hint": "three_quarter"},
+
+    # ── Drone ─────────────────────────────────────────────────────────────
+    "flight_controller":       {"accent_rgb": (1.00, 0.55, 0.00), "dominant_feature": "flight_controller_pcb", "camera_hint": "front"},
+    "gimbal_camera":           {"accent_rgb": (0.00, 0.55, 0.65), "dominant_feature": "gimbal_lens_housing", "camera_hint": "front"},
+
+    # ── Vertical farm ─────────────────────────────────────────────────────
+    "lighting_array":          {"accent_rgb": (1.00, 0.92, 0.10), "dominant_feature": "led_bar_array", "camera_hint": "top_down"},
+    "climate_control":         {"accent_rgb": (0.00, 0.80, 0.95), "dominant_feature": "hvac_duct_fan_array", "camera_hint": "front"},
+    "irrigation":              {"accent_rgb": (0.10, 0.40, 0.85), "dominant_feature": "water_pipe_nozzle_array", "camera_hint": "three_quarter"},
+    "water_irrigation":        {"accent_rgb": (0.10, 0.40, 0.85), "dominant_feature": "water_pipe_nozzle_array", "camera_hint": "three_quarter"},
+    "growing_trays":           {"accent_rgb": (0.05, 0.55, 0.10), "dominant_feature": "tray_array_with_plant_rows", "camera_hint": "three_quarter"},
+    "nutrient_dosing":         {"accent_rgb": (0.45, 0.70, 0.95), "dominant_feature": "dosing_pump_reservoir", "camera_hint": "three_quarter"},
+
+    # ── EV charger ────────────────────────────────────────────────────────
+    "dispensing":              {"accent_rgb": (0.05, 0.42, 1.00), "dominant_feature": "dispenser_screen_connector", "camera_hint": "front"},
+    "power_electronics":       {"accent_rgb": (0.62, 0.05, 0.95), "dominant_feature": "rectifier_stack_heatsink", "camera_hint": "three_quarter"},
+    "communication":           {"accent_rgb": (0.00, 0.55, 0.65), "dominant_feature": "antenna_comms_module", "camera_hint": "front"},
+
+    # ── Heat pump ─────────────────────────────────────────────────────────
+    "outdoor_unit":            {"accent_rgb": (0.00, 0.80, 0.95), "dominant_feature": "fan_coil_condensing_unit", "camera_hint": "front"},
+    "indoor_unit":             {"accent_rgb": (0.45, 0.70, 0.95), "dominant_feature": "air_handler_evaporator", "camera_hint": "front"},
+    "refrigerant_circuit":     {"accent_rgb": (1.00, 0.45, 0.05), "dominant_feature": "refrigerant_piping_compressor", "camera_hint": "three_quarter"},
+
+    # ── AUV ───────────────────────────────────────────────────────────────
+    "thruster_array":          {"accent_rgb": (0.15, 0.50, 1.00), "dominant_feature": "thruster_pod_propeller", "camera_hint": "three_quarter"},
+    "navigation_sensors":      {"accent_rgb": (0.00, 0.92, 0.10), "dominant_feature": "dvl_sonar_imu_cluster", "camera_hint": "front"},
+    "pressure_hull":           {"accent_rgb": (0.55, 0.56, 0.58), "dominant_feature": "cylinder_end_caps_ports", "camera_hint": "three_quarter"},
+}
+
+
+def get_module_profile(module_id: str) -> dict | None:
+    """Return the visual profile dict for module_id, or None if unrecognised.
+
+    Matching is substring-based: "energy_storage_source" matches the key
+    "energy_storage_source" exactly first, then any key that is a substring
+    of the module_id (longest match wins).  If nothing matches, logs a
+    stderr warning and returns None so the caller can fall back to the
+    generic enclosure render.
+
+    The returned dict has keys: accent_rgb (sRGB tuple), dominant_feature
+    (str hint), camera_hint ("front"|"three_quarter"|"top_down").
+    """
+    import sys as _sys
+    module_lower = module_id.lower()
+    # Exact match first
+    if module_lower in _MODULE_VISUAL_PROFILES:
+        return _MODULE_VISUAL_PROFILES[module_lower]
+    # Substring match — longest key wins
+    best_key = None
+    best_len = 0
+    for key in _MODULE_VISUAL_PROFILES:
+        if key in module_lower and len(key) > best_len:
+            best_key = key
+            best_len = len(key)
+    if best_key:
+        return _MODULE_VISUAL_PROFILES[best_key]
+    print(f'[blender] module slug "{module_id}" has no visual profile — using generic enclosure', file=_sys.stderr)
+    return None
+
+
+def module_accent_mat(module_id: str, fallback_rgb=(0.55, 0.56, 0.58)) -> "bpy.types.Material":
+    """Convenience: return a Principled BSDF material using the module's
+    accent colour (linear-converted).  Falls back to enclosure grey if the
+    module has no profile.  Useful for quick dominant-feature accent boxes
+    without manually looking up the palette.
+    """
+    profile = get_module_profile(module_id)
+    rgb = profile["accent_rgb"] if profile else fallback_rgb
+    lin = _to_linear(rgb)
+    return make_mat(f"m_accent_{module_id[:20]}", lin)
+
+
+def _srgb_to_linear_channel(c: float) -> float:
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _to_linear(rgb):
+    """Convert an sRGB colour tuple to scene-linear for Blender shader inputs.
+
+    MANDATORY for any colour tuple assigned directly to Principled BSDF
+    Base Color / Emission Color / World Background Color.  Blender's shader
+    inputs expect LINEAR values; raw sRGB values wash out at render time.
+    See mempalace forgeos_blender_srgb_linear_gamma_mismatch_gotcha.
+
+    Usage: bsdf.inputs["Base Color"].default_value = (*_to_linear(rgb), 1.0)
+    """
+    return tuple(_srgb_to_linear_channel(c) for c in rgb)
+
+
 # ─── Geometry primitive helpers ──────────────────────────────────────────
 
 
