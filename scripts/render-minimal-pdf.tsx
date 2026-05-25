@@ -3630,7 +3630,9 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null): Complian
       // L23 brief using these direct keys while the table only knew the _mwh / _mw
       // variants, so the compliance row silently dropped a 23% usable-energy shortfall)
       usable_energy_kwh:           { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy',          unit: 'kWh', tolerancePct: 5 },
+      usable_energy_mwh:           { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy',          unit: 'MWh', convert: (v) => v / 1000, tolerancePct: 5 },
       continuous_power_kw:         { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'kW',  tolerancePct: 5 },
+      continuous_power_mw:         { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
       peak_power_kw:               { qtyKey: 'peak_power_kw',             label: 'Peak power',             unit: 'kW',  tolerancePct: 5 },
       rated_power_mw:              { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
       peak_power_mw:               { qtyKey: 'peak_power_kw',             label: 'Peak power',             unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
