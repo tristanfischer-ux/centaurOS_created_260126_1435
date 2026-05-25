@@ -98,7 +98,19 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     category: 'hvdc_contactor',
     rated_current_a: 500,
     rated_voltage_dc_v: 800,
-    notes: 'Gigavac MX12 series: 350-500 A continuous, 800 V DC.',
+    notes: 'Gigavac MX12 series: 350-500 A continuous, 800 V DC. WARNING: unsuitable for 250S LFP packs (max charge 912.5 V > 800 V rated) — use EV200HAANA (1500 V) instead.',
+  },
+  // L30 council FIX 3: per-rack contactor for 250S LFP strings. Max charge
+  // voltage 250 × 3.65 V = 912.5 V exceeds Gigavac MX12 800 V rating.
+  // TE Connectivity EV200HAANA is a confirmed-real part (Digi-Key £139.16,
+  // verified in Radical demo commit c51268b5).
+  {
+    manufacturer: 'TE Connectivity',
+    part_number_pattern: /^EV200HAANA$/i,
+    category: 'hvdc_contactor',
+    rated_current_a: 500,
+    rated_voltage_dc_v: 1500,
+    notes: 'TE Connectivity EV200HAANA: 500 A continuous, 1500 V DC bi-directional, hermetically sealed, IEC 60947-4-1. Confirmed real on Digi-Key at £139.16 (Radical demo 2026-05-10 commit c51268b5). Canonical per-rack contactor for 250S LFP packs (912.5 V max charge).',
   },
   // ── BESS DC fuses (Bussmann 170M family) ──────────────────────
   // 170M68xx subfamily: 1250 A fuses. Lower-current 170M variants exist.

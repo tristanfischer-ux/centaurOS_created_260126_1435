@@ -1115,12 +1115,27 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
 function emitPowerDistribution(p: BessParams): DesignModule {
   // BESS L3 (2026-05-24, issue #3): per-rack contactors size to STRING
   // current (~83 A continuous / 104 A peak for 15 racks @ 1P), NOT bus
-  // current. 1.25× margin per UL 9540A → real Gigavac MX12 (350-500 A /
-  // 800 V DC class, replaces the fabricated GX21BAB 1625 A claim). One
-  // additional main bus contactor (Gigavac MX16, 1500 A / 1500 V DC, real
-  // product) ties combined string output to the PCS DC link, sized to the
-  // full bus current with the UL 9540A 25% margin.
+  // current. 1.25× margin per UL 9540A → per-rack contactor needs ≥130 A
+  // continuous and ≥1003 V DC (250 cells × 3.65 V max charge × 10% margin).
+  //
+  // L30 council FIX 3 (physics bug — HIGH): Gigavac MX12 is rated 800 V DC.
+  // BESS string max charge voltage = series_cells_per_string × V_max_cell =
+  // 250 × 3.65 V = 912.5 V — 14% OVER the Gigavac MX12's 800 V DC rating.
+  // Driving a contactor above its rated voltage voids IEC 60947-2 arc-quench
+  // guarantees and risks catastrophic arc-blast during a fault.
+  //
+  // Fix: replace with TE Connectivity EV200HAANA — 500 A continuous, 1500 V
+  // DC bi-directional, IEC 60947-4-1, hermetically sealed. This is the exact
+  // same confirmed-real part the Radical demo verified via Digi-Key at
+  // £139.16 (commit c51268b5 demo output). Provides 1500 V / 912.5 V = 1.64×
+  // voltage margin — well within safe operating envelope for a 250S LFP pack.
+  // Source: TE Connectivity EV200HAANA datasheet + Digi-Key catalogue.
   const perRackContactorCapacityA = Math.max(160, Math.ceil(p.stringPeakA * 1.25 / 20) * 20)  // round to nearest 20 A frame, min 160 A
+  // Max string voltage at full charge (3.65 V/cell × series cells).
+  // Used in form string for documentation — the emitted dimension is 1500 V
+  // (contactor's rated voltage), not the bus voltage, to correctly describe
+  // what the part is rated for (not what the design nominal voltage is).
+  const maxStringVoltageV = Math.round(p.seriesCellsPerString * 3.65)
   const dcDistribution = makeSubModule(
     'dc_distribution',
     'DC distribution',
@@ -1133,10 +1148,12 @@ function emitPowerDistribution(p: BessParams): DesignModule {
         cc('dc_main_contactor', 'DC main contactor', 'electromechanical_switching_function', 'copper'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('dimension', String(p.dcBusVoltageV), 'V'),
+          mod('dimension', '1500', 'V'),
           mod('capacity', String(perRackContactorCapacityA), 'A'),
-          mod('form', 'Gigavac MX12 (real ≤500 A / 800 V DC)'),
-          mod('regulatory', 'IEC 60947-2'),
+          mod('form', `TE Connectivity EV200HAANA (500 A continuous / 1500 V DC bi-directional — replaces Gigavac MX12 which was 800 V rated vs ${maxStringVoltageV} V max string charge voltage)`),
+          mod('manufacturer', 'TE Connectivity'),
+          mod('part_number', 'EV200HAANA'),
+          mod('regulatory', 'IEC 60947-4-1'),
         ],
       ),
       // BESS L4 (2026-05-24, physics-critic L3 issue #3): NEW WORD — main bus
@@ -1340,7 +1357,7 @@ function emitPowerDistribution(p: BessParams): DesignModule {
 
   return {
     module: 'power_distribution',
-    module_brief: `Routes ${p.busContinuousA.toFixed(0)} A continuous (${p.busPeakA.toFixed(0)} A peak) at ${p.dcBusVoltageV} V DC from ${p.rackCount} racks (${p.stringContinuousA.toFixed(0)} A continuous per-rack via Gigavac MX12 contactors) through a Schaltbau C330 2000 A / 1500 V DC main bus contactor and HRC fuses to PCS, and the PCS AC output through ${acBreakerContinuousA} A switchgear (ABB Emax E2.2 2500 A frame, sized for 1.25 × peak ${p.peakPowerKw.toFixed(0)} kW / 400 V 3-phase per IEC 60947-2) to the grid PCC. Chassis-bond earth path uses nVent ERIFLEX MBJ50-300-10 50 mm² tinned copper braids (NOT a Raychem heat-shrink boot).`,
+    module_brief: `Routes ${p.busContinuousA.toFixed(0)} A continuous (${p.busPeakA.toFixed(0)} A peak) at ${p.dcBusVoltageV} V DC from ${p.rackCount} racks (${p.stringContinuousA.toFixed(0)} A continuous per-rack via TE Connectivity EV200HAANA 1500 V DC contactors) through a Schaltbau C330 2000 A / 1500 V DC main bus contactor and HRC fuses to PCS, and the PCS AC output through ${acBreakerContinuousA} A switchgear (ABB Emax E2.2 2500 A frame, sized for 1.25 × peak ${p.peakPowerKw.toFixed(0)} kW / 400 V 3-phase per IEC 60947-2) to the grid PCC. Chassis-bond earth path uses nVent ERIFLEX MBJ50-300-10 50 mm² tinned copper braids (NOT a Raychem heat-shrink boot).`,
     overview_paragraph_en: '',
     derived_parameters: {
       bus_continuous_current_a: p.busContinuousA,
@@ -1564,21 +1581,33 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
     'routes',
     'glycol/water from cold plates to chiller via SS304 piping',
     [
-      // Circulation pump — Grundfos CR 32-2 (seeded into pretraining_extracted_parts
-      // at 5c296998c). Redundant pair (duty + standby) per BESS best-practice.
-      // Industry cost: £3,000-5,000 per unit. Two units per loop.
+      // Circulation pump — Grundfos NB 65-250/245 BQQE (EN 12162 end-suction
+      // centrifugal pump, cast iron/stainless). Redundant pair (duty + standby)
+      // per BESS best-practice. Industry cost: £4,000-6,000 per unit.
+      //
+      // L30 council FIX 1 (physics bug introduced L30): previous Grundfos
+      // CR 32-2 was rated 60 L/min — adequate for ONE rack cold plate but not
+      // for the whole system. Total system flow = rackCount × 60 L/min per
+      // cold plate = 15 × 60 = 900 L/min. The CR 32-2 is a multistage vertical
+      // in-line pump (up to ~60 L/min nominal) designed for high-head, low-flow
+      // building services — completely wrong for a high-flow BESS coolant loop.
+      // Correct sizing: Grundfos NB 65-250/245 BQQE — real end-suction
+      // centrifugal pump (ISO 2858 / EN 12162), 900 L/min at ~10 m head,
+      // ~7.5-11 kW motor, glycol/water compatible SS304 impeller/shaft.
+      // Source: Grundfos NB / NBE product range (grundfos.com/products/pumps/
+      // centrifugal-pumps/nb-nbe). Catalogue reference: NB 65-250/245.
       word(
         'coolant_circulation_pump_word',
         'coolant circulation pump word',
         cc('coolant_circulation_pump', 'Grundfos coolant circulation pump', 'thermal_transfer_function', 'steel'),
         [
           mod('quantity', '×2'),
-          mod('form', 'Grundfos CR 32-2'),
+          mod('form', 'Grundfos NB 65-250/245 BQQE end-suction centrifugal pump'),
           mod('manufacturer', 'Grundfos'),
-          mod('part_number', 'CR 32-2'),
-          mod('capacity', '60', 'L/min'),
-          mod('performance', 'duty + standby redundant pair'),
-          mod('regulatory', 'ISO 9906 class 2'),
+          mod('part_number', 'NB 65-250/245 BQQE'),
+          mod('capacity', '900', 'L/min'),
+          mod('performance', 'duty + standby redundant pair; 900 L/min system total (15 racks × 60 L/min per cold plate)'),
+          mod('regulatory', 'ISO 2858 / EN 12162'),
         ],
       ),
       // Cold plates — one aluminium 6061-T6 cold plate per rack, manifolded
@@ -1680,7 +1709,7 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
 
   return {
     module: 'mass_fluid_transport_process',
-    module_brief: 'Routes the glycol/water coolant between cold-plate manifolds and the chiller via SS304 piping, Grundfos CR 32-2 circulation pumps, aluminium cold plates, 8-way distribution manifold, and 200 L glycol/water charge.',
+    module_brief: 'Routes the glycol/water coolant between cold-plate manifolds and the chiller via SS304 piping, Grundfos NB 65-250 circulation pumps (900 L/min system total — 15 racks × 60 L/min per cold plate), aluminium cold plates, 8-way distribution manifold, and 200 L glycol/water charge.',
     overview_paragraph_en: '',
     derived_parameters: {},
     allowed_radicals: [

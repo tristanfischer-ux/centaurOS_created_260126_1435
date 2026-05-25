@@ -123,16 +123,30 @@ const CLASS_MIN_UNIT_PRICES: Record<string, Array<{ name_pattern: RegExp; min_gb
   // L28 council fix (2026-05-25): BESS enclosure fan was priced at £21 by
   // Engine B (thermal class reference £28 × 0.75 volume multiplier). Real
   // 225 mm AC axial fan (EBM-Papst W2E200 series, IP44) costs £120-£260 at
-  // distributor qty-1. Floor set at £80 — catches any future Engine B
-  // regression below catalogue pricing for industrial enclosure fans.
+  // distributor qty-1. Floor set at £130 — above Mouser £133.78 cached price,
+  // catches any future Engine B / cache-miss regression below catalogue price.
+  //
+  // L30 council FIX 2 (regression — safety BoM collapsed £1,620 → £234):
+  // After the L28 Kidde ECARO-25 → Kidde ECS swap (commit eb423889a), the
+  // clean_agent_cylinder word's form string changed. Engine B's
+  // chemical_sensing class curve prices the cylinder at ~£18 (well below
+  // the real £3,500-5,000 for a 70 kg Novec 1230 pre-charged cylinder).
+  // Neither the cache nor cost-repair corrected this upward — the part is
+  // industrial-purchased (not commodity-curve territory).
+  // Floor set at £3,500 — the lower end of real Kidde ECS 70 kg cylinder
+  // pricing (Kidde/Carrier list prices: pre-charged Novec 1230 cylinder
+  // £3,500-5,000 inc. service valve + pressure gauge, exc. nozzles).
   bess: [
-    { name_pattern: /\benclosure\s+ventilation\s+fan\b/i, min_gbp: 80, reason: 'BESS enclosure fan ≥ £80 each (ebm-papst W2E200, IP44, 225 mm, Mouser £133.78)' },
+    { name_pattern: /\benclosure\s+ventilation\s+fan\b/i, min_gbp: 130, reason: 'BESS enclosure fan ≥ £130 each (ebm-papst W2E200-HK38-01, IP44, 225 mm, Mouser £133.78)' },
+    { name_pattern: /\bclean\s+agent\s+cylinder\b/i, min_gbp: 3_500, reason: 'BESS clean-agent cylinder ≥ £3,500 each (Kidde ECS 70 kg Novec 1230 pre-charged cylinder, list price £3,500-5,000 exc. nozzles and detection panel)' },
   ],
   energy_storage: [
-    { name_pattern: /\benclosure\s+ventilation\s+fan\b/i, min_gbp: 80, reason: 'BESS enclosure fan ≥ £80 each (ebm-papst W2E200, IP44, 225 mm, Mouser £133.78)' },
+    { name_pattern: /\benclosure\s+ventilation\s+fan\b/i, min_gbp: 130, reason: 'BESS enclosure fan ≥ £130 each (ebm-papst W2E200-HK38-01, IP44, 225 mm, Mouser £133.78)' },
+    { name_pattern: /\bclean\s+agent\s+cylinder\b/i, min_gbp: 3_500, reason: 'BESS clean-agent cylinder ≥ £3,500 each (Kidde ECS 70 kg Novec 1230 pre-charged cylinder, list price £3,500-5,000 exc. nozzles and detection panel)' },
   ],
   'bess-utility-scale': [
-    { name_pattern: /\benclosure\s+ventilation\s+fan\b/i, min_gbp: 80, reason: 'BESS enclosure fan ≥ £80 each (ebm-papst W2E200, IP44, 225 mm, Mouser £133.78)' },
+    { name_pattern: /\benclosure\s+ventilation\s+fan\b/i, min_gbp: 130, reason: 'BESS enclosure fan ≥ £130 each (ebm-papst W2E200-HK38-01, IP44, 225 mm, Mouser £133.78)' },
+    { name_pattern: /\bclean\s+agent\s+cylinder\b/i, min_gbp: 3_500, reason: 'BESS clean-agent cylinder ≥ £3,500 each (Kidde ECS 70 kg Novec 1230 pre-charged cylinder, list price £3,500-5,000 exc. nozzles and detection panel)' },
   ],
 }
 
