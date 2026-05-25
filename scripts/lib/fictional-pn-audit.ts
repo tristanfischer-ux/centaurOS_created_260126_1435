@@ -10,87 +10,60 @@
  * believable alphanumerics — but does not exist in any distributor catalogue.
  * Gate 13 (parts-spec validator) catches this when the part appears in our
  * curated KNOWN_PART_AUTHORITATIVE table. Anything OUTSIDE that table sails
- * through gate 13 silently. Now that the distributor cascade is LIVE
- * (Mouser + Digi-Key + Farnell + LCSC + Nexar), gate 20 closes that gap:
- * any BoM line whose MPN returns null from ALL five distributors AND is not
- * in the curated table is flagged as potentially fictional.
+ * through gate 13 silently. Gate 20 closes that gap: any BoM line whose MPN
+ * is not in the DB (distributor_cascade_cache or pretraining_extracted_parts)
+ * AND is not in the curated table is flagged as potentially fictional.
+ *
+ * DB-ONLY ARCHITECTURE (codified 2026-05-25, drawer_forgeos_decisions_e30f5e00a59dc3ff):
+ * This gate now reads ONLY from ~/.forge-truth/forge-truth.db via
+ * db-only-cascade.ts. No live distributor API calls happen here.
+ * Live discovery is exclusively the responsibility of scripts/ingest/* jobs.
+ * This prevents chain runs from burning Mouser/Digi-Key/Nexar free-tier
+ * quotas (~200 calls/chain × N chains/day = quota exhausted in hours).
  *
  * Severity ladder:
- *   HIGH — MPN matches a structured part-number pattern
- *          (e.g. "ABCD1234-5X" — looks like a genuine product number,
- *          manufacturer plausibly hallucinated it) AND all four native
- *          distributors return null. These are the ones most likely to
- *          deceive a procurement engineer.
- *   MED  — MPN is non-commodity and doesn't match the structured PN
- *          pattern AND all distributors miss. Possibly a valid but
- *          obscure part OR a low-confidence hallucination.
- *   LOW  — Short alphanumeric (3-4 chars), or MPN looks like a
- *          catalogue-class commodity descriptor ("M6 bolt", "20mm angle",
- *          "PV-25 fuse" — valid but un-findable via keyword search).
- *          Informational only.
+ *   HIGH — MPN matches a structured part-number pattern (e.g. "ABCD1234-5X")
+ *          AND source='cache_miss_confirmed' (ingest confirmed it does not exist).
+ *          These are confirmed-fictional hallucinations.
+ *   MED  — source='unknown' (not yet ingested) AND structured PN pattern.
+ *          Needs ingest, NOT confirmed fictional — do NOT block the chain.
+ *          The part may be real but not yet in the DB.
+ *   MED  — source='cache_miss_confirmed' AND non-structured PN.
+ *          Possibly a valid but obscure OEM part or a low-confidence hallucination.
+ *   LOW  — source='unknown' AND non-structured PN. Informational only.
  *
- * Exit code 20 on any HIGH-severity finding (chain fails fast). MED + LOW
- * are informational and do not block the chain.
+ * EXIT CODE: 20 on any HIGH-severity finding (source='cache_miss_confirmed'
+ * AND structured PN). 'unknown' findings are MED/LOW only and do NOT block.
+ * This prevents the chain from blocking on parts that simply haven't been
+ * ingested yet.
  *
- * Nexar quota conservation: Nexar Evaluation plan = 100 matched parts/MONTH.
- * Mouser = 1000/day, Digi-Key = 1000/day after OAuth, Farnell = free,
- * LCSC = free. This audit defaults to the four native distributors in
- * parallel. ONLY if all four miss does it fall back to Nexar — preventing
- * unnecessary burn on the scarce monthly quota.
- *
- * Concurrency: a semaphore limits fan-out to 3 parallel distributor checks
- * at a time. Each individual distributor call is already capped at 8 s via
- * AbortSignal.timeout() — safe in CLI tsx context (not a Server Action).
+ * Concurrency: a semaphore limits fan-out to 3 parallel DB checks at a time.
+ * DB reads are fast but we preserve the semaphore for consistency with
+ * future live-API path.
  *
  * Distinct from gate 13 (parts-spec validator): gate 13 checks curated-table
  * entries for SPEC CLAIM CORRECTNESS (claimed 1500 A, real 500 A). Gate 20
- * checks EXISTENCE in any distributor catalogue. The two are orthogonal:
- * a hallucinated part number has NO distributor match AND is NOT in the
- * curated table; gate 13 can only catch it once an operator adds it to the
- * curated table. Gate 20 catches it universally without any table entry.
+ * checks EXISTENCE in the forge-truth.db corpus. The two are orthogonal.
  *
  * Pre-change mempalace search: fictional part number distributor hallucination
  * BESS L22 gate 13 curated table → 1 drawer loaded (BESS L22 council
  * 2026-05-25 identified this as universal-fix #3 from the 6-seat council).
+ *
+ * CHAIN-AS-DB-CONSUMER (2026-05-25): this file MUST NOT import from
+ * src/lib/pdf-engine-v2/lib/distributors/{mouser,digikey,farnell,lcsc,nexar}.ts
+ * Regression test: src/__tests__/chain-must-be-db-only.test.ts enforces this.
  */
 
 import { readFileSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 
-// ── DISTRIBUTOR IMPORTS ──────────────────────────────────────────────────────
-// We import the per-distributor functions directly rather than going through
-// findSkuForPart() (which fans out to ALL FIVE in parallel). This lets us
-// implement the 4-native-first, Nexar-last-resort cascade that conserves
-// the 100 matched-parts/month Nexar Evaluation plan quota.
-//
-// TypeScript compiler path: scripts/ → src/ works via the tsconfig paths
-// configured in tsconfig.json (or we can use a relative path from here to
-// the src directory — relative is simpler for a CLI script).
-const distDir = resolve(__dirname, '../../src/lib/pdf-engine-v2/lib/distributors')
-
-// We use dynamic requires so the compiler doesn't demand the exact types
-// at the import site (the distributor files export DistributorResult which
-// is re-exported from mouser.ts — still fully typed at runtime).
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuMouser } = require(resolve(distDir, 'mouser')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/mouser')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuDigikey } = require(resolve(distDir, 'digikey')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/digikey')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuFarnell } = require(resolve(distDir, 'farnell')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/farnell')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuLcsc } = require(resolve(distDir, 'lcsc')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/lcsc')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuNexar } = require(resolve(distDir, 'nexar')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/nexar')
+// ── DB-ONLY LOOKUP ────────────────────────────────────────────────────────────
+// Chain reads ONLY from forge-truth.db. No live API calls in this file.
+import { lookupCached, type DbCascadeSource } from '../../src/lib/pdf-engine-v2/lib/distributors/db-only-cascade'
 
 // ── CURATED-TABLE SKIP ───────────────────────────────────────────────────────
 // Parts already in KNOWN_PART_AUTHORITATIVE are validated by gate 13. We
 // don't re-check them here — gate 13 already covers their existence claim.
-// Rather than importing the whole table (which is heavy), we call findAuth()
-// logic by pattern-matching the MPN against the well-known prefixes. Gate 20
-// skips a part when gate 13 would recognise it. We achieve this by importing
-// the KNOWN_PART_AUTHORITATIVE array and running the same lookup.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { KNOWN_PART_AUTHORITATIVE } = require('./parts-spec-validator') as typeof import('./parts-spec-validator')
+import { KNOWN_PART_AUTHORITATIVE } from './parts-spec-validator'
 
 function isInCuratedTable(mpn: string, manufacturer: string | null): boolean {
   if (!mpn) return false
@@ -132,82 +105,31 @@ const STRUCTURED_PN_REGEX = /^[A-Z0-9]{3,}[-_/][A-Z0-9]{1,}(?:[-_/][A-Z0-9]{1,})
 // return a meaningful miss. LOW severity.
 const SHORT_ALPHANUMERIC_REGEX = /^[A-Za-z0-9]{1,4}$/
 
-// ── EXISTENCE CHECK ──────────────────────────────────────────────────────────
+// ── EXISTENCE CHECK (DB-ONLY) ────────────────────────────────────────────────
 //
-// Two-stage cascade to protect Nexar quota:
-//   Stage 1: parallel Mouser + Digi-Key + Farnell + LCSC (all cheap)
-//   Stage 2: only Nexar if all four native distributors miss
+// CHAIN-AS-DB-CONSUMER: reads only from forge-truth.db via lookupCached().
+// No live API calls happen here. Live discovery is handled by scripts/ingest/*.
 //
-// AbortSignal.timeout() is safe in CLI tsx context — documented gotcha
-// applies to Next.js Server Actions only, not Node.js scripts.
+// DbCascadeSource semantics for gate 20:
+//   'cache_hit'            → part exists → PASS (not fictional)
+//   'library_only'         → part in curated corpus → PASS
+//   'cache_miss_confirmed' → ingest confirmed non-existent → classify as HIGH/MED
+//   'unknown'              → not yet ingested → MED only (needs ingest, not confirmed fictional)
 
 interface ExistenceResult {
   real: boolean
-  sources: string[]
-  nexar_tried: boolean
+  source: DbCascadeSource
+  dbSource: string
 }
 
-async function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  label: string,
-): Promise<T | null> {
-  const abort = new AbortController()
-  const timer = setTimeout(() => abort.abort(new Error(`[fictional-pn-audit] ${label} timed out after ${ms}ms`)), ms)
-  try {
-    const result = await promise
-    clearTimeout(timer)
-    return result
-  } catch (err) {
-    clearTimeout(timer)
-    return null
-  }
-}
-
-async function liveExistenceCheck(
+function dbExistenceCheck(
   mpn: string,
   manufacturer: string | null,
-): Promise<ExistenceResult> {
-  const TIMEOUT_MS = 8_000
-
-  // Stage 1: 4 native distributors in parallel (cheap quota)
-  const [m, d, f, l] = await Promise.all([
-    withTimeout(lookupSkuMouser(mpn).catch(() => null), TIMEOUT_MS, `mouser:${mpn}`),
-    withTimeout(lookupSkuDigikey(mpn).catch(() => null), TIMEOUT_MS, `digikey:${mpn}`),
-    withTimeout(lookupSkuFarnell(mpn).catch(() => null), TIMEOUT_MS, `farnell:${mpn}`),
-    withTimeout(lookupSkuLcsc(mpn).catch(() => null), TIMEOUT_MS, `lcsc:${mpn}`),
-  ])
-
-  // Manufacturer filter: if a distributor row comes back with a manufacturer
-  // field that is completely inconsistent with the declared manufacturer, we
-  // treat that as a miss (same logic as findSkuForPart's manufacturer-strict
-  // filter — but here we only reject when BOTH are non-empty AND clearly
-  // incompatible, to avoid rejecting distributors that don't return mfr info).
-  function mfrCompatible(row: { manufacturer?: string } | null): boolean {
-    if (!row) return false
-    if (!manufacturer?.trim()) return true   // no declared mfr → accept any match
-    const decl = manufacturer.trim().toLowerCase()
-    const rowMfr = (row.manufacturer ?? '').toLowerCase()
-    if (!rowMfr) return true   // distributor returned no mfr field → can't reject
-    return rowMfr.includes(decl) || decl.includes(rowMfr)
-  }
-
-  const hits1: string[] = []
-  if (mfrCompatible(m)) { hits1.push('mouser') }
-  if (mfrCompatible(d)) { hits1.push('digikey') }
-  if (mfrCompatible(f)) { hits1.push('farnell') }
-  if (mfrCompatible(l)) { hits1.push('lcsc') }
-
-  if (hits1.length > 0) {
-    return { real: true, sources: hits1, nexar_tried: false }
-  }
-
-  // Stage 2: Nexar fallback (only when all four native distributors miss)
-  const n = await withTimeout(lookupSkuNexar(mpn).catch(() => null), TIMEOUT_MS, `nexar:${mpn}`)
-  if (n && mfrCompatible(n)) {
-    return { real: true, sources: ['nexar'], nexar_tried: true }
-  }
-  return { real: false, sources: [], nexar_tried: true }
+): ExistenceResult {
+  const dbResult = lookupCached(manufacturer, mpn)
+  const real = dbResult.found
+  const dbSourceLabel = dbResult.result?.source ?? 'none'
+  return { real, source: dbResult.source, dbSource: dbSourceLabel }
 }
 
 // ── WORD COLLECTION ──────────────────────────────────────────────────────────
@@ -326,8 +248,8 @@ export interface FictionalPnFinding {
   sub_module_id: string
   severity: FictionalPnSeverity
   reason: string
-  distributors_tried: string[]
-  nexar_tried: boolean
+  /** DB source: 'cache_miss_confirmed' | 'unknown' (never 'cache_hit' or 'library_only' — those pass). */
+  db_source: DbCascadeSource
   explanation: string
 }
 
@@ -337,33 +259,14 @@ export interface FictionalPnAuditResult {
   lines_skipped_curated: number
   lines_skipped_commodity: number
   lines_skipped_too_short: number
+  /** Always 0 in DB-only mode — retained for interface compatibility. */
   nexar_calls: number
+  /** DB source hit counts for cache_hit + library_only (confirmed real). */
   per_distributor_hit: Record<string, number>
   product_class: string
 }
 
-// ── SEMAPHORE ────────────────────────────────────────────────────────────────
-// Limit concurrent distributor fan-outs to 3 at a time. Distributors
-// throttle aggressively; more than 3 concurrent checks causes 429s that
-// silently return null (masking a real existence hit as a miss).
-
-async function runWithSemaphore<T>(
-  semaphore: { slots: number },
-  fn: () => Promise<T>,
-): Promise<T> {
-  // Spin until a slot is free
-  while (semaphore.slots <= 0) {
-    await new Promise((res) => setTimeout(res, 50))
-  }
-  semaphore.slots -= 1
-  try {
-    return await fn()
-  } finally {
-    semaphore.slots += 1
-  }
-}
-
-// ── AUDIT ────────────────────────────────────────────────────────────────────
+// ── AUDIT ─────────────────────────────────────────────────────────────────────
 
 export async function auditFictionalPartNumbers(
   state: any,
@@ -380,12 +283,12 @@ export async function auditFictionalPartNumbers(
   let linesSkippedCurated = 0
   let linesSkippedCommodity = 0
   let linesSkippedTooShort = 0
-  let nexarCalls = 0
-  const perDistributorHit: Record<string, number> = {}
+  const perDbSourceHit: Record<string, number> = {}
 
-  const semaphore = { slots: 3 }
   const seen = new Set<string>()  // dedup by mpn+manufacturer
 
+  // DB reads are synchronous (better-sqlite3), but we keep async interface
+  // for drop-in compatibility with callers that await this function.
   const tasks = lines.map((line) => async () => {
     const { mpn, manufacturer, word_id, module_id, sub_module_id } = line
 
@@ -420,22 +323,47 @@ export async function auditFictionalPartNumbers(
 
     linesAudited += 1
 
-    // Live existence check (semaphore-gated)
-    const result = await runWithSemaphore(semaphore, () => liveExistenceCheck(mpn, manufacturer))
+    // DB-only existence check (synchronous, no live API)
+    const result = dbExistenceCheck(mpn, manufacturer)
 
-    if (result.nexar_tried) nexarCalls += 1
-    for (const src of result.sources) {
-      perDistributorHit[src] = (perDistributorHit[src] ?? 0) + 1
+    // Track confirmed-real DB source hits
+    if (result.real && result.dbSource !== 'none') {
+      const key = `db:${result.source}`
+      perDbSourceHit[key] = (perDbSourceHit[key] ?? 0) + 1
     }
 
     if (result.real) return  // found — not fictional
 
-    // All distributors missed — classify severity
+    // Not found. Classify severity based on DB source + PN structure.
     const isStructured = STRUCTURED_PN_REGEX.test(mpn)
-    const severity: FictionalPnSeverity = isStructured ? 'HIGH' : 'MED'
 
-    const distributorsTried = ['mouser', 'digikey', 'farnell', 'lcsc']
-    if (result.nexar_tried) distributorsTried.push('nexar')
+    // Severity matrix:
+    //   cache_miss_confirmed + structured PN  → HIGH (confirmed fictional)
+    //   cache_miss_confirmed + unstructured   → MED  (confirmed absent, but may be OEM-direct)
+    //   unknown + structured PN               → MED  (needs ingest, NOT confirmed fictional)
+    //   unknown + unstructured                → LOW  (informational)
+    let severity: FictionalPnSeverity
+    if (result.source === 'cache_miss_confirmed') {
+      severity = isStructured ? 'HIGH' : 'MED'
+    } else {
+      // source === 'unknown'
+      severity = isStructured ? 'MED' : 'LOW'
+    }
+
+    const confirmedAbsent = result.source === 'cache_miss_confirmed'
+    const reasonPrefix = confirmedAbsent
+      ? `MPN "${mpn}"${manufacturer ? ` (${manufacturer})` : ''} is confirmed absent from all distributor catalogues in forge-truth.db (ingest previously checked and found nothing). `
+      : `MPN "${mpn}"${manufacturer ? ` (${manufacturer})` : ''} is not yet in forge-truth.db (has not been ingested). `
+    const structuredNote = isStructured
+      ? 'The MPN matches a structured part-number pattern (alphanumeric+separator+alphanumeric), suggesting a plausible-looking but potentially hallucinated part number.'
+      : 'The MPN does not match a structured part-number pattern — may be a valid OEM-direct or custom part.'
+    const severityNote = severity === 'HIGH'
+      ? 'HIGH: confirmed absent AND structured PN — likely hallucinated.'
+      : severity === 'MED'
+        ? confirmedAbsent
+          ? 'MED: confirmed absent but unstructured PN — possibly valid OEM-direct.'
+          : 'MED: not yet ingested AND structured PN — run ingest to confirm.'
+        : 'LOW: not yet ingested AND unstructured PN — informational only.'
 
     findings.push({
       id: `${word_id}:${mpn}`,
@@ -445,24 +373,22 @@ export async function auditFictionalPartNumbers(
       module_id,
       sub_module_id,
       severity,
-      reason: `MPN "${mpn}"${manufacturer ? ` (declared manufacturer: ${manufacturer})` : ''} returned null from all ${distributorsTried.length} distributor(s) queried (${distributorsTried.join(', ')}) and is not in the curated parts table. ${isStructured ? 'The MPN\'s structure matches a real part-number pattern (alphanumeric + separator + alphanumeric), strongly suggesting the LLM hallucinated a plausible-looking but non-existent part number.' : 'The MPN doesn\'t match a structured part-number pattern — it may be a valid but obscure OEM part, or a low-confidence hallucination.'}`,
-      distributors_tried: distributorsTried,
-      nexar_tried: result.nexar_tried,
+      reason: `${reasonPrefix}${structuredNote} ${severityNote}`,
+      db_source: result.source,
       explanation:
-        `Root cause: deterministic-emitter.ts or the LLM generator emitted this manufacturer+PN combination ` +
-        `without verifying it against any catalogue. Gate 13 (parts-spec validator) cannot catch parts ` +
-        `outside its curated KNOWN_PART_AUTHORITATIVE table. Gate 20 (this audit) covers the orthogonal ` +
-        `case — any BoM line whose MPN doesn't resolve to a real part in the live distributor cascade. ` +
-        `Fix: (a) replace "${mpn}" with a real ${manufacturer ?? 'manufacturer'} part that IS available ` +
-        `from Mouser/Digi-Key/Farnell/LCSC, OR (b) if this is a custom/OEM item, add a "custom" prefix ` +
-        `to the MPN (e.g. "CUSTOM-${mpn}") so future runs skip it explicitly.`,
+        confirmedAbsent
+          ? `Gate 20 DB-only check: "${mpn}" is in distributor_cascade_cache with miss=1 ` +
+            `(ingest confirmed non-existent). Fix: (a) replace with a real ${manufacturer ?? 'manufacturer'} ` +
+            `MPN from Mouser/Digi-Key/Farnell/LCSC, OR (b) add a "custom" prefix if OEM-direct.`
+          : `Gate 20 DB-only check: "${mpn}" has no row in distributor_cascade_cache or ` +
+            `pretraining_extracted_parts. This is NOT confirmed fictional — it may be real but not ` +
+            `yet ingested. Run scripts/ingest/run-weekly-component-sweep.sh to populate the DB ` +
+            `for this part class. If you need immediate confirmation, add it to KNOWN_PART_AUTHORITATIVE ` +
+            `in parts-spec-validator.ts.`,
     })
   })
 
-  // Execute tasks — each task already acquires the semaphore internally
-  // (see runWithSemaphore call around liveExistenceCheck above). We launch
-  // all tasks concurrently; the semaphore inside each task ensures at most
-  // 3 distributor fan-outs are in flight simultaneously.
+  // DB reads are synchronous but tasks are async-compatible
   await Promise.all(tasks.map((t) => t()))
 
   return {
@@ -471,8 +397,8 @@ export async function auditFictionalPartNumbers(
     lines_skipped_curated: linesSkippedCurated,
     lines_skipped_commodity: linesSkippedCommodity,
     lines_skipped_too_short: linesSkippedTooShort,
-    nexar_calls: nexarCalls,
-    per_distributor_hit: perDistributorHit,
+    nexar_calls: 0,  // DB-only mode: no live API calls ever
+    per_distributor_hit: perDbSourceHit,
     product_class: productClass,
   }
 }
@@ -481,25 +407,25 @@ export async function auditFictionalPartNumbers(
 
 function renderMarkdown(result: FictionalPnAuditResult, statePath: string): string {
   const lines: string[] = []
-  lines.push(`# Fictional-Part-Number Audit (gate 20) — ${statePath}`)
+  lines.push(`# Fictional-Part-Number Audit (gate 20, DB-only) — ${statePath}`)
   lines.push('')
   lines.push(`**Product class:** \`${result.product_class}\``)
   lines.push('')
   lines.push(
-    `**${result.lines_audited} BoM line(s) audited** against live distributor cascade ` +
+    `**${result.lines_audited} BoM line(s) audited** against forge-truth.db ` +
     `(${result.lines_skipped_curated} skipped — in curated gate-13 table; ` +
     `${result.lines_skipped_commodity} skipped — commodity descriptor; ` +
     `${result.lines_skipped_too_short} skipped — too short / junk).`,
   )
   lines.push('')
   lines.push(
-    `**Nexar calls used:** ${result.nexar_calls} ` +
-    `(Nexar only called as last resort when all 4 native distributors miss — ` +
-    `conserves 100/month Evaluation-plan quota).`,
+    `**Architecture:** DB-only reads from \`~/.forge-truth/forge-truth.db\`. ` +
+    `No live distributor API calls. Zero quota consumed. ` +
+    `Live discovery handled by \`scripts/ingest/run-weekly-component-sweep.sh\`.`,
   )
   lines.push('')
   if (Object.keys(result.per_distributor_hit).length > 0) {
-    lines.push('**Per-distributor hits (confirmed real parts):**')
+    lines.push('**DB source hits (confirmed real parts):**')
     for (const [src, count] of Object.entries(result.per_distributor_hit).sort()) {
       lines.push(`  - ${src}: ${count}`)
     }
@@ -507,7 +433,7 @@ function renderMarkdown(result: FictionalPnAuditResult, statePath: string): stri
   }
 
   if (result.findings.length === 0) {
-    lines.push(`PASS — every audited MPN resolved to a real part on at least one distributor.`)
+    lines.push(`PASS — every audited MPN found in forge-truth.db (cache_hit or library_only).`)
     return lines.join('\n')
   }
 
@@ -518,6 +444,11 @@ function renderMarkdown(result: FictionalPnAuditResult, statePath: string): stri
     `FAIL — ${result.findings.length} finding(s): ${high.length} HIGH, ${med.length} MED, ${low.length} LOW.`,
   )
   lines.push('')
+  lines.push(
+    `> HIGH = confirmed absent (cache_miss_confirmed) + structured PN → chain fails. ` +
+    `MED/LOW = needs ingest OR confirmed absent + unstructured PN → informational only.`,
+  )
+  lines.push('')
 
   const sorted = [...result.findings].sort((a, b) => {
     const order: Record<FictionalPnSeverity, number> = { HIGH: 0, MED: 1, LOW: 2 }
@@ -526,11 +457,10 @@ function renderMarkdown(result: FictionalPnAuditResult, statePath: string): stri
 
   for (const f of sorted) {
     const mfrDisplay = f.manufacturer ? ` (${f.manufacturer})` : ''
-    lines.push(`## [${f.severity}] ${f.mpn}${mfrDisplay} — fictional or un-catalogued part number`)
+    lines.push(`## [${f.severity}] ${f.mpn}${mfrDisplay} — fictional or un-ingested part number`)
     lines.push(`- **id:** \`${f.id}\``)
     lines.push(`- **Module:** \`${f.module_id}\` → \`${f.sub_module_id}\``)
-    lines.push(`- **Distributors tried:** ${f.distributors_tried.join(', ')}`)
-    lines.push(`- **Nexar tried:** ${f.nexar_tried ? 'yes' : 'no (native distributors hit)'}`)
+    lines.push(`- **DB source:** \`${f.db_source}\``)
     lines.push(`- **Reason:** ${f.reason}`)
     lines.push(`- **Fix:** ${f.explanation}`)
     lines.push('')
@@ -582,11 +512,10 @@ if (isMain) {
       process.exit(20)
     }
     console.log(
-      `[fictional-pn-audit] PASS: ${result.lines_audited} lines audited, ` +
+      `[fictional-pn-audit] PASS: ${result.lines_audited} lines audited (DB-only, zero quota consumed), ` +
       `${result.findings.length} non-blocking findings ` +
       `(${result.findings.filter((f) => f.severity === 'MED').length} MED, ` +
-      `${result.findings.filter((f) => f.severity === 'LOW').length} LOW). ` +
-      `Nexar calls used: ${result.nexar_calls}.`,
+      `${result.findings.filter((f) => f.severity === 'LOW').length} LOW).`,
     )
   }).catch((err) => {
     console.error(`[fictional-pn-audit] runtime error: ${(err as Error).message}`)

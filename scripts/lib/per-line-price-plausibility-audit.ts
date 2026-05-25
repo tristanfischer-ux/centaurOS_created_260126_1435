@@ -59,23 +59,13 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 
-// ── DISTRIBUTOR IMPORTS ──────────────────────────────────────────────────────
-// 4-native-first, Nexar-last-resort cascade that conserves the 100
-// matched-parts/month Nexar Evaluation-plan quota.
-const distDir = resolve(__dirname, '../../src/lib/pdf-engine-v2/lib/distributors')
-
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuMouser } = require(resolve(distDir, 'mouser')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/mouser')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuDigikey } = require(resolve(distDir, 'digikey')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/digikey')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuFarnell } = require(resolve(distDir, 'farnell')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/farnell')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuLcsc } = require(resolve(distDir, 'lcsc')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/lcsc')
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { lookupSkuNexar } = require(resolve(distDir, 'nexar')) as typeof import('../../src/lib/pdf-engine-v2/lib/distributors/nexar')
+// ── DB-ONLY LOOKUP ────────────────────────────────────────────────────────────
+// CHAIN-AS-DB-CONSUMER (codified 2026-05-25, drawer_forgeos_decisions_e30f5e00a59dc3ff):
+// This gate reads ONLY from forge-truth.db via db-only-cascade.ts.
+// No live distributor API calls happen here. Zero quota consumed.
+// Live discovery is exclusively the responsibility of scripts/ingest/* jobs.
+import { lookupCached } from '../../src/lib/pdf-engine-v2/lib/distributors/db-only-cascade'
 
 // ── COMMODITY / SKIP PATTERNS ────────────────────────────────────────────────
 // Same regex as gate 20 — commodity descriptors are not findable via exact
@@ -90,114 +80,64 @@ const COMMODITY_SKIP_REGEX = /^(?:M\d{1,2}(?:\.\d)?\s*(?:x\s*\d+)?|generic|stand
 // unreliable as a benchmark.
 const SHORT_ALPHANUMERIC_REGEX = /^[A-Za-z0-9]{1,4}$/
 
-// ── TIMEOUT HELPER ───────────────────────────────────────────────────────────
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  ms: number,
-  label: string,
-): Promise<T | null> {
-  const abort = new AbortController()
-  const timer = setTimeout(
-    () => abort.abort(new Error(`[per-line-price-audit] ${label} timed out after ${ms}ms`)),
-    ms,
-  )
-  try {
-    const result = await promise
-    clearTimeout(timer)
-    return result
-  } catch {
-    clearTimeout(timer)
-    return null
-  }
-}
-
-// ── PRICE LOOKUP ─────────────────────────────────────────────────────────────
+// ── PRICE LOOKUP (DB-ONLY) ────────────────────────────────────────────────────
 //
-// Two-stage cascade to protect Nexar quota:
-//   Stage 1: parallel Mouser + Digi-Key + Farnell + LCSC (cheap)
-//   Stage 2: Nexar only if all four native distributors miss
+// CHAIN-AS-DB-CONSUMER: reads only from forge-truth.db via lookupCached().
+// No live API calls. Zero quota consumed.
 //
-// Returns the qty-1 unit price (GBP) from every distributor that hit,
-// plus which source was cheapest.
+// Severity rules for gate 21 with DB-only data:
+//   'cache_hit'            → has result.priceGBP — compute ratio and classify
+//   'library_only'         → priceGBP may be empty — skip line (no pricing data)
+//   'cache_miss_confirmed' → PASS — gate 20 covers existence; gate 21 only acts on real prices
+//   'unknown'              → skip line (informational note; not yet ingested)
 
 interface PriceLookupResult {
-  /** All qty-1 unit prices from distributors that returned a match. */
+  /** All qty-1 unit prices from DB sources that had pricing data. */
   pricesGbp: Array<{ source: string; unitPriceGbp: number }>
-  nexar_tried: boolean
+  /** Always false in DB-only mode — retained for interface compatibility. */
+  nexar_tried: false
+  /** The DB source outcome — drives skip logic. */
+  db_source: string
 }
 
-function qty1Price(row: { priceGBP?: Array<{ qty: number; unitPriceGbp: number }> } | null): number | null {
-  if (!row?.priceGBP || row.priceGBP.length === 0) return null
-  const sorted = [...row.priceGBP].sort((a, b) => a.qty - b.qty)
+function qty1PriceFromResult(
+  priceGBP?: Array<{ qty: number; unitPriceGbp: number }>,
+): number | null {
+  if (!priceGBP || priceGBP.length === 0) return null
+  const sorted = [...priceGBP].sort((a, b) => a.qty - b.qty)
   const p = sorted[0].unitPriceGbp
   return Number.isFinite(p) && p > 0 ? p : null
 }
 
-function mfrCompatible(
-  row: { manufacturer?: string } | null,
-  declaredManufacturer: string | null,
-): boolean {
-  if (!row) return false
-  if (!declaredManufacturer?.trim()) return true
-  const decl = declaredManufacturer.trim().toLowerCase()
-  const rowMfr = (row.manufacturer ?? '').toLowerCase()
-  if (!rowMfr) return true
-  return rowMfr.includes(decl) || decl.includes(rowMfr)
-}
-
-async function priceCascadeLookup(
+function dbPriceLookup(
   mpn: string,
   manufacturer: string | null,
-): Promise<PriceLookupResult> {
-  const TIMEOUT_MS = 8_000
+): PriceLookupResult {
+  const dbResult = lookupCached(manufacturer, mpn)
 
-  const [m, d, f, l] = await Promise.all([
-    withTimeout(lookupSkuMouser(mpn).catch(() => null), TIMEOUT_MS, `mouser:${mpn}`),
-    withTimeout(lookupSkuDigikey(mpn).catch(() => null), TIMEOUT_MS, `digikey:${mpn}`),
-    withTimeout(lookupSkuFarnell(mpn).catch(() => null), TIMEOUT_MS, `farnell:${mpn}`),
-    withTimeout(lookupSkuLcsc(mpn).catch(() => null), TIMEOUT_MS, `lcsc:${mpn}`),
-  ])
-
-  const pricesGbp: Array<{ source: string; unitPriceGbp: number }> = []
-
-  function tryAdd(source: string, row: Parameters<typeof mfrCompatible>[0]): void {
-    if (!mfrCompatible(row, manufacturer)) return
-    const p = qty1Price(row as any)
-    if (p !== null) pricesGbp.push({ source, unitPriceGbp: p })
+  // cache_miss_confirmed or unknown: no prices to compare
+  if (!dbResult.found || !dbResult.result) {
+    return { pricesGbp: [], nexar_tried: false, db_source: dbResult.source }
   }
 
-  tryAdd('mouser', m)
-  tryAdd('digikey', d)
-  tryAdd('farnell', f)
-  tryAdd('lcsc', l)
-
-  if (pricesGbp.length > 0) {
-    return { pricesGbp, nexar_tried: false }
+  // library_only: result exists but priceGBP is typically empty
+  // (library-writeback doesn't populate pricing from distributor calls)
+  if (dbResult.source === 'library_only') {
+    return { pricesGbp: [], nexar_tried: false, db_source: 'library_only' }
   }
 
-  // Stage 2: Nexar last resort
-  const n = await withTimeout(lookupSkuNexar(mpn).catch(() => null), TIMEOUT_MS, `nexar:${mpn}`)
-  tryAdd('nexar', n)
-
-  return { pricesGbp, nexar_tried: true }
-}
-
-// ── SEMAPHORE ────────────────────────────────────────────────────────────────
-
-async function runWithSemaphore<T>(
-  semaphore: { slots: number },
-  fn: () => Promise<T>,
-): Promise<T> {
-  while (semaphore.slots <= 0) {
-    await new Promise((res) => setTimeout(res, 50))
+  // cache_hit: extract qty-1 GBP price if present
+  const price = qty1PriceFromResult(dbResult.result.priceGBP)
+  if (price !== null) {
+    return {
+      pricesGbp: [{ source: `db:${dbResult.result.source}`, unitPriceGbp: price }],
+      nexar_tried: false,
+      db_source: dbResult.source,
+    }
   }
-  semaphore.slots -= 1
-  try {
-    return await fn()
-  } finally {
-    semaphore.slots += 1
-  }
+
+  // cache_hit but no price data (stock-only row with no price breaks)
+  return { pricesGbp: [], nexar_tried: false, db_source: dbResult.source }
 }
 
 // ── MEDIAN HELPER ────────────────────────────────────────────────────────────
@@ -381,12 +321,12 @@ export async function auditPerLinePricePlausibility(
   let linesSkippedTooShort = 0
   let linesSkippedNoDistributorHit = 0
   let linesPass = 0
-  let nexarCalls = 0
-  const perDistributorHit: Record<string, number> = {}
+  const perDbSourceHit: Record<string, number> = {}
 
-  const semaphore = { slots: 3 }
   const seen = new Set<string>()  // dedup by mpn+manufacturer
 
+  // DB reads are synchronous (better-sqlite3) but we keep async interface
+  // for drop-in compatibility with callers that await this function.
   const tasks = lines.map((line) => async () => {
     const { part_number, manufacturer, word_id, word_name, module_id, sub_module_id, unit_price_gbp } = line
 
@@ -415,18 +355,16 @@ export async function auditPerLinePricePlausibility(
 
     linesAudited += 1
 
-    // Live price lookup (semaphore-gated)
-    const lookup = await runWithSemaphore(semaphore, () =>
-      priceCascadeLookup(part_number, manufacturer),
-    )
+    // DB-only price lookup — synchronous, zero quota
+    const lookup = dbPriceLookup(part_number, manufacturer)
 
-    if (lookup.nexar_tried) nexarCalls += 1
     for (const { source } of lookup.pricesGbp) {
-      perDistributorHit[source] = (perDistributorHit[source] ?? 0) + 1
+      perDbSourceHit[source] = (perDbSourceHit[source] ?? 0) + 1
     }
 
-    // If no distributor returned a price, skip — gate 20 already handles
-    // existence; gate 21 has nothing to compare against.
+    // If no DB source returned a price, skip — gate 20 already handles
+    // existence for confirmed-absent parts; gate 21 has nothing to compare.
+    // 'unknown' source = not yet ingested, skip with informational note.
     if (lookup.pricesGbp.length === 0) {
       linesSkippedNoDistributorHit += 1
       return
@@ -467,11 +405,11 @@ export async function auditPerLinePricePlausibility(
       severity,
       top_source: `${cheapestSource.source} £${cheapestSource.unitPriceGbp.toFixed(2)}`,
       all_sources: lookup.pricesGbp,
-      nexar_tried: lookup.nexar_tried,
+      nexar_tried: false,
       explanation:
-        `Gate 21 per-line plausibility: BoM renders "${word_name}" (MPN: ${part_number}` +
+        `Gate 21 per-line plausibility (DB-only): BoM renders "${word_name}" (MPN: ${part_number}` +
         `${manufacturer ? `, manufacturer: ${manufacturer}` : ''}) at £${unit_price_gbp.toFixed(2)} per unit. ` +
-        `Cheapest live distributor price (${cheapestSource.source}) = £${distributorBest.toFixed(2)}. ` +
+        `Cheapest DB-cached distributor price (${cheapestSource.source}) = £${distributorBest.toFixed(2)}. ` +
         `Ratio = ${ratio.toFixed(2)}. ${directionNote} ` +
         `Gate 10 B-7 (aggregate cost band) would not catch this because per-line errors can cancel across the BoM. ` +
         `Fix: (a) verify the correct unit basis — is this per-unit or per-reel/lot/pack? ` +
@@ -481,9 +419,7 @@ export async function auditPerLinePricePlausibility(
     })
   })
 
-  // Launch all tasks concurrently. Each task acquires the semaphore internally
-  // before calling priceCascadeLookup, so at most 3 distributor fan-outs are
-  // in flight simultaneously.
+  // DB reads are synchronous but tasks are async-compatible
   await Promise.all(tasks.map((t) => t()))
 
   return {
@@ -494,8 +430,8 @@ export async function auditPerLinePricePlausibility(
     lines_skipped_too_short: linesSkippedTooShort,
     lines_skipped_no_distributor_hit: linesSkippedNoDistributorHit,
     lines_pass: linesPass,
-    nexar_calls: nexarCalls,
-    per_distributor_hit: perDistributorHit,
+    nexar_calls: 0,  // DB-only mode: no live API calls ever
+    per_distributor_hit: perDbSourceHit,
     product_class: productClass,
   }
 }
@@ -516,27 +452,26 @@ function renderMarkdown(result: PricePlausibilityAuditResult, statePath: string)
   lines.push('## Summary')
   lines.push('')
   lines.push(
-    `**${result.lines_audited} BoM line(s) audited** against live distributor cascade. ` +
+    `**${result.lines_audited} BoM line(s) audited** against forge-truth.db (DB-only, zero quota consumed). ` +
     `${result.lines_pass} PASS, ${high.length} HIGH, ${med.length} MEDIUM, ${low.length} LOW.`,
   )
   lines.push('')
   lines.push(
     `**Skipped:** ${result.lines_skipped_commodity} commodity descriptors, ` +
     `${result.lines_skipped_too_short} short/ambiguous MPNs, ` +
-    `${result.lines_skipped_no_distributor_hit} lines with no distributor hit ` +
-    `(gate 20 may have already flagged those), ` +
+    `${result.lines_skipped_no_distributor_hit} lines with no cached price ` +
+    `(not yet ingested or confirmed absent — gate 20 covers existence), ` +
     `${result.lines_skipped_no_price} lines with no rendered price.`,
   )
   lines.push('')
   lines.push(
-    `**Nexar calls used:** ${result.nexar_calls} ` +
-    `(Nexar only called as last resort when all 4 native distributors miss — ` +
-    `conserves 100/month Evaluation-plan quota).`,
+    `**Architecture:** DB-only reads from \`~/.forge-truth/forge-truth.db\`. ` +
+    `No live API calls. Live pricing populated by \`scripts/ingest/run-weekly-component-sweep.sh\`.`,
   )
   lines.push('')
 
   if (Object.keys(result.per_distributor_hit).length > 0) {
-    lines.push('**Per-distributor price hits:**')
+    lines.push('**DB source price hits:**')
     for (const [src, count] of Object.entries(result.per_distributor_hit).sort()) {
       lines.push(`  - ${src}: ${count}`)
     }
@@ -545,8 +480,8 @@ function renderMarkdown(result: PricePlausibilityAuditResult, statePath: string)
 
   if (result.findings.length === 0) {
     lines.push(
-      'PASS — every audited BoM line with a live distributor match has a unit price ' +
-      'within [0.5×, 2.0×] of the cheapest distributor source.',
+      'PASS — every audited BoM line with a DB-cached price has a unit price ' +
+      'within [0.5×, 2.0×] of the cheapest cached distributor source.',
     )
     return lines.join('\n')
   }
@@ -575,7 +510,6 @@ function renderMarkdown(result: PricePlausibilityAuditResult, statePath: string)
       lines.push(`- **Distributor median:** £${f.distributor_median_gbp.toFixed(2)}`)
       lines.push(`- **Ratio:** ${f.ratio.toFixed(2)}× (threshold: outside [0.2, 5])`)
       lines.push(`- **All sources:** ${f.all_sources.map(x => `${x.source} £${x.unitPriceGbp.toFixed(2)}`).join(', ')}`)
-      lines.push(`- **Nexar tried:** ${f.nexar_tried ? 'yes' : 'no (native distributor hit)'}`)
       lines.push(`- **Fix:** ${f.explanation}`)
       lines.push('')
     }
@@ -671,11 +605,10 @@ if (isMain) {
       process.exit(21)
     }
     console.log(
-      `[per-line-price-audit] PASS: ${result.lines_audited} lines audited, ` +
+      `[per-line-price-audit] PASS: ${result.lines_audited} lines audited (DB-only, zero quota consumed), ` +
       `${result.lines_pass} PASS, ` +
       `${result.findings.filter((f) => f.severity === 'MEDIUM').length} MEDIUM, ` +
-      `${result.findings.filter((f) => f.severity === 'LOW').length} LOW (non-blocking). ` +
-      `Nexar calls used: ${result.nexar_calls}.`,
+      `${result.findings.filter((f) => f.severity === 'LOW').length} LOW (non-blocking).`,
     )
   }).catch((err) => {
     console.error(`[per-line-price-audit] runtime error: ${(err as Error).message}`)

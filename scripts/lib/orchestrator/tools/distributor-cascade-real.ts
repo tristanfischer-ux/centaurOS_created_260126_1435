@@ -1,31 +1,33 @@
 /**
  * scripts/lib/orchestrator/tools/distributor-cascade-real.ts
  *
- * REAL parts catalogue lookup tool — replaces the prior octopart-stub.
+ * Parts catalogue enrichment tool — DB-only reads from forge-truth.db.
  *
- * For every declared BoM part (manufacturer, part_number, quantity), call
- * the distributor cascade `findSkuForPart` from
- * src/lib/pdf-engine-v2/lib/distributors/index.ts which hits in parallel:
- *   - Mouser  (MOUSER_API_KEY)
- *   - Digi-Key (DIGIKEY_CLIENT_ID + DIGIKEY_CLIENT_SECRET)
- *   - Farnell (FARNELL_API_KEY)
- *   - LCSC    (LCSC_API_KEY when set)
- *   - Nexar   (NEXAR_ACCESS_TOKEN or NEXAR_CLIENT_ID/SECRET)
+ * CHAIN-AS-DB-CONSUMER ARCHITECTURE (codified 2026-05-25,
+ * drawer_forgeos_decisions_e30f5e00a59dc3ff):
+ * This tool is now ENRICHMENT not DISCOVERY. It reads from
+ * ~/.forge-truth/forge-truth.db via db-only-cascade.ts for every declared
+ * BoM part. No live distributor API calls happen here.
  *
- * The cascade is the AUTHORITATIVE tier-1 source per the mempalace policy
- * (drawer_forgeos_decisions: part-verification.ts) — distributor URLs are
- * trusted by construction (no HEAD-check needed), LLM verification is the
- * last-resort tier.
+ * Live discovery is exclusively the responsibility of scripts/ingest/* jobs
+ * running on a schedule. This separation prevents chain runs from burning
+ * free-tier quotas (~200 calls/chain × N chains = Mouser/DK/Nexar exhausted
+ * within hours as seen in L23-L26).
  *
  * Output preserves the OctopartOutput shape so downstream consumers (chain
- * + tools-flow-mermaid TOOL_INPUT_HINTS) don't need migration. Provenance
- * carries the count of hits per source so the Mermaid + Tools Used
- * appendix can display the cascade breakdown.
+ * + tools-flow-mermaid TOOL_INPUT_HINTS) don't need migration. The
+ * sources_breakdown uses 'cache:mouser', 'cache:digikey', 'library:mouser'
+ * etc. to distinguish DB-cached hits from library-only rows.
+ *
+ * Trade-off documented intentionally: a part not yet ingested returns
+ * in_stock=false, unit_price_gbp=null. This is correct — the chain should
+ * not show a price we don't have. Gate 20 (fictional-pn-audit) will emit
+ * MED for unknown parts, prompting an ingest run.
  */
 
 import { registerTool } from '../registry'
 import type { Tool, ToolResult } from '../types'
-import { findSkuForPart } from '../../../../src/lib/pdf-engine-v2/lib/distributors'
+import { lookupCached } from '../../../../src/lib/pdf-engine-v2/lib/distributors/db-only-cascade'
 
 export interface DistributorCascadeInput {
   parts: Array<{
@@ -55,17 +57,17 @@ export interface DistributorCascadeOutput {
 
 export const distributorCascadeRealTool: Tool<DistributorCascadeInput, DistributorCascadeOutput> = {
   id: 'octopart:parts-lookup', // kept stable so TOOL_INPUT_HINTS + mermaid still match
-  name: 'Distributor Cascade (Mouser + Digi-Key + Farnell + LCSC + Nexar)',
-  version: '2026-05-25-real',
-  license: 'mixed (Mouser commercial / Digi-Key commercial / Farnell commercial / LCSC commercial / Nexar Evaluation)',
-  source_url: 'https://www.mouser.co.uk/api-hub/ + https://developer.digikey.com/ + https://partner.element14.com/ + https://www.lcsc.com/ + https://portal.nexar.com/',
+  name: 'Distributor Cascade — DB Enrichment (forge-truth.db, no live API)',
+  version: '2026-05-25-db-only',
+  license: 'free-proprietary',  // DB read, no live API calls
+  source_url: 'forge-truth.db distributor_cascade_cache + pretraining_extracted_parts',
   domain: 'parts_catalog',
   pinned_environment: {
-    mouser_api: 'v2',
-    digikey_api: 'v4',
-    farnell_api: 'v1',
-    lcsc_api: 'v1',
-    nexar_api: 'supSearchMpn-graphql',
+    mouser_api: 'cached',
+    digikey_api: 'cached',
+    farnell_api: 'cached',
+    lcsc_api: 'cached',
+    nexar_api: 'cached',
   },
   applicable_to() {
     return true // every class has BoM parts worth looking up
@@ -85,16 +87,12 @@ export const distributorCascadeRealTool: Tool<DistributorCascadeInput, Distribut
     }
     let priced = 0
     let in_stock = 0
+
     for (const p of input.parts) {
       const mpn = (p.part_number || '').trim()
       const mfr = (p.manufacturer || '').trim() || null
-      let result: Awaited<ReturnType<typeof findSkuForPart>> = null
-      try {
-        if (mpn.length >= 2) result = await findSkuForPart(mpn, mfr)
-      } catch (err) {
-        console.warn(`[distributor-cascade] error on ${mpn}: ${(err as Error).message}`)
-      }
-      if (!result) {
+
+      if (mpn.length < 2) {
         out_parts.push({
           manufacturer: p.manufacturer,
           part_number: p.part_number,
@@ -108,18 +106,48 @@ export const distributorCascadeRealTool: Tool<DistributorCascadeInput, Distribut
         })
         continue
       }
-      const best = result.best
-      sources_breakdown[best.source] = (sources_breakdown[best.source] ?? 0) + 1
-      for (const alt of result.alternates) {
-        sources_breakdown[alt.source] = (sources_breakdown[alt.source] ?? 0) + 1
+
+      // DB-only lookup — synchronous, zero quota
+      const dbResult = lookupCached(mfr, mpn)
+
+      if (!dbResult.found || !dbResult.result) {
+        out_parts.push({
+          manufacturer: p.manufacturer,
+          part_number: p.part_number,
+          quantity_requested: p.quantity,
+          in_stock: false,
+          stock_units: 0,
+          unit_price_gbp: null,
+          lead_time_weeks_min: null,
+          lead_time_weeks_max: null,
+          distributors: [],
+        })
+        continue
       }
+
+      const best = dbResult.result
+
+      // Record discovery source with prefix indicating data origin
+      const sourceKey = best.source
+      const sourceLabel = `${dbResult.source === 'library_only' ? 'library' : 'cache'}:${sourceKey}`
+      sources_breakdown[sourceKey] = (sources_breakdown[sourceKey] ?? 0) + 1
+      console.debug(`[distributor-cascade] DB ${sourceLabel} hit for ${mpn}`)
+
       const stockBest = best.stockUK ?? 0
       const isInStock = stockBest > 0
       if (isInStock) in_stock += 1
-      const priceQty1 = result.qty1GBP
-      if (priceQty1 != null && priceQty1 > 0) priced += 1
+
+      // Extract qty-1 GBP price from cached result
+      let priceQty1: number | null = null
+      if (best.priceGBP && best.priceGBP.length > 0) {
+        const sorted = [...best.priceGBP].sort((a, b) => a.qty - b.qty)
+        const p0 = sorted[0].unitPriceGbp
+        priceQty1 = Number.isFinite(p0) && p0 > 0 ? p0 : null
+      }
+      if (priceQty1 != null) priced += 1
+
       const lead = best.leadWeeks
-      const distributorNames = [best.source, ...result.alternates.map((a) => a.source)]
+
       out_parts.push({
         manufacturer: best.manufacturer || p.manufacturer,
         part_number: best.mpn || p.part_number,
@@ -129,9 +157,10 @@ export const distributorCascadeRealTool: Tool<DistributorCascadeInput, Distribut
         unit_price_gbp: priceQty1,
         lead_time_weeks_min: lead,
         lead_time_weeks_max: lead,
-        distributors: Array.from(new Set(distributorNames)),
+        distributors: [sourceKey],
       })
     }
+
     const out: DistributorCascadeOutput = {
       parts: out_parts,
       total_priced_count: priced,
@@ -144,21 +173,24 @@ export const distributorCascadeRealTool: Tool<DistributorCascadeInput, Distribut
       provenance: {
         source: 'tool:octopart:parts-lookup',
         tool_id: 'octopart:parts-lookup',
-        tool_version: '2026-05-25-real',
-        tool_license: 'mixed',
-        tool_source_url: 'https://www.mouser.co.uk/api-hub/',
+        tool_version: '2026-05-25-db-only',
+        tool_license: 'free-proprietary',
+        tool_source_url: 'forge-truth.db distributor_cascade_cache + pretraining_extracted_parts',
         invocation_input: input,
         pinned_versions: {
-          mouser_api: 'v2',
-          digikey_api: 'v4',
-          farnell_api: 'v1',
-          lcsc_api: 'v1',
-          nexar_api: 'supSearchMpn-graphql',
+          mouser_api: 'cached',
+          digikey_api: 'cached',
+          farnell_api: 'cached',
+          lcsc_api: 'cached',
+          nexar_api: 'cached',
         },
         timestamp: new Date().toISOString(),
         duration_ms: Date.now() - t0,
       },
-      warnings: [],
+      warnings: [
+        'DB-only mode: no live API calls. Prices and stock from cached distributor data. ' +
+        'Run scripts/ingest/run-weekly-component-sweep.sh to refresh the cache.',
+      ],
     }
   },
 }
