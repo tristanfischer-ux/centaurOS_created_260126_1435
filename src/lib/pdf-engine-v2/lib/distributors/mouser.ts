@@ -17,6 +17,7 @@
  */
 
 import { recordDistributorHit } from './library-writeback'
+import { getCached, setCached } from './cascade-cache'
 
 export interface DistributorResult {
   source: 'mouser' | 'digikey' | 'farnell' | 'lcsc' | 'nexar' | 'rs' | 'eriks' | 'zoro'
@@ -76,13 +77,20 @@ export function parseLeadTimeWeeks(raw: unknown): number | null {
 
 const MOUSER_API_URL = 'https://api.mouser.com/api/v2/search/partnumber'
 
-export async function lookupSkuMouser(mpn: string): Promise<DistributorResult | null> {
+export async function lookupSkuMouser(mpn: string, manufacturerHint?: string | null): Promise<DistributorResult | null> {
   const key = process.env.MOUSER_API_KEY
   if (!key) {
     console.warn('[mouser] MOUSER_API_KEY not set — skipping')
     return null
   }
   if (!mpn || mpn.length < 2) return null
+
+  // Cache check (wired 2026-05-25 after audit showed cascade-cache module
+  // was dead code — module existed but no caller imported it, so every
+  // chain run hit Mouser live for every part. Now: short-circuit on
+  // cached hit (real result) AND on cached confirmed miss (null)).
+  const cached = getCached(manufacturerHint ?? '', mpn, 'mouser')
+  if (cached !== undefined) return cached
 
   try {
     const res = await fetch(`${MOUSER_API_URL}?apiKey=${encodeURIComponent(key)}`, {
@@ -99,12 +107,17 @@ export async function lookupSkuMouser(mpn: string): Promise<DistributorResult | 
 
     if (!res.ok) {
       console.warn(`[mouser] HTTP ${res.status} for ${mpn}`)
+      // Don't cache HTTP errors — they may be transient (rate limit / 5xx)
       return null
     }
 
     const data = await res.json() as any
     const parts = data?.SearchResults?.Parts
-    if (!Array.isArray(parts) || parts.length === 0) return null
+    if (!Array.isArray(parts) || parts.length === 0) {
+      // Confirmed catalogue miss — cache so we don't re-query.
+      setCached(manufacturerHint ?? '', mpn, 'mouser', null)
+      return null
+    }
 
     // Prefer exact MPN match, else take first result
     const exact = parts.find((p: any) =>
@@ -151,6 +164,7 @@ export async function lookupSkuMouser(mpn: string): Promise<DistributorResult | 
       fetchedAt: new Date().toISOString(),
     }
     recordDistributorHit(result)
+    setCached(manufacturerHint ?? result.manufacturer ?? '', mpn, 'mouser', result)
     return result
   } catch (err) {
     console.warn(`[mouser] lookup failed for ${mpn}:`, (err as Error).message)

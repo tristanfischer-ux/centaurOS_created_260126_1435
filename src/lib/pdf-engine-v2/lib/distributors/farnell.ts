@@ -18,17 +18,22 @@
 import type { DistributorResult } from './mouser'
 import { parseLeadTimeWeeks } from './mouser'
 import { recordDistributorHit } from './library-writeback'
+import { getCached, setCached } from './cascade-cache'
 
 const FARNELL_URL = 'https://api.element14.com/catalog/products'
 const STORE = 'uk.farnell.com'
 
-export async function lookupSkuFarnell(mpn: string): Promise<DistributorResult | null> {
+export async function lookupSkuFarnell(mpn: string, manufacturerHint?: string | null): Promise<DistributorResult | null> {
   const key = process.env.FARNELL_API_KEY
   if (!key) {
     console.warn('[farnell] FARNELL_API_KEY not set — skipping')
     return null
   }
   if (!mpn || mpn.length < 2) return null
+
+  // Cache short-circuit (wired 2026-05-25 — module existed but no caller used it)
+  const cached = getCached(manufacturerHint ?? '', mpn, 'farnell')
+  if (cached !== undefined) return cached
 
   const params = new URLSearchParams({
     'term': `manuPartNum:${mpn}`,
@@ -54,13 +59,17 @@ export async function lookupSkuFarnell(mpn: string): Promise<DistributorResult |
 
     const xml = await res.text()
     if (!xml.includes('<ns1:products>')) {
-      // No matches
+      // No matches — confirmed catalogue miss; cache so we don't re-query.
+      setCached(manufacturerHint ?? '', mpn, 'farnell', null)
       return null
     }
 
     // Extract the first product block (prefer exact-match MPN, else take first)
     const productBlocks = [...xml.matchAll(/<ns1:products>([\s\S]*?)<\/ns1:products>/g)].map(m => m[1])
-    if (productBlocks.length === 0) return null
+    if (productBlocks.length === 0) {
+      setCached(manufacturerHint ?? '', mpn, 'farnell', null)
+      return null
+    }
 
     const upperMpn = mpn.toUpperCase()
     const block = productBlocks.find(b => {
@@ -132,6 +141,7 @@ export async function lookupSkuFarnell(mpn: string): Promise<DistributorResult |
       fetchedAt: new Date().toISOString(),
     }
     recordDistributorHit(result)
+    setCached(manufacturerHint ?? result.manufacturer ?? '', mpn, 'farnell', result)
     return result
   } catch (err) {
     console.warn(`[farnell] lookup failed for ${mpn}:`, (err as Error).message)
