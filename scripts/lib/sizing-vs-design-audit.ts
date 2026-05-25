@@ -123,6 +123,34 @@ export const SIZING_RULES: SlotSizingRule[] = [
     description:
       'String-level + per-rack DC components must be sized to ≥ 1.25 × string_continuous_current_a per rack.',
   },
+  // ── WIND class (2026-05-25) ───────────────────────────────────
+  // Utility wind generator (Vestas / SGRE / GE / Goldwind) uses 690 V AC
+  // LV side at the generator + converter; transformer steps up to 11/33 kV
+  // for collector network. Compute per-phase continuous from rated_power_kw
+  // at the appropriate voltage class.
+  // Generator + converter + chopper (LV 690 V side)
+  {
+    match_sub_module: /generator_(stator|rotor|conducting|electromechanical)|converter|inverter|chopper|braking_resistor|generator_circuit/i,
+    continuous_load_source: [
+      { compute_ac_from: { power_param: 'rated_power_kw', voltage_v: 690 } },
+    ],
+    safety_factor: 1.25,
+    applies_to_classes: ['wind', 'wind_turbine', 'wind_offshore'],
+    description:
+      'Wind generator + converter + chopper LV-side components (690 V AC bus) must be sized to ≥ 1.25 × rated_power_kw × 1000 / (690 × √3). IEC 61400-1 + IEC 60204-1.',
+  },
+  // Wind transformer HV side (11/33 kV collector) — voltage from design
+  // parameter if available (transformer_hv_kv); default 11 kV utility class.
+  {
+    match_sub_module: /transformer_hv|step_up_secondary|hv_switchgear|hv_metering|hv_breaker|collector_(point|switchgear)/i,
+    continuous_load_source: [
+      { compute_ac_from: { power_param: 'rated_power_kw', voltage_v: 11000 } },
+    ],
+    safety_factor: 1.25,
+    applies_to_classes: ['wind', 'wind_turbine', 'wind_offshore', 'solar_inverter'],
+    description:
+      'Wind HV collector / transformer HV-side components must be sized to ≥ 1.25 × rated_power_kw × 1000 / (V_HV × √3). Voltage defaults to 11 kV utility class; for 33 kV systems update the rule or add per-design override.',
+  },
 ]
 
 // ── COLLECTORS ───────────────────────────────────────────────────────────────
