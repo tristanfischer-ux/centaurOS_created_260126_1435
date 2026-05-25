@@ -1489,7 +1489,7 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
 
   return {
     module: 'environmental_interface',
-    module_brief: `Rejects ${p.thermalRejectionKw.toFixed(0)} kW of inverter + pack losses via a Pfannenberg ${selected.part_number} (${pinnedChillerCapacityKw} kW @ 35°C / ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient) glycol/water chiller and four enclosure ventilation fans.`,
+    module_brief: `Rejects ${p.systemThermalDissipationKw.toFixed(1)} kW of inverter + pack losses via a Pfannenberg ${selected.part_number} (${pinnedChillerCapacityKw} kW @ 35°C / ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient) glycol/water chiller and four enclosure ventilation fans.`,
     overview_paragraph_en: '',
     derived_parameters: {
       cooling_capacity_kw: chillerKw,
@@ -2004,21 +2004,27 @@ function emitInterconnect(p: BessParams): DesignModule {
     'ac_grid_interconnect',
     'AC grid interconnect',
     'connects',
-    `${totalGlands}× MV cable glands (3 phases × ${cablesPerPhase} parallel cables/phase + 1N + 1PE for ${continuousAcA.toFixed(0)} A continuous AC) + 0.5S metering CTs at the PCC`,
+    `${totalGlands}× LV AC cable glands (3 phases × ${cablesPerPhase} parallel cables/phase + 1N + 1PE for ${continuousAcA.toFixed(0)} A continuous AC at 400 V) + 0.5S metering CTs at the PCC`,
     [
       word(
-        'mv_cable_gland_word',
-        'MV cable gland word',
-        cc('mv_cable_gland', 'MV cable gland', 'electrical_conducting_function', 'copper'),
+        'lv_cable_gland_word',
+        'LV AC cable gland word',
+        cc('lv_cable_gland', 'LV AC cable gland', 'electrical_conducting_function', 'copper'),
         [
           mod('quantity', `×${totalGlands}`),
           mod('manufacturer', 'Hawke'),
-          mod('part_number', '501/421/Universal'),
+          // Bug 2 fix (2026-05-25): 501/421/Universal is an 11 kV HV-rated
+          // gland — massively over-spec and mis-labelled for a 400 V LV AC
+          // PCS output circuit. Replaced with Hawke ICG/501, a 1 kV AC
+          // LV Ex-rated cable gland certified for Zone 1/2 hazardous areas.
+          // Using an 11 kV gland on a 400 V circuit is a safety-critical
+          // labelling error: the gland's voltage rating must match the circuit.
+          mod('part_number', 'ICG/501'),
           mod(
             'form',
-            `compression-style HV cable gland, nickel-plated brass, M63 entry (round, NOT a Roxtec rectangular cable transit frame); count CALCULATED: 3 phases × ceil(${continuousAcA.toFixed(0)} A / ${AMPS_PER_CABLE} A per ${240} mm² Cu cable) = 3 × ${cablesPerPhase} = ${PHASES * cablesPerPhase} phase glands + 1 neutral + 1 PE bond = ${totalGlands} total`,
+            `compression-style LV AC cable gland, nickel-plated brass, M63 entry (round, NOT a Roxtec rectangular cable transit frame); count CALCULATED: 3 phases × ceil(${continuousAcA.toFixed(0)} A / ${AMPS_PER_CABLE} A per ${240} mm² Cu cable) = 3 × ${cablesPerPhase} = ${PHASES * cablesPerPhase} phase glands + 1 neutral + 1 PE bond = ${totalGlands} total`,
           ),
-          mod('rating_primary', '11 kV'),
+          mod('rating_primary', '1 kV AC'),
           mod('regulatory', 'IEC 60079-0 + IEC 60079-1 + IEC 60079-7 (Exd + Exe)'),
         ],
       ),
@@ -2041,7 +2047,7 @@ function emitInterconnect(p: BessParams): DesignModule {
 
   return {
     module: 'maintenance_serviceability',
-    module_brief: `Terminates the AC export at the grid point of common coupling via ${totalGlands}× MV Hawke 501/421 M63 cable glands (3 phases × ${cablesPerPhase} parallel 240 mm² Cu cables + 1 neutral + 1 PE bond, sized for ${continuousAcA.toFixed(0)} A continuous AC per IEC 60364-5-52 ampacity tables) and 0.5S accuracy CTs for revenue metering. Provides service-side electrical access to PCC for inspection + isolation.`,
+    module_brief: `Terminates the 400 V LV AC export at the grid point of common coupling via ${totalGlands}× Hawke ICG/501 M63 LV AC cable glands (3 phases × ${cablesPerPhase} parallel 240 mm² Cu cables + 1 neutral + 1 PE bond, sized for ${continuousAcA.toFixed(0)} A continuous AC per IEC 60364-5-52 ampacity tables) and 0.5S accuracy CTs for revenue metering. Provides service-side electrical access to PCC for inspection + isolation.`,
     overview_paragraph_en: '',
     derived_parameters: {
       phase_count: PHASES,

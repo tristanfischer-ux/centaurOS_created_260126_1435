@@ -763,12 +763,12 @@ registerArchetype('bess', (brief: any) => {
       source_detail: `£100/cell × ${cellCount} cells (CATL 280 Ah LFP prismatic, programme-rate)`,
     },
     {
-      word_name: 'pcs_inverter_bidirectional',
+      word_name: 'pcs_inverter',
       unit_price_gbp: 150,
       dimension_basis: 'kw_power',
       dimension_value: continuousKw,
       total_gbp: 150 * continuousKw,
-      source_detail: `£150/kW × ${continuousKw} kW (1700 V IGBT-based bidirectional PCS, utility-scale BESS)`,
+      source_detail: `£150/kW × ${continuousKw} kW (IGBT-based bidirectional PCS; SiC path via ngspice replaces at £80-90/kW)`,
     },
     {
       word_name: 'iso_container_enclosure',
