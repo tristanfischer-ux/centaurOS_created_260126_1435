@@ -20,6 +20,9 @@ import os
 import math
 import mathutils
 from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).parent))
+import forge_blender_lib as fl
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
@@ -245,199 +248,13 @@ for i in range(4):
     add_box(f"ea10_label_{i}", (W * 0.20 + i * 0.10, D * 0.80, H - 0.001), (0.03, 0.02, 0.001), MAT["maint"], "maintenance_serviceability")
 
 
-# ─── Lighting ─────────────────────────────────────────────────
-bpy.ops.object.light_add(type="SUN", location=(0.5, -0.5, 1.0))
-sun = bpy.context.active_object
-sun.data.energy = 3.0
-sun.rotation_euler = (math.radians(55), math.radians(20), math.radians(35))
 
-bpy.ops.object.light_add(type="AREA", location=(W/2, D/2, 0.6))
-fill = bpy.context.active_object
-fill.data.energy = 40
-fill.data.size = 1.2
-
-world = bpy.data.worlds.new("world")
-bpy.context.scene.world = world
-world.use_nodes = True
-world_bg = world.node_tree.nodes["Background"]
-world_bg.inputs["Color"].default_value = (1.0, 1.0, 1.0, 1.0)
-world_bg.inputs["Strength"].default_value = 1.0
-
-scene = bpy.context.scene
-scene.render.engine = "BLENDER_EEVEE"
-scene.render.resolution_x = 1600
-scene.render.resolution_y = 1100
-scene.render.resolution_percentage = 100
-scene.render.image_settings.file_format = "PNG"
-scene.view_settings.exposure = 0.0
-scene.view_settings.view_transform = "Standard"
-
-
-def compute_scene_bbox():
-    xs, ys, zs = [], [], []
-    for obj in bpy.data.objects:
-        if obj.type != "MESH":
-            continue
-        for v in obj.bound_box:
-            wv = obj.matrix_world @ mathutils.Vector(v)
-            xs.append(wv.x); ys.append(wv.y); zs.append(wv.z)
-    return ((min(xs), max(xs)), (min(ys), max(ys)), (min(zs), max(zs)))
-
-
-def nine_shot_cameras(bbox, distance_factor=2.8, elevation_factor=0.6):
-    (xmin, xmax), (ymin, ymax), (zmin, zmax) = bbox
-    cx, cy, cz = (xmin+xmax)/2, (ymin+ymax)/2, (zmin+zmax)/2
-    max_dim = max(xmax-xmin, ymax-ymin, zmax-zmin)
-    radius = max_dim * distance_factor
-    elev = max_dim * elevation_factor
-    ortho_scale = max_dim * 1.45
-    target = (cx, cy, cz)
-    cams = [{"name": "01-top", "loc": (cx, cy, zmax + radius), "target": target, "ortho_scale": ortho_scale}]
-    diag = radius / math.sqrt(2)
-    for name, sx, sy in [("02-corner-FR", +1, +1), ("03-corner-BL", -1, -1)]:
-        cams.append({"name": name, "loc": (cx + sx * diag, cy + sy * diag, cz + elev), "target": target, "ortho_scale": ortho_scale})
-    return cams
-
-
-def setup_camera(loc, target, ortho_scale, focal=50):
-    bpy.ops.object.camera_add(location=loc)
-    cam = bpy.context.active_object
-    cam.data.type = "ORTHO"
-    cam.data.ortho_scale = ortho_scale
-    cam.data.lens = focal
-    direction = (target[0] - loc[0], target[1] - loc[1], target[2] - loc[2])
-    cam.rotation_euler = mathutils.Vector(direction).to_track_quat("-Z", "Y").to_euler()
-    scene.camera = cam
-    return cam
-
-
-def clear_cameras():
-    for obj in list(bpy.data.objects):
-        if obj.type == "CAMERA":
-            bpy.data.objects.remove(obj, do_unlink=True)
-
-
-bbox = compute_scene_bbox()
-cams = nine_shot_cameras(bbox)
-for cam_spec in cams:
-    clear_cameras()
-    setup_camera(loc=cam_spec["loc"], target=cam_spec["target"], ortho_scale=cam_spec["ortho_scale"])
-    scene.render.filepath = str(OUT / f"{cam_spec['name']}.png")
-    bpy.ops.render.render(write_still=True)
-    print(f"[edge-ai] {cam_spec['name']}.png")
-
-
-HERO_GHOST = bpy.data.materials.new("hero_ghost_enclosure")
-HERO_GHOST.use_nodes = True
-gb = HERO_GHOST.node_tree.nodes["Principled BSDF"]
-gb.inputs["Base Color"].default_value = (0.93, 0.94, 0.95, 1.0)
-gb.inputs["Metallic"].default_value = 0.0
-gb.inputs["Roughness"].default_value = 0.4
-gb.inputs["Alpha"].default_value = 0.18
-HERO_GHOST.blend_method = "BLEND"
-
-structure_objs = MODULE_OBJECTS.get("structure_containment", [])
-hero_snap = {}
-for obj in structure_objs:
-    if obj.data and obj.data.materials:
-        hero_snap[obj.name] = list(obj.data.materials)
-        obj.data.materials.clear()
-        obj.data.materials.append(HERO_GHOST)
-
-clear_cameras()
-(xmin, xmax), (ymin, ymax), (zmin, zmax) = compute_scene_bbox()
-cx, cy, cz = (xmin+xmax)/2, (ymin+ymax)/2, (zmin+zmax)/2
-# For flat form factors (1U server), bbox Z is tiny compared to X/Y. Don't let
-# max_dim collapse the iso view — use the horizontal max for orthoscale.
-horizontal_max = max(xmax-xmin, ymax-ymin)
-hero_diag = horizontal_max * 1.6 / math.sqrt(2)
-setup_camera(loc=(cx + hero_diag, cy - hero_diag, cz + horizontal_max * 0.55),
-             target=(cx, cy, cz), ortho_scale=horizontal_max * 1.10)
-scene.render.filepath = str(OUT / "00-hero.png")
-bpy.ops.render.render(write_still=True)
-print("[edge-ai] 00-hero.png")
-
-for name, mats in hero_snap.items():
-    obj = bpy.data.objects.get(name)
-    if obj and obj.type == "MESH":
-        obj.data.materials.clear()
-        for m in mats:
-            obj.data.materials.append(m)
-
-
-scene.render.use_freestyle = True
-vl_fs = scene.view_layers[0]
-vl_fs.use_freestyle = True
-fs = vl_fs.freestyle_settings
-fs.crease_angle = math.radians(140)
-ls = fs.linesets[0]
-ls.select_silhouette = True
-ls.select_border = True
-ls.select_crease = True
-if ls.linestyle is None:
-    ls.linestyle = bpy.data.linestyles.new("focal_outline")
-ls.linestyle.color = (0.05, 0.08, 0.12)
-ls.linestyle.thickness = 1.4
-
-GHOST_LIGHT = bpy.data.materials.new("ghost_light")
-GHOST_LIGHT.use_nodes = True
-gl = GHOST_LIGHT.node_tree.nodes["Principled BSDF"]
-gl.inputs["Base Color"].default_value = (0.60, 0.62, 0.65, 1.0)
-gl.inputs["Metallic"].default_value = 0.0
-gl.inputs["Roughness"].default_value = 0.75
-
-ENCLOSURE_GHOST = bpy.data.materials.new("enclosure_ghost")
-ENCLOSURE_GHOST.use_nodes = True
-eg = ENCLOSURE_GHOST.node_tree.nodes["Principled BSDF"]
-eg.inputs["Base Color"].default_value = (0.85, 0.86, 0.88, 1.0)
-eg.inputs["Metallic"].default_value = 0.0
-eg.inputs["Roughness"].default_value = 0.5
-eg.inputs["Alpha"].default_value = 0.18
-ENCLOSURE_GHOST.blend_method = "BLEND"
-
-structure_names = set(o.name for o in MODULE_OBJECTS.get("structure_containment", []))
-
-all_orig = {}
-for obj in bpy.data.objects:
-    if obj.type == "MESH" and obj.data and obj.data.materials:
-        all_orig[obj.name] = list(obj.data.materials)
-
-
-def apply_focal_palette(focal_module_id):
-    focal_names = set(o.name for o in MODULE_OBJECTS.get(focal_module_id, []))
-    for obj_name, orig_mats in all_orig.items():
-        obj = bpy.data.objects.get(obj_name)
-        if obj is None:
-            continue
-        obj.data.materials.clear()
-        if obj_name in focal_names:
-            for m in orig_mats:
-                obj.data.materials.append(m)
-        elif obj_name in structure_names and focal_module_id != "structure_containment":
-            obj.data.materials.append(ENCLOSURE_GHOST)
-        else:
-            obj.data.materials.append(GHOST_LIGHT)
-
-
-for module_id, mod_objs in MODULE_OBJECTS.items():
-    if not mod_objs:
-        continue
-    apply_focal_palette(module_id)
-    clear_cameras()
-    bbox_mod = compute_scene_bbox()
-    cams_mod = nine_shot_cameras(bbox_mod)
-    fr = cams_mod[1]
-    setup_camera(loc=fr["loc"], target=fr["target"], ortho_scale=fr["ortho_scale"])
-    scene.render.filepath = str(OUT / f"module-{module_id}.png")
-    bpy.ops.render.render(write_still=True)
-    print(f"[edge-ai] module-{module_id}.png")
-
-for obj_name, orig_mats in all_orig.items():
-    obj = bpy.data.objects.get(obj_name)
-    if obj is None:
-        continue
-    obj.data.materials.clear()
-    for m in orig_mats:
-        obj.data.materials.append(m)
-
-print(f"[edge-ai] DONE — {OUT}")
+# ─── Lighting + render via shared pipeline (forge_blender_lib) ──────────
+# Refactored 2026-05-24: was inline custom render loop; now uses the
+# universal fl.run_render_pipeline so this template benefits from Phase A+B
+# upgrades (2400×1600 res, drop shadows, 2-angle per module, Cycles opt-in,
+# SSR+AO+bloom) without per-template maintenance. Drawer:
+# drawer_forgeos_gotchas_51a949460c38006b.
+fl.add_lights(target_centre=(0.22, 0.0, 0.05), fill_energy=80, fill_size=1.0)
+fl.make_world_white()
+fl.run_render_pipeline(OUT, MODULE_OBJECTS, structure_module_id="structure_containment")
