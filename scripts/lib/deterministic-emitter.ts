@@ -1776,6 +1776,11 @@ function emitSafetyProtection(p: BessParams): DesignModule {
       // releasing panel, ECS-N nozzles. Canonical UK BESS choice: BYD Cube
       // Pro, Sungrow PowerStack, CATL EnerC+ all pair Novec 1230 with ECS.
       // Spec a 70 kg Kidde ECS cylinder (62.3 kg net charge, 10% margin).
+      // L31 council Fix (2026-05-25): add list_price_gbp modifier so Engine B
+      // bypasses its chemical_sensing class curve (which priced this at £4.23).
+      // Real Kidde ECS 70 kg Novec 1230 pre-charged cylinder: £3,500-5,000 list
+      // (service valve + pressure gauge included; nozzles and detection panel
+      // separate). Using £3,500 lower bound — consistent with audit B-4 floor.
       word(
         'clean_agent_cylinder_word',
         'clean agent cylinder word',
@@ -1786,6 +1791,7 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('capacity', '62.3', 'kg'),
           mod('performance', '5.3% v/v in 86 m³ @ 20 °C'),
           mod('regulatory', 'NFPA 2001'),
+          mod('list_price_gbp', '3500'),
         ],
       ),
       word(
@@ -1814,6 +1820,20 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('form', 'VESDA-E'),
+        ],
+      ),
+      // L31 (2026-05-25): added 5th word to bring fire_suppression to ≥5 words,
+      // preventing Stage 1.7 densification from injecting cell_fuse items here.
+      // The releasing panel is the control-and-release node for the Kidde ECS
+      // system — it's a real required BOM item (control head + solenoid actuator).
+      word(
+        'suppression_releasing_panel_word',
+        'suppression releasing panel word',
+        cc('suppression_releasing_panel', 'Kidde ECS releasing panel', 'electromechanical_switching_function', 'steel'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'Kidde ECS-N releasing panel, 24 V DC activation, 2-zone'),
+          mod('regulatory', 'NFPA 2001 + EN 15004'),
         ],
       ),
     ],
