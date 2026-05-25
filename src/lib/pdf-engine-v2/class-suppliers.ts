@@ -71,6 +71,55 @@ export const CLASS_SUPPLIERS: Record<string, ClassSuppliers> = {
         search_keywords: ['ISO container fit-out manufacturer UK', 'BESS enclosure shop', 'shipping container conversion UK'],
         preferred_regions: ['GB', 'NL', 'DE'],
       },
+      // Component-level archetypes (Bug 1 fix, 2026-05-25): L26 council found only
+      // module-level contractors in state.suppliers[]. Added battery_cell_manufacturer,
+      // pcs_inverter_supplier, bms_system_supplier so the supplier section surfaces
+      // the specific component vendors a BESS procurement team needs to contact.
+      {
+        id: 'battery_cell_manufacturer',
+        label: 'Component supplier — LFP prismatic battery cells',
+        function_description:
+          'Manufactures or distributes the 280 Ah – 314 Ah LFP prismatic cells that go into BESS racks. Tier-1 cell suppliers (CATL, BYD, EVE, CALB) dominate utility-scale projects; authorised UK/EU distributors can supply smaller quantities with UKCA documentation.',
+        capabilities: ['LFP prismatic cell manufacture', '280 Ah – 314 Ah cell supply', 'UN 38.3 transport certification', 'IEC 62619 cell testing'],
+        search_profiles: ['bess-supplier-discovery-20260422', 'manufacturing'],
+        search_keywords: [
+          'LFP prismatic cell supplier UK',
+          'CATL BYD EVE 280Ah cell distributor',
+          'lithium iron phosphate cell vendor utility BESS',
+          '314Ah prismatic cell EU distributor',
+        ],
+        preferred_regions: ['GB', 'CN', 'KR', 'DE', 'NL'],
+      },
+      {
+        id: 'pcs_inverter_supplier',
+        label: 'Component supplier — power conversion system (PCS) inverter',
+        function_description:
+          'Supplies the bi-directional grid-tied PCS/inverter that converts DC battery power to AC grid power and vice versa. For utility-scale BESS (250 kW – 1 MW blocks), key suppliers include Sungrow, SUNGROW-SMA, ABB, Dynapower, and Parker Hannifin. IEC 62109 / G99 grid-code approval is mandatory for UK grid connection.',
+        capabilities: ['bi-directional grid-tied inverter', 'PCS 250kW–1MW', 'IEC 62109 / G99 certification', 'MPPT + active reactive power control'],
+        search_profiles: ['bess-supplier-discovery-20260422', 'cleantech-uk', 'manufacturing'],
+        search_keywords: [
+          'BESS PCS inverter supplier UK',
+          'grid-scale bi-directional inverter 1MW',
+          'Sungrow ABB Dynapower power conversion system',
+          'utility BESS inverter G99 certified',
+        ],
+        preferred_regions: ['GB', 'CN', 'DE', 'US', 'NL'],
+      },
+      {
+        id: 'bms_system_supplier',
+        label: 'Component supplier — battery management system (BMS)',
+        function_description:
+          'Supplies the rack-level BMS that monitors cell voltage, temperature, and state-of-charge across the string, and communicates with the EMS/SCADA. At utility scale, the BMS is often a multi-tier hierarchy: cell-level slave boards + string-level master + site EMS. Key suppliers include Nuvation Energy, Orion BMS, Batrium, EnerTech, and Lithium Balance.',
+        capabilities: ['rack-level BMS', 'cell-voltage + temperature monitoring', 'CAN bus / Modbus EMS integration', 'IEC 62619 safety compliance'],
+        search_profiles: ['bess-supplier-discovery-20260422', 'manufacturing'],
+        search_keywords: [
+          'utility BESS battery management system supplier',
+          'Nuvation Orion Batrium BMS rack-level',
+          'grid-scale BMS master slave architecture',
+          'IEC 62619 BMS system UK',
+        ],
+        preferred_regions: ['GB', 'US', 'DE', 'NL', 'DK'],
+      },
     ],
   },
 

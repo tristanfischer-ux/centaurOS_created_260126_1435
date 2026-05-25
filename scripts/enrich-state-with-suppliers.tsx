@@ -2021,7 +2021,10 @@ function rowToCandidate(row: CompanyRow, llmScore: LLMScore | null): SupplierCan
     website_url: row.website_url,
     contact_name: row.contact_name,
     contact_title: row.contact_title,
-    contact_email: row.contact_email,
+    // Bug #2 fix (2026-05-25): normalise empty-string DB rows to null so the
+    // email-derivation gate fires correctly and the PDF renderer never receives
+    // a literal empty-string contact_email field.
+    contact_email: row.contact_email || null,
     description: row.description,
     ch_verified: Boolean(row.ch_company_number),
     ch_company_number: row.ch_company_number,
