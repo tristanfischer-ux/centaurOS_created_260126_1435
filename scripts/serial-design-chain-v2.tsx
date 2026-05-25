@@ -4891,6 +4891,52 @@ async function main() {
     console.error(`[chain] jurisdictional-standards-audit flagged issues (see AUDIT-JURISDICTION.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
 
+  // 2026-05-25 (Tristan-asked, BESS L22 council universal-fix #3): fictional-
+  // part-number detection (gate 20). Gate 13 (parts-spec validator) catches
+  // spec-claim errors for parts in its curated KNOWN_PART_AUTHORITATIVE table.
+  // But the LLM can hallucinate a manufacturer+MPN combination that LOOKS
+  // plausible — structurally valid, believable alphanumerics — and is simply
+  // not in that curated table. Now that the distributor cascade is LIVE
+  // (Mouser + Digi-Key + Farnell + LCSC + Nexar), gate 20 closes the gap:
+  // any BoM line whose MPN returns null from all five distributors AND is not
+  // in the curated table is flagged as potentially fictional.
+  // Nexar quota: Evaluation plan = 100 matched parts/month. The audit uses
+  // Nexar ONLY as a last resort after all four native distributors miss.
+  // Exit 20 on HIGH findings (structured PN pattern + all distributors miss).
+  // Non-fatal on MED / LOW — informational only.
+  // Distinct from gate 13: gate 13 checks SPEC CLAIM CORRECTNESS for curated
+  // parts; gate 20 checks EXISTENCE for parts outside that curated table.
+  try {
+    execFileSync(
+      'npx',
+      ['tsx', resolve(__dirname, 'lib/fictional-pn-audit.ts'), statePath, resolve(outDir, 'AUDIT-FICTIONAL-PN.md')],
+      { stdio: 'inherit', cwd: resolve(__dirname, '..') },
+    )
+  } catch (err) {
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 20) {
+      console.error('')
+      console.error('======================================================================')
+      console.error('  CHAIN HARD-EXIT - Fictional-PN audit FAILED (code 20)')
+      console.error('  At least one BoM line emits a manufacturer+MPN combination that')
+      console.error('  returns null from ALL five live distributor APIs (Mouser, Digi-Key,')
+      console.error('  Farnell, LCSC, Nexar) and is not in the curated parts table.')
+      console.error('  Structured MPNs (alphanumeric+separator+alphanumeric) that miss all')
+      console.error('  distributors strongly indicate the LLM hallucinated a plausible-looking')
+      console.error('  but non-existent part number. A procurement engineer who tries to order')
+      console.error('  this part will find nothing — destroying the document\'s credibility.')
+      console.error('  PDF + state.json saved to disk for inspection but chain is BLOCKED.')
+      console.error('  See AUDIT-FICTIONAL-PN.md for the un-catalogued MPNs.')
+      console.error('  Fix area: scripts/lib/deterministic-emitter.ts — replace hallucinated')
+      console.error('  MPNs with real distributor-findable parts, or mark custom/OEM items')
+      console.error('  with a "CUSTOM-" prefix so future runs skip the existence check.')
+      console.error('======================================================================')
+      logAction({ step: 'fatal_fictional_pn_audit', reason: 'fictional-pn-audit exit 20', status: 20 })
+      process.exit(20)
+    }
+    console.error(`[chain] fictional-pn-audit flagged issues (see AUDIT-FICTIONAL-PN.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
+  }
+
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
   // try/catch. The renderer's own `open` was guarded; this one was not. In
   // the worker/LaunchAgent path, `open` can fail (no GUI session) and would
