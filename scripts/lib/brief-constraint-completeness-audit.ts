@@ -93,9 +93,17 @@ const KNOWN_METRIC_MAP: Record<string, { qtyKey: string; label: string }> = {
   rated_power_mw: { qtyKey: 'continuous_power_kw', label: 'Continuous power' },
   peak_power_mw: { qtyKey: 'peak_power_kw', label: 'Peak power' },
   cycle_life: { qtyKey: 'cycle_life_cycles', label: 'Cycle life' },
+  // BESS L26 (2026-05-25, gate-17 HIGH #3): brief emits key_metric
+  // 'cycle_life_cycles' (not 'cycle_life') so the above entry was never
+  // matched. Mirror the renderer fix: add the _cycles-suffixed alias.
+  cycle_life_cycles: { qtyKey: 'cycle_life_cycles', label: 'Cycle life' },
   dc_bus_voltage_v: { qtyKey: 'dc_bus_voltage_v', label: 'DC bus voltage' },
   ac_output_voltage_v: { qtyKey: 'ac_output_voltage_v', label: 'AC output voltage' },
-  rated_power_kw: { qtyKey: 'rated_power_kw', label: 'Rated power' },
+  // 2026-05-25 (BESS L26 council): fix qtyKey from 'rated_power_kw' to
+  // 'continuous_power_kw' to mirror renderer fix — BESS contracts emit
+  // continuous_power_kw, not rated_power_kw. Also add 'rated_power' alias.
+  rated_power: { qtyKey: 'continuous_power_kw', label: 'Rated power' },
+  rated_power_kw: { qtyKey: 'continuous_power_kw', label: 'Rated power' },
   annual_energy_mwh: { qtyKey: 'annual_energy_yield_mwh', label: 'Annual energy yield' },
   thermal_output_kw: { qtyKey: 'thermal_output_kw', label: 'Thermal output' },
   cop: { qtyKey: 'cop_seasonal', label: 'COP (seasonal)' },

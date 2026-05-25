@@ -151,13 +151,20 @@ function deriveEnergyStorageHeadline(modules: ModuleSpec[], parsedBrief: any, br
   // Match cells: character_id contains "cell" as a standalone word component,
   // but exclude cell-adjacent components (busbars, terminals, tap wires, etc.)
   const isCellRegex = /(^|_)cell(_|$)/
-  const isCellAdjacent = /cell_balanc|cell_to_cell|cell_terminal|cell_voltage_tap|cell_insulat|cell_string|cell_holder|cell_separator/
+  // cell_electrolyte added 2026-05-25 (BESS L26 council fix 1): electrolyte is
+  // an ancillary per-cell sub-component (×N_cells in BoM) and was being counted
+  // as N additional cells, producing exactly 2× the true cell count (7501 vs 3750).
+  // Also skip no-qty cell words (spec/template header rows, default qty=1).
+  const isCellAdjacent = /cell_balanc|cell_to_cell|cell_terminal|cell_voltage_tap|cell_insulat|cell_string|cell_holder|cell_separator|cell_electrolyte/
   for (const sm of (esm?.sub_modules ?? [])) {
     for (const w of (sm.words ?? [])) {
       const charId = String(w.content_character?.character_id ?? w.id ?? '').toLowerCase()
       if (!isCellRegex.test(charId) || isCellAdjacent.test(charId)) continue
-      totalCells += getQuantity(w)
       const mods = Array.isArray(w.modifier_characters) ? w.modifier_characters : []
+      // Skip spec/template entries with no explicit quantity — bare cell words
+      // default to qty=1 but represent a header row, not a counted cell.
+      if (!mods.some((mc: any) => mc?.kind === 'quantity' || mc?.kind === 'qty')) continue
+      totalCells += getQuantity(w)
 
       // Voltage extraction — LLM emits this several different ways:
       //   1. voltage / voltage_nominal_v / cell_voltage_v modifier (rare)

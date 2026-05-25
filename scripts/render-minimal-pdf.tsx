@@ -3637,10 +3637,19 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null): Complian
       rated_power_mw:              { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
       peak_power_mw:               { qtyKey: 'peak_power_kw',             label: 'Peak power',             unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
       cycle_life:                  { qtyKey: 'cycle_life_cycles',         label: 'Cycle life',             unit: 'cycles', tolerancePct: 5 },
+      // BESS L26 (2026-05-25, gate-17 HIGH #3): brief emits key_metric
+      // 'cycle_life_cycles' (not 'cycle_life') so the above entry was never
+      // matched. Add the _cycles-suffixed alias pointing to the same quantity.
+      cycle_life_cycles:           { qtyKey: 'cycle_life_cycles',         label: 'Cycle life',             unit: 'cycles', tolerancePct: 5 },
       dc_bus_voltage_v:            { qtyKey: 'dc_bus_voltage_v',          label: 'DC bus voltage',         unit: 'V',   tolerancePct: 2 },
       ac_output_voltage_v:         { qtyKey: 'ac_output_voltage_v',       label: 'AC output voltage',      unit: 'V',   tolerancePct: 2 },
-      // Wind-turbine
-      rated_power_kw:              { qtyKey: 'rated_power_kw',            label: 'Rated power',            unit: 'kW',  tolerancePct: 5 },
+      // Wind-turbine + BESS alias (2026-05-25, BESS L26 council): brief key
+      // 'rated_power_kw' was already here but mapped to qtyKey 'rated_power_kw'
+      // which BESS contracts don't emit (they use continuous_power_kw). Both
+      // BESS and wind turbine continuous/rated power live in continuous_power_kw.
+      // 'rated_power' (no suffix) added for brief parsers that drop the unit suffix.
+      rated_power:                 { qtyKey: 'continuous_power_kw',       label: 'Rated power',            unit: 'kW',  tolerancePct: 5 },
+      rated_power_kw:              { qtyKey: 'continuous_power_kw',       label: 'Rated power',            unit: 'kW',  tolerancePct: 5 },
       annual_energy_mwh:           { qtyKey: 'annual_energy_yield_mwh',   label: 'Annual energy yield',    unit: 'MWh', tolerancePct: 10 },
       // Heat pump
       thermal_output_kw:           { qtyKey: 'thermal_output_kw',         label: 'Thermal output',         unit: 'kW',  tolerancePct: 5 },
