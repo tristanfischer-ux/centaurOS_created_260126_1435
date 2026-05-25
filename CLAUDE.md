@@ -71,6 +71,30 @@ When adding a new fatal exit, allocate the next free code AND update this table.
 
 ---
 
+## CHAIN-AS-DB-CONSUMER PRINCIPLE (codified 2026-05-25)
+
+The chain (`scripts/serial-design-chain-v2.tsx` + all gate audits + the orchestrator tools) MUST be a pure consumer of `~/.forge-truth/forge-truth.db`. NO chain-side file may import from `src/lib/pdf-engine-v2/lib/distributors/{mouser,digikey,farnell,lcsc,nexar}.ts` — those are LIVE-API adapters reserved for background ingest jobs.
+
+LIVE DISTRIBUTOR API CALLS HAPPEN HERE ONLY:
+- `scripts/ingest/*` — scheduled jobs (cron-able)
+- `scripts/ingest-distributor-catalogue.ts` — bulk catalogue sweep
+
+ALL CHAIN-SIDE READS GO THROUGH:
+- `src/lib/pdf-engine-v2/lib/distributors/db-only-cascade.ts::lookupCached`
+
+QUOTA-PROTECTION GUARANTEE: chain runs cannot burn distributor free-tier quotas, because no chain-side code touches live APIs. Repeatedly broken before 2026-05-25 (L23-L26 burnt Mouser/DK/Nexar quotas via gate 20/21 + orchestrator tool — ~200 calls/chain × N chains = Mouser 1000/day, DK 1000/day, Nexar 100/month all exhausted within hours).
+
+KNOWN FOLLOW-UP: `scripts/lib/part-reality-check.ts` (Stage 10.5 soft stage) still uses live API calls as of 2026-05-25. It is the only remaining violator. Convert it when Stage 10.5 needs work.
+
+REGRESSION TEST: `src/lib/pdf-engine-v2/lib/distributors/chain-must-be-db-only.test.ts` enforces this principle. Build fails if fictional-pn-audit.ts, per-line-price-plausibility-audit.ts, or distributor-cascade-real.ts imports a live distributor adapter.
+
+INGEST JOBS:
+- Weekly component sweep: `bash scripts/ingest/run-weekly-component-sweep.sh`
+- Monthly OEM scrape: `npx tsx scripts/ingest/run-monthly-oem-scrape.ts` (stub — see README)
+- Replay failed writes: `npx tsx scripts/ingest/replay-ingest.ts`
+
+---
+
 ## Self-reinforcing PDF-quality loop (CANONICAL — codified 2026-05-23 after Tristan-flagged wind L20; gate 3 added 2026-05-24; gates 4+5 added 2026-05-24 after BESS L17 council; gates 6+7 added 2026-05-24 after BESS L18 Physics Critic; gate 8 added 2026-05-25 task #122 universal thermal subsystem ambient-derating contract; gate 9 added 2026-05-25 after BESS L22 council; gate 10 added 2026-05-25 after BESS L22 council universal-fix #4 jurisdictional-standards filter; gate 11 added 2026-05-25 after BESS L22 council universal-fix #2 cross-page numeric consistency; gate 12 added 2026-05-25 after BESS L22 council universal-fix #3 fictional-PN live distributor cascade check; gate 13 added 2026-05-25 after BESS L22 council universal-fix #5 per-line price plausibility check; Stage 10.5 Part Reality Check added 2026-05-25 council item #2 — PRE-render soft stage that substitutes fictional MPNs from Stage 17.6 library candidates OR logs HIGH warning; gate 12 remains the POST-render hard backstop with exit 20)
 
 > **Stage 10.5 — Part Reality Check** (`scripts/lib/part-reality-check.ts`, wired into `scripts/serial-design-chain-v2.tsx` after structural-gate routing ~line 3543): PRE-render, SOFT (exit 0 always, skip via `CHAIN_SKIP_PART_REALITY_CHECK=1`). Walks every BoM word, queries the distributor cascade (cached in `~/.forge-truth/forge-truth.db` table `distributor_cascade_cache`). PASS = MPN real → no-op. SUBSTITUTE = MPN fictional + Stage 17.6 library candidate at similarity ≥ 0.60 AND real in cascade → patches `modifier_characters` in-place. WARN = MPN fictional + no real library candidate → logs HIGH to `actions.jsonl`. Gate 12 (`fictional-pn-audit.ts`, exit 20, stage 49.14) remains the POST-render hard backstop. Stage 10.5 reduces gate 12's HIGH count over time as the pretraining library grows; for BESS industrial subsystems (PCS inverters, Grundfos pumps, Beckhoff IPCs) the library currently lacks real candidates above 0.60 similarity — ingesting BESS-class industrial subsystem catalogues into `pretraining_extracted_parts` is the required follow-up.
