@@ -644,6 +644,58 @@ async function main() {
     }
   }
 
+  // ── Pre-step: emitter-pinned list_price_gbp → distributor_price_gbp ─────────
+  // When a word has mod('list_price_gbp', '<N>') in modifier_characters, treat
+  // that as an authoritative catalogue-pinned price and set distributor_price_gbp
+  // directly in the partVerification row (creating the row if it doesn't exist).
+  // This takes priority over Engine B's class curve (distributor_price_gbp is
+  // checked before price_estimate_gbp at line 653). Motivation: the
+  // enclosure_ventilation_fan_word (W2E200-HK38-01) oscillated £21→£35→£28→£35
+  // across L28-L31 because Engine B set price_estimate_gbp=35 early, then the
+  // skip guard prevented correction, and cost_repair left_as_is because the LLM
+  // didn't flag a 3.8× discrepancy. The list_price_gbp modifier pins the Mouser
+  // catalogue price (£133.78) in the emitter source so no downstream step can
+  // drift it. Codified L31 council Fix 3 (2026-05-25).
+  let listPricePinned = 0
+  for (const m of state.moduleDecomposition?.modules ?? []) {
+    for (const sm of m.sub_modules ?? []) {
+      for (const w of sm.words ?? []) {
+        const listPriceMod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'list_price_gbp')
+        if (!listPriceMod) continue
+        const listPrice = parseFloat(String(listPriceMod.value))
+        if (!isFinite(listPrice) || listPrice <= 0) continue
+        const key = compoundKey(m.module, sm.id, w.id)
+        const existing = verifByCompoundId.get(key) ?? verifByLegacyWordId.get(w.id)
+        if (existing) {
+          existing.distributor_price_gbp = listPrice
+          existing.distributor_price_source = 'emitter_list_price'
+        } else {
+          const mfgMod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'manufacturer')
+          const pnMod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'part_number')
+          const newRow: any = {
+            id: key,
+            module: m.module,
+            sub_module_id: sm.id,
+            word_id: w.id,
+            word_name: w.name_human || w.id,
+            manufacturer: mfgMod ? String(mfgMod.value) : null,
+            part_number: pnMod ? String(pnMod.value) : null,
+            status: 'verified',
+            confidence: 'high',
+            distributor_price_gbp: listPrice,
+            distributor_price_source: 'emitter_list_price',
+          }
+          state.partVerifications.push(newRow)
+          verifByCompoundId.set(key, newRow)
+        }
+        listPricePinned++
+      }
+    }
+  }
+  if (listPricePinned > 0) {
+    console.log(`[estimate] pinned ${listPricePinned} parts from emitter list_price_gbp modifiers (bypasses Engine B curve)`)
+  }
+
   // Collect all targets that need estimates
   const targets: PartContext[] = []
   for (const m of state.moduleDecomposition?.modules ?? []) {

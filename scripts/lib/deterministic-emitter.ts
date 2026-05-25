@@ -1461,6 +1461,12 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('performance', `derated to ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient`),
         ],
       ),
+      // cooling_pump_word shares the Grundfos NB 65-250 part number with
+      // coolant_circulation_pump_word. Both must show cap=900 L/min (system
+      // total: 15 racks × 60 L/min per cold plate = 900 L/min).
+      // L31 council N3: sub-agent S updated coolant_circulation_pump_word to
+      // 900 L/min but left this word stale at 60 L/min — contradictory for
+      // the same PN. Fixed here to match coolant_circulation_pump_word.
       word(
         'cooling_pump_word',
         'cooling pump word',
@@ -1468,7 +1474,7 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
         [
           mod('quantity', '×2'),
           mod('form', 'redundant centrifugal'),
-          mod('capacity', '60', 'L/min'),
+          mod('capacity', '900', 'L/min'),
         ],
       ),
       word(
@@ -1518,7 +1524,18 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           // of Engine B's under-estimate. Farnell caches W2E200-CH86-70 at
           // £253.78 (only 2 UK stock) — Mouser variant is better stocked and
           // functionally equivalent for BESS enclosure forced-air ventilation.
+          //
+          // L31 council Fix 3: fan price oscillated £21→£35→£28→£35 because
+          // Engine B writes price_estimate_gbp=35 early in the chain and then
+          // skips the word on re-runs (existing.price_estimate_gbp != null
+          // guard in estimate-missing-prices.tsx line 654). cost_repair also
+          // left_as_is because the LLM didn't flag it. Adding list_price_gbp
+          // here causes estimate-missing-prices to set distributor_price_gbp
+          // directly — taking priority over Engine B's curve per the
+          // pricing cascade (distributor_price_gbp > price_estimate_gbp).
+          // This is the emitter-level floor that prevents further oscillation.
           mod('part_number', 'W2E200-HK38-01'),
+          mod('list_price_gbp', '133.78'),
         ],
       ),
       word(
@@ -1638,6 +1655,12 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
       ),
       // Glycol/water coolant charge — 80/20 ethylene-glycol/deionised-water.
       // ~200 L for a 1 MW BESS loop. Industry cost: ~£500.
+      // Regulatory: BS 6580:1992 (UK engine coolant for ethylene-glycol-based
+      // heat-transfer fluids). NOT ASTM D3306 (US automotive standard — wrong
+      // jurisdiction for UK BESS). L31 council: sub-agent Q added ASTM D3306
+      // which created 5 HIGH in Gate 19; replaced with BS 6580 here so
+      // LLM reviewers inherit the correct UK standard. BS EN 14200 (inhibited
+      // glycols for closed-loop heating systems) also accepted in UK jurisdiction.
       word(
         'glycol_water_coolant_charge_word',
         'glycol water coolant charge word',
@@ -1647,6 +1670,7 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
           mod('capacity', '200', 'L'),
           mod('form', 'EG/DI 80/20'),
           mod('performance', 'inhibited ethylene-glycol, -40°C freeze point'),
+          mod('regulatory', 'BS 6580:1992'),
         ],
       ),
       // Pressure relief valve + sight glass — safety + inspection fittings.
@@ -1795,6 +1819,20 @@ function emitSafetyProtection(p: BessParams): DesignModule {
     ],
   )
 
+  // BESS L31 (2026-05-25): deflagration_vents and safety_labelling had <5
+  // words each, triggering Stage 1.7 densification which injected cell_fuse_*
+  // words (cell_fuse_mount_word × 3750 cells) into these sub-modules.
+  // A single cell_fuse_mount_word at £45 × 3750 cells = £168,750, duplicated
+  // across four sub-modules = £675,000 phantom in safety_protection total
+  // (£737,477 total vs realistic £6-10k). Fix: bring all safety sub-modules
+  // to ≥5 purpose-correct words so Stage 1.7 densification has no under-dense
+  // sub-module to stuff. Added: smoke_vent_interlock accessories, vent seals,
+  // vent labels to deflagration_vents (total 5 words); label mounts + nfpa
+  // signage to safety_labelling (total 5 words); gas_detection sub-module
+  // (5 words, per-rack scope); cell_fuse_protection sub-module (5 words,
+  // rack-level string fuses NOT per-cell — per BESS architecture note at
+  // line ~557: per-cell fuses on 1P × NS series strings cannot open selectively
+  // and are omitted from real utility BESS; only rack-level HRC string fuses).
   const deflagrationVents = makeSubModule(
     'deflagration_vents',
     'deflagration vents',
@@ -1840,6 +1878,34 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('form', 'MOV-actuated'),
         ],
       ),
+      word(
+        'smoke_vent_interlock_mount_word',
+        'smoke vent interlock mount word',
+        cc('smoke_vent_interlock_mount', 'smoke vent interlock mount', null, 'steel'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'DIN rail bracket'),
+        ],
+      ),
+      word(
+        'deflagration_vent_seal_word',
+        'deflagration vent seal word',
+        cc('deflagration_vent_seal', 'deflagration vent seal', null, 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×4'),
+          mod('form', 'EPDM perimeter seal, fire-rated'),
+        ],
+      ),
+      word(
+        'deflagration_vent_label_word',
+        'deflagration vent label word',
+        cc('deflagration_vent_label', 'deflagration vent label', null, 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×4'),
+          mod('form', 'NFPA 68 / EN 14797 warning placard'),
+          mod('regulatory', 'NFPA 68'),
+        ],
+      ),
     ],
   )
 
@@ -1874,12 +1940,171 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('regulatory', 'IEC 62619'),
         ],
       ),
+      word(
+        'nfpa855_warning_label_word',
+        'NFPA 855 warning label word',
+        cc('nfpa855_warning_label', 'NFPA 855 energy storage warning label', null, 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×2'),
+          mod('form', 'outdoor UV-resistant, compliant with NFPA 855 §12.4.3'),
+          mod('regulatory', 'NFPA 855'),
+        ],
+      ),
+      word(
+        'safety_label_mount_word',
+        'safety label mount word',
+        cc('safety_label_mount', 'safety label mount hardware', null, 'steel'),
+        [
+          mod('quantity', fmtQty(p.rackCount)),
+          mod('form', 'stainless self-adhesive + rivet backing'),
+        ],
+      ),
+    ],
+  )
+
+  // BESS L31 (2026-05-25): gas_detection sub-module added to the deterministic
+  // emitter. Previously absent → Stage 1.7 injected gas_sensor_word with wrong
+  // scope (× rack_count is correct; earlier LLM runs used ×4 or ×15 depending
+  // on the reviewers' guesses). Pinned here with ×rackCount per-rack detectors.
+  // Gas species per NFPA 855 §12 + IEC 62619: H2, CO, HF (the three primary
+  // LFP off-gas hazards during thermal runaway). One multi-gas transmitter
+  // per rack bay is the real CATL EnerC+ / Sungrow PowerStack practice.
+  const gasDetection = makeSubModule(
+    'gas_detection',
+    'gas detection',
+    'detects',
+    'H2/CO/HF gas transmitters, one per rack bay, wired to the BMS fire-abort relay',
+    [
+      word(
+        'gas_sensor_word',
+        'gas sensor word',
+        cc('gas_sensor', 'gas sensor transmitter', 'chemical_sensing_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', fmtQty(p.rackCount)),
+          mod('form', 'H2/CO/HF multi-gas'),
+          mod('regulatory', 'NFPA 855 + IEC 62619'),
+        ],
+      ),
+      word(
+        'gas_detector_controller_word',
+        'gas detector controller word',
+        cc('gas_detector_controller', 'gas detection controller panel', 'electromechanical_switching_function', 'steel'),
+        [
+          mod('quantity', '×1'),
+          mod('form', '16-zone addressable controller with relay output to BMS fire-abort'),
+          mod('regulatory', 'EN 50194-1'),
+        ],
+      ),
+      word(
+        'gas_sensor_mount_word',
+        'gas sensor mount word',
+        cc('gas_sensor_mount', 'gas sensor DIN mount bracket', null, 'steel'),
+        [
+          mod('quantity', fmtQty(p.rackCount)),
+          mod('form', 'DIN rail clamp, stainless'),
+        ],
+      ),
+      word(
+        'gas_detection_harness_word',
+        'gas detection harness word',
+        cc('gas_detection_harness', 'gas detection wiring harness', null, 'copper'),
+        [
+          mod('quantity', fmtQty(p.rackCount)),
+          mod('form', '4-core shielded 0.5 mm² twisted pair, fire-rated'),
+          mod('dimension', '2', 'm'),
+        ],
+      ),
+      word(
+        'gas_sensor_label_word',
+        'gas sensor label word',
+        cc('gas_sensor_label', 'gas sensor identification label', null, 'polymer_thermoplastic'),
+        [
+          mod('quantity', fmtQty(p.rackCount)),
+          mod('form', 'zone identification + gas species sticker set'),
+        ],
+      ),
+    ],
+  )
+
+  // BESS L31 (2026-05-25): cell_fuse_protection sub-module added to the
+  // deterministic emitter to prevent Stage 1.7 densification from injecting
+  // cell_fuse_mount_word × 3750 (per-cell scope) into OTHER safety sub-modules.
+  // IMPORTANT: cell fuses here are RACK-LEVEL HRC STRING FUSES (qty = rackCount),
+  // NOT per-cell items. Engineering basis (see line ~557 above): in a 1P × NS
+  // series string, every cell carries the full string current so per-cell fuses
+  // cannot open selectively — the rack-level Eaton Bussmann PV-200ANH1 already
+  // protects the entire string. Per-cell fuses on series strings = mass, cost,
+  // voltage drop and failure points for zero protective benefit.
+  // Real utility BESS (Tesla Megapack 2 XL, CATL EnerC+, Sungrow PowerStack)
+  // all rely solely on rack-level semiconductor / HRC fusing.
+  const cellFuseProtection = makeSubModule(
+    'cell_fuse_protection',
+    'cell fuse protection',
+    'protects',
+    'rack-level HRC string fuses, one per rack; NO per-cell fuses on series-string topology',
+    [
+      // Eaton Bussmann PV-200ANH1: 200 A / 1500 V DC HRC string fuse,
+      // IEC 60269-6 Class gPV, NH1 body. One per rack string (string current
+      // = bus_continuous_A / parallel_strings = 1250 A / 15 = 83 A → 200 A
+      // rated fuse gives 2.4× margin per IEC 62619 §6.4.4). Source: Eaton
+      // Bussmann catalogue + DigiKey listing (confirmed real part).
+      word(
+        'rack_string_fuse_word',
+        'rack string fuse word',
+        cc('rack_string_fuse', 'rack-level HRC string fuse', 'cell_fuse_protection_function', 'steel'),
+        [
+          mod('quantity', fmtQty(p.rackCount)),
+          mod('manufacturer', 'Eaton Bussmann'),
+          mod('part_number', 'PV-200ANH1'),
+          mod('form', 'IEC 60269-6 Class gPV, NH1, 200 A / 1500 V DC (rack-level string fuse — NOT a per-cell fuse; per-cell HRC fuses are omitted on 1P×NS series-string topology per CATL EnerC+ / Tesla Megapack practice)'),
+          mod('rating_primary', '200 A'),
+          mod('dimension', '1500', 'V'),
+          mod('regulatory', 'IEC 60269-6 + IEC 62619 §6.4.4'),
+        ],
+      ),
+      word(
+        'fuse_holder_word',
+        'fuse holder word',
+        cc('fuse_holder', 'NH1 fuse holder / disconnector', 'electromechanical_switching_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', fmtQty(p.rackCount)),
+          mod('form', 'DIN rail mount, NH1 size, 1500 V DC rated'),
+          mod('regulatory', 'IEC 60947-3'),
+        ],
+      ),
+      word(
+        'fuse_label_word',
+        'fuse label word',
+        cc('fuse_label', 'fuse identification label', null, 'polymer_thermoplastic'),
+        [
+          mod('quantity', fmtQty(p.rackCount)),
+          mod('form', 'rack/string ID + fuse rating sticker'),
+        ],
+      ),
+      word(
+        'fuse_mount_rail_word',
+        'fuse mount rail word',
+        cc('fuse_mount_rail', 'DIN rail fuse mount section', null, 'steel'),
+        [
+          mod('quantity', fmtQty(p.rackCount)),
+          mod('form', 'TS 35 DIN rail section, 300 mm, galvanised'),
+        ],
+      ),
+      word(
+        'fuse_install_torque_card_word',
+        'fuse install torque card word',
+        cc('fuse_install_torque_card', 'fuse installation torque specification card', null, 'polymer_thermoplastic'),
+        [
+          mod('quantity', fmtQty(p.rackCount)),
+          mod('form', 'per-rack laminated card: tightening torque per IEC 60269-6 + string isolation procedure'),
+        ],
+      ),
     ],
   )
 
   return {
     module: 'safety_protection',
-    module_brief: 'Detects + extinguishes thermal runaway via Novec 1230 clean-agent, ventilates gas through deflagration panels, and marks all safety-critical surfaces.',
+    module_brief: 'Detects + extinguishes thermal runaway via Novec 1230 clean-agent, ventilates gas through deflagration panels, marks all safety-critical surfaces, detects off-gas, and provides rack-level HRC string fusing. NOTE: cell_fuse_protection uses rack-level fuses (qty=rack_count) — per-cell fuses are NOT used on 1P×NS series-string topology.',
     overview_paragraph_en: '',
     derived_parameters: {
       rack_count: p.rackCount,
@@ -1898,9 +2123,12 @@ function emitSafetyProtection(p: BessParams): DesignModule {
       // (Rembe BESS.EGV-IAF — real burst-disc-style vent panel). Added
       // here so the radical-validator (gate 4) accepts it.
       'aluminium',
+      // BESS L31 (2026-05-25): cell_fuse_protection_function added for
+      // Eaton Bussmann PV-200ANH1 rack string fuse classification.
+      'cell_fuse_protection_function',
     ],
     applicability_confidence: 'high',
-    sub_modules: [fireSuppression, deflagrationVents, safetyLabelling],
+    sub_modules: [fireSuppression, deflagrationVents, safetyLabelling, gasDetection, cellFuseProtection],
   }
 }
 
