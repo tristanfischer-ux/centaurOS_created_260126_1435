@@ -2945,28 +2945,17 @@ async function main() {
         // CHAIN_SKIP_BLENDER_BG=1 to use the synchronous fallback in
         // generate-hero-images.tsx. Mempalace:
         // drawer_forgeos_decisions_3f18c3cae92fe29e.
-        if (process.env.CHAIN_SKIP_BLENDER_BG !== '1') {
-          try {
-            const bgRunner = resolve(__dirname, 'blender-bg-runner.tsx')
-            const bgLog = resolve(outDir, 'blender-bg.log')
-            const bgStdoutFd = openSync(bgLog, 'a')
-            const bgStderrFd = openSync(bgLog, 'a')
-            const bgChild = spawn('npx', ['tsx', bgRunner, statePath, outDir], {
-              detached: true,
-              stdio: ['ignore', bgStdoutFd, bgStderrFd],
-              cwd: resolve(__dirname, '..'),
-              env: process.env,
-            })
-            bgChild.unref()
-            console.error(`[chain] phase 5: blender bg pipeline spawned (PID ${bgChild.pid}) → ${bgLog}`)
-            logAction({ step: 'blender_bg_spawned', ok: true, pid: bgChild.pid })
-          } catch (err) {
-            console.error(`[chain] blender bg spawn failed: ${(err as Error).message.slice(0, 120)}; falling back to in-line synchronous Blender at [hero] stage`)
-            logAction({ step: 'blender_bg_spawned', ok: false, error: String(err).slice(0, 200) })
-          }
-        } else {
-          console.error('[chain] CHAIN_SKIP_BLENDER_BG=1 — Blender will run serially inside [hero] stage')
-        }
+        // BESS L25 (2026-05-25) — Blender bg-spawn moved to immediately
+        // after the state.json write below (line ~3845). The original
+        // location here referenced `statePath` AND `state`, both declared
+        // ~900 lines below, so JS temporal-dead-zone threw on every chain
+        // run. The fallback path took over and chains lost ~10 min of
+        // parallelism per run, but worse: the failure was silent (logged,
+        // not surfaced) so the regression was invisible until BESS L25.
+        // The minimal fix moves the spawn to after state is initialised;
+        // we lose ~10 min of parallelism with the physics-repair loop +
+        // design-decisions stages but the bg pipeline now ACTUALLY runs.
+        // Original drawer: drawer_forgeos_decisions_3f18c3cae92fe29e.
       } catch (err) {
         console.error(`[chain] specialist review threw: ${(err as Error).message}; continuing without`)
         logAction({ step: 'specialist_review', class: currentProductClass, specialist_key: specialist.key, applied: false, error: String(err).slice(0, 200) })
@@ -3843,6 +3832,37 @@ async function main() {
   const statePath = resolve(outDir, 'state.json')
   writeFileSync(statePath, JSON.stringify(state, null, 2))
   logAction({ step: 'save_state', path: statePath, accepted: allPassed, acceptance_status: acceptanceStatus, decision_count: designDecisions.length })
+
+  // Blender bg-pipeline spawn (BESS L25 fix — moved here from after Stage 8.5
+  // because the original location referenced statePath + state before they
+  // existed, hitting JS temporal-dead-zone on every run and silently falling
+  // back to in-line synchronous Blender). Detached child writes a sentinel
+  // that generate-hero-images.tsx polls. By the time [hero] fires the Blender
+  // PNGs are typically complete, so the chain finishes faster than the
+  // serial path. Disable via CHAIN_SKIP_BLENDER_BG=1.
+  // Drawer: drawer_forgeos_decisions_3f18c3cae92fe29e.
+  if (process.env.CHAIN_SKIP_BLENDER_BG !== '1') {
+    try {
+      const bgRunner = resolve(__dirname, 'blender-bg-runner.tsx')
+      const bgLog = resolve(outDir, 'blender-bg.log')
+      const bgStdoutFd = openSync(bgLog, 'a')
+      const bgStderrFd = openSync(bgLog, 'a')
+      const bgChild = spawn('npx', ['tsx', bgRunner, statePath, outDir], {
+        detached: true,
+        stdio: ['ignore', bgStdoutFd, bgStderrFd],
+        cwd: resolve(__dirname, '..'),
+        env: process.env,
+      })
+      bgChild.unref()
+      console.error(`[chain] phase 5: blender bg pipeline spawned (PID ${bgChild.pid}) → ${bgLog}`)
+      logAction({ step: 'blender_bg_spawned', ok: true, pid: bgChild.pid })
+    } catch (err) {
+      console.error(`[chain] blender bg spawn failed: ${(err as Error).message.slice(0, 120)}; falling back to in-line synchronous Blender at [hero] stage`)
+      logAction({ step: 'blender_bg_spawned', ok: false, error: String(err).slice(0, 200) })
+    }
+  } else {
+    console.error('[chain] CHAIN_SKIP_BLENDER_BG=1 — Blender will run serially inside [hero] stage')
+  }
 
   // ── P6 wiring (2026-05-18): Engine B — backfill per-line price estimates +
   // engine_b_component_class for every word that lacks a distributor quote.
