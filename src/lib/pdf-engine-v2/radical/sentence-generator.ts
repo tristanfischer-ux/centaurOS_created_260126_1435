@@ -334,6 +334,35 @@ export function capitaliseFirst(s: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// resolveSubmoduleLabel — guard against snake_case name_human leak
+// ---------------------------------------------------------------------------
+
+/**
+ * Return the human-readable label for a sub-module.
+ *
+ * Bug fix (prose-quality L26 — 2026-05-25): the orchestrator sometimes emits
+ * sub_module.name_human as a snake_case pipeline-internal ID such as
+ * "energy_storage_source_electrochemical_energy" instead of a human phrase.
+ * When this happens, `generateSubmoduleSentence` renders "The
+ * energy_storage_source_electrochemical_energy consists of …" — a leaked
+ * internal identifier rather than readable prose.
+ *
+ * Heuristic: a name_human that contains underscores but no spaces is almost
+ * certainly a snake_case ID, not a real phrase (real phrases like "BMS slave"
+ * contain spaces). When detected, fall through to humaniseId(sub.id) which
+ * always produces readable output.
+ *
+ * A name_human that is empty/absent → humaniseId(sub.id) (existing behaviour).
+ */
+function resolveSubmoduleLabel(subModule: SubModuleSpec): string {
+  const raw = (subModule.name_human ?? '').trim()
+  if (!raw) return humaniseId(subModule.id)
+  // Contains underscore but NO space → looks like a snake_case internal ID.
+  if (raw.includes('_') && !raw.includes(' ')) return humaniseId(subModule.id)
+  return raw
+}
+
+// ---------------------------------------------------------------------------
 // generateSubmoduleSentence — one English sentence per sub-module
 // ---------------------------------------------------------------------------
 
@@ -411,7 +440,10 @@ export function generateSubmoduleSentence(
     return ensureTerminalPunctuation(subModule.english_sentence.trim())
   }
   const style = options?.style ?? 'verbose'
-  const subject = subModule.name_human || humaniseId(subModule.id)
+  // Bug fix (prose-quality L26 — 2026-05-25): use resolveSubmoduleLabel so
+  // snake_case name_human values (e.g. "energy_storage_source_electrochemical_energy")
+  // are humanised instead of rendered verbatim as the sentence subject.
+  const subject = resolveSubmoduleLabel(subModule)
   const rawVerb = (subModule.role_verb && subModule.role_verb.trim()) || 'comprises'
   // Universal fix #E (2026-05-22): make the verb agree with subject number.
   const verb = pluraliseVerb(rawVerb, subject)
@@ -732,7 +764,9 @@ export function generateSubmoduleParagraph(subModule: SubModuleSpec): string {
     return ensureTerminalPunctuation(llmProse)
   }
 
-  const subject = subModule.name_human || humaniseId(subModule.id)
+  // Bug fix (prose-quality L26 — 2026-05-25): resolveSubmoduleLabel prevents
+  // snake_case name_human IDs from leaking as the paragraph subject.
+  const subject = resolveSubmoduleLabel(subModule)
   const rawVerb = (subModule.role_verb && subModule.role_verb.trim()) || 'comprises'
   // Universal fix #E (2026-05-22): subject-verb agreement.
   const verb = pluraliseVerb(rawVerb, subject)

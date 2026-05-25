@@ -626,6 +626,16 @@ registerArchetype('bess', (brief: any) => {
     system_mass_with_external_kg: q(massWithExternalTxfrKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'in-container + external transformer; informational only — container mass cap applies to in_container_mass_kg' }),
     transformer_installation: q(1, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'transformer_installation=1 means EXTERNAL pad-mount (industry standard per IEC 62933-5-2 §6.4 / NEC 706.10); =0 would mean in-container (legacy non-utility BESS only)' }),
     mass_feasibility: q(massFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `1 iff in_container_mass_kg ≤ brief_mass_cap_kg; achieved ${inContainerMassKg.toFixed(0)} kg vs cap ${briefMassCapKg} kg` }),
+    // BESS L26 (2026-05-25, gate-17 HIGH #4): ac_output_voltage_v — UK
+    // grid-tie BESS universally uses 400 V / 50 Hz LV AC output via the PCS;
+    // brief target_performance has key 'ac_output_voltage_v' → 400 V. METRIC_MAP
+    // maps that key → qtyKey 'ac_output_voltage_v', but the BESS contract never
+    // emitted the field → _qtyFromOrch returned null → compliance row silently
+    // dropped by `if (!ach) continue`. Static 400 V is correct for UK grid-tie
+    // LV connection (IEC 60038 / G99 at ≤1 MW); PCS raises to MV via external
+    // step-up transformer. If a future brief specifies a different AC voltage,
+    // the compliance table will show a FAIL row (brief 690 V vs achieved 400 V).
+    ac_output_voltage_v: q(400, 'V', 'voltage', 'AC', 'system', 'physics_constant', { source_detail: 'UK grid-tie LV AC output at PCS terminals: 400 V / 50 Hz (IEC 60038 standard voltage; G99 connection at ≤ 1 MW). Raises to MV (typically 11 kV or 33 kV) via external step-up transformer.', condition: 'PCS output terminals, 50 Hz, balanced 3-phase' }),
     // BESS L24 (2026-05-25, gate-17 HIGH #3): cycle_life_cycles — the
     // durability metric the brief states as a hard constraint. The renderer's
     // METRIC_MAP maps brief key `cycle_life` → qtyKey `cycle_life_cycles` but
