@@ -3294,6 +3294,12 @@ async function main() {
       apiKey,
       timeoutMs: 600_000,
       extraContext: computeDensityTargets(design),
+      // L31 guardrail (2026-05-25): pass parsedBrief so the repair LLM
+      // receives a jurisdiction constraint + ECARO-25 / EBS-500 banned list
+      // in its system prompt. Prevents re-introduction of foreign-jurisdiction
+      // citations (UL/NEC/ASTM for UK briefs) and known incompatible
+      // brand-product combinations on every repair iteration.
+      parsedBrief: parsedResult.data,
     })
     if (rep.unfixable) {
       console.error(`[chain] Phase 2: repair LLM returned unfixable: ${rep.reason}`)
@@ -3304,6 +3310,14 @@ async function main() {
     console.error(`[chain] Phase 2 iter ${repairIter}: applied ${applied.applied} patches, skipped ${applied.skipped}, state_changed=${applied.state_changed}`)
     for (const r of applied.reasons) console.error(`    ${r}`)
     logAction({ step: `phase2_repair_${repairIter}`, patches: rep.patches, applied: applied.applied, skipped: applied.skipped, state_changed: applied.state_changed, reasons: applied.reasons })
+    // L31 guardrail (2026-05-25): run the jurisdiction prose filter immediately
+    // after every applyPatches call so foreign-jurisdiction citations introduced
+    // by THIS repair iter are stripped before the next gate evaluation sees them.
+    // Without this in-loop call the filter only ran once at the end of Phase 2
+    // (line ~3863) — the gates themselves kept seeing leaked citations in the
+    // interim iters and could waste repair budget trying to "fix" them.
+    applyJurisdictionFilterToModules((design.modules ?? []) as any)
+    logAction({ step: `phase2_repair_${repairIter}_jurisdiction_filter`, note: 'in-loop jurisdiction filter applied after applyPatches' })
     if (!applied.state_changed) {
       console.error(`[chain] Phase 2: no state change after repair iter ${repairIter} — bailing (further iterations will not progress).`)
       logAction({ step: `phase2_bail_no_progress`, iter: repairIter })

@@ -45,6 +45,12 @@ export const UK_CODE_SUBSTITUTIONS: Array<[RegExp, string]> = [
   [/\bUL 1577\b/g, 'IEC 60044-1'],
   // PCS / inverter safety (silicone wire insulation, power electronics)
   [/\bUL 3266\b/g, 'IEC 62477-1'],
+  // ECARO-25 (FE-25 / HFC-125 hardware) — incompatible with Novec 1230.
+  // L31 recurring hallucination: Phase 2 repair LLM repeatedly re-introduces
+  // ECARO-25 for Novec 1230 suppression systems. The correct hardware for
+  // Novec 1230 is Kidde ECS. Substitute so the gate-19 filter removes it
+  // even if the LLM guardrail fails to prevent emission.
+  [/\bECARO-25\b/gi, 'Kidde ECS'],
   // Clean agent extinguishers / suppression nozzles
   [/\bUL 2166\b/g, 'BS EN 12094'],
   // Thermal detectors / heat detectors

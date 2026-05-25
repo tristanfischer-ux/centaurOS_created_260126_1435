@@ -108,6 +108,73 @@ export interface RepairResult {
   raw?: string
 }
 
+// ---------------------------------------------------------------------------
+// Jurisdiction-aware guardrail builder
+// ---------------------------------------------------------------------------
+// Infers the brief's jurisdiction from parsedBrief fields (same priority order
+// as scripts/lib/jurisdictional-standards-audit.ts::inferJurisdiction).
+function inferJurisdictionFromBrief(parsedBrief: any): string {
+  if (!parsedBrief) return 'UNKNOWN'
+  const country = (parsedBrief.country ?? '').toString().trim().toUpperCase()
+  if (/\b(UK|UNITED KINGDOM|GB|GREAT BRITAIN|ENGLAND|SCOTLAND|WALES)\b/.test(country)) return 'UK'
+  if (/\b(US|USA|UNITED STATES|AMERICA)\b/.test(country)) return 'US'
+  if (/\b(EU|EUROPE|EUROPEAN UNION)\b/.test(country)) return 'EU'
+  if (/\b(CA|CANADA|CANADIAN)\b/.test(country)) return 'CA'
+  const region = (
+    parsedBrief?.constraints?.target_market_region
+    ?? parsedBrief?.target_market_region
+    ?? ''
+  ).toString().trim().toUpperCase()
+  if (/\b(UK|UNITED KINGDOM|GB|GREAT BRITAIN)\b/.test(region)) return 'UK'
+  if (/\b(US|USA|UNITED STATES)\b/.test(region)) return 'US'
+  if (/\b(EU|EUROPE|EUROPEAN UNION)\b/.test(region)) return 'EU'
+  if (/\b(CA|CANADA)\b/.test(region)) return 'CA'
+  const customers = (parsedBrief?.target_customers ?? '').toString()
+  if (/\b(UK|British|United Kingdom|GB|grid.?scale UK|UK grid|BESS UK)\b/i.test(customers)) return 'UK'
+  if (/\b(US|United States|American|US grid|utility US)\b/i.test(customers)) return 'US'
+  if (/\b(EU|European|Europe)\b/i.test(customers)) return 'EU'
+  if (/\b(Canada|Canadian)\b/i.test(customers)) return 'CA'
+  return 'UNKNOWN'
+}
+
+function buildJurisdictionGuardrail(parsedBrief: any): string {
+  const jurisdiction = inferJurisdictionFromBrief(parsedBrief)
+
+  const byJurisdiction: Record<string, string> = {
+    UK: `JURISDICTION CONSTRAINT: The brief's target market is UK.
+You MUST NOT emit any modifier_characters[kind=regulatory] or prose containing standards from non-accepted families.
+For UK briefs:
+  Accepted families: BS, BS EN, CENELEC, DIN, DNV, EN, ENA, ETSI, G99, IEC, IEEE, IPC, ISO, NFPA.
+  Banned families: UL (except UL 9540A, UL 9540, NFPA 855, NFPA 68, NFPA 70E, UL 94), NEC, ASTM, ANSI, FCC, CSA.
+  If you need to cite a standard for a UK brief, use the IEC/BS/EN equivalent. Examples:
+    UL 489 → IEC 60947-2 | UL 1973 → IEC 62619 | UL 467 → BS 7430 | NEC 706.10 → IEC 62933-5-2 §6.4
+    UL 248 → IEC 60269 | UL 1577 → IEC 60044-1 | ASTM A312 → BS EN 10216-5`,
+    US: `JURISDICTION CONSTRAINT: The brief's target market is US.
+You MUST NOT emit standards from EU-only or UK-only families (BS, G99, ENA) unless explicitly appropriate.
+For US briefs, preferred families: NEC, UL, NFPA, ANSI, IEEE, ISO, IEC, ASTM, ASME, FCC, IPC, DNV.`,
+    EU: `JURISDICTION CONSTRAINT: The brief's target market is EU.
+You MUST NOT emit standards from US-only families (NEC, UL, ANSI, ASTM, FCC, CSA) or UK-specific (G99, ENA).
+For EU briefs, preferred families: EN, IEC, ISO, CENELEC, ETSI, DIN, VDE, IPC, DNV, NFPA, IEEE.`,
+    CA: `JURISDICTION CONSTRAINT: The brief's target market is Canada.
+For CA briefs, preferred families: CSA, NEC, UL, NFPA, ANSI, IEEE, ISO, IEC, IPC, DNV.`,
+    UNKNOWN: `JURISDICTION CONSTRAINT: Brief jurisdiction unknown.
+Use IEC/ISO standards as the default where possible. Avoid jurisdiction-specific families (UL, NEC, BS, G99, CSA) unless the design context clearly mandates them.`,
+  }
+
+  const base = byJurisdiction[jurisdiction] ?? byJurisdiction['UNKNOWN']
+
+  return `
+${base}
+
+INCOMPATIBLE COMBINATIONS — NEVER EMIT THESE REGARDLESS OF JURISDICTION:
+- ECARO-25 + Novec 1230: ECARO-25 is FE-25 (HFC-125) hardware — it is INCOMPATIBLE with Novec 1230 clean agent. For Novec 1230 systems use Kidde ECS (or equivalent Novec-certified hardware). Do not emit ECARO-25 in any design that references Novec 1230.
+- Sungrow SC1000UD-MV: never claim >1500 V DC input or >1100 kW peak — the datasheet caps are 1500 V / 1100 kW. If the design needs more power, emit multiple units.
+- nVent ERIFLEX EBS-500: this part number does not exist. For grounding braids in the nVent ERIFLEX family use MBJ50-300-10 (or another real MBJ-series part). Do not emit EBS-500 under any circumstances.
+
+If you are tempted to emit a regulatory citation or brand-product combination you are not certain about, OMIT IT rather than hallucinate. An absent citation is always safer than a fabricated one.
+`
+}
+
 const SYSTEM = `You are Gemini 3.1 Flash-Lite with Google Search grounding ON. Your job: repair specific gate failures by emitting a TARGETED JSON patch.
 
 You will receive:
@@ -193,7 +260,17 @@ export async function repair(opts: {
   apiKey: string
   timeoutMs?: number
   extraContext?: string
+  /** parsedBrief from the chain — used to build the jurisdiction guardrail.
+   *  Optional for backwards-compatibility; when absent falls back to UNKNOWN. */
+  parsedBrief?: any
 }): Promise<RepairResult> {
+  // Build a jurisdiction-aware system message that adds the guardrail block
+  // after the core SYSTEM template. This prevents the repair LLM from emitting
+  // foreign-jurisdiction standards (e.g. UL/NEC/ASTM for UK briefs) or known
+  // incompatible brand-product combinations (ECARO-25 + Novec 1230, EBS-500).
+  const jurisdictionGuardrail = buildJurisdictionGuardrail(opts.parsedBrief ?? null)
+  const systemWithGuardrail = SYSTEM + '\n' + jurisdictionGuardrail
+
   const userContent = `CURRENT DESIGN:
 ${JSON.stringify({ modules: opts.modules, cross_module_grammar_links: opts.crossLinks }, null, 2)}
 
@@ -215,7 +292,7 @@ Return the JSON patch. Emit as many patches as needed (up to 30) — DO NOT stop
       body: JSON.stringify({
         model: FLASH_LITE,
         messages: [
-          { role: 'system', content: SYSTEM },
+          { role: 'system', content: systemWithGuardrail },
           { role: 'user', content: userContent },
         ],
         temperature: 0,
