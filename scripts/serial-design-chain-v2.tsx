@@ -4774,6 +4774,73 @@ async function main() {
     console.error(`[chain] brief-constraint-completeness-audit flagged issues (see AUDIT-COMPLETENESS.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
 
+  // 2026-05-25 (Tristan-asked, BESS L22 council universal-fix #2): cross-page
+  // numeric consistency audit (gate 18). Walks the rendered PDF page-by-page,
+  // extracts every `<N> <unit>` occurrence, clusters by (family-anchor,
+  // strong-qualifier-set) and flags any cluster whose intra-cluster variance
+  // exceeds 1% (HIGH) or 0.1% (MED, advisory only).
+  //
+  // L22 trigger: cover headline (page 1) said "USABLE ENERGY CAPACITY
+  // (BRIEF TARGET) 3.5 MWh" while Mission paragraph (page 2) said "Deliver
+  // 2.69 MWh of usable energy" and Module 4 (page 14) said "3.36 MWh
+  // nameplate". Three different MWh numbers within 14 pages, all labelled
+  // "energy" — the reader has no honest way to reconcile them. The audit
+  // catches this universally across every product class because the
+  // clustering is keyed on family-anchor (energy / power / voltage / etc)
+  // and engineering-strong qualifiers (nameplate / usable / continuous /
+  // peak / dc / ac), not on class-specific knowledge.
+  //
+  // Distinct from gate 12 (numeric-claim drift): gate 12 compares
+  // orchestratorContract.quantities vs BoM word.quantity (CODE-vs-CODE).
+  // Gate 18 compares NARRATIVE-vs-NARRATIVE: the same noun phrase appearing
+  // in two PROSE locations of the rendered PDF with conflicting scalars.
+  // The chain can pass gate 12 (contract matches BoM) but still ship a PDF
+  // where the cover headline disagrees with the mission paragraph because
+  // both are LLM-generated prose pulling from different upstream sources.
+  //
+  // Distinct from gate 17 (brief-constraint completeness): gate 17 catches
+  // MISSING ROWS in the Brief Compliance table. Gate 18 catches CONFLICTING
+  // VALUES in the prose body of the rendered PDF.
+  //
+  // False-positive guards (see scripts/lib/cross-page-numeric-consistency-
+  // audit.ts header for full list): different unit families never cluster
+  // (cell 3.2 V ≠ string 800 V); STRONG qualifiers split clusters (nameplate
+  // ≠ usable, dc ≠ ac, continuous ≠ peak); operating-range second values
+  // skipped (-20 °C to +50 °C); derate-table second values skipped (36 kW
+  // @ 35°C / 21.6 kW @ 50°C); ratio notation skipped (1500/5A CT secondary);
+  // per-part LENGTH/MASS/VOLTAGE/CURRENT measurements excluded from
+  // fallback clustering. Exit 18 on HIGH (>1% variance, ≥2 distinct context
+  // windows). MED + money-format-drift findings are informational only.
+  try {
+    execFileSync(
+      'npx',
+      ['tsx', resolve(__dirname, 'lib/cross-page-numeric-consistency-audit.ts'), pdfPath, resolve(outDir, 'AUDIT-CONSISTENCY.md')],
+      { stdio: 'inherit', cwd: resolve(__dirname, '..') },
+    )
+  } catch (err) {
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 18) {
+      console.error('')
+      console.error('======================================================================')
+      console.error('  CHAIN HARD-EXIT - Cross-page numeric consistency audit FAILED (18)')
+      console.error('  The rendered PDF contains conflicting scalar values for the same')
+      console.error('  engineering quantity across two or more pages (e.g. cover headline')
+      console.error('  3.5 MWh usable energy vs Mission paragraph 2.69 MWh usable energy).')
+      console.error('  The reader cannot reconcile contradicting numbers within a few pages.')
+      console.error('  PDF + state.json saved to disk for inspection but chain is BLOCKED.')
+      console.error('  See AUDIT-CONSISTENCY.md for the offending clusters + occurrences.')
+      console.error('  Fix area: align the upstream source of truth for each contradicting')
+      console.error('  cluster - either correct the headline / mission / module emission to')
+      console.error('  match the canonical scalar, OR add an explicit qualifier (nameplate /')
+      console.error('  usable / continuous / peak) so the different values are honestly')
+      console.error('  presented as different engineering quantities.')
+      console.error('======================================================================')
+      logAction({ step: 'fatal_consistency_audit', reason: 'cross-page-numeric-consistency-audit exit 18', status: 18 })
+      process.exit(18)
+    }
+    console.error(`[chain] cross-page-numeric-consistency-audit flagged issues (see AUDIT-CONSISTENCY.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
+  }
+
   // 2026-05-25 (Tristan-asked, BESS L22 council universal-fix #4): jurisdictional-
   // standards audit (gate 19). The L22 BESS PDF was generated for a UK
   // grid-scale brief (parsedBrief.target_customers: "UK grid-scale frequency
