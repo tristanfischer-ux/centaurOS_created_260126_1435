@@ -243,7 +243,18 @@ const GLOBAL_EXCLUDE_WORD_ID = new RegExp(
     // Busbars (sized by copper cross-section + ventilation, not breaker rating)
     'busbar|bus_bar|copper_bar|distribution_bar|' +
     // Connectors / terminals / lugs (passive, sized by IEC 61238 ampacity table)
-    'crimp_lug|terminal_lug|cable_lug|ferrule|connector_housing',
+    'crimp_lug|terminal_lug|cable_lug|ferrule|connector_housing|' +
+    // cell_terminal_hardware = Klauke 16208 voltage-sense ring terminal (≤1 mA
+    // quiescent on 22 AWG BMS slave sense lead). NOT a current-carrying conductor;
+    // the cell M8 power stud is bolted directly to the Mersen busbar per
+    // Tesla Megapack / CATL EnerC+ / Sungrow PowerStack practice. Sizing it
+    // against string_continuous_current_a (100 A class) is a category error —
+    // same reason bms_slave is excluded. IEC 61238-1 / DIN 46234 ampacity
+    // table governs; 0.5-1.0 mm² Klauke 16208 at ≤1 mA is compliant.
+    // L28 council gate-14 CHAIN-BLOCKER: "6 A vs 83 A continuous" — correct
+    // diagnosis that the 6 A figure exists, wrong conclusion that it's
+    // undersized; it's a voltage-sense lug, not a power conductor.
+    'cell_terminal_hardware|thermistor_attachment',
   'i',
 )
 
