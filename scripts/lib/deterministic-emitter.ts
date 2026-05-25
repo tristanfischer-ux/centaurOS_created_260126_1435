@@ -1406,6 +1406,13 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('quantity', '×1'),
           mod('capacity', String(pinnedChillerCapacityKw), 'kW'),
           mod('form', chillerFormText),
+          // BESS L25 fix (2026-05-25): explicit manufacturer + part_number
+          // modifiers so parts-spec-validator (gate 13) binds against the
+          // EB XT 600 WT (or whichever model the picker chose) authoritative
+          // entry instead of falling back to the smallest Pfannenberg row
+          // (CC 60.000 @ 6 kW) and reporting a 5.9× false-positive overclaim.
+          mod('manufacturer', 'Pfannenberg'),
+          mod('part_number', selected.part_number),
           // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): R513A is a
           // refrigerant material, not a regulatory standard. Use `material`.
           // L17 fix: EB XT family uses R410A, not R513A (per product page).
