@@ -62,19 +62,23 @@ export async function findSkuForPart(mpn: string, manufacturer?: string | null):
   // Cascade policy (per mempalace decision part-verification.ts + url-resolves.ts):
   // Tier 1: native distributor APIs (Mouser, Digi-Key, Farnell, LCSC) — primary
   //         catalogue lookup, URLs trusted by construction (no HEAD-check).
-  // Tier 1.5 (NEW 2026-05-25): Nexar (Octopart) added as an ADDITIONAL LAYER ON
-  //         TOP — its supSearchMpn aggregates across 60+ distributors including
-  //         RS, Avnet, Newark, TTI; runs in parallel as a 5th hit and provides
-  //         cross-validation + extra coverage when one of the native four
-  //         misses an OEM-direct or region-specific part. Free tier 100
-  //         matched parts/month so it's an OPPORTUNISTIC enrichment, not a
-  //         replacement for the native four.
+  //
+  // Nexar (Octopart) DISABLED 2026-05-25 (drawer_forgeos_gotchas_19f39608a4daadc3):
+  // Evaluation plan = 100 matched parts/month; one BESS chain burns 137
+  // calls. Quota was exhausted within hours of activation. Audit
+  // 2026-05-25 of `distributor_cascade_cache` + `pretraining_extracted_parts`
+  // showed Nexar produced ZERO cached hits and ZERO library writebacks
+  // across the full session — Mouser landed 25/69, Farnell 17/24, Nexar 0/0.
+  // Net effect: burning a finite quota for zero DB benefit. Re-enable only
+  // when paid plan + writeback-proof are both in place.
+  // Toggle via env: NEXAR_ENABLED=1 to re-include. Default off.
+  const nexarEnabled = process.env.NEXAR_ENABLED === '1'
   const [mouser, digikey, farnell, lcsc, nexar] = await Promise.all([
     lookupSkuMouser(mpn).catch(() => null),
     lookupSkuDigikey(mpn).catch(() => null),
     lookupSkuFarnell(mpn).catch(() => null),
     lookupSkuLcsc(mpn).catch(() => null),
-    lookupSkuNexar(mpn).catch(() => null),
+    nexarEnabled ? lookupSkuNexar(mpn).catch(() => null) : Promise.resolve(null),
   ])
 
   // Manufacturer-strict filter: when the BoM line declares a manufacturer,
