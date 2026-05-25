@@ -154,6 +154,12 @@ const ALWAYS_ACCEPTED_CODES = new Set<string>([
   'NFPA 855',
   'NFPA 68',  // deflagration vents — universally cited
   'NFPA 70E', // electrical worker safety — universally cited
+  // UL 94 = component flammability — globally accepted on plastics / insulation
+  // / PCB substrate / cable jacket. Cited in component datasheets worldwide
+  // even on UK / EU goods, so UK BESS docs legitimately reference it. Added
+  // 2026-05-25 after BESS L23 council scored 84 of 121 jurisdiction-audit
+  // HIGH findings as UL 94 false-positives.
+  'UL 94',
 ])
 
 /** Standards FAMILIES accepted per jurisdiction. A standard from a family NOT

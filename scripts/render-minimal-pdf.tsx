@@ -3626,6 +3626,12 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null): Complian
     const METRIC_MAP: Record<string, { qtyKey: string; label: string; unit: string; convert?: (v: number) => number; tolerancePct?: number }> = {
       // BESS-class energy/power
       nameplate_capacity_mwh:      { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy capacity', unit: 'MWh', convert: (v) => v / 1000, tolerancePct: 5 },
+      // Direct-kWh / kW brief keys (alias, BESS L23 council fix — gate 17 caught
+      // L23 brief using these direct keys while the table only knew the _mwh / _mw
+      // variants, so the compliance row silently dropped a 23% usable-energy shortfall)
+      usable_energy_kwh:           { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy',          unit: 'kWh', tolerancePct: 5 },
+      continuous_power_kw:         { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'kW',  tolerancePct: 5 },
+      peak_power_kw:               { qtyKey: 'peak_power_kw',             label: 'Peak power',             unit: 'kW',  tolerancePct: 5 },
       rated_power_mw:              { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
       peak_power_mw:               { qtyKey: 'peak_power_kw',             label: 'Peak power',             unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
       cycle_life:                  { qtyKey: 'cycle_life_cycles',         label: 'Cycle life',             unit: 'cycles', tolerancePct: 5 },
