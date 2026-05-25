@@ -2518,6 +2518,12 @@ async function main() {
             const sampleSummary = `${ctx.moduleBrief} :: ${ctx.firstSubModule} :: ${Array.from(ctx.sampleNames).slice(0, 4).join(', ')}`
             const res = await queryLibraryCandidates(cls, {
               summary: `${sampleSummary}${physicsSummaryGlobal ? '; physics: ' + physicsSummaryGlobal : ''}`,
+              // Fix 2 (BESS L26 evidence 2026-05-25): pass productClass so the
+              // embedding query is anchored in the right product domain. Without
+              // this, safety_consumable for BESS retrieved Generac generator
+              // fuses because the Generac corpus is dense and the query had no
+              // domain discriminator.
+              productClass,
             }, 5)
             candidateLines.push(renderCandidateBlock(cls, res))
             if (res.candidates.length > 0) nClassesWithMatch++; else nClassesEmpty++
@@ -3046,6 +3052,91 @@ async function main() {
     console.error(`[chain] sub-module prose pre-fill: rewrote ${proseResult.sub_modules_rewritten}/${proseResult.total_sub_modules} sub-modules (LLM english_sentence dropped words; deterministic prose covers all)`)
   }
   logAction({ step: 'submodule_prose_pre_phase2', sub_modules_rewritten: proseResult.sub_modules_rewritten, total_sub_modules: proseResult.total_sub_modules })
+
+  // ── Fix 3: Library override detection (BESS L26 evidence 2026-05-25).
+  //
+  // After all reviewers run, walk every word that has a manufacturer + part_number.
+  // Cross-reference against the Stage 17.6 library candidates for that word's
+  // inferred component_class. If the word's (manufacturer, part_number) is NOT
+  // in the library candidate list AND source_detail doesn't already start with
+  // "Library override:", set source_detail = "Library override: (no reason given)".
+  //
+  // This fires the background-enrichment.ts write-back (which looks for
+  // source_detail.startsWith('Library override:')), triggering Brave verification
+  // + DB insert so the next chain run can retrieve the part from the corpus.
+  //
+  // Graceful: skips if no library candidates file was produced (Stage 17.6 failed
+  // or DB was missing) — the chain continues without the annotation.
+  try {
+    const libCandPath = resolve(outDir, '4-library-candidates.json')
+    const { existsSync: _existsSync2 } = await import('fs')
+    if (_existsSync2(libCandPath)) {
+      const libCandData = JSON.parse(readFileSync(libCandPath, 'utf8')) as {
+        candidates_by_class: Record<string, Array<{ manufacturer: string | null; part_number: string | null }>>
+      }
+      const candidatesByClass = libCandData.candidates_by_class ?? {}
+      let overridesTagged = 0
+      const mods = Array.isArray(design?.modules) ? design.modules : []
+      for (const m of mods) {
+        for (const sm of (m?.sub_modules ?? [])) {
+          for (const w of (sm?.words ?? [])) {
+            const modChars = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+            const mfrMod = modChars.find((mc: any) => String(mc?.kind ?? '').toLowerCase().replace(/[\s_-]/g, '') === 'manufacturer')
+            const pnMod  = modChars.find((mc: any) => { const k = String(mc?.kind ?? '').toLowerCase().replace(/[\s_-]/g, ''); return k === 'partnumber' || k === 'part_number' || k === 'pn' })
+            if (!mfrMod || !pnMod) continue
+            const mfr = String(mfrMod.value ?? '').trim()
+            const pn  = String(pnMod.value ?? '').trim()
+            if (!mfr || !pn) continue
+            // Skip if already tagged.
+            const existing = String((w as any)?.source_detail ?? '').trim()
+            if (existing.toLowerCase().startsWith('library override:')) continue
+            // Find the component_class for this word (same inferClass logic).
+            const wname = String(w?.name_human ?? w?.id ?? w?.content_character?.name_human ?? '').toLowerCase()
+            let matchedClass: string | null = null
+            for (const cls of Object.keys(candidatesByClass)) {
+              if (cls && wname && wname.includes(cls.replace(/_/g, ' ').split(' ')[0])) {
+                matchedClass = cls
+                break
+              }
+            }
+            // Broader: try each class token against the word name
+            if (!matchedClass) {
+              outer: for (const cls of Object.keys(candidatesByClass)) {
+                const tokens = cls.replace(/_/g, ' ').split(' ')
+                for (const tok of tokens) {
+                  if (tok.length >= 4 && wname.includes(tok)) { matchedClass = cls; break outer }
+                }
+              }
+            }
+            if (!matchedClass) continue
+            const candidates = candidatesByClass[matchedClass] ?? []
+            if (candidates.length === 0) continue // no candidates for this class — pick freely
+            const normMfr = mfr.toLowerCase().replace(/[^a-z0-9]/g, '')
+            const normPn  = pn.toLowerCase().replace(/[^a-z0-9]/g, '')
+            const inLibrary = candidates.some((c) => {
+              const cMfr = (c.manufacturer ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+              const cPn  = (c.part_number ?? '').toLowerCase().replace(/[^a-z0-9]/g, '')
+              // Partial match: either manufacturer tokens overlap OR part_number overlaps
+              if (!cMfr && !cPn) return false
+              const mfrMatch = cMfr && normMfr && (cMfr.includes(normMfr.slice(0, 6)) || normMfr.includes(cMfr.slice(0, 6)))
+              const pnMatch  = cPn  && normPn  && (cPn.includes(normPn.slice(0, 6))   || normPn.includes(cPn.slice(0, 6)))
+              return mfrMatch || pnMatch
+            })
+            if (!inLibrary) {
+              ;(w as any).source_detail = 'Library override: (no reason given)'
+              overridesTagged++
+            }
+          }
+        }
+      }
+      if (overridesTagged > 0) {
+        console.error(`[chain] library-override detection: tagged ${overridesTagged} word(s) with source_detail="Library override: (no reason given)" — these will be Brave-verified by background-enrichment`)
+      }
+      logAction({ step: 'library_override_detection', overrides_tagged: overridesTagged })
+    }
+  } catch (err) {
+    console.error(`[chain] library-override detection threw: ${(err as Error).message}; continuing without`)
+  }
 
   // ── G0.5 Brief Target Reconciliation (Tristan firestorm directive 2026-05-19):
   // catches the catastrophic class where Generator emits a design at the wrong

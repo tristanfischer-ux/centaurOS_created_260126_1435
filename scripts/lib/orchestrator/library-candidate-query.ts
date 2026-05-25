@@ -63,6 +63,19 @@ export interface PhysicsSpecs {
   /** Optional structured fields if the caller has them — appended to the
    *  query string in a deterministic order. */
   fields?: Record<string, string | number>
+  /**
+   * Product class slug (e.g. "bess", "haps", "vertical_farm"). When set,
+   * the query text is prefixed with domain anchor terms so cosine similarity
+   * biases toward parts from that domain rather than adjacent domains whose
+   * corpus is larger.
+   *
+   * BESS L26 evidence (2026-05-25): Stage 17.6 surfaced "Generac|10000005117"
+   * as the top safety_consumable candidate because the Generac backup-generator
+   * fuse is semantically close to "safety consumable for battery cabinet" WITHOUT
+   * a BESS anchor. With the anchor ("battery energy storage system LFP grid-scale
+   * …") the embedding biases toward BESS-domain fuses and contactors instead.
+   */
+  productClass?: string
 }
 
 export interface LibraryCandidate {
@@ -85,6 +98,63 @@ export interface LibraryCandidateResult {
   diagnostic: string
   /** True when retrieval used cosine similarity, false when class-only. */
   used_embedding: boolean
+}
+
+// ---------------------------------------------------------------------------
+// PRODUCT-CLASS DOMAIN ANCHOR TERMS
+//
+// BESS L26 evidence (2026-05-25): without a product-class prefix the cosine
+// similarity picked Generac generator fuses for safety_consumable and Excelitas
+// photon counters for optical — adjacent-domain junk that shares the same
+// component_class label but has no business in a BESS design.
+//
+// Fix: prepend a short domain-specific phrase to the embedding query so the
+// semantic space is anchored in the right product domain BEFORE the
+// component_class + slot description steer further. The anchor is short
+// (≤10 tokens) so it biases without drowning the component-level signal.
+//
+// Canonical product class slugs match classifyProduct() + PRODUCT_CLASS_VOLUME_BUCKET.
+// Aliases listed so partial slug matches work (bess / energy_storage / bess-utility-scale).
+// ---------------------------------------------------------------------------
+
+const PRODUCT_CLASS_ANCHOR_TERMS: Record<string, string> = {
+  bess:                      'battery energy storage system lithium iron phosphate LFP grid-scale containerised',
+  energy_storage:            'battery energy storage system lithium iron phosphate LFP grid-scale containerised',
+  'bess-utility-scale':      'battery energy storage system lithium iron phosphate LFP grid-scale containerised',
+  residential_ess:           'residential battery energy storage LFP home inverter',
+  haps:                      'high altitude platform station solar stratospheric drone pseudo-satellite',
+  wind:                      'wind turbine nacelle rotor blade gearbox tower offshore onshore',
+  'vertical-farm':           'vertical farm hydroponic LED lighting climate-controlled indoor agriculture',
+  vertical_farm:             'vertical farm hydroponic LED lighting climate-controlled indoor agriculture',
+  heatpump:                  'heat pump compressor R290 refrigerant evaporator condenser HVAC residential',
+  heat_pump:                 'heat pump compressor R290 refrigerant evaporator condenser HVAC residential',
+  thermal_system:            'heat pump compressor refrigerant evaporator condenser HVAC thermal',
+  mini_split_heatpump:       'heat pump compressor R290 refrigerant mini-split HVAC',
+  'ev-charger':              'electric vehicle charger DC fast charging CCS2 SiC inverter',
+  ev_charger:                'electric vehicle charger DC fast charging CCS2 SiC inverter',
+  dc_fast_ev_charger:        'electric vehicle charger DC fast charging CCS2 SiC inverter',
+  bioreactor:                'bioreactor GMP single-use mammalian cell culture sterile peristaltic',
+  auv:                       'autonomous underwater vehicle AUV subsea sonar INS thruster',
+  drone:                     'drone consumer cinematography quadrotor BLDC',
+  consumer_cinematography_drone: 'drone consumer cinematography quadrotor BLDC',
+  'edge-ai':                 'edge AI inference server GPU rack-mount NVMe',
+  edge_ai_server:            'edge AI inference server GPU rack-mount NVMe',
+  cgm:                       'continuous glucose monitor wearable medical biosensor disposable',
+  wearable_medical:          'wearable medical biosensor disposable glucose monitor',
+  wearable_medical_device:   'wearable medical biosensor disposable glucose monitor',
+}
+
+/** Return the domain anchor string for a product class slug, or empty string. */
+function anchorTermsForClass(productClass: string | undefined): string {
+  if (!productClass) return ''
+  const anchor = PRODUCT_CLASS_ANCHOR_TERMS[productClass]
+  if (anchor) return anchor
+  // Partial match — if the slug contains a known key token
+  const lower = productClass.toLowerCase()
+  for (const [key, terms] of Object.entries(PRODUCT_CLASS_ANCHOR_TERMS)) {
+    if (lower.includes(key) || key.includes(lower.split(/[-_]/)[0])) return terms
+  }
+  return ''
 }
 
 // ---------------------------------------------------------------------------
@@ -157,9 +227,22 @@ function cosineSimilarity(a: number[], b: number[]): number {
 
 /** Build the natural-language query string we embed. Mirrors the
  *  index-time recipe in embed-distributor-rows.ts so query and index
- *  alignment is consistent. */
+ *  alignment is consistent.
+ *
+ *  Fix 2 (BESS L26 evidence 2026-05-25): prepend product-class domain anchor
+ *  terms BEFORE the component class name. Without this, "safety consumable for
+ *  battery cabinet" in a BESS context produces a cosine match to Generac
+ *  backup-generator fuses because both are safety_consumable and the Generac
+ *  corpus is dense. The BESS anchor ("battery energy storage system LFP …")
+ *  shifts the embedding toward BESS-domain safety parts first.
+ */
 function buildQueryText(component_class: string, specs: PhysicsSpecs): string {
-  const parts: string[] = [component_class.replace(/[_-]+/g, ' ')]
+  const parts: string[] = []
+  // Prepend domain anchor so the query embedding is anchored in the right
+  // product domain BEFORE the component-class + slot description steer further.
+  const anchor = anchorTermsForClass(specs.productClass)
+  if (anchor) parts.push(anchor)
+  parts.push(component_class.replace(/[_-]+/g, ' '))
   if (specs.summary && specs.summary.trim().length > 0) parts.push(specs.summary.trim())
   if (specs.fields) {
     // Deterministic order for cache friendliness; the embed call doesn't
@@ -270,6 +353,9 @@ export async function queryLibraryCandidates(
     }
   }
 
+  const hasAnchor = !!anchorTermsForClass(physics_specs.productClass)
+  const anchorNote = hasAnchor ? `, domain-anchor="${physics_specs.productClass}"` : ''
+
   // If we have <= top_n rows, no point embedding — return all.
   if (scanRows.length <= top_n) {
     const candidates: LibraryCandidate[] = scanRows.map((r) => ({
@@ -284,7 +370,7 @@ export async function queryLibraryCandidates(
     }))
     return {
       candidates,
-      diagnostic: `ok (${candidates.length} candidates, confidence-DESC, class-only filter)`,
+      diagnostic: `ok (${candidates.length} candidates, confidence-DESC, class-only filter${anchorNote})`,
       used_embedding: false,
     }
   }
@@ -307,7 +393,7 @@ export async function queryLibraryCandidates(
     }))
     return {
       candidates,
-      diagnostic: `ok (${candidates.length} candidates, fallback: class-only filter, no embedding) — set OPENAI_API_KEY for semantic ranking`,
+      diagnostic: `ok (${candidates.length} candidates, fallback: class-only filter, no embedding${anchorNote}) — set OPENAI_API_KEY for semantic ranking`,
       used_embedding: false,
     }
   }
@@ -333,7 +419,7 @@ export async function queryLibraryCandidates(
   }))
   return {
     candidates,
-    diagnostic: `ok (${candidates.length} candidates, embedding-ranked, scanned ${scored.length} rows)`,
+    diagnostic: `ok (${candidates.length} candidates, embedding-ranked, scanned ${scored.length} rows${anchorNote})`,
     used_embedding: true,
   }
 }
