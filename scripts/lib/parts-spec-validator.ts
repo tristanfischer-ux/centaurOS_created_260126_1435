@@ -156,29 +156,172 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
   // + RS Components https://us.rs-online.com/product/bussmann-by-eaton/pv-200anh1/74058757/
   // + Wholesale Supply Group https://catalog.wholesalesupply.us/brand-eaton-bussmann/fuse-200a-1000v-dc-pv-size-1-dual-ind/sku-V3908-pv-200anh1
   // + Cooper Electric https://www.cooper-electric.com/product/detail/869495/bussmann-mfg-pv-200anh1.
+  // Eaton Bussmann PV-NH series — one entry per variant so each variant
+  // validates against its own current rating (NOT a family-max that
+  // would let a wildly wrong claim pass). The variant current is
+  // encoded in the part_number (PV-80ANH1 = 80 A, PV-200ANH1 = 200 A
+  // etc.) so the rated_current_a is unambiguous per entry.
   {
     manufacturer: 'Eaton Bussmann',
-    part_number_pattern: /^PV-(80|100|125|160|200|250|315|400|500|630)A?NH[12]$/i,
+    part_number_pattern: /^PV-80A?NH[12]$/i,
     category: 'dc_pv_fuse',
-    // Current rating varies by variant — set to the largest in the family
-    // (630 A) so the manufacturer-range fallback path doesn't false-flag
-    // smaller variants at < 1.5× the variant's own rating. The current
-    // claim check then catches genuine over-claims (e.g. claiming 1500 A
-    // on a PV-200ANH1 would be 7.5× over the family's largest variant).
+    rated_current_a: 80,
+    rated_voltage_dc_v: 1000,
+    notes: 'Eaton Bussmann PV-80ANH1: 80 A / 1000 V DC / NH1 / Class gPV per IEC 60269-6.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-100A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 100,
+    rated_voltage_dc_v: 1000,
+    notes: 'Eaton Bussmann PV-100ANH1: 100 A / 1000 V DC / NH1 / Class gPV per IEC 60269-6.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-125A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 125,
+    rated_voltage_dc_v: 1000,
+    notes: 'Eaton Bussmann PV-125ANH1: 125 A / 1000 V DC / NH1 / Class gPV per IEC 60269-6.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-160A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 160,
+    rated_voltage_dc_v: 1000,
+    notes: 'Eaton Bussmann PV-160ANH1: 160 A / 1000 V DC / NH1 / Class gPV per IEC 60269-6.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-200A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 200,
+    rated_voltage_dc_v: 1000,
+    notes: 'Eaton Bussmann PV-200ANH1: 200 A / 1000 V DC / NH1 / Class gPV per IEC 60269-6 / 50 kAIC / UL Listed + CSA + CE/RoHS. The EXPLICIT DC-PV variant — preferred over 170M family for new BESS chains. Source: https://www.eaton.com/us/en-us/skuPage.PV-200ANH1.html.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-250A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 250,
+    rated_voltage_dc_v: 1000,
+    notes: 'Eaton Bussmann PV-250ANH1: 250 A / 1000 V DC / NH1 / Class gPV per IEC 60269-6.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-315A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 315,
+    rated_voltage_dc_v: 1000,
+    notes: 'Eaton Bussmann PV-315ANH1: 315 A / 1000 V DC / NH1 / Class gPV per IEC 60269-6.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-400A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 400,
+    rated_voltage_dc_v: 1000,
+    notes: 'Eaton Bussmann PV-400ANH2: 400 A / 1000 V DC / NH2 / Class gPV per IEC 60269-6.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-500A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 500,
+    rated_voltage_dc_v: 1000,
+    notes: 'Eaton Bussmann PV-500ANH2: 500 A / 1000 V DC / NH2 / Class gPV per IEC 60269-6.',
+  },
+  {
+    manufacturer: 'Eaton Bussmann',
+    part_number_pattern: /^PV-630A?NH[12]$/i,
+    category: 'dc_pv_fuse',
     rated_current_a: 630,
     rated_voltage_dc_v: 1000,
-    notes: 'Eaton Bussmann PV-NH series (e.g. PV-200ANH1): photovoltaic / battery-storage fuse line, 1000 V DC unambiguous on canonical datasheet, NH1 or NH2 body per current rating, Class gPV per IEC 60269-6, 50 kAIC interrupt, UL Listed + CSA + CE/RoHS. The EXPLICIT DC-PV variant — preferred over 170M family for new BESS chains. Currents span 80-630 A in standard increments.',
+    notes: 'Eaton Bussmann PV-630ANH2: 630 A / 1000 V DC / NH2 / Class gPV per IEC 60269-6 (top of PV-NH family).',
   },
-  // Also add a manufacturer alias for the bare "Bussmann" prefix so the
-  // parser catches PV-200ANH1 when the form modifier says just "Bussmann
-  // PV-200ANH1" instead of the full "Eaton Bussmann".
+  // Manufacturer alias for the bare "Bussmann" prefix (some chains drop
+  // the "Eaton" qualifier). Same pattern, one entry per current variant.
   {
     manufacturer: 'Bussmann',
-    part_number_pattern: /^PV-(80|100|125|160|200|250|315|400|500|630)A?NH[12]$/i,
+    part_number_pattern: /^PV-80A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 80,
+    rated_voltage_dc_v: 1000,
+    notes: 'Bussmann PV-80ANH1 (alias for Eaton Bussmann — same part). See Eaton Bussmann entry.',
+  },
+  {
+    manufacturer: 'Bussmann',
+    part_number_pattern: /^PV-100A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 100,
+    rated_voltage_dc_v: 1000,
+    notes: 'Bussmann PV-100ANH1 (alias). See Eaton Bussmann entry.',
+  },
+  {
+    manufacturer: 'Bussmann',
+    part_number_pattern: /^PV-125A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 125,
+    rated_voltage_dc_v: 1000,
+    notes: 'Bussmann PV-125ANH1 (alias). See Eaton Bussmann entry.',
+  },
+  {
+    manufacturer: 'Bussmann',
+    part_number_pattern: /^PV-160A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 160,
+    rated_voltage_dc_v: 1000,
+    notes: 'Bussmann PV-160ANH1 (alias). See Eaton Bussmann entry.',
+  },
+  {
+    manufacturer: 'Bussmann',
+    part_number_pattern: /^PV-200A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 200,
+    rated_voltage_dc_v: 1000,
+    notes: 'Bussmann PV-200ANH1 (alias). See Eaton Bussmann entry.',
+  },
+  {
+    manufacturer: 'Bussmann',
+    part_number_pattern: /^PV-250A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 250,
+    rated_voltage_dc_v: 1000,
+    notes: 'Bussmann PV-250ANH1 (alias). See Eaton Bussmann entry.',
+  },
+  {
+    manufacturer: 'Bussmann',
+    part_number_pattern: /^PV-315A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 315,
+    rated_voltage_dc_v: 1000,
+    notes: 'Bussmann PV-315ANH1 (alias). See Eaton Bussmann entry.',
+  },
+  {
+    manufacturer: 'Bussmann',
+    part_number_pattern: /^PV-400A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 400,
+    rated_voltage_dc_v: 1000,
+    notes: 'Bussmann PV-400ANH2 (alias). See Eaton Bussmann entry.',
+  },
+  {
+    manufacturer: 'Bussmann',
+    part_number_pattern: /^PV-500A?NH[12]$/i,
+    category: 'dc_pv_fuse',
+    rated_current_a: 500,
+    rated_voltage_dc_v: 1000,
+    notes: 'Bussmann PV-500ANH2 (alias). See Eaton Bussmann entry.',
+  },
+  {
+    manufacturer: 'Bussmann',
+    part_number_pattern: /^PV-630A?NH[12]$/i,
     category: 'dc_pv_fuse',
     rated_current_a: 630,
     rated_voltage_dc_v: 1000,
-    notes: 'Bussmann PV-NH series (alias for Eaton Bussmann PV-NH — same family). See "Eaton Bussmann" entry for spec details.',
+    notes: 'Bussmann PV-630ANH2 (alias). See Eaton Bussmann entry.',
   },
   // ── BESS isolation monitor ────────────────────────────────────
   {
