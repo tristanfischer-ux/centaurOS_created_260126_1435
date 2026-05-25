@@ -4937,6 +4937,52 @@ async function main() {
     console.error(`[chain] fictional-pn-audit flagged issues (see AUDIT-FICTIONAL-PN.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
   }
 
+  // 2026-05-25 (Tristan-asked, BESS L22 council universal-fix #5): per-line
+  // BoM price plausibility (gate 21). Gate 10 B-7 verifies the TOTAL BoM cost
+  // per output unit is within an industry band. But individual line items can
+  // be wildly mispriced while the total stays in band — one £18 connector
+  // rendered at £180, offset by a £3 000 string-inverter rendered at £30.
+  // Gate 21 closes that gap: for each BoM line with a positive rendered
+  // unit_price_gbp AND a resolvable MPN, hits the distributor cascade and
+  // flags any price outside [0.3×, 3.0×] of the cheapest distributor source.
+  // HIGH (exit 21): ratio > 5 or < 0.2. MEDIUM/LOW are informational.
+  // Nexar quota: Evaluation plan = 100 matched parts/month — Nexar only tried
+  // as last resort after all four native distributors miss.
+  // Distinct from gate 10 B-7: B-7 checks AGGREGATE total vs industry band;
+  // gate 21 checks each INDIVIDUAL line — the two are orthogonal.
+  // Gate 10 B-7 (total cost) remains running; gate 21 adds per-line coverage.
+  try {
+    execFileSync(
+      'npx',
+      ['tsx', resolve(__dirname, 'lib/per-line-price-plausibility-audit.ts'), statePath, resolve(outDir, 'AUDIT-PER-LINE-PRICE.md')],
+      { stdio: 'inherit', cwd: resolve(__dirname, '..') },
+    )
+  } catch (err) {
+    const status = (err as NodeJS.ErrnoException & { status?: number }).status
+    if (status === 21) {
+      console.error('')
+      console.error('======================================================================')
+      console.error('  CHAIN HARD-EXIT - Per-line price plausibility audit FAILED (code 21)')
+      console.error('  At least one BoM line has a rendered unit price that diverges > 5×')
+      console.error('  from the cheapest live distributor source (Mouser / Digi-Key /')
+      console.error('  Farnell / LCSC / Nexar). This level of per-line error cannot be')
+      console.error('  explained by quantity breaks, currency drift, or catalogue timing —')
+      console.error('  it indicates a systematic pricing error on the specific line item.')
+      console.error('  Gate 10 B-7 (aggregate cost band) does NOT catch this because')
+      console.error('  over-billing and under-billing errors can cancel in the total while')
+      console.error('  individual lines are both wrong in opposite directions.')
+      console.error('  PDF + state.json saved to disk for inspection but chain is BLOCKED.')
+      console.error('  See AUDIT-PER-LINE-PRICE.md for the mispriced line items.')
+      console.error('  Fix area: scripts/lib/deterministic-emitter.ts — correct the unit')
+      console.error('  basis (per-unit vs per-reel/lot), check currency conversion, or')
+      console.error('  update stale catalogue prices to 2025 UK market rates.')
+      console.error('======================================================================')
+      logAction({ step: 'fatal_per_line_price_audit', reason: 'per-line-price-plausibility-audit exit 21', status: 21 })
+      process.exit(21)
+    }
+    console.error(`[chain] per-line-price-plausibility-audit flagged issues (see AUDIT-PER-LINE-PRICE.md, status=${status}): ${(err as Error).message.slice(0, 80)}`)
+  }
+
   // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
   // try/catch. The renderer's own `open` was guarded; this one was not. In
   // the worker/LaunchAgent path, `open` can fail (no GUI session) and would
