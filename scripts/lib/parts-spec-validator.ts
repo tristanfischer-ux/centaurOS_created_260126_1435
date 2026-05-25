@@ -766,6 +766,115 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     rated_voltage_ac_v: 11000,
     notes: 'Hawke 501/421/Universal: dual-cert (Exd + Exe) compression-style HV cable gland, nickel-plated brass, M16-M75 entry threads, IEC 60079-0 + IEC 60079-1 + IEC 60079-7, BASEEFA + IECEx + ATEX certified, suitable for HV power cables (11 kV typical) in Zone 1/21 + Zone 2/22 hazardous areas. The correct part type for a round threaded HV gland — distinct from Roxtec CF 16 (which is a RECTANGULAR cable transit FRAME, not a round gland).',
   },
+
+  // ── BESS OEM subsystems (manual seed 2026-05-25) ────────────────────────
+  // Added to enable gate 13 spec-claim validation for the 5 most engineering-
+  // critical BESS subsystems seeded into pretraining_extracted_parts by
+  // scripts/seed-bess-oem-library.ts. Source: manufacturer datasheets.
+  //
+  // 1. Sungrow SC1000UD-MV (1 MW PCS inverter)
+  //    Source: https://www.sungrowpower.com/product/sc1000ud-mv
+  //    Datasheet: 1000 kW continuous / 1100 kW peak, 1500 V DC max input,
+  //    690 V AC 3-phase output, IEC 62109-1/-2, CE.
+  {
+    manufacturer: 'Sungrow',
+    part_number_pattern: /^SC1000UD-MV$/i,
+    category: 'pcs_inverter',
+    rated_power_kw: 1000,
+    rated_voltage_dc_v: 1500,
+    rated_voltage_ac_v: 690,
+    notes: 'Sungrow SC1000UD-MV: 1000 kW continuous / 1100 kW peak bidirectional PCS inverter, 1500 V DC max input, 690 V AC 3-phase output, IEC 62109-1/-2, CE. Grid-scale BESS primary conversion stage. Claiming >1100 kW on this model is wrong; claiming >1500 V DC is wrong. Source: https://www.sungrowpower.com/product/sc1000ud-mv',
+  },
+  // Alias — deterministic-emitter may emit without the -MV suffix.
+  {
+    manufacturer: 'Sungrow',
+    part_number_pattern: /^SC1000UD$/i,
+    category: 'pcs_inverter',
+    rated_power_kw: 1000,
+    rated_voltage_dc_v: 1500,
+    rated_voltage_ac_v: 690,
+    notes: 'Sungrow SC1000UD (alias — same product as SC1000UD-MV). See SC1000UD-MV entry.',
+  },
+  {
+    manufacturer: 'Sungrow',
+    part_number_pattern: /^SC2000UD-MV$/i,
+    category: 'pcs_inverter',
+    rated_power_kw: 2000,
+    rated_voltage_dc_v: 1500,
+    rated_voltage_ac_v: 690,
+    notes: 'Sungrow SC2000UD-MV: 2000 kW continuous bidirectional PCS inverter, 1500 V DC max, 690 V AC. Source: https://www.sungrowpower.com/product/sc2000ud-mv',
+  },
+
+  // 2. Grundfos CR 32-2 A-F-A-E-HQQE (BESS thermal-loop circulation pump)
+  //    Source: https://product.grundfos.com/CR-32-2
+  //    Datasheet: 32 m³/h nominal flow, 24 m head at nominal duty point,
+  //    2.2 kW motor shaft power, 3-phase 400 V 50 Hz, HQQE seal.
+  //    Note: rated_power_kw field used as motor shaft power proxy.
+  {
+    manufacturer: 'Grundfos',
+    part_number_pattern: /^CR[\s.-]*32-2[\s.-]*A-F-A-E-HQQE$/i,
+    category: 'circulation_pump',
+    rated_power_kw: 2.2,
+    notes: 'Grundfos CR 32-2 A-F-A-E-HQQE: vertical multi-stage centrifugal pump, 32 m³/h nominal flow, 24 m head at nominal duty, 2.2 kW motor shaft power, 3-phase 400 V 50 Hz, HQQE mechanical seal. Claiming >15 kW on this model is wrong (that is CR 32-8 territory). Source: https://product.grundfos.com/CR-32-2',
+  },
+  // Generic Grundfos CR 32 family pattern (emitter may omit full variant suffix)
+  {
+    manufacturer: 'Grundfos',
+    part_number_pattern: /^CR[\s.-]*32-[1-5](?:\s+.*)?$/i,
+    category: 'circulation_pump',
+    rated_power_kw: 5.5,   // conservative upper bound for CR 32-1 to CR 32-5 family
+    notes: 'Grundfos CR 32-N family (1 to 5 stages): 2.2–5.5 kW motor range at nominal duty, 32 m³/h class. Any claim >30 kW on a CR 32-N is wrong (max in-family is ~7.5 kW for CR 32-7). Source: https://product.grundfos.com/CR-32',
+  },
+
+  // 3. Beckhoff CX2030-0125 (BESS EMS / SCADA embedded PC)
+  //    Source: https://www.beckhoff.com/en-us/products/ipc/embedded-pcs/cx2030/
+  //    Datasheet: Intel Atom E3940 4-core 1.6 GHz, 8 GB RAM, fanless,
+  //    DIN-rail mount, -25 to +60 °C operating range.
+  //    No power/current spec needed — rated_power_kw used as max power draw proxy.
+  {
+    manufacturer: 'Beckhoff',
+    part_number_pattern: /^CX2030-0125$/i,
+    category: 'industrial_pc',
+    rated_power_kw: 0.015,   // ~12-15 W max TDP fanless, datasheet-typical for Atom E39xx
+    notes: 'Beckhoff CX2030-0125: Intel Atom E3940 (4-core 1.6 GHz), 8 GB RAM, fanless DIN-rail embedded PC. Max TDP ~12-15 W. Claiming >50 W on this model is wrong (it has no active cooling). Used for BESS EMS / SCADA controller duty. Source: https://www.beckhoff.com/en-us/products/ipc/embedded-pcs/cx2030/',
+  },
+  {
+    manufacturer: 'Beckhoff',
+    part_number_pattern: /^CX2042-0150$/i,
+    category: 'industrial_pc',
+    rated_power_kw: 0.030,   // Core i5-7300U TDP ~25-30 W
+    notes: 'Beckhoff CX2042-0150: Intel Core i5-7300U (2-core 2.6 GHz), 16 GB RAM DDR4, fanless, PCIe expansion. TDP ~25-30 W. Source: https://www.beckhoff.com/en-us/products/ipc/embedded-pcs/cx2042/',
+  },
+
+  // 4. Kidde ECARO-25 IndustryShield (BESS clean-agent fire suppression)
+  //    Source: https://www.kidde.com/home-safety/en/us/products/fire-safety-products/fire-suppression-systems/ecaro-25/
+  //    Datasheet: HFC-227ea (FM-200) agent, UL 2127, NFPA 2001, EN 15004-5,
+  //    FM 5600. Room volumes 50-1500 m³.
+  //    No electrical rating — notes field describes validated design parameter.
+  {
+    manufacturer: 'Kidde',
+    part_number_pattern: /^ECARO-25[\s-]?IndustryShield$/i,
+    category: 'fire_suppression_system',
+    notes: 'Kidde ECARO-25 IndustryShield: HFC-227ea (FM-200) clean agent fire suppression, room volumes 50-1500 m³, UL 2127, NFPA 2001, EN 15004-5, FM 5600. Correct type for BESS enclosure fire suppression per UL 9540A / NFPA 855. Any claim that this system covers >1500 m³ unassisted is wrong — larger volumes require multi-cylinder manifolded systems. Source: https://www.kidde.com/home-safety/en/us/products/fire-safety-products/fire-suppression-systems/ecaro-25/',
+  },
+  // Alias — emitter may emit just "ECARO-25"
+  {
+    manufacturer: 'Kidde',
+    part_number_pattern: /^ECARO-25$/i,
+    category: 'fire_suppression_system',
+    notes: 'Kidde ECARO-25: HFC-227ea (FM-200) clean agent system. See ECARO-25 IndustryShield entry for full spec.',
+  },
+
+  // 5. Stat-X T16450ES (aerosol fire suppression generator — BESS cabinet)
+  //    Source: https://www.statx.com/products/generators/t16450es
+  //    Datasheet: 450 g condensed aerosol charge, electrical activation,
+  //    UL Listed, FM Approved, NFPA 2010. Cabinet-level BESS fire protection.
+  {
+    manufacturer: 'Stat-X',
+    part_number_pattern: /^T16450ES$/i,
+    category: 'aerosol_fire_suppression',
+    notes: 'Stat-X T16450ES: condensed aerosol fire suppression generator, 450 g charge, electrical activation, UL Listed, FM Approved, NFPA 2010. BESS rack-level fire protection per NFPA 855 Section 15.6. Claiming >900 g charge on a T16450ES is wrong (that is T16900ES territory). Source: https://www.statx.com/products/generators/t16450es',
+  },
 ]
 
 // ── PARSERS ──────────────────────────────────────────────────────────────────

@@ -140,6 +140,37 @@ export const KEYWORD_MAP: KeywordTarget[] = [
   // (POC). Add a second keyword + DigiKey side; existing dedup catches overlaps.
   { componentClass: 'oem_subsystem', distributor: 'mouser',  keyword: 'AC-DC power supply',        maxPages: 20, rationale: 'PSUs — Mean Well, TDK-Lambda, Vicor, XP Power.' },
   { componentClass: 'oem_subsystem', distributor: 'digikey', keyword: 'isolated DC-DC converter',  maxPages: 20, rationale: 'Isolated brick converters — Vicor, RECOM, TDK-Lambda.' },
+
+  // ── BESS-adjacent additions 2026-05-25 (Stage 10.5 enablement) ─────────────
+  // These classes live on Mouser/DigiKey and extend Stage 10.5 library
+  // candidates for BESS-class industrial components. Grid-scale PCS inverters
+  // (Sungrow SC1000UD-MV etc.) do NOT appear on Mouser/DigiKey — those are
+  // covered by the manual seed in scripts/seed-bess-oem-library.ts.
+
+  // Smaller grid-tie inverters (sub-100 kW) DO appear on Mouser/DigiKey
+  { componentClass: 'oem_subsystem', distributor: 'mouser',  keyword: 'grid-tie inverter',         maxPages: 12, rationale: 'Sub-100 kW string + hybrid inverters (SMA SB, Fronius, Growatt, Huawei) — BESS AC-coupling.' },
+
+  // BMS protection ICs (distributor-stocked BMS slave silicon)
+  { componentClass: 'electronic_ic', distributor: 'digikey', keyword: 'battery management system IC', maxPages: 12, rationale: 'BMS cell-monitor ICs — Analog Devices ADBMS, TI BQ7960x, Renesas, Maxim.' },
+
+  // Industrial PLCs (Allen-Bradley, Siemens S7, Beckhoff IO modules via DigiKey)
+  { componentClass: 'oem_subsystem', distributor: 'digikey', keyword: 'industrial PLC',            maxPages: 10, rationale: 'Programmable logic controllers — Allen-Bradley MicroLogix, Siemens LOGO!, Phoenix Contact.' },
+
+  // Industrial cabinet fans (ebm-papst / Mechatronics / Sanyo Denki)
+  { componentClass: 'mechanical_assembly', distributor: 'mouser', keyword: 'industrial cabinet fan', maxPages: 12, rationale: 'Cabinet / enclosure fans for BESS and inverter thermal management — ebm-papst A3G, Mechatronics, Sanyo Denki.' },
+
+  // DIN rail PSU 24 V (Mean Well / Phoenix Contact / Wago / Murr)
+  { componentClass: 'oem_subsystem', distributor: 'mouser',  keyword: 'DIN rail power supply 24V', maxPages: 12, rationale: 'DIN-rail 24 V PSUs for BESS controls auxiliary power — Mean Well DRP/SDR, Phoenix Contact QUINT, Wago.' },
+  { componentClass: 'oem_subsystem', distributor: 'digikey', keyword: 'DIN rail power supply',     maxPages: 10, rationale: 'DIN rail PSU DigiKey coverage — TDK-Lambda, Murr, Puls, Bel.' },
+
+  // Industrial PCs (Beckhoff CX, Advantech UNO, IEI, Kontron)
+  { componentClass: 'oem_subsystem', distributor: 'mouser',  keyword: 'industrial PC embedded',    maxPages: 10, rationale: 'Fanless embedded PCs for BESS EMS/SCADA — Beckhoff CX, Kontron, IEI, Advantech.' },
+
+  // Thermal interface pads (Henkel / Laird / Bergquist — BESS cell thermal management)
+  { componentClass: 'thermal', distributor: 'digikey', keyword: 'thermal interface pad',           maxPages: 12, rationale: 'Thermal interface material pads for BESS cell-to-cooler contact — Laird Tflex, Bergquist GP3000, Henkel Bergquist.' },
+
+  // Battery fuses (Mersen / Bussmann / Littelfuse — BESS string protection)
+  { componentClass: 'safety_consumable', distributor: 'digikey', keyword: 'battery fuse',          maxPages: 12, rationale: 'High-current battery/DC string fuses — Mersen NH gPV, Bussmann 170M, Littelfuse KLK/KLS — BESS string protection.' },
 ]
 
 // ---------------------------------------------------------------------------
