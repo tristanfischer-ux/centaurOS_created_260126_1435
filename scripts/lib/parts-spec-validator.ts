@@ -695,6 +695,33 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     rated_current_a: 0,
     notes: 'TE (alias for TE Connectivity) 202K142-25: heat-shrinkable moulded transition boot. See TE Connectivity entry.',
   },
+  // ── L28 council fix (2026-05-25): EBM-Papst W2E200-HK38-01 enclosure fan ─
+  // AC axial fan with wall ring, 225×225×80 mm, 230 VAC 50/60 Hz,
+  // 880-1000 m³/h free-air flow, 83 W shaft power, IP44, ball bearing.
+  // Catalogued by ebm-papst for BESS and inverter cabinet forced-air cooling.
+  // Mouser MPN W2E200-HK38-01, UK list price £133.78 (qty-1), 226 UK stock
+  // (fetched 2026-05-25). Farnell stocks variant W2E200-CH86-70 at £253.78.
+  // Pinning the MPN in deterministic-emitter.ts forces the distributor
+  // cascade to use the cached £133.78 instead of Engine B's ~£21 estimate
+  // (thermal class, ref £28 × ~0.75 volume multiplier at BESS volume).
+  // This entry gates gate 13 so any claimed airflow or rated-voltage outside
+  // the datasheet range is flagged HIGH.
+  // Source: Mouser https://www.mouser.co.uk/ProductDetail/ebm-papst/W2E200-HK38-01
+  //         ebm-papst datasheet https://www.ebmpapst.com/en/products/axial-fans/w2e200/
+  {
+    manufacturer: 'ebm-papst',
+    part_number_pattern: /^W2E200-HK38-01$/i,
+    category: 'axial_enclosure_fan',
+    rated_voltage_ac_v: 230,
+    notes: 'ebm-papst W2E200-HK38-01: AC axial fan with wall ring, 225×225×80 mm, 230 VAC 50/60 Hz, 880-1000 m³/h free-air flow, IP44, ball bearing, 83 W shaft power. Standard enclosure ventilation fan for BESS containers and inverter cabinets. Any claim > 1000 m³/h airflow or > 110 W is outside the datasheet envelope. Mouser list £133.78 (qty-1).',
+  },
+  {
+    manufacturer: 'EBM-Papst',
+    part_number_pattern: /^W2E200-HK38-01$/i,
+    category: 'axial_enclosure_fan',
+    rated_voltage_ac_v: 230,
+    notes: 'EBM-Papst W2E200-HK38-01 (alias — same part, capitalisation variant). See ebm-papst entry.',
+  },
   // ── BESS L18 fix (2026-05-24): AC LCL output filter ──────────────
   // Schaffner FN6840 series — LCL filter for Active Front End motor drives
   // and active infeed converters. Same topology as utility BESS PCS. Family

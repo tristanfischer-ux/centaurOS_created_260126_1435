@@ -891,7 +891,10 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
           mod('rating_primary', `${Math.ceil((p.continuousPowerKw * 1000 / (400 * Math.sqrt(3)) * 1.25) / 100) * 100} A 3-phase continuous`),
           mod('manufacturer', 'Schaffner'),
           mod('part_number', 'FN6840 series'),
-          mod('regulatory', 'IEC 60947-2 + UL 489'),
+          // UL 489 removed: US-only circuit-breaker type-cert, rejected for UK
+          // briefs by gate 19 (HIGH). IEC 60947-2 is the universal MCCB/ACB
+          // standard (BS EN 60947-2 is the UK transposition). L28 regression.
+          mod('regulatory', 'IEC 60947-2'),
         ],
       ),
     ],
@@ -916,7 +919,10 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
     'step_up_transformer',
     'step-up transformer',
     'steps up',
-    '400 V AC inverter output to 11 kV grid — EXTERNAL pad-mounted unit outside the container envelope (IEC 62933-5-2 §6.4, NEC 706.10)',
+    // NEC 706.10 removed: US National Electrical Code citation rejected for UK
+    // briefs by gate 19 (HIGH). IEC 62933-5-2 §6.4 is the correct UK/IEC
+    // reference for external-pad-mount MV switchgear on stationary BESS.
+    '400 V AC inverter output to 11 kV grid — EXTERNAL pad-mounted unit outside the container envelope (IEC 62933-5-2 §6.4)',
     [
       word(
         'step_up_transformer_word',
@@ -1240,7 +1246,9 @@ function emitPowerDistribution(p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('capacity', String(acBreakerContinuousA), 'A'),
-          mod('form', 'ABB Emax E2.2 2500 A 4-pole air circuit breaker (real product, thermal-magnetic trip, IEC 60947-2 + UL 489 listed)'),
+          // UL 489 removed from form string: US-only type-cert (gate 19 HIGH
+          // for UK briefs). ABB Emax E2.2 carries IEC 60947-2 + BS EN 60947-2.
+          mod('form', 'ABB Emax E2.2 2500 A 4-pole air circuit breaker (real product, thermal-magnetic trip, IEC 60947-2 + BS EN 60947-2 listed)'),
           mod('regulatory', 'IEC 60947-2'),
         ],
       ),
@@ -1308,7 +1316,10 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('dimension', '50', 'mm²'),
           mod('manufacturer', 'nVent ERIFLEX'),
           mod('part_number', 'MBJ50-300-10'),
-          mod('regulatory', 'IEC 60364-5-54 + UL 467'),
+          // UL 467 removed: US-only grounding/bonding type-cert (gate 19 HIGH
+          // for UK briefs). BS 7430 is the UK Code of Practice for protective
+          // earthing of electrical installations. L28 gate-19 regression fix.
+          mod('regulatory', 'IEC 60364-5-54 + BS 7430'),
           mod(
             'form',
             'nVent ERIFLEX MBJ50-300-10 (catalog 556860): 50 mm² tinned copper grounding + bonding braid, 250 A continuous ampacity, 300 mm centre-to-centre, integral pressed copper palms with 10.5 mm hole for M10 stud, no separate crimp lugs required, vibration + fatigue resistant — canonical BESS chassis-bond part (CATL EnerC+, Sungrow PowerStack, BYD HVS, Tesla Megapack 2 XL). NOT a Raychem heat-shrink boot (TE 202K142-25 is a moulded transition boot, NOT a copper braid)',
@@ -1473,6 +1484,15 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): EBM-Papst is a
           // manufacturer, not a regulatory standard.
           mod('manufacturer', 'EBM-Papst'),
+          // L28 council finding (fix: 2026-05-25): fan was priced at £21 by
+          // Engine B (thermal class curve at BESS volume ≈ £28 × 0.75 = £21).
+          // Cached Mouser price for W2E200-HK38-01 is £133.78 (226 UK stock,
+          // IP44, 225×225×80 mm, 880-1000 m³/h, 230 VAC). Pinning the MPN
+          // forces the distributor-cascade to use the cached £133.78 instead
+          // of Engine B's under-estimate. Farnell caches W2E200-CH86-70 at
+          // £253.78 (only 2 UK stock) — Mouser variant is better stocked and
+          // functionally equivalent for BESS enclosure forced-air ventilation.
+          mod('part_number', 'W2E200-HK38-01'),
         ],
       ),
       word(
@@ -1607,16 +1627,25 @@ function emitSafetyProtection(p: BessParams): DesignModule {
       // container at 20 °C requires ~62.3 kg (PV=nRT with Novec MW=316.04 g/mol
       // and ρ_vapour at 5.3% partial pressure). The previous 25 kg charge only
       // yielded ~2.1% concentration — below the NFPA 2001 Class A minimum of
-      // 5.0% for clean-agent total-flooding systems. Spec a 70 kg Kidde
-      // ECARO-25 series cylinder (real product, charged to 62.3 kg net) so
-      // the cylinder rating bounds the required charge with a 10% margin.
+      // 5.0% for clean-agent total-flooding systems.
+      //
+      // L28 council SAFETY BUG (Fix 3, 2026-05-25): "Kidde ECARO-25" is
+      // Kidde's brand for FE-25 (HFC-125 / Pentafluoroethane) hardware.
+      // ECARO-25 cylinders are INCOMPATIBLE with Novec 1230 (FK-5-1-12):
+      // different MW (66 vs 316), different design concentration (8-10% vs
+      // 5-6%), different nozzle orifice sizing, and different decomposition
+      // by-products. Correct Kidde hardware for Novec 1230 is the Kidde ECS
+      // (Engineered Clean-Agent System) family — ECS-N cylinder, ECS-N
+      // releasing panel, ECS-N nozzles. Canonical UK BESS choice: BYD Cube
+      // Pro, Sungrow PowerStack, CATL EnerC+ all pair Novec 1230 with ECS.
+      // Spec a 70 kg Kidde ECS cylinder (62.3 kg net charge, 10% margin).
       word(
         'clean_agent_cylinder_word',
         'clean agent cylinder word',
         cc('clean_agent_cylinder', 'clean agent cylinder', 'chemical_sensing_function', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', 'Kidde ECARO-25 70 kg cylinder, Novec 1230 charge'),
+          mod('form', 'Kidde ECS 70 kg cylinder, Novec 1230 (FK-5-1-12) charge'),
           mod('capacity', '62.3', 'kg'),
           mod('performance', '5.3% v/v in 86 m³ @ 20 °C'),
           mod('regulatory', 'NFPA 2001'),

@@ -120,6 +120,20 @@ const CLASS_MIN_UNIT_PRICES: Record<string, Array<{ name_pattern: RegExp; min_gb
     { name_pattern: /\bmonopile\b/i,         min_gbp: 1_000_000,reason: 'offshore monopile ≥ £1M each' },
     { name_pattern: /\bstep[\s-]?up\s+transformer\b/i, min_gbp: 30_000, reason: 'utility step-up transformer ≥ £30k' },
   ],
+  // L28 council fix (2026-05-25): BESS enclosure fan was priced at £21 by
+  // Engine B (thermal class reference £28 × 0.75 volume multiplier). Real
+  // 225 mm AC axial fan (EBM-Papst W2E200 series, IP44) costs £120-£260 at
+  // distributor qty-1. Floor set at £80 — catches any future Engine B
+  // regression below catalogue pricing for industrial enclosure fans.
+  bess: [
+    { name_pattern: /\benclosure\s+ventilation\s+fan\b/i, min_gbp: 80, reason: 'BESS enclosure fan ≥ £80 each (ebm-papst W2E200, IP44, 225 mm, Mouser £133.78)' },
+  ],
+  energy_storage: [
+    { name_pattern: /\benclosure\s+ventilation\s+fan\b/i, min_gbp: 80, reason: 'BESS enclosure fan ≥ £80 each (ebm-papst W2E200, IP44, 225 mm, Mouser £133.78)' },
+  ],
+  'bess-utility-scale': [
+    { name_pattern: /\benclosure\s+ventilation\s+fan\b/i, min_gbp: 80, reason: 'BESS enclosure fan ≥ £80 each (ebm-papst W2E200, IP44, 225 mm, Mouser £133.78)' },
+  ],
 }
 
 function readJsonSafe(path: string): any {
