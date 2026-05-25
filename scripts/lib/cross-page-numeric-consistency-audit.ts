@@ -204,6 +204,18 @@ const STRONG_QUALIFIERS = new Set<string>([
   'bus', 'busbar', 'output', 'input', 'primary', 'secondary',
   'inverter', 'pcs', 'transformer', 'chiller', 'pump',
   'inlet', 'outlet', 'supply', 'return',
+  // Circuit-level sense/monitoring qualifiers — LEM / Hall-effect current
+  // transducers come in MULTIPLE ratings for different circuits in a BESS
+  // (cell-string: ~100 A, rack-level: ~300 A, main bus: ~2000 A). These are
+  // legitimately different parts for different sense circuits. Without these
+  // tokens the audit clusters all current transducer ratings together and
+  // fires a false-positive HIGH. Added 2026-05-25 after BESS L30 false-pos.
+  'main', 'sense', 'monitoring', 'metering',
+  // "rating" as a strong qualifier splits "your specific current rating 2000A"
+  // (a sourcing-note parenthetical) from "100 A nominal" design claims.
+  // Both "rated" (already above) and "rating" appear near component specs;
+  // treating them as STRONG splits sourcing-note citations from system claims.
+  'rating',
   // Alternative-scenario discriminators — values presented under
   // "IF prioritise CAPEX/MASS (alternative scenario):" in the design
   // decisions section are legitimately different from the canonical
@@ -461,6 +473,18 @@ function extractOccurrences(pageText: string, page: number): NumericOccurrence[]
     // upper bound of a stated range and should not cluster as if they were
     // an independent scalar claim about ambient temperature.
     if (isPartOfRange(cleaned, matchStart)) continue
+    // Skip ±-notation values ("±300 A" tolerance / measuring-range spec) —
+    // a ±N <unit> is a tolerance band or symmetric range, not an independent
+    // scalar claim about a system quantity. Pattern: the Unicode plus-minus
+    // sign (U+00B1) immediately precedes the matched number.
+    // Added 2026-05-25: LEM HASS 100-S transducer prose emits
+    // "±300 A peak measuring range" and "tolerance: ±300 A" — without this
+    // guard the 300 A tolerance clusters with the 100 A nominal rating and
+    // fires a false-positive HIGH.
+    {
+      const preChar = cleaned.slice(Math.max(0, matchStart - 4), matchStart)
+      if (/±\s*$/.test(preChar)) continue
+    }
     // Skip ratio-notation values ("1500/5A" → 5A is the CT secondary, not
     // a separate scalar claim). Pattern: <num>/ immediately precedes.
     {
