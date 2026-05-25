@@ -50,6 +50,13 @@ import { readFileSync } from 'node:fs'
 export interface MisPinRule {
   /** Slot identifier (matches content_character.character_id). */
   character_id_pattern: RegExp
+  /** Optional EXCLUDE on the word_id field (separate from character_id).
+   * Used when the chain creates a word whose word_id semantic disagrees
+   * with its content_character.character_id — e.g. `vent_seal_word`
+   * misclassified under character_id `deflagration_vent_panel`. The
+   * word_id takes precedence: if it signals seal/gasket/bracket the
+   * mis-pin rule is skipped regardless of character_id. */
+  exclude_word_id?: RegExp
   /** What pinned part triggers the flag — at least one of these must match. */
   forbidden_match: {
     manufacturer?: RegExp
@@ -143,6 +150,14 @@ export const KNOWN_MIS_PINS: MisPinRule[] = [
     // fluorocarbon rubber; gaskets are silicone; brackets are mild steel
     // or polymer). Only the rupture element itself must be metallic.
     character_id_pattern: /^(?!.*(_seal|_gasket|_frame_mount|_clamp|_bracket|_mount|_housing)$).*(deflagration|burst_disc|rupture_disc|explosion_vent|pressure_relief_disc).*$/i,
+    // BESS L21 (2026-05-25) additional refinement: also exclude based on
+    // word_id suffix. The chain can create a `vent_seal_word` whose
+    // content_character.character_id is `deflagration_vent_panel` (a
+    // chain-side semantic mismatch — word names a seal but classifies it
+    // as the panel). When word_id signals seal/gasket/bracket, that takes
+    // precedence: the word is the seal hardware regardless of what the
+    // misclassified character_id says.
+    exclude_word_id: /(_seal|_gasket|_frame_mount|_clamp|_bracket|_mount|_housing)_word$|^(vent_seal|vent_gasket|vent_frame_mount|vent_clamp|vent_bracket)/i,
     // Use material_radical (canonical taxonomy) instead of form (free text)
     // — form fields can contain negations like "NOT polycarbonate" that
     // false-positive on a substring match.
@@ -277,6 +292,7 @@ export function detectMisPins(state: any): MisPinResult {
       }
       // Slot match
       if (!rule.character_id_pattern.test(p.character_id)) continue
+      if (rule.exclude_word_id && rule.exclude_word_id.test(p.word_id)) continue
       // Pin match
       if (!ruleMatchesPart(rule, p)) continue
       findings.push({
