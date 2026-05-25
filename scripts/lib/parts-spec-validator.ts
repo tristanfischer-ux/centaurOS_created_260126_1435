@@ -406,6 +406,27 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     ],
     notes: 'Pfannenberg EB 60 panel cooler: 600 W @ 35°C. Claiming 60 kW on an EB 60 was a 100× spec error caught Loop ~28.',
   },
+  // ── Pfannenberg DTT top-mounted enclosure cooling units ─────────
+  // BESS L23 council #3: DTT 6201 was emitted as "20 kW HVAC backup" — a 10×
+  // overclaim. The DTT series are DIN-rail-mount top-of-enclosure air coolers,
+  // NOT packaged liquid chillers. The model number encodes BTU/h × 0.293 W:
+  //   DTT 1201 ≈ 350 W, DTT 2201 ≈ 640 W, DTT 3201 ≈ 940 W, DTT 6201 ≈ 2 kW
+  // Source: https://www.pfannenbergusa.com/product/thermal-management/cooling-units/dtt-top-mount/dtt-6201
+  // (rated 6826 BTU/h = 2.0 kW @ Δ35°C; ~0.8 kW at +50°C ambient, +35°C internal)
+  // Adding to KNOWN_PART_AUTHORITATIVE so gate 13 catches a "20 kW" claim as
+  // HIGH (20 kW / 2 kW = 10× overclaim >> 1.5× gate threshold). Gate 16 will
+  // also use the cooling_curve once the DTT word is collected by the hvac_backup
+  // CHILLER_PATTERN extension (BESS L23 council #3 fix).
+  {
+    manufacturer: 'Pfannenberg',
+    part_number_pattern: /^DTT[\s.-]*6201$/i,
+    category: 'enclosure_cooler',
+    cooling_curve: [
+      { ambient_c: 35, capacity_kw: 2.0 },
+      { ambient_c: 50, capacity_kw: 0.8 },
+    ],
+    notes: 'Pfannenberg DTT 6201 top-mounted enclosure cooler: 2.0 kW @ Δ35°C (6826 BTU/h). 0.8 kW at 50°C ambient. NOT a packaged liquid chiller — any claim ≥3 kW is wrong.',
+  },
   // ── Pfannenberg EB XT large packaged chillers (BESS-rated) ─────
   // Family: 9 units across 3 housing sizes, 36-150 kW cooling capacity,
   // R410A refrigerant, scroll compressor, microchannel condenser, EN 14511 +

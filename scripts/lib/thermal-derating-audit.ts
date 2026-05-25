@@ -178,7 +178,11 @@ function resolveManufacturerAndPart(
  * packaged_chiller / etc.) OR whose word_id matches the same pattern. */
 function collectChillerWords(state: any): EmittedChiller[] {
   const out: EmittedChiller[] = []
-  const CHILLER_PATTERN = /chiller|cooling_unit|enclosure_cooler|packaged_cooler|cooling_module/i
+  // BESS L23 council #3: widened to include hvac_backup / hvac_unit so that
+  // enclosure climate-control units emitted as backup cooling also participate
+  // in the capacity sum check. The deterministic emitter pins these with
+  // character_id "hvac_backup" which did not match the previous pattern.
+  const CHILLER_PATTERN = /chiller|cooling_unit|enclosure_cooler|packaged_cooler|cooling_module|hvac_backup|hvac_unit/i
   const modules: any[] = state?.moduleDecomposition?.modules ?? []
   for (const m of modules) {
     const moduleId = String(m?.module ?? m?.id ?? 'unknown')
@@ -269,15 +273,30 @@ function buildThermalContext(state: any): ThermalContext {
   let load: number
   let sourceOfLoad: string
   if (typeof q?.system_thermal_dissipation_kw?.value === 'number') {
-    load = q.system_thermal_dissipation_kw.value
-    sourceOfLoad = 'orchestratorContract.quantities.system_thermal_dissipation_kw'
-  } else if (typeof q?.thermal_rejection_min_kw?.value === 'number') {
-    // legacy field already baked in a 1.5× safety factor; reverse it for the
-    // raw load comparison so we don't double-count when applying our own
-    // safety factor below.
-    load = q.thermal_rejection_min_kw.value / 1.5
+    // BESS L23 council #3 root-cause fix: system_thermal_dissipation_kw is the
+    // BATTERY heat load only (PyBaMM-derived I²R losses, 11.72 kW for L23).
+    // The PCS inverter dissipates separately (inverter_dissipated_kw = 15 kW
+    // for L23). Both must be rejected by the cooling system — sum them.
+    // Before this fix the gate used 11.72 kW alone, making the 21.6 kW primary
+    // chiller look adequate (21.6 / (11.72 × 1.20) = 1.54×) when the real
+    // system load is 26.72 kW and 21.6 kW covers only 81% of that × 1.20
+    // required = 32.1 kW → gap of 10.5 kW.
+    const batteryLoad = q.system_thermal_dissipation_kw.value
+    const pcsLoad =
+      typeof q?.inverter_dissipated_kw?.value === 'number' ? q.inverter_dissipated_kw.value : 0
+    load = batteryLoad + pcsLoad
     sourceOfLoad =
-      'orchestratorContract.quantities.thermal_rejection_min_kw / 1.5 (legacy contract)'
+      pcsLoad > 0
+        ? `orchestratorContract.quantities.system_thermal_dissipation_kw (${batteryLoad} kW battery) + inverter_dissipated_kw (${pcsLoad} kW PCS)`
+        : 'orchestratorContract.quantities.system_thermal_dissipation_kw'
+  } else if (typeof q?.thermal_rejection_min_kw?.value === 'number') {
+    // Legacy field: thermal_rejection_min_kw already includes both heat sources
+    // plus the engineering margin (1.25× in L23; historical contracts used 1.5×).
+    // Divide by 1.25 to strip the baked-in margin so we don't double-count
+    // when we apply our own THERMAL_MARGIN_FACTOR below.
+    load = q.thermal_rejection_min_kw.value / 1.25
+    sourceOfLoad =
+      'orchestratorContract.quantities.thermal_rejection_min_kw / 1.25 (legacy contract — margin already baked in)'
   } else if (typeof q?.inverter_dissipated_kw?.value === 'number') {
     load = q.inverter_dissipated_kw.value
     sourceOfLoad = 'orchestratorContract.quantities.inverter_dissipated_kw'
