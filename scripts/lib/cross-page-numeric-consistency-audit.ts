@@ -204,6 +204,15 @@ const STRONG_QUALIFIERS = new Set<string>([
   'bus', 'busbar', 'output', 'input', 'primary', 'secondary',
   'inverter', 'pcs', 'transformer', 'chiller', 'pump',
   'inlet', 'outlet', 'supply', 'return',
+  // Alternative-scenario discriminators — values presented under
+  // "IF prioritise CAPEX/MASS (alternative scenario):" in the design
+  // decisions section are legitimately different from the canonical
+  // design value and the brief target. They must not cluster with
+  // occurrences from the cover headline, mission paragraph, or
+  // compliance table. Added 2026-05-25 after BESS L27 false-positive:
+  // 450 kWh / 2340 kWh alt-brief values clustering with 2690 kWh
+  // design value and 3500 kWh brief target.
+  'alternative', 'scenario', 'hypothetical',
 ])
 
 /** WEAK qualifiers do NOT split clusters — "minimum target capacity" should
@@ -726,6 +735,32 @@ function buildFindings(clusters: Cluster[]): { findings: ConsistencyFinding[]; s
       const hasContinuous = perOccQuals.some((q) => q.includes('continuous'))
       const hasPeak = perOccQuals.some((q) => q.includes('peak'))
       if (hasContinuous && hasPeak) severity = 'MED'
+    }
+    // Down-grade clusters where ALL occurrences are in an "alternative scenario"
+    // context (values presented as "IF prioritise CAPEX/MASS (alternative
+    // scenario):" in design-decisions prose). These are intentional trade-off
+    // comparisons — different scenario VALUES that a reader selects between,
+    // not contradictions on the same canonical quantity. When every occurrence
+    // in the cluster carries "alternative" or "scenario" in its per-occurrence
+    // token window, downgrade HIGH → MED and annotate the reason.
+    // Added 2026-05-25 after BESS L27: the cluster-splitter correctly separates
+    // canonical values (3.5 MWh brief target / 2.69 MWh design) from the
+    // alt-brief section, but the alt-brief section itself lists multiple
+    // scenario values (450 kWh / 2340 kWh / 3500 kWh for energy, 8000 kg /
+    // 40000 kg for mass) — all explicitly labelled "alternative scenario" and
+    // all intentional "pick one" options for the founder.
+    {
+      const ALT_SCENARIO_TOKENS = new Set(['alternative', 'scenario', 'hypothetical'])
+      const allOccurrencesAreAltScenario = deduped.every((o) => {
+        const perOccTokens = classifyTokens([...o.preTokens, ...o.postTokens])
+        return (
+          perOccTokens.qualifiers.some((q) => ALT_SCENARIO_TOKENS.has(q)) ||
+          [...o.preTokens, ...o.postTokens].some((t) => ALT_SCENARIO_TOKENS.has(t.toLowerCase()))
+        )
+      })
+      if (allOccurrencesAreAltScenario && severity === 'HIGH') {
+        severity = 'MED'
+      }
     }
     // Down-grade clusters where occurrences look like a structured JSON/key-
     // value dump: multiple same-family unit tokens appear within 30 chars

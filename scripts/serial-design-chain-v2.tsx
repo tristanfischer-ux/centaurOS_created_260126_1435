@@ -2345,13 +2345,52 @@ async function main() {
             ? targetMarket
             : `Operators procuring ${productClassReadable} systems for the use case described in the brief — typically mid-market industrial buyers with defined performance and compliance requirements rather than research-pilot or hobbyist users.`
         }
-        if (!bop.why_now || bop.why_now.trim().length === 0) {
-          bop.why_now = typeof macroDriver === 'string' && macroDriver.length > 0
-            ? macroDriver
-            : `Demand for ${productClassReadable} solutions is driven by the technical and commercial constraints stated in the brief (cost ceiling, deployment window, throughput target). The macro context — supply-chain, regulatory, or market timing rationale — is to be added by the brief author for the next narrator pass.`
+        // Bug fix #16 (2026-05-25): the LLM generator sometimes emits the
+        // literal placeholder string "is to be added by the brief author for
+        // the next narrator pass" into bop.why_now. The previous guard only
+        // fired when the field was empty — a non-empty placeholder slipped
+        // through. Now treat any why_now containing the placeholder substring
+        // as empty and replace with the parsedBrief fallback. The renderer
+        // at line 3019 does `bp.why_now || pb.why_now` but pb.why_now never
+        // fires because bp.why_now is non-empty (placeholder). Fix here at
+        // source so the state.json carries real content by render time.
+        const WHY_NOW_PLACEHOLDER = 'is to be added by the brief author for the next narrator pass'
+        if (
+          !bop.why_now ||
+          bop.why_now.trim().length === 0 ||
+          bop.why_now.includes(WHY_NOW_PLACEHOLDER)
+        ) {
+          const parsedWhyNow = (parsedBriefAny as any)?.why_now
+            ?? (parsedBriefAny as any)?.summary?.why_now
+          bop.why_now = typeof parsedWhyNow === 'string' && parsedWhyNow.trim().length > 0
+            ? parsedWhyNow.trim()
+            : (typeof macroDriver === 'string' && macroDriver.length > 0
+              ? macroDriver
+              : '')
+          // If we have no real content at all, clear it so the renderer
+          // suppresses the "Why now" heading entirely instead of showing
+          // the system instruction as visible text.
+          if (!bop.why_now) {
+            bop.why_now = ''
+          }
         }
-        if (!bop.overview_and_context || bop.overview_and_context.trim().length === 0) {
-          bop.overview_and_context = bop.mission_statement ?? ''
+        // Bug fix #17 (2026-05-25): the LLM generator sometimes emits
+        // overview_and_context as the SAME single sentence as mission_statement
+        // (both read "Deliver 2.69 MWh of usable energy..."). The previous
+        // guard only filled overview_and_context when empty, then set it to
+        // bop.mission_statement — which makes the duplication even more
+        // explicit when the field is already populated but identical. Fix:
+        // clear overview_and_context when it is identical to mission_statement
+        // so the renderer suppresses the redundant Overview heading entirely.
+        if (
+          !bop.overview_and_context ||
+          bop.overview_and_context.trim().length === 0 ||
+          bop.overview_and_context.trim() === (bop.mission_statement ?? '').trim()
+        ) {
+          // Do NOT copy mission_statement into overview_and_context — that
+          // is the duplication root cause. Leave it empty so the renderer's
+          // `{overview ? ... : null}` gate suppresses the heading.
+          bop.overview_and_context = ''
         }
       }
 
