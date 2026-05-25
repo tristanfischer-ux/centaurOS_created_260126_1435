@@ -90,7 +90,7 @@ import { resolvePriceBand, targetPerformanceValueAs } from '../src/lib/pdf-engin
 import { resolveCostStack, computeCostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
-import { verifyAllParts, stripUnverifiedParts, recommendReplacementsForStripped, buildTechnicalSummary, enrichWithRagSuggestions, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
+import { verifyAllParts, stripUnverifiedParts, inheritPartNumberFromDeterministicSibling, recommendReplacementsForStripped, buildTechnicalSummary, enrichWithRagSuggestions, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
 import { runPhysicsCritic, type CritiqueReport } from '../src/lib/pdf-engine-v2/radical/physics-critic'
 // Phase C pipeline integration REVERTED 2026-05-15 per coding council (5/5
 // REVERT). Registry pre-seed of reviewer prompts caused score regression and
@@ -3518,6 +3518,19 @@ async function main() {
     if (strippedParts.stripped > 0) {
       console.error(`[chain] part verification: stripped ${strippedParts.stripped} high-confidence fake part_numbers`)
       for (const d of strippedParts.details.slice(0, 5)) console.error(`  • ${d.word_id} → removed "${d.removed_pn}" (${d.reasoning.slice(0, 100)})`)
+      // BESS L27 fix: after stripping a hallucinated part_number from a Phase 2-added
+      // word, copy the verified part_number from a same-manufacturer sibling word in
+      // the same sub_module (typically the deterministic-emitter word). Without this,
+      // gate 13 falls back to manufacturer-only matching and fires a false-positive HIGH
+      // (e.g. nVent ERIFLEX without PN → fallback picks MBJ50 250 A → 500 A claim =
+      // 2.0× → HIGH). Only copies when a real sibling with the same manufacturer + PN
+      // exists in the same sub_module — never fabricates.
+      const inheritResult = inheritPartNumberFromDeterministicSibling(design.modules ?? [], strippedParts.details)
+      if (inheritResult.inherited > 0) {
+        console.error(`[chain] part verification: inherited part_number from deterministic sibling for ${inheritResult.inherited} stripped word(s)`)
+        for (const h of inheritResult.details) console.error(`  ↳ ${h.word_id} ← ${h.donor_word_id} (PN: ${h.inherited_pn})`)
+        logAction({ step: 'part_number_inherited_from_sibling', inherited: inheritResult.inherited, details: inheritResult.details })
+      }
       // Strip+recommend: for each stripped part, ask Flash-Lite for a verified
       // real alternative. Honesty rule: if the recommender doesn't know a real
       // SKU it MUST say "uncertain — manual sourcing required" rather than

@@ -1156,6 +1156,109 @@ export function stripUnverifiedParts(
   return { stripped, details }
 }
 
+/**
+ * After stripUnverifiedParts() removes a hallucinated part_number from a word,
+ * the word is left with manufacturer but no part_number. Gate 13
+ * (parts-spec-validator) then falls back to manufacturer-only matching, picks
+ * the smallest known variant, and fires a false-positive HIGH finding (e.g.
+ * emc_grounding_busbar_word with nVent ERIFLEX + no PN → fallback picks
+ * MBJ50-300-10 (250 A) → 500 A claim / 250 A auth = 2.0× → HIGH).
+ *
+ * This function closes that gap: after stripping, for every word that has
+ * manufacturer but NO part_number, search the same sub_module for a sibling
+ * word that has the same manufacturer AND an intact part_number. If found,
+ * copy the sibling's part_number + any missing safety-class modifiers
+ * (capacity, regulatory, dimension, material) across as "inherited from
+ * deterministic sibling — gate 13 suppressed for this slot".
+ *
+ * SAFETY GUARD: only copies when the sibling word is in the same sub_module
+ * AND shares the same manufacturer (exact, case-insensitive). Does not
+ * fabricate or guess — if no sibling with a PN exists, the word stays as-is
+ * (gate 13 manufacturer-only fallback or gate 20 fictional-PN audit handles
+ * it downstream).
+ *
+ * Returns the count of words that received an inherited part_number.
+ *
+ * BESS L27 root cause: Phase 2 repair LLM adds emc_grounding_busbar_word with
+ * part_number=EBS-500 (hallucinated). Verifier strips EBS-500. The sibling
+ * emc_ground_braid_word in the same sub_module has manufacturer=nVent ERIFLEX
+ * + part_number=MBJ50-300-10 (deterministic emitter, verified). This function
+ * copies MBJ50-300-10 → emc_grounding_busbar_word so gate 13 can look up the
+ * correct spec instead of falling back to the smallest MBJ50 variant.
+ */
+export function inheritPartNumberFromDeterministicSibling(
+  modules: ModuleSpec[],
+  strippedDetails: Array<{ word_id: string; removed_pn: string; reasoning: string }>,
+): { inherited: number; details: Array<{ word_id: string; donor_word_id: string; inherited_pn: string }> } {
+  // Build a set of composite keys for stripped words: "module::sub_module::word_id"
+  const strippedKeys = new Set(strippedDetails.map(d => d.word_id))
+  if (strippedKeys.size === 0) return { inherited: 0, details: [] }
+
+  const SAFETY_COPY_KINDS = new Set(['capacity', 'regulatory', 'dimension', 'material', 'form'])
+  let inherited = 0
+  const details: Array<{ word_id: string; donor_word_id: string; inherited_pn: string }> = []
+
+  for (const m of modules ?? []) {
+    for (const sm of ((m as any).sub_modules ?? [])) {
+      const smWords: any[] = Array.isArray(sm?.words) ? sm.words : []
+
+      // Build a map of manufacturer → words-with-part_number in this sub_module
+      const donorsByMfr = new Map<string, Array<{ word: any; pn: string }>>()
+      for (const w of smWords) {
+        const mods: Array<{ kind: string; value: string }> = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+        const pnMod = mods.find(mc => normaliseKind(String(mc?.kind ?? '')) === 'part_number')
+        if (!pnMod?.value?.trim()) continue
+        const mfrMod = mods.find(mc => normaliseKind(String(mc?.kind ?? '')) === 'manufacturer')
+        if (!mfrMod?.value?.trim()) continue
+        const mfrKey = String(mfrMod.value).toLowerCase().trim()
+        if (!donorsByMfr.has(mfrKey)) donorsByMfr.set(mfrKey, [])
+        donorsByMfr.get(mfrKey)!.push({ word: w, pn: pnMod.value.trim() })
+      }
+
+      // Now walk words in this sub_module that were stripped
+      for (const w of smWords) {
+        const key = `${m.module}::${sm.id}::${w.id ?? '?'}`
+        if (!strippedKeys.has(key)) continue  // not stripped — skip
+        const mods: Array<{ kind: string; value: string }> = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+        // Confirm this word currently has no part_number (strip may have already run)
+        if (mods.some(mc => normaliseKind(String(mc?.kind ?? '')) === 'part_number')) continue
+        // Find the manufacturer of the stripped word
+        const mfrMod = mods.find(mc => normaliseKind(String(mc?.kind ?? '')) === 'manufacturer')
+        if (!mfrMod?.value?.trim()) continue
+        const mfrKey = String(mfrMod.value).toLowerCase().trim()
+        const donors = donorsByMfr.get(mfrKey)
+        if (!donors || donors.length === 0) continue  // no sibling with same manufacturer + PN
+
+        // Pick the first donor (deterministic emitter words come first; repair LLM
+        // words appear later after the push, so the first entry is the earlier word)
+        const donor = donors[0]
+        // Skip self-donation (shouldn't happen but guard)
+        if (donor.word === w) continue
+
+        // Copy part_number
+        mods.push({ kind: 'part_number', value: donor.pn })
+
+        // Copy missing safety-class modifiers from the donor
+        const existingKinds = new Set(mods.map(mc => normaliseKind(String(mc?.kind ?? ''))))
+        const donorMods: Array<{ kind: string; value: string }> = Array.isArray(donor.word.modifier_characters) ? donor.word.modifier_characters : []
+        for (const dm of donorMods) {
+          const dk = normaliseKind(String(dm?.kind ?? ''))
+          if (SAFETY_COPY_KINDS.has(dk) && !existingKinds.has(dk)) {
+            mods.push({ kind: dm.kind, value: dm.value })
+            existingKinds.add(dk)
+          }
+        }
+
+        w.modifier_characters = mods
+        inherited++
+        details.push({ word_id: key, donor_word_id: `${m.module}::${sm.id}::${donor.word.id ?? '?'}`, inherited_pn: donor.pn })
+      }
+    }
+  }
+
+  return { inherited, details }
+}
+
 // ─── Strip + recommend ────────────────────────────────────────────────────────
 
 const RECOMMENDER_SYSTEM = `You are a procurement engineer helping a designer pick a REAL component to replace one that was found to be fabricated in an LLM-generated design.

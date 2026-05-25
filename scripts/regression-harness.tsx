@@ -432,6 +432,41 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       () => `ambient_design_temp_c missing from orchestratorContract.quantities — gate 16 audit + selectPfannenbergEbXt will silently fall back to 35°C default for non-+35°C briefs`,
     ))
 
+    // BESS.emc_busbar_sibling_pn — after strip+inherit, any word in the
+    // emc_grounding sub_module that has manufacturer=nVent ERIFLEX MUST have
+    // a part_number. Without the inheritPartNumberFromDeterministicSibling fix
+    // (2026-05-25, L27 regression), Phase 2 repair adds emc_grounding_busbar_word
+    // with a hallucinated MPN (EBS-500), the verifier strips EBS-500, and gate 13
+    // falls back to manufacturer-only, picking MBJ50-300-10 (250 A) and firing a
+    // false-positive HIGH for 500 A claim. The inheritance pass copies
+    // MBJ50-300-10 from the deterministic sibling so gate 13 sees a precise finding.
+    // This invariant confirms the fix is in place: all emc_grounding nVent ERIFLEX
+    // words must have a part_number, NOT <no-part-number>.
+    const emcGroundingModule = state?.moduleDecomposition?.modules?.find(
+      (m: any) => m.module === 'power_distribution'
+    )
+    let emcGroundingNoPn = 0
+    if (emcGroundingModule) {
+      const emcSm = (emcGroundingModule as any).sub_modules?.find(
+        (sm: any) => sm.id === 'emc_grounding'
+      )
+      if (emcSm) {
+        for (const w of (emcSm.words ?? [])) {
+          const mods: Array<{ kind: string; value: string }> = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+          const hasMfr = mods.some(m => m.kind === 'manufacturer' && /nvent|eriflex/i.test(m.value ?? ''))
+          const hasPn = mods.some(m => m.kind === 'part_number' && String(m.value ?? '').trim().length > 0)
+          if (hasMfr && !hasPn) emcGroundingNoPn++
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'BESS.emc_busbar_sibling_pn',
+      'All nVent ERIFLEX words in emc_grounding sub_module have a part_number (inheritPartNumberFromDeterministicSibling fix, 2026-05-25)',
+      emcGroundingNoPn,
+      (n) => n === 0,
+      (n) => `${n} nVent ERIFLEX word(s) in emc_grounding missing part_number — inheritPartNumberFromDeterministicSibling may have regressed`,
+    ))
+
     // Suppress unused-var warning for the eosCheck (kept for future invariants)
     void eosCheck
   }
