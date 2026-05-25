@@ -403,16 +403,30 @@ function deriveBessParams(contract: ContractShape): BessParams {
   // BESS L22 (2026-05-25, task #122): ambient + actual thermal load.
   // ambient_design_temp_c default 35°C (EN 14511 nominal); legacy contracts
   // without the field land on the nominal rating point.
-  // system_thermal_dissipation_kw is pybamm's computed load when orchestrator
-  // ran; legacy contracts fall back to thermal_rejection_min_kw / 1.5 (which
+  // system_thermal_dissipation_kw is pybamm's computed BATTERY I²R load;
+  // legacy contracts fall back to thermal_rejection_min_kw / 1.5 (which
   // approximates the raw load before the previous 1.5× safety factor was
   // baked in — keeps legacy chains sized identically).
+  //
+  // BESS L23 fix (task #148): system_thermal_dissipation_kw is battery heat
+  // ONLY. The PCS inverter dissipates separately into the same container
+  // (inverter_dissipated_kw — 15 kW for a 1 MW BESS at 98% efficiency).
+  // Both sources must be rejected by the chiller, so we sum them here.
+  // This mirrors buildThermalContext in thermal-derating-audit.ts which
+  // already performs the same sum (added in commit dd51b9383 for gate 16).
+  // Without this fix: L23 load read as 11.72 kW → required 14.1 kW → EB XT
+  // 400 WT (21.6 kW derated) passes the emitter; gate 16 then re-computes
+  // the correct 26.72 kW total and exits 16 on every run.
+  // With this fix: 11.72 + 15.0 = 26.72 kW → required 32.1 kW → EB XT 700
+  // WT (41.4 kW derated) selected; gate 16 passes cleanly.
   const ambientDesignTempC = q(contract, 'ambient_design_temp_c', 35)
-  const systemThermalDissipationKw = q(
+  const batteryThermalDissipationKw = q(
     contract,
     'system_thermal_dissipation_kw',
     thermalRejectionKw / 1.5,
   )
+  const inverterDissipatedKw = q(contract, 'inverter_dissipated_kw', 0)
+  const systemThermalDissipationKw = batteryThermalDissipationKw + inverterDissipatedKw
   return {
     cellCount,
     rackCount,
