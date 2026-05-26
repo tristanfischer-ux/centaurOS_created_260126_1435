@@ -142,6 +142,7 @@ export interface AuthSpec {
   rated_voltage_dc_v?: number
   rated_voltage_ac_v?: number
   rated_power_kw?: number
+  rated_flow_lpm?: number  // L35 fix: added for hydraulic parts (coolant pumps, etc.)
   cooling_curve?: Array<{ ambient_c: number; capacity_kw: number }>
   notes?: string
 }
@@ -247,6 +248,65 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     rated_current_a: 150,
     rated_voltage_dc_v: 1500,
     notes: 'Schaltbau C310K/150: 150 A continuous (50 mm² / 40°C), 1,500 V DC bi-directional @ PD2, IEC/UL 60947-4-1. Used as dc_precharge_contactor on 250S LFP strings (precharge duty ~10-50 A). NOT C310K/500 (500 A — that is the per-rack main contactor). Datasheet: https://2024.schaltbau.com/media/c310_en.pdf.',
+  },
+  // L35 council SAFETY BLOCKER FIX (2026-05-26): ABB OT200E03P actual
+  // rated voltage is 600 V DC (AC-rated OT family with limited DC use).
+  // Sub-agent class-killer #3g (commit ef3b2e466) emitted OT200E03P on the
+  // rack DC isolator slot — insufficient for the 250S LFP string's 900 V
+  // max charge. This entry catches any re-emission of OT200E03P/OT250E03P/
+  // OT100E03P and flags it as undersized for ≥800 V DC service.
+  // Use OTDC{N}E02P below instead (ABB's dedicated DC-switch family).
+  {
+    manufacturer: 'ABB',
+    part_number_pattern: /^OT\d+E03P$/i,
+    category: 'dc_disconnect',
+    rated_current_a: 200,
+    rated_voltage_dc_v: 600,
+    notes: 'ABB OT_E03P family (AC-rated, limited DC use): 600 V DC max. UNSUITABLE for 250S LFP packs (912.5 V string > 600 V rating). Use OTDC_E02P (1000 V) or higher OTDC_EV22 (1500 V) for DC-dedicated isolation. Source: ABB OT/OETL/OTDC/OTM catalogue, library.e.abb.com.',
+  },
+  // L35 SAFETY FIX: ABB OTDC200E02P — DC-dedicated disconnect for rack
+  // isolation. 200 A continuous, 1000 V DC, IEC 60947-3 DC-21B, IP65,
+  // direct-mount handle (P suffix). Family OTDC100/160/200/250 all share
+  // 1000 V DC rating; the higher OTDC_EV22 variants provide 1500 V DC.
+  //
+  // Datasheet: https://library.e.abb.com/public/9c3426d8764d4c4aa6852ef4b7f753cc/1SCC301021C0202_TC_OTDC_OTDCP.pdf
+  // Verbatim rated-voltage line (100…250 A range table):
+  //   "OTDC200E02 | OTDC200E11 | OTDC200E22 ... Ue [V DC] 1000"
+  // (E33 variant column also at 1000 V DC; EV22 variant at 1500 V DC.)
+  // Standards: IEC 60947-3 DC-21B utilization category.
+  //
+  // Variant disambiguation:
+  //   OTDC_E02 / E02P = 1000 V DC, basic / direct-mount handle (THIS variant).
+  //   OTDC_EV22       = 1500 V DC, higher voltage class.
+  //   OT_E03P         = AC family with 600 V DC limit — UNSAFE for BESS.
+  {
+    manufacturer: 'ABB',
+    part_number_pattern: /^OTDC\d+E(?:02|11|22|33)P?$/i,
+    category: 'dc_disconnect',
+    rated_current_a: 250,
+    rated_voltage_dc_v: 1000,
+    notes: 'ABB OTDC_E02P family (DC-dedicated disconnect): 1000 V DC, IEC 60947-3 DC-21B, IP65, direct-mount handle. Available 100/160/200/250 A current variants. EV22 variants extend to 1500 V DC. Canonical replacement for OT_E03P (600 V) on BESS rack isolators. Datasheet: https://library.e.abb.com/public/9c3426d8764d4c4aa6852ef4b7f753cc/1SCC301021C0202_TC_OTDC_OTDCP.pdf.',
+  },
+  // ── BESS thermal: coolant circulation pumps ──────────────────
+  // L35 fix (2026-05-26): pin Grundfos NB 65-250/245 BQQE on cooling_pump_word
+  // to prevent reviewer-LLM PIN STAMP substitution. Prior chain runs had
+  // reviewers stamp "MAGNA3 32-60" (a 200 L/min wet-rotor heating circulator)
+  // onto the slot — physically impossible at the claimed 900 L/min.
+  // The deterministic-emitter now explicitly emits NB 65-250/245 BQQE; this
+  // entry catches any MAGNA3 family re-emission as a wrong-spec overclaim.
+  {
+    manufacturer: 'Grundfos',
+    part_number_pattern: /^MAGNA3\s+\d+-\d+$/i,
+    category: 'circulator_pump',
+    rated_flow_lpm: 200,
+    notes: 'Grundfos MAGNA3 family (small wet-rotor heating circulator): max ~200 L/min at zero head. UNSUITABLE for BESS coolant circulation at 900 L/min — physically cannot deliver. Use Grundfos NB 65-250/245 BQQE (end-suction centrifugal, ~900 L/min @ ~30 m head). Source: grundfos.com MAGNA3 product datasheet.',
+  },
+  {
+    manufacturer: 'Grundfos',
+    part_number_pattern: /^NB\s+65-250\/\d+\s+BQQE$/i,
+    category: 'centrifugal_pump',
+    rated_flow_lpm: 900,
+    notes: 'Grundfos NB 65-250/245 BQQE (end-suction centrifugal pump, EN 12162): 900 L/min nominal @ ~30 m head, water-glycol compatible. Canonical coolant circulator for utility BESS thermal-management loops (~15 racks × 60 L/min per cold plate = 900 L/min system total). Validated in L30 council (commit cbcc23755). Source: grundfos.com NB-NBE family product page.',
   },
   // ── BESS DC fuses (Bussmann 170M family) ──────────────────────
   // 170M68xx subfamily: 1250 A fuses. Lower-current 170M variants exist.

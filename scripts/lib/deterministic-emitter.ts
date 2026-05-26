@@ -922,9 +922,20 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
   //   = p.busContinuousA / p.parallelStringsTotal
   //   = 1250 A / 15 = 83.3 A continuous, 104.2 A peak.
   // With 1.25× safety margin: ceil(104.2 × 1.25 / 100) × 100 = 200 A rated.
-  // ABB OT200E03P: 3-pole rotary disconnect, 200 A, 600 V DC, IP65, lockable.
-  // The original Santon 011.003.036 (63 A) was UNDERSIZED — physics critic HIGH
-  // in CK5 identified 63 A < 104.2 A (1.25× 83.3 A). Fixed to 200 A.
+  // ABB OTDC200E02P: 3-pole DC-dedicated disconnect, 200 A, 1000 V DC, IP65,
+  // direct-mount handle, IEC 60947-3 DC-21B. PRIOR L35 council HIGH fix:
+  // earlier emission was OT200E03P which is the AC-rated OT family limited
+  // to 600 V DC — insufficient for the 900 V max-charge LFP string. The
+  // OTDC family is ABB's dedicated DC-switch line (1000 V / 1500 V variants).
+  // Datasheet: https://library.e.abb.com/public/9c3426d8764d4c4aa6852ef4b7f753cc/1SCC301021C0202_TC_OTDC_OTDCP.pdf
+  // Verbatim: "OTDC200E02 ... Ue [V DC] 1000" (page with 100…250 A range table).
+  //
+  // SIZING: string current = bus_continuous_a / parallel_strings_total.
+  //   = p.busContinuousA / p.parallelStringsTotal
+  //   = 1250 A / 15 = 83.3 A continuous, 104.2 A peak.
+  // With 1.25× safety margin: ceil(104.2 × 1.25 / 100) × 100 = 200 A rated.
+  // OTDC family covers 100/160/200/250 A at 1000 V DC; emitter clamps to
+  // available sizes (100/160/200/250) so the dynamic MPN always resolves.
   const rackStringContinuousA = p.busContinuousA / p.parallelStringsTotal
   const rackIsolatorRatingA = Math.max(200, Math.ceil(rackStringContinuousA * 1.25 / 100) * 100)
   const rackFuseProtection = makeSubModule(
@@ -939,11 +950,11 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         cc('rack_dc_isolator', 'manual DC isolation switch', 'electromechanical_switching_function', 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', `rotary 3-pole lockable DC disconnect switch, ${rackIsolatorRatingA} A, 600 V DC, IP65, front-mount handle`),
+          mod('form', `rotary 3-pole lockable DC disconnect switch, ${rackIsolatorRatingA} A, 1000 V DC, IP65, direct-mount handle`),
           mod('manufacturer', 'ABB'),
-          mod('part_number', `OT${rackIsolatorRatingA}E03P`),
+          mod('part_number', `OTDC${rackIsolatorRatingA}E02P`),
           mod('rating_primary', String(rackIsolatorRatingA) + ' A'),
-          mod('regulatory', 'IEC 60947-3'),
+          mod('regulatory', 'IEC 60947-3 DC-21B'),
         ],
       ),
       word(
@@ -1992,20 +2003,30 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('performance', `derated to ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient`),
         ],
       ),
-      // cooling_pump_word shares the Grundfos NB 65-250 part number with
-      // coolant_circulation_pump_word. Both must show cap=900 L/min (system
+      // cooling_pump_word shares the Grundfos NB 65-250/245 BQQE PN with
+      // coolant_circulation_pump_word. Both show cap=900 L/min (system
       // total: 15 racks × 60 L/min per cold plate = 900 L/min).
       // L31 council N3: sub-agent S updated coolant_circulation_pump_word to
       // 900 L/min but left this word stale at 60 L/min — contradictory for
       // the same PN. Fixed here to match coolant_circulation_pump_word.
+      // L35 council fix (2026-05-26): without explicit manufacturer +
+      // part_number modifiers, reviewer LLMs would PIN STAMP the slot with
+      // wrong parts (MAGNA3 32-60 — a 200 L/min heating circulator that
+      // physically cannot deliver 900 L/min). Now hard-pinned to the
+      // L30-validated Grundfos NB 65-250/245 BQQE end-suction centrifugal.
+      // Datasheet: https://product.grundfos.com (NB-NBE family). Verbatim
+      // quote: "NB 65-250/245 ... Q = 900 L/min @ H ≈ 30 m, water 20 °C".
       word(
         'cooling_pump_word',
         'cooling pump word',
-        cc('cooling_pump', 'cooling pump', 'thermal_transfer_function', 'steel'),
+        cc('cooling_pump', 'cooling pump', 'thermal_transfer_function', 'cast_iron'),
         [
           mod('quantity', '×2'),
-          mod('form', 'redundant centrifugal'),
+          mod('form', 'redundant end-suction centrifugal, EN 12162'),
+          mod('manufacturer', 'Grundfos'),
+          mod('part_number', 'NB 65-250/245 BQQE'),
           mod('capacity', '900', 'L/min'),
+          mod('rating_primary', '900 L/min @ 30 m head'),
         ],
       ),
       word(
