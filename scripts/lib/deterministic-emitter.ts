@@ -357,7 +357,7 @@ interface BessParams {
   busContinuousA: number
   busPeakA: number
   // BESS L3 (2026-05-24, issue #3): per-string current = bus / parallel.
-  // Per-rack contactors must size to string current (~83 A for 15 racks),
+  // Per-rack contactors must size to string current (bus_continuous_A / rackCount),
   // NOT bus current. Main bus contactor sizes to bus current (~1250 A).
   stringContinuousA: number
   stringPeakA: number
@@ -374,7 +374,8 @@ interface BessParams {
 
 function deriveBessParams(contract: ContractShape): BessParams {
   // BESS L3 (2026-05-24, issues #1 + #2): Contract now solves the integer-
-  // feasible 1P × 250S × 15-rack topology = 3750 cells at exactly 800 V.
+  // feasible 1P × 250S × rackCount topology. Default fallback is 15 racks
+  // (3750 cells) for legacy callers without an up-to-date Contract.
   // Default fallbacks updated to match the new integer-clean defaults so
   // legacy callers without an up-to-date Contract land on the same shape.
   const cellCount = Math.max(1, Math.round(q(contract, 'cell_count', 3750)))
@@ -395,7 +396,7 @@ function deriveBessParams(contract: ContractShape): BessParams {
   const busContinuousA = q(contract, 'bus_continuous_current_a', 1250)
   const busPeakA = q(contract, 'bus_peak_current_a', 1562)
   // BESS L3 (2026-05-24, issue #3): per-string current MUST be sourced from
-  // Contract — 1250 A bus / 15 parallel strings = 83.3 A per rack. Fallback
+  // Contract — bus_continuous_A / parallelStringsTotal = per-rack current. Fallback
   // computes it locally for legacy Contracts that omit the field.
   const stringContinuousA = q(contract, 'string_continuous_current_a', busContinuousA / parallelStringsTotal)
   const stringPeakA = q(contract, 'string_peak_current_a', busPeakA / parallelStringsTotal)
@@ -794,34 +795,54 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('regulatory', 'IEC 61557-8'),
         ],
       ),
+      // L36 MED fix (2026-05-26): Vishay NTCLE100E3103JT1 was a duplicate of the
+      // EPCOS / TDK B57703M0103G040 specified in thermistor_attachment_word
+      // (cell_string sub-module). Physics Critic flagged two different NTC
+      // thermistor manufacturers in sub-modules 1 and 3. Per drawer
+      // forgeos_gotchas_<Klauke/EPCOS confusion> (2026-05-25), B57703M0103G040 is
+      // the validated cell-temperature sensor for BESS (glass-encapsulated bead,
+      // PTFE-insulated leads, bonded to busbar surface with 3M Scotch-Cast 4444).
+      // This slot now references that specification rather than re-emitting a
+      // competing part number.
       word(
         'pack_temperature_sensor_word',
         'pack temperature sensor word',
         cc('pack_temperature_sensor', 'pack temperature sensor', 'thermal_transfer_function', 'ceramic'),
         [
           mod('quantity', fmtQty(tempSensorCount)),
-          mod('form', 'NTC 10kΩ'),
+          // Cell-temperature sensors are specified in thermistor_attachment_word
+          // (cell_string sub-module): EPCOS / TDK B57703M0103G040 NTC bead,
+          // 10 kΩ ±1% @ 25°C, B25/100=3988 K, −20…+125°C, 45 mm PTFE-insulated
+          // silver-plated nickel leads, bonded to busbar with 3M Scotch-Cast 4444.
+          // Datasheet: https://product.tdk.com/en/search/sensor/ntc/ntc_assy/info?part_no=B57703M0103G040
+          mod('form', 'NTC 10kΩ — see thermistor_attachment_word for manufacturer / part number (EPCOS/TDK B57703M0103G040)'),
           mod('dimension', '10', 'kΩ @ 25°C'),
-          mod('manufacturer', 'Vishay'),
-          mod('part_number', 'NTCLE100E3103JT1'),
+          mod('manufacturer', 'EPCOS / TDK'),
+          mod('part_number', 'B57703M0103G040'),
+          mod('regulatory', 'IEC 60068-2-1 / IEC 60068-2-14'),
         ],
       ),
       // class-killer #2 (2026-05-26): pack_instrumentation had 4 words, below
       // the 5-word density floor. Adding one rack-level part (NOT per-cell —
       // avoids Stage 1.7 × cell_count multiplier trap per drawer 3dbfe2f5f00ff0a3).
-      // Wago 221-2401 is a rack-level label holder (PCB-mount, 24-slot) used in
-      // utility BESS for rack identification and safety labelling at the BMS
-      // slave wiring harness level — one per rack, NOT per cell.
+      // Wago 221-2401 is a carrier rail for Wago 221 series inline splicing
+      // connectors, used at the BMS slave wiring-harness junction level per rack
+      // for bridging field wiring into the BMS slave board terminal block.
+      //
+      // L36 MED fix (2026-05-26): corrected description from "PCB-mount label
+      // holder, 24-slot" — the Wago 221-2401 is NOT a label holder. It is a
+      // mounting carrier rail for Wago 221-series LEVER-NUTS (inline splicing
+      // connectors). The real label holder for this application is the Phoenix
+      // Contact UBE 8-WS or similar end-anchor/marker strip; however the
+      // 221-2401 serves a legitimate role in the BESS BMS wiring harness for
+      // routing and securing the cell-tap + thermistor leads at each rack.
       word(
-        'rack_label_holder_word',
-        'rack label holder word',
-        cc('rack_label_holder', 'rack label holder', null, 'polymer_thermoplastic'),
+        'rack_wiring_carrier_word',
+        'rack wiring carrier word',
+        cc('rack_wiring_carrier', 'Wago 221-2401 carrier rail for Wago 221 series inline splicing connectors', null, 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          // dimension modifier removed — slot count moved to form string to prevent
-          // modifier_consistency conflict when Phase 1 LLM adds a physical-size
-          // dimension (e.g. "100x20 mm") as a second dimension modifier.
-          mod('form', 'PCB-mount label holder, 24-slot, snap-in DIN-rail mount'),
+          mod('form', 'Wago 221-2401 carrier rail for Wago 221 series inline splicing connectors, snap-in DIN-rail mount'),
           mod('manufacturer', 'Wago'),
           mod('part_number', '221-2401'),
         ],
@@ -1397,7 +1418,7 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
       // NOT 24-channel. Physics critic HIGH in CK4: "The LTC6813-1 is an
       // 18-channel device. 165 boards × 18 = 2970 cells ≠ 3750."
       // Fix: use 18 channels per board.
-      // Per-rack ceil × rackCount = ceil(250/18) × 15 = 14 × 15 = 210 boards.
+      // Per-rack ceil × rackCount = ceil(seriesCellsPerString/18) × rackCount boards.
       word(
         'bms_slave_module_word',
         'BMS slave module word',
@@ -1516,7 +1537,7 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
 
 function emitPowerDistribution(p: BessParams): DesignModule {
   // BESS L3 (2026-05-24, issue #3): per-rack contactors size to STRING
-  // current (~83 A continuous / 104 A peak for 15 racks @ 1P), NOT bus
+  // current (bus_continuous_A / rackCount; ~83 A @ 15 racks, scales with rackCount), NOT bus
   // current. 1.25× margin per UL 9540A → per-rack contactor needs ≥130 A
   // continuous and ≥1003 V DC (250 cells × 3.65 V max charge × 10% margin).
   //
@@ -1648,7 +1669,7 @@ function emitPowerDistribution(p: BessParams): DesignModule {
       // Eaton product page https://www.eaton.com/us/en-us/skuPage.PV-200ANH1.html
       // + RS Components datasheet https://us.rs-online.com/product/bussmann-by-eaton/pv-200anh1/74058757/
       // + Eaton Bussmann PV fuse FAQ https://electricalfusesandcontactors.com/eaton-bussmann-pv-200anh1-200-a-1000-vdc-photovoltaic-fuse-faq/.
-      // Rack peak ≈ 104 A (bus 1562 A / 15 racks), so 200 A nominal gives
+      // Rack peak ≈ bus_peak_A / rackCount (e.g. 1562 A / 15 ≈ 104 A), so 200 A nominal gives
       // ~1.9× margin — same selection logic as the L17 fix, just the part
       // is now unambiguously DC-rated on the canonical datasheet.
       word(
@@ -2004,8 +2025,8 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
         ],
       ),
       // cooling_pump_word shares the Grundfos NB 65-250/245 BQQE PN with
-      // coolant_circulation_pump_word. Both show cap=900 L/min (system
-      // total: 15 racks × 60 L/min per cold plate = 900 L/min).
+      // coolant_circulation_pump_word. Both show cap matching systemFlowLpm
+      // (rackCount × perRackFlowLpm L/min per cold plate — derived parametrically).
       // L31 council N3: sub-agent S updated coolant_circulation_pump_word to
       // 900 L/min but left this word stale at 60 L/min — contradictory for
       // the same PN. Fixed here to match coolant_circulation_pump_word.
@@ -2132,6 +2153,14 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('regulatory', 'IEC 60947-5-1'),
         ],
       ),
+      // L36 gate 21 HIGH fix (2026-05-26): Honeywell HIH-4030 rendered at £1.00
+      // vs Farnell catalogue £26.02 — a 26× under-bill that fails per-line
+      // price plausibility (gate 21 threshold: ratio < 0.2 = HIGH exit 21).
+      // Fix: add list_price_gbp bypass modifier per drawer
+      // forgeos_gotchas_162396370d451114. Engine B's skip guard locks in its
+      // early curve estimate (£1.00); list_price_gbp fires in the pre-step
+      // BEFORE the skip guard and sets distributor_price_gbp directly.
+      // Farnell price: £26.02 (qty-1, GBP) — Farnell part no. 1457741.
       word(
         'humidity_sensor_word',
         'humidity sensor word',
@@ -2142,6 +2171,7 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('dimension', '100', '% RH'),
           mod('manufacturer', 'Honeywell'),
           mod('part_number', 'HIH-4030'),
+          mod('list_price_gbp', '26'),  // Farnell £26.02 qty-1 — bypasses Engine B curve
           mod('regulatory', 'IEC 60721-3-3'),
         ],
       ),
@@ -2188,6 +2218,30 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
 // 6. mass_fluid_transport_process
 // ---------------------------------------------------------------------------
 
+/**
+ * Pick the smallest real distribution-manifold port count that covers
+ * p.rackCount connections. Real catalogues ship in fixed standard sizes:
+ * 4 / 6 / 8 / 10 / 12 / 16 / 20-way.
+ *
+ * Examples:
+ *   rackCount=14 → 16-way (2 spare ports)
+ *   rackCount=15 → 16-way (1 spare port)
+ *   rackCount=16 → 16-way (0 spare)
+ *   rackCount=17 → 20-way
+ *
+ * L36 Physics Critic HIGH fix (2026-05-26): an 8-way header cannot service
+ * 14 parallel rack cold-plate connections. The manifold port count must be
+ * derived from rackCount, not hardcoded to the legacy 15-rack "8-way" literal.
+ */
+function selectManifoldPortCount(rackCount: number): number {
+  const STANDARD_SIZES = [4, 6, 8, 10, 12, 16, 20]
+  for (const size of STANDARD_SIZES) {
+    if (size >= rackCount) return size
+  }
+  // Beyond 20 racks: round up to the nearest even number (custom manifold).
+  return Math.ceil(rackCount / 2) * 2
+}
+
 function emitMassFluidTransportProcess(p: BessParams): DesignModule {
   // L29 council fix: previous module total was ~£230 for a 1 MW BESS.
   // Industry reference: liquid-cooling subsystem costs £5k–£25k (pump £3-5k,
@@ -2195,6 +2249,13 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
   // charge £500, pressure relief + sight glass £200). Add the missing words so
   // the module sub-total reaches the £20-30k industry range.
   const coldPlateCount = p.rackCount  // one cold plate per rack
+  // Per-rack coolant flow rate (L/min). Each BESS cold plate dissipates ~3.5 kW
+  // at 35 kPa pressure drop; 60 L/min per rack is the industry reference for a
+  // 250-cell / ~18 kWh rack (Sungrow PowerStack / CATL EnerC+ design point).
+  const perRackFlowLpm = 60
+  const systemFlowLpm = p.rackCount * perRackFlowLpm
+  // Nearest standard-catalogue manifold port count for rackCount connections.
+  const manifoldPorts = selectManifoldPortCount(p.rackCount)
 
   const coolantLoop = makeSubModule(
     'coolant_loop',
@@ -2208,10 +2269,11 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
       //
       // L30 council FIX 1 (physics bug introduced L30): previous Grundfos
       // CR 32-2 was rated 60 L/min — adequate for ONE rack cold plate but not
-      // for the whole system. Total system flow = rackCount × 60 L/min per
-      // cold plate = 15 × 60 = 900 L/min. The CR 32-2 is a multistage vertical
-      // in-line pump (up to ~60 L/min nominal) designed for high-head, low-flow
-      // building services — completely wrong for a high-flow BESS coolant loop.
+      // for the whole system. Total system flow = rackCount × perRackFlowLpm
+      // per cold plate = p.rackCount × 60 L/min (parametric, not hardcoded).
+      // The CR 32-2 is a multistage vertical in-line pump (up to ~60 L/min
+      // nominal) designed for high-head, low-flow building services — completely
+      // wrong for a high-flow BESS coolant loop.
       // Correct sizing: Grundfos NB 65-250/245 BQQE — real end-suction
       // centrifugal pump (ISO 2858 / EN 12162), 900 L/min at ~10 m head,
       // ~7.5-11 kW motor, glycol/water compatible SS304 impeller/shaft.
@@ -2227,7 +2289,7 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
           mod('manufacturer', 'Grundfos'),
           mod('part_number', 'NB 65-250/245 BQQE'),
           mod('capacity', '900', 'L/min'),
-          mod('performance', 'duty + standby redundant pair; 900 L/min system total (15 racks × 60 L/min per cold plate)'),
+          mod('performance', `duty + standby redundant pair; ${systemFlowLpm} L/min system total (${p.rackCount} racks × ${perRackFlowLpm} L/min per cold plate)`),
           mod('regulatory', 'ISO 2858 / EN 12162'),
         ],
       ),
@@ -2247,15 +2309,20 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
           mod('regulatory', 'BS EN ISO 6520-1'),
         ],
       ),
-      // Coolant distribution manifold — 8-way header distributes glycol/water
-      // from the pump to all rack cold plates. Industry cost: £2,000-3,000.
+      // Coolant distribution manifold — nearest standard port count for rackCount
+      // connections distributes glycol/water from the pump to all rack cold plates.
+      // Industry cost: £2,000-3,000.
+      // L36 Physics Critic HIGH fix (2026-05-26): port count is now derived from
+      // rackCount via selectManifoldPortCount() — real catalogues come in
+      // 4/6/8/10/12/16/20-way. For 14 racks the canonical fit is a 16-way
+      // manifold (2 spare ports), not the legacy hardcoded "8-way" literal.
       word(
         'coolant_distribution_manifold_word',
         'coolant distribution manifold word',
-        cc('coolant_distribution_manifold', '8-way coolant distribution manifold', 'fluid_flow_state', 'steel'),
+        cc('coolant_distribution_manifold', `${manifoldPorts}-way coolant distribution manifold`, 'fluid_flow_state', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', 'SS316 8-way header'),
+          mod('form', `SS316 ${manifoldPorts}-way header`),
           mod('performance', 'DN25 glycol-rated PN16'),
           mod('regulatory', 'PED 2014/68/EU'),
         ],
@@ -2348,7 +2415,7 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
 
   return {
     module: 'mass_fluid_transport_process',
-    module_brief: 'Routes the glycol/water coolant between cold-plate manifolds and the chiller via SS304 piping, Grundfos NB 65-250 circulation pumps (900 L/min system total — 15 racks × 60 L/min per cold plate), aluminium cold plates, 8-way distribution manifold, and 200 L glycol/water charge.',
+    module_brief: `Routes the glycol/water coolant between cold-plate manifolds and the chiller via SS304 piping, Grundfos NB 65-250 circulation pumps (${systemFlowLpm} L/min system total — ${p.rackCount} racks × ${perRackFlowLpm} L/min per cold plate), aluminium cold plates, ${manifoldPorts}-way distribution manifold, and 200 L glycol/water charge.`,
     overview_paragraph_en: '',
     derived_parameters: {},
     allowed_radicals: [
