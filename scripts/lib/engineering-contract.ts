@@ -46,6 +46,12 @@
  * records + topology constraints + cost anchors.
  */
 
+import { MARKET_BANDS, type MarketBand } from '../../src/lib/pdf-engine-v2/lib/market-bands'
+
+// Re-export so callers can import MarketBand from here without needing the
+// full path to the shared lib.
+export type { MarketBand }
+
 // ---------------------------------------------------------------------------
 // TYPED QUANTITY — per GPT-5.5: "next bug class is basis-of-measure mismatch.
 // Add (value, unit, basis, scope, condition) fields to every quantity."
@@ -203,6 +209,12 @@ export interface EngineeringContract {
   // CANNOT advance to render unless all `fail` invariants are resolved.
   // Replaces the current Physics-Critic-after-the-fact loop.
   closures: ContractClosureResult[]
+
+  // Market band for this product class (Tristan directive 2026-05-26).
+  // Populated by resolveContractForState() from MARKET_BANDS lookup.
+  // Null when the product_class has no entry in MARKET_BANDS (e.g. TBD
+  // classes or very niche products). Renderer skips the band block when null.
+  market_band?: MarketBand | null
 }
 
 export interface ContractClosureResult {
@@ -436,7 +448,13 @@ export function buildContract(productClass: string, parsedBrief: any): Engineeri
   const canonical = ARCHETYPE_ALIASES[key] ?? key
   const builder = ARCHETYPE_REGISTRY[canonical]
   if (!builder) return null
-  return builder(parsedBrief)
+  const contract = builder(parsedBrief)
+  // Attach market_band from MARKET_BANDS table. Renderer uses this to draw
+  // the INDUSTRY BAND COMPARISON BLOCK on the cover. Null when not defined
+  // (TBD classes) — renderer skips the block gracefully.
+  // Try canonical slug first, then original key, then original productClass.
+  contract.market_band = MARKET_BANDS[canonical] ?? MARKET_BANDS[key] ?? MARKET_BANDS[productClass] ?? null
+  return contract
 }
 
 /**

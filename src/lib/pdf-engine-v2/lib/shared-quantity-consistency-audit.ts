@@ -145,6 +145,234 @@ export const SHARED_QUANTITY_ANCHORS: SharedQuantityAnchor[] = [
 
 ]
 
+// ── Cross-domain modifier leak detection ─────────────────────────────────────
+
+/**
+ * IrrelevantModifierRule — a rule that says a modifier PATTERN must NOT appear
+ * on words belonging to a given PART CLASS family.
+ *
+ * `part_class_pattern`    — matches word.id (or content_character.character_id).
+ *                           e.g. /electrical_|resistor|contactor|inverter|fuse/
+ * `forbidden_modifier`    — matches modifier value strings that are physically
+ *                           meaningless on the given part class.
+ * `severity`              — 'HIGH' triggers exit 24; 'MED' is logged but does not exit.
+ * `example`               — human-readable example for error messages.
+ *
+ * Architecture: universal table — new part classes add rows, not code.
+ * L39 [LOW] finding that motivated this: PN16 (fluid pressure nominal rating)
+ * appeared on a precharge_resistor (electrical wirewound part). Gate 24
+ * previously had no cross-domain pattern check — IRRELEVANT_MODIFIER_PATTERNS
+ * fills that gap and makes it class-universal.
+ */
+export interface IrrelevantModifierRule {
+  id: string
+  part_class_pattern: RegExp
+  forbidden_modifier: RegExp
+  severity: 'HIGH' | 'MED'
+  example: string
+  /** Optional: only apply to these product class prefixes. Undefined = all. */
+  class_scope?: string[]
+}
+
+/**
+ * IRRELEVANT_MODIFIER_PATTERNS — cross-domain modifier leak detector.
+ *
+ * Each row says: "if a word whose id matches part_class_pattern carries a
+ * modifier value matching forbidden_modifier, that is a physical impossibility
+ * (copy-paste error, cross-module contamination, or LLM hallucination)."
+ *
+ * ADDING A NEW RULE: add a new entry. The audit walks all words and checks
+ * every row. No other code changes required.
+ */
+export const IRRELEVANT_MODIFIER_PATTERNS: IrrelevantModifierRule[] = [
+  // ── Fluid pressure ratings on electrical parts ──────────────────────────
+  // "PN" = Pressure Nominal (DN/PN pipe rating system per EN 1333). PN16 = 16 bar.
+  // This is physically meaningless on electrical resistors, contactors, fuses,
+  // inverters, sensors, cables, or any electrical component.
+  // L39 [LOW]: PN16 on precharge_resistor (wirewound 1.9 kV HS100).
+  {
+    id: 'irrelevant_pn_on_electrical',
+    part_class_pattern: /resistor|contactor|inverter|fuse|relay|breaker|cable|busbar|connector|sensor|transducer|transformer|rectifier|bms|battery|cell|module|inverter|charger|switch|circuit_breaker|arc_flash|electrical|power_distribution|energy_conversion|control_compute/i,
+    forbidden_modifier: /\bPN\s*\d+\b/i,
+    severity: 'HIGH',
+    example: 'PN16 (pipe nominal pressure 16 bar) on a precharge_resistor — fluid pressure ratings have no meaning on electrical wirewound parts',
+    class_scope: undefined,  // universal — all classes
+  },
+  // ── Pressure/flow unit modifiers on electrical parts ────────────────────
+  // "bar", "MPa", "kPa" as standalone units are fluid-domain quantities.
+  // On electrical parts they indicate a copy-paste error from a fluid module.
+  // Exclusion: "mbar" acceptable on weather/environmental sensors (ambient pressure).
+  // Exclusion: regulatory modifiers may cite pressure test standards — exclude kind=regulatory.
+  {
+    id: 'irrelevant_bar_on_electrical',
+    part_class_pattern: /resistor|contactor|inverter|fuse|relay|breaker|cable|busbar|connector|bms|battery|cell|module|charger|switch|circuit_breaker|arc_flash|electrical/i,
+    // Match " bar" or "bar " but NOT "mbar" (millibar for env sensors) and NOT part of a word like "busbar"
+    forbidden_modifier: /(?<!\w)(?:(?:\d+(?:\.\d+)?)\s*bar\b|(?:\d+(?:\.\d+)?)\s*MPa\b|(?:\d+(?:\.\d+)?)\s*kPa\b)/i,
+    severity: 'HIGH',
+    example: '16 bar pressure rating on a DC contactor — bar/MPa/kPa are fluid-domain pressure units with no meaning on electrical switchgear',
+    class_scope: undefined,
+  },
+  // ── Fluid flow units on electrical parts ────────────────────────────────
+  // gpm, lpm, L/min, m³/h are fluid transport quantities.
+  // These appear on electrical words only via copy-paste from fluid modules.
+  {
+    id: 'irrelevant_flow_on_electrical',
+    part_class_pattern: /resistor|contactor|fuse|relay|breaker|cable|busbar|connector|bms|battery|cell|module|charger|switch|circuit_breaker|arc_flash|inverter/i,
+    forbidden_modifier: /\b\d+(?:\.\d+)?\s*(?:gpm|lpm|L\/min|l\/min|m³\/h|m3\/h)\b/i,
+    severity: 'HIGH',
+    example: '200 L/min flow rate on a DC circuit breaker — flow units belong to fluid transport modules, not electrical switchgear',
+    class_scope: undefined,
+  },
+  // ── Electrical current ratings on fluid transport parts ─────────────────
+  // Ampere (A) current ratings on pipes, valves, manifolds, pumps, or fluid
+  // fittings indicate cross-module contamination. Exception: pump motor current
+  // (typical "3A motor current") — but if the word_id is clearly a fluid fitting
+  // or pipe component, a current modifier is wrong.
+  {
+    id: 'irrelevant_current_on_fluid',
+    part_class_pattern: /pipe|valve|manifold|fitting|hose|tube|duct|nozzle|filter_housing|coolant_charge|glycol_charge|expansion_vessel|heat_exchanger/i,
+    forbidden_modifier: /\b\d+(?:\.\d+)?\s*A\b(?!\s*(?:mbar|ambient|atm))/,
+    severity: 'MED',
+    example: '89 A current rating on a coolant manifold — current ratings belong to electrical components, not fluid transport parts',
+    class_scope: undefined,
+  },
+  // ── Voltage ratings on fluid transport parts ────────────────────────────
+  // Voltage (V/kV) on pipes, valves, manifolds, fluid transport parts.
+  // Exception whitelist: contactor coil voltage is legitimate — but if the
+  // word_id is clearly a fluid fitting (pipe, valve, manifold, hose), V is wrong.
+  {
+    id: 'irrelevant_voltage_on_fluid',
+    part_class_pattern: /pipe|manifold|fitting|hose|tube|duct|nozzle|filter_housing|coolant_charge|glycol_charge|expansion_vessel/i,
+    forbidden_modifier: /\b\d+(?:\.\d+)?\s*(?:kV|V\s*DC|V\s*AC)\b/i,
+    severity: 'MED',
+    example: '800 V DC on a coolant manifold — voltage ratings belong to electrical components, not fluid transport parts',
+    class_scope: undefined,
+  },
+  // ── Frequency ratings on mechanical or fluid parts ───────────────────────
+  // Hz, kHz, MHz on pipes, tanks, vessels, structural parts, or coolant words.
+  {
+    id: 'irrelevant_frequency_on_mechanical_fluid',
+    part_class_pattern: /pipe|manifold|fitting|hose|vessel|tank|structural|floor|panel|enclosure_wall|coolant_charge|glycol_charge|expansion_vessel|bolt|weld/i,
+    forbidden_modifier: /\b\d+(?:\.\d+)?\s*(?:Hz|kHz|MHz)\b/i,
+    severity: 'MED',
+    example: '50 Hz on a steel structural panel — frequency ratings belong to electrical/electronic parts',
+    class_scope: undefined,
+  },
+]
+
+// ── Violation type for cross-domain checks ────────────────────────────────────
+
+export interface IrrelevantModifierViolation {
+  rule_id: string
+  severity: 'HIGH' | 'MED'
+  location: string  // "module_id::sub_module_id::word_id[modifier_kind]"
+  word_id: string
+  modifier_kind: string
+  modifier_value: string
+  example: string
+}
+
+/**
+ * runIrrelevantModifierAudit — walks every word's modifier_characters and
+ * checks all IRRELEVANT_MODIFIER_PATTERNS rules.
+ *
+ * Called in the same gate 24 invocation as runSharedQuantityConsistencyAudit.
+ * HIGH findings are accumulated into the shared exit-24 decision.
+ *
+ * @param modules   The design.modules array
+ * @param className Product class string (e.g. 'energy_storage/utility_containerised')
+ * @param rules     Rule registry — defaults to IRRELEVANT_MODIFIER_PATTERNS
+ */
+export function runIrrelevantModifierAudit(
+  modules: DesignModuleLike[],
+  className: string,
+  rules: IrrelevantModifierRule[] = IRRELEVANT_MODIFIER_PATTERNS,
+): {
+  violations: IrrelevantModifierViolation[]
+  high_count: number
+  med_count: number
+  passed: boolean
+  error_message: string | null
+} {
+  const classLower = className.toLowerCase()
+  const violations: IrrelevantModifierViolation[] = []
+
+  // Filter rules to those applicable to this product class.
+  const applicableRules = rules.filter((r) => {
+    if (!r.class_scope) return true
+    return r.class_scope.some((s) => classLower.includes(s.toLowerCase()))
+  })
+
+  const safeMods = Array.isArray(modules) ? modules : []
+
+  for (const m of safeMods) {
+    const moduleId = String(m?.module ?? 'unknown_module')
+    const subs = Array.isArray(m?.sub_modules) ? m.sub_modules : []
+
+    for (const sm of subs) {
+      const subModuleId = String(sm?.id ?? 'unknown_sub_module')
+      const words = Array.isArray(sm?.words) ? sm.words : []
+
+      for (const w of words) {
+        const wordId = String(w?.id ?? 'unknown_word')
+        const mods = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+
+        // Skip regulatory modifiers — they cite standards which may look like
+        // pressure/frequency specs (e.g. "BS EN 1333 PN16") but are not leaks.
+        const nonRegulatoryMods = mods.filter((mc) => mc?.kind !== 'regulatory')
+
+        for (const mc of nonRegulatoryMods) {
+          const rawValue = String(mc?.value ?? '')
+          if (!rawValue) continue
+
+          for (const rule of applicableRules) {
+            // Only check if word id matches the part class pattern
+            if (!rule.part_class_pattern.test(wordId)) continue
+            // Only flag if the forbidden modifier pattern matches the value
+            if (!rule.forbidden_modifier.test(rawValue)) continue
+
+            violations.push({
+              rule_id: rule.id,
+              severity: rule.severity,
+              location: `${moduleId}::${subModuleId}::${wordId}[${mc.kind ?? '?'}]`,
+              word_id: wordId,
+              modifier_kind: mc.kind ?? '?',
+              modifier_value: rawValue,
+              example: rule.example,
+            })
+          }
+        }
+      }
+    }
+  }
+
+  const highCount = violations.filter((v) => v.severity === 'HIGH').length
+  const medCount = violations.filter((v) => v.severity === 'MED').length
+  const passed = highCount === 0
+
+  let errorMessage: string | null = null
+  if (!passed) {
+    const lines = [
+      `[Gate 24 / exit 24] Cross-domain modifier leak FAIL — class: ${className}`,
+      `${highCount} HIGH violation(s), ${medCount} MED violation(s):`,
+    ]
+    for (const v of violations.filter((vv) => vv.severity === 'HIGH').slice(0, 10)) {
+      lines.push(`  ${v.rule_id} @ ${v.location}: value="${v.modifier_value}"`)
+      lines.push(`    Example: ${v.example}`)
+    }
+    if (medCount > 0) {
+      lines.push(`  + ${medCount} MED violation(s) (see full violations list)`)
+    }
+    lines.push('')
+    lines.push('Fix: remove cross-domain modifiers from the listed word IDs.')
+    lines.push('Root cause: copy-paste from a fluid/mechanical sub-module into an')
+    lines.push('electrical sub-module, or LLM hallucination of domain-wrong modifiers.')
+    errorMessage = lines.join('\n')
+  }
+
+  return { violations, high_count: highCount, med_count: medCount, passed, error_message: errorMessage }
+}
+
 // ── Public API ────────────────────────────────────────────────────────────────
 
 export interface AnchorViolation {

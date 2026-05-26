@@ -28,6 +28,13 @@ import { getClassHazards, computeHazardRPN, type ClassHazard } from '../src/lib/
 import { resolvePriceBand, type PriceBand, type PriceBandVerdict } from '../src/lib/pdf-engine-v2/class-price-bands'
 import { resolveCostStack, computeCostStack, type CostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 import { getToolNarrative } from '../src/lib/pdf-engine-v2/tool-narratives'
+import {
+  MARKET_BANDS,
+  classifyBandPosition,
+  computeDesignBandPosition,
+  type MarketBand,
+  type BandPosition,
+} from '../src/lib/pdf-engine-v2/lib/market-bands'
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
 
@@ -2030,6 +2037,164 @@ function ProvisionalClassRegistryAppendixBlock({
   )
 }
 
+// ─── Industry Band Comparison Block (Tristan directive 2026-05-26) ───────────
+//
+// Renders a bordered callout box directly below the cost-stack panel on the
+// cover, showing:
+//   • Commodity tier  £X–£Y/unit   (cheap alternative — Tier-1 China, no certs)
+//   • Premium tier    £A–£B/unit   (design's actual certified tier)
+//   • This design     £Z/unit  →  "upper edge of premium" or similar marker
+//   • Source line
+//   • 1-2 sentence narrative explaining why the design lands where it does
+//
+// Resolver: reads state.engineeringContract.market_band (set by buildContract).
+// Falls back to MARKET_BANDS direct lookup if the contract field is absent
+// (e.g. chains run before this field was introduced). Returns null component
+// when no band is available for the product class.
+
+/**
+ * Resolve the market band for a given state. Priority:
+ *   1. state.engineeringContract.market_band (set by buildContract at chain start)
+ *   2. MARKET_BANDS direct lookup by product_class (back-compat for older states)
+ */
+function resolveMarketBandFromState(state: any): MarketBand | null {
+  const contractBand = state?.engineeringContract?.market_band
+  if (contractBand && contractBand.product_class) return contractBand as MarketBand
+  const productClass = state?.moduleDecomposition?.product_class ?? state?.parsedBrief?.product_class ?? ''
+  if (!productClass) return null
+  return MARKET_BANDS[productClass] ?? MARKET_BANDS[String(productClass).toLowerCase()] ?? null
+}
+
+/**
+ * Build a 1-2 sentence narrative explaining the design's price position.
+ * Keeps the cover informative without requiring LLM involvement.
+ */
+function buildBandNarrative(position: BandPosition, band: MarketBand, computedPerUnit: number, state: any): string {
+  const unitLabel = band.output_unit
+  const fmt = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`
+  const computedFmt = `${fmt(computedPerUnit)}/${unitLabel}`
+  const productClass = band.product_class
+
+  // Pull premium notes excerpt (≤70 chars) for the narrative
+  const premiumExcerpt = band.tiers.premium.notes.split(':').slice(-1)[0]?.trim().split(',')[0] ?? ''
+
+  if (position === 'below commodity band') {
+    return `At ${computedFmt} this design is BELOW the commodity band floor of ${fmt(band.tiers.commodity.low_gbp)}/${unitLabel}. Verify BoM completeness — major subsystems may be missing or Engine B pricing is under-estimating a key assembly.`
+  }
+  if (position === 'mid commodity' || position === 'lower edge of commodity') {
+    return `At ${computedFmt} this design sits within the commodity tier (${fmt(band.tiers.commodity.low_gbp)}–${fmt(band.tiers.commodity.high_gbp)}/${unitLabel}). The component selection may include lower-certification parts; verify against the premium tier's regulatory requirements if UK/EU certification is required.`
+  }
+  if (position === 'upper edge of commodity') {
+    return `At ${computedFmt} this design is at the upper edge of the commodity tier (${fmt(band.tiers.commodity.low_gbp)}–${fmt(band.tiers.commodity.high_gbp)}/${unitLabel}), approaching premium territory. Component selection or certification scope may be driving cost above a standard commodity build.`
+  }
+  if (position === 'between commodity and premium') {
+    return `At ${computedFmt} this design falls between the commodity (${fmt(band.tiers.commodity.high_gbp)}/${unitLabel}) and premium (${fmt(band.tiers.premium.low_gbp)}/${unitLabel}) tiers — a position consistent with mid-tier certification and selective premium components.`
+  }
+  if (position === 'lower edge of premium') {
+    return `At ${computedFmt} this design sits at the lower edge of the premium-certified tier (${fmt(band.tiers.premium.low_gbp)}–${fmt(band.tiers.premium.high_gbp)}/${unitLabel}), reflecting the ${premiumExcerpt} component selection.`
+  }
+  if (position === 'mid premium') {
+    return `At ${computedFmt} this design is solidly within the premium-certified tier (${fmt(band.tiers.premium.low_gbp)}–${fmt(band.tiers.premium.high_gbp)}/${unitLabel}), consistent with the ${premiumExcerpt} specification.`
+  }
+  if (position === 'upper edge of premium') {
+    return `At ${computedFmt} this design sits at the upper edge of the premium-certified tier (${fmt(band.tiers.premium.low_gbp)}–${fmt(band.tiers.premium.high_gbp)}/${unitLabel}), reflecting the ${premiumExcerpt} component selection and full certification stack.`
+  }
+  if (position === 'above premium band') {
+    return `At ${computedFmt} this design EXCEEDS the premium band ceiling of ${fmt(band.tiers.premium.high_gbp)}/${unitLabel}. Verify no double-counted assemblies or confirm intentional above-market specification. The premium band notes: ${band.tiers.premium.notes.substring(0, 120)}.`
+  }
+  return `At ${computedFmt} this design is positioned within the ${productClass} market bands.`
+}
+
+/**
+ * IndustryBandBlock — rendered below the cost-stack panel on the cover.
+ * Returns null (no render) when no market band data is available.
+ */
+function IndustryBandBlock({
+  state,
+  costStack,
+}: {
+  state: any
+  costStack: CostStack | null | undefined
+}) {
+  const band = resolveMarketBandFromState(state)
+  if (!band) return null
+  if (!costStack || costStack.installed_asp_gbp <= 0) return null
+
+  const result = computeDesignBandPosition(costStack.installed_asp_gbp, state, band)
+  if (!result) return null
+
+  const { computed_per_unit, position } = result
+  const unitLabel = band.output_unit
+  const fmt = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`
+  const fmtDec = (n: number, dp = 0) => `£${n.toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp })}`
+
+  const narrative = buildBandNarrative(position, band, computed_per_unit, state)
+
+  // Colour for the "This design" position marker — amber for edges, green for
+  // in-premium, red for outside both bands.
+  const positionColour = (() => {
+    if (position === 'above premium band' || position === 'below commodity band') return '#9b1c1c'
+    if (position === 'mid premium' || position === 'lower edge of premium' || position === 'upper edge of premium') return '#065f46'
+    return '#92400e'
+  })()
+
+  const positionBg = (() => {
+    if (position === 'above premium band' || position === 'below commodity band') return '#fee2e2'
+    if (position === 'mid premium' || position === 'lower edge of premium' || position === 'upper edge of premium') return '#d1fae5'
+    return '#fef3c7'
+  })()
+
+  return (
+    <View style={{ marginTop: 10, padding: 10, borderWidth: 0.75, borderColor: '#94a3b8', borderRadius: 4, backgroundColor: '#f8fafc' }}>
+      <Text style={{ fontSize: 7.5, color: '#334155', letterSpacing: 1.1, marginBottom: 7 }}>
+        {`INDUSTRY £/${unitLabel.toUpperCase()} REFERENCE BAND`}
+      </Text>
+      {/* Commodity tier */}
+      <View style={{ flexDirection: 'row', marginBottom: 3 }}>
+        <Text style={{ fontSize: 8, color: '#64748b', width: 110 }}>Commodity tier</Text>
+        <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#334155', width: 110 }}>
+          {`${fmt(band.tiers.commodity.low_gbp)}–${fmt(band.tiers.commodity.high_gbp)}/${unitLabel}`}
+        </Text>
+        <Text style={{ fontSize: 7, color: '#64748b', flex: 1 }}>
+          {band.tiers.commodity.notes.length > 100 ? band.tiers.commodity.notes.substring(0, 97) + '...' : band.tiers.commodity.notes}
+        </Text>
+      </View>
+      {/* Premium tier */}
+      <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+        <Text style={{ fontSize: 8, color: '#64748b', width: 110 }}>Premium UK-certified</Text>
+        <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#334155', width: 110 }}>
+          {`${fmt(band.tiers.premium.low_gbp)}–${fmt(band.tiers.premium.high_gbp)}/${unitLabel}`}
+        </Text>
+        <Text style={{ fontSize: 7, color: '#64748b', flex: 1 }}>
+          {band.tiers.premium.notes.length > 100 ? band.tiers.premium.notes.substring(0, 97) + '...' : band.tiers.premium.notes}
+        </Text>
+      </View>
+      {/* This design position */}
+      <View style={{ flexDirection: 'row', alignItems: 'flex-start', paddingTop: 6, borderTopWidth: 0.5, borderTopColor: '#cbd5e1' }}>
+        <Text style={{ fontSize: 8, color: '#64748b', width: 110 }}>This design</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+          <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: '#0f172a' }}>
+            {`${fmtDec(computed_per_unit, 0)}/${unitLabel}`}
+          </Text>
+          <View style={{ marginLeft: 8, paddingHorizontal: 5, paddingVertical: 2, backgroundColor: positionBg, borderRadius: 3 }}>
+            <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: positionColour }}>
+              {position}
+            </Text>
+          </View>
+        </View>
+      </View>
+      {/* Narrative */}
+      <Text style={{ fontSize: 7.5, color: '#475569', marginTop: 6, lineHeight: 1.4 }}>
+        {narrative}
+      </Text>
+      {/* Source */}
+      <Text style={{ fontSize: 6.5, color: '#94a3b8', marginTop: 5, fontStyle: 'italic' }}>
+        {`Source: ${band.source}`}
+      </Text>
+    </View>
+  )
+}
+
 // ─── Cover ──────────────────────────────────────────────────────────────────
 
 // Engine D cost-stack row — one £-amount line on the cover-page breakdown.
@@ -2310,6 +2475,7 @@ function CoverPage({
           // two-column row so BOTH appear on page 1 — left column (~55%)
           // holds the cost stack, right column (~45%) holds the hero. When
           // there's no hero, the panel stays full-width as before.
+          <>
           <View style={(heroImagePath || briefEnvelope)
             ? { marginTop: 14, flexDirection: 'row', alignItems: 'flex-start' }
             : { marginTop: 14 }}>
@@ -2445,6 +2611,13 @@ function CoverPage({
             <View style={{ flex: 45 }} />
           )}
           </View>
+          {/* Industry Band Comparison Block (Tristan directive 2026-05-26).
+              Rendered full-width below the two-column cost-stack + hero row.
+              IndustryBandBlock returns null when no band exists for this class,
+              so the cover layout is unchanged for classes without a MARKET_BANDS
+              entry. */}
+          <IndustryBandBlock state={state} costStack={costStack} />
+          </>
         ) : bomTotals ? (
           // Fallback when no cost-stack ratios resolve — show the legacy
           // single-number card so the cover never goes blank.

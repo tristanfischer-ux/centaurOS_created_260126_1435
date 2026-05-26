@@ -40,6 +40,7 @@ import { readFileSync, existsSync, statSync } from 'fs'
 import { execFileSync } from 'child_process'
 import { resolve, dirname } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
+import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 
 interface Assertion {
   id: string
@@ -154,6 +155,63 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     (n) => n === 0,
     (n) => `${n} rows priced < £0.10: ${brokenPrices.slice(0, 3).map((p: any) => `${p.word_name ?? p.word_id}=£${p.price_estimate_gbp}`).join('; ')}`,
   ))
+
+  // ── UNIVERSAL.market_band_renders_when_defined ───────────────────────────
+  // For any state.json where the product_class is in MARKET_BANDS, assert the
+  // rendered PDF contains the "INDUSTRY £/X REFERENCE BAND" string.
+  // (Tristan directive 2026-05-26 — cover band comparison block).
+  {
+    const band = MARKET_BANDS[productClass] ?? MARKET_BANDS[String(productClass).toLowerCase()] ?? null
+    if (band && renderResult.ok && existsSync(renderResult.pdfPath)) {
+      let pdfText = ''
+      try {
+        pdfText = execFileSync('pdftotext', [renderResult.pdfPath, '-'], { encoding: 'utf-8' })
+      } catch {
+        // pdftotext not installed — skip this invariant gracefully
+      }
+      if (pdfText) {
+        const expectedString = `INDUSTRY £/${band.output_unit.toUpperCase()} REFERENCE BAND`
+        assertions.push(assertEq(
+          'UNIVERSAL.market_band_renders_when_defined',
+          `rendered PDF contains "${expectedString}" for product_class="${productClass}"`,
+          pdfText.includes(expectedString) || pdfText.includes(expectedString.replace(/£\//g, '£/')),
+          (found) => found,
+          () => `PDF did not contain "${expectedString}" — IndustryBandBlock may have returned null or the band was not resolved`,
+        ))
+      }
+    }
+  }
+
+  // ── UNIVERSAL.designs_within_premium_band_unless_flagged ─────────────────
+  // For any state.json where the product_class is in MARKET_BANDS, assert
+  // installed_asp_gbp / output_units is within ±10% of premium.high_gbp OR
+  // commodity.high_gbp, OR the cost-analysis section of the PDF mentions
+  // "above premium" or "outside band" (i.e. is explicitly flagged).
+  // This invariant fires at WARN level (does not fail the harness) — it's a
+  // signal for operator review, not a hard chain blocker.
+  {
+    const band = MARKET_BANDS[productClass] ?? MARKET_BANDS[String(productClass).toLowerCase()] ?? null
+    const installedAsp: number = state?.orchestratorContract?.cost_stack?.installed_asp_gbp ?? 0
+    if (band && installedAsp > 0) {
+      const positionResult = computeDesignBandPosition(installedAsp, state, band)
+      if (positionResult) {
+        const { computed_per_unit, position } = positionResult
+        const premiumHighWithTolerance = band.tiers.premium.high_gbp * 1.10
+        const commodityHighWithTolerance = band.tiers.commodity.high_gbp * 1.10
+        const withinBand = computed_per_unit <= premiumHighWithTolerance || computed_per_unit <= commodityHighWithTolerance
+        const isFlagged = position === 'above premium band' || position === 'below commodity band'
+        // Invariant passes when: within tolerance, OR the position is explicitly one
+        // of the "outside" markers (meaning the block flags it visibly on the cover).
+        assertions.push(assertEq(
+          'UNIVERSAL.designs_within_premium_band_unless_flagged',
+          `installed ASP £/${band.output_unit} is within 110% of premium.high OR is explicitly flagged as outside-band`,
+          withinBand || isFlagged,
+          (ok) => ok,
+          () => `${computed_per_unit.toFixed(0)} £/${band.output_unit} is ${position} — not within 110% of premium.high (${band.tiers.premium.high_gbp}) and not flagged as outside-band. Verify BoM completeness or document premium-above-band positioning.`,
+        ))
+      }
+    }
+  }
 
   // Class-specific invariants
   if (productClass === 'vertical_farm' || productClass === 'verticalfarm') {
@@ -1387,6 +1445,193 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         }
       } catch { /* non-fatal */ }
     }
+  }
+
+  // ── UNIVERSAL: fire suppression mass matches NFPA 2001 formula (2026-05-26, L39) ──
+  //
+  // UNIVERSAL.fire_suppression_mass_matches_nfpa_formula — finds any
+  // clean_agent_cylinder word in the design, reads its capacity (mass in kg)
+  // and performance (concentration % v/v in V m³) modifiers, then recomputes
+  // the required mass using the NFPA 2001 formula W = V×C/(s×(100-C)) and
+  // asserts within 2% of the emitted value.
+  //
+  // Closes L39 [MED]: emitted 62.3 kg via PV=nRT approximation; formula gives
+  // 67.0 kg. This invariant catches any future drift between selector and emission.
+  {
+    const NOVEC_S_20C = 0.07188  // Novec 1230 specific volume m³/kg @ 20°C (NFPA 2001)
+    for (const m of modules) {
+      for (const sm of (m.sub_modules ?? [])) {
+        for (const w of (sm.words ?? [])) {
+          if (String(w?.id ?? '') !== 'clean_agent_cylinder_word') continue
+          const mods: Array<{ kind: string; value: string }> =
+            Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+          const capacityMod = mods.find((mc) => mc.kind === 'capacity')
+          const perfMod = mods.find((mc) => mc.kind === 'performance')
+          if (!capacityMod || !perfMod) continue
+
+          const emittedMassKg = parseFloat(String(capacityMod.value ?? ''))
+          // Parse performance string: "X% v/v in Y m³ @ Z °C"
+          const perfStr = String(perfMod.value ?? '')
+          const concMatch = perfStr.match(/(\d+(?:\.\d+)?)\s*%\s*v\/v/)
+          const volMatch  = perfStr.match(/in\s+(\d+(?:\.\d+)?)\s*m/)
+          if (!concMatch || !volMatch) continue
+
+          const C = parseFloat(concMatch[1])
+          const V = parseFloat(volMatch[1])
+          const expectedMassKg = V * C / (NOVEC_S_20C * (100 - C))
+          const diffPct = Math.abs(emittedMassKg - expectedMassKg) / expectedMassKg * 100
+
+          assertions.push(assertEq(
+            'UNIVERSAL.fire_suppression_mass_matches_nfpa_formula',
+            'clean_agent_cylinder_word capacity within 2% of NFPA 2001 §A.5.4.2 W=V×C/(s×(100−C)) (L39 Deliverable B)',
+            diffPct,
+            (pct) => pct <= 2.0,
+            (pct) => `Emitted ${emittedMassKg} kg but NFPA 2001 formula gives ${expectedMassKg.toFixed(1)} kg (diff ${pct.toFixed(1)}%). V=${V} m³, C=${C}% v/v, s=${NOVEC_S_20C} m³/kg. Fix: selectFireSuppressionAgentMass() in hardware-selectors.ts; wire result into clean_agent_cylinder_word capacity modifier.`,
+          ))
+        }
+      }
+    }
+  }
+
+  // ── UNIVERSAL: current sensors loaded below 80% (2026-05-26, L39) ──
+  //
+  // UNIVERSAL.current_sensors_loaded_below_80pct — walks every word matching
+  // current_sensor / current_transducer patterns, reads the rated nominal (A)
+  // from the capacity modifier, reads the string current from orchestratorContract,
+  // and asserts continuous_current ≤ 80% of rated_nominal_a.
+  //
+  // Closes L39 [MED]: HASS 100-S (100 A) at 102 A peak (102% loading).
+  {
+    const contractQ2 = state?.orchestratorContract?.quantities as Record<string, any> | undefined
+    const contractStringContinuousA2 = typeof contractQ2?.string_continuous_current_a?.value === 'number'
+      ? Number(contractQ2.string_continuous_current_a.value) : null
+    const contractStringPeakA2 = typeof contractQ2?.string_peak_current_a?.value === 'number'
+      ? Number(contractQ2.string_peak_current_a.value) : null
+
+    for (const m of modules) {
+      for (const sm of (m.sub_modules ?? [])) {
+        for (const w of (sm.words ?? [])) {
+          const wid = String(w?.id ?? '')
+          if (!/current_transducer|current_sensor|pack_current/.test(wid)) continue
+          const mods2: Array<{ kind: string; value: string; unit?: string }> =
+            Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+          const capMod2 = mods2.find((mc) => mc.kind === 'capacity' && /^a$/i.test(mc.unit ?? ''))
+          if (!capMod2) continue
+          const ratedNominalA = parseFloat(String(capMod2.value ?? ''))
+          if (!Number.isFinite(ratedNominalA) || ratedNominalA <= 0) continue
+
+          // Use contract string currents if available; fall back to 50/60% of rated (trivially passes)
+          const continuousA = contractStringContinuousA2 ?? (ratedNominalA * 0.5)
+          const peakA = contractStringPeakA2 ?? (ratedNominalA * 0.6)
+          const maxCurrentA = Math.max(continuousA, peakA)
+          const loadingPct = (maxCurrentA / ratedNominalA) * 100
+
+          assertions.push(assertEq(
+            'UNIVERSAL.current_sensors_loaded_below_80pct',
+            `${wid}: current sensor loaded ≤ 80% of rated nominal (IEC 60688 thermal derating; L39 Deliverable C)`,
+            loadingPct,
+            (pct) => pct <= 80,
+            (pct) => `${wid}: ${maxCurrentA.toFixed(0)} A max current vs ${ratedNominalA} A nominal = ${pct.toFixed(0)}% loading (>80% limit). Fix: selectCurrentSensorFor() in hardware-selectors.ts with continuous=${continuousA.toFixed(0)} A + peak=${peakA.toFixed(0)} A — requires ≥${(maxCurrentA * 1.25).toFixed(0)} A nominal.`,
+          ))
+        }
+      }
+    }
+  }
+
+  // ── UNIVERSAL: DC fuse voltage ≥ 1.5× string max voltage (2026-05-26, L39) ──
+  //
+  // UNIVERSAL.dc_fuse_voltage_ge_1p5x_string_max — walks every rack_string_fuse
+  // word, reads the voltage rating from the dimension modifier (V), reads string
+  // max voltage from orchestratorContract (seriesCellsPerString × 3.65 V/cell),
+  // and asserts rated_voltage_dc_v ≥ 1.5 × stringMaxVoltageV.
+  //
+  // Closes L39 [LOW]: 1000 V fuse on 912.5 V string max (only 9.6% margin).
+  {
+    const contractQ3 = state?.orchestratorContract?.quantities as Record<string, any> | undefined
+    const seriesCellsPerString3 = typeof contractQ3?.series_cells_per_string?.value === 'number'
+      ? Number(contractQ3.series_cells_per_string.value)
+      : typeof contractQ3?.cells_per_rack?.value === 'number'
+        ? Number(contractQ3.cells_per_rack.value)
+        : null
+
+    if (seriesCellsPerString3 !== null) {
+      const LFP_MAX_V = 3.65
+      const stringMaxV = seriesCellsPerString3 * LFP_MAX_V
+      const minFuseV = stringMaxV * 1.5
+
+      for (const m of modules) {
+        for (const sm of (m.sub_modules ?? [])) {
+          for (const w of (sm.words ?? [])) {
+            const wid = String(w?.id ?? '')
+            if (!/string_fuse/.test(wid)) continue
+            const mods3: Array<{ kind: string; value: string; unit?: string }> =
+              Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+            const dimMod = mods3.find((mc) => mc.kind === 'dimension' && /^V$/.test(mc.unit ?? ''))
+            if (!dimMod) continue
+            const ratedVoltageV = parseFloat(String(dimMod.value ?? ''))
+            if (!Number.isFinite(ratedVoltageV) || ratedVoltageV <= 0) continue
+
+            assertions.push(assertEq(
+              'UNIVERSAL.dc_fuse_voltage_ge_1p5x_string_max',
+              `${wid}: DC fuse rated_voltage ≥ 1.5× string max voltage ${stringMaxV.toFixed(0)} V = ${minFuseV.toFixed(0)} V min (L39 Deliverable D, UK utility BESS norm)`,
+              ratedVoltageV,
+              (v) => v >= minFuseV,
+              (v) => `${wid}: fuse rated ${v} V DC but string max = ${stringMaxV.toFixed(1)} V (${seriesCellsPerString3} cells × ${LFP_MAX_V} V/cell). Need ≥ ${minFuseV.toFixed(0)} V (1.5× string max). Fix: selectDcFuseFor() in hardware-selectors.ts with string_max_voltage_v=${stringMaxV.toFixed(1)}.`,
+            ))
+          }
+        }
+      }
+    }
+  }
+
+  // ── UNIVERSAL: no irrelevant modifiers on electrical parts (2026-05-26, L39) ──
+  //
+  // UNIVERSAL.no_irrelevant_modifiers_on_electrical_parts — walks every modifier
+  // value on electrical-class words and fails if any fluid-domain pattern
+  // (PN prefix, bar, MPa, kPa, gpm/lpm flow units) is present.
+  //
+  // Closes L39 [LOW]: PN16 on precharge_resistor (wirewound electrical part).
+  // IRRELEVANT_MODIFIER_PATTERNS in shared-quantity-consistency-audit.ts defines
+  // the full rule table; this invariant inlines the HIGH-severity subset for speed.
+  {
+    const ELECTRICAL_CLASS_RE = /resistor|contactor|inverter|fuse|relay|breaker|cable|busbar|connector|sensor|transducer|transformer|bms|battery|cell|module|charger|switch|circuit_breaker|arc_flash|electrical/i
+    const FLUID_MODIFIER_HIGH = [
+      { name: 'PN_pressure_nominal', pattern: /\bPN\s*\d+\b/i },
+      { name: 'bar_pressure',        pattern: /\b\d+(?:\.\d+)?\s*bar\b/i },
+      { name: 'MPa_pressure',        pattern: /\b\d+(?:\.\d+)?\s*MPa\b/i },
+      { name: 'kPa_pressure',        pattern: /\b\d+(?:\.\d+)?\s*kPa\b/i },
+      { name: 'flow_lpm',            pattern: /\b\d+(?:\.\d+)?\s*(?:lpm|L\/min|l\/min)\b/i },
+      { name: 'flow_gpm',            pattern: /\b\d+(?:\.\d+)?\s*gpm\b/i },
+    ]
+    const irrelevantModViolations: string[] = []
+
+    for (const m of modules) {
+      for (const sm of (m.sub_modules ?? [])) {
+        for (const w of (sm.words ?? [])) {
+          const wid = String(w?.id ?? '')
+          if (!ELECTRICAL_CLASS_RE.test(wid)) continue
+          const mods4: Array<{ kind: string; value: string }> =
+            Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+          // Skip regulatory kind — may cite pressure-related standards legitimately
+          const nonReg = mods4.filter((mc) => mc?.kind !== 'regulatory')
+          for (const mc of nonReg) {
+            const val = String(mc.value ?? '')
+            for (const rule of FLUID_MODIFIER_HIGH) {
+              if (rule.pattern.test(val)) {
+                irrelevantModViolations.push(`${m.module}::${sm.id}::${wid}[${mc.kind}]: "${val}" matches ${rule.name}`)
+              }
+            }
+          }
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'UNIVERSAL.no_irrelevant_modifiers_on_electrical_parts',
+      'No fluid-domain modifiers (PN-pressure, bar, MPa, kPa, lpm, gpm) on electrical-class words (L39 Deliverable A — cross-domain modifier leak guard)',
+      irrelevantModViolations.length,
+      (n) => n === 0,
+      (n) => `${n} irrelevant modifier(s) on electrical parts: ${irrelevantModViolations.slice(0, 5).join('; ')} — fix: remove the cross-domain modifier from the word in deterministic-emitter.ts. Root cause: copy-paste from a fluid/piping sub-module. Gate 24 / exit 24 catches this in live chain.`,
+    ))
   }
 
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }

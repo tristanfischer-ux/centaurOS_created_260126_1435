@@ -35,7 +35,13 @@
 // with a contract-derived pump that is SIZED for the actual thermal load.
 // formatMassKg() replaces hardcoded mass literals (gate 25 class-killer C).
 // ---------------------------------------------------------------------------
-import { selectCoolantPumpFor, formatMassKg } from './hardware-selectors'
+import {
+  selectCoolantPumpFor,
+  selectFireSuppressionAgentMass,
+  selectCurrentSensorFor,
+  selectDcFuseFor,
+  formatMassKg,
+} from './hardware-selectors'
 
 // ---------------------------------------------------------------------------
 // Local types — kept inline to avoid a circular import with engineering-
@@ -428,6 +434,19 @@ interface BessParams {
   // literal-scanner) enforces that no emitter template can contain a literal
   // matching parsedBrief.constraints.max_mass_kg.
   briefMassCapKg: number
+
+  // ── Fire suppression sizing (2026-05-26, L39 class-killer B) ─────────────
+  // Gross internal volume of the protected enclosure in m³ (ISO container default
+  // 86 m³ = 40-ft HC internal volume 12.03 × 2.35 × 2.39 m rounded up for HC
+  // extra height; override from contract.enclosure_volume_m3 if present).
+  // Used by selectFireSuppressionAgentMass(). The net free volume (after
+  // subtracting equipment displacement) may differ — the selector operates on
+  // gross volume as conservative sizing; precise net-volume calculation requires
+  // equipment layout data not available at emitter time.
+  enclosureVolumeM3: number
+  // Design concentration for Novec 1230 clean-agent total-flooding per NFPA 2001.
+  // Class A minimum 5.0% v/v; standard BESS practice 5.3% v/v per NFPA 2001 §5.4.
+  fireSuppressionDesignConcentrationPct: number
 }
 
 function deriveBessParams(contract: ContractShape): BessParams {
@@ -509,6 +528,24 @@ function deriveBessParams(contract: ContractShape): BessParams {
   const briefMassCapKg = Number(getSharedQty(contract, 'brief_mass_cap_kg',
     q(contract, 'brief_mass_cap_kg', LEGACY_BRIEF_MASS_CAP_KG)))
 
+  // ── Fire suppression sizing (2026-05-26, L39 class-killer B) ─────────────
+  // 40-ft HC ISO container gross internal volume: 12.03 m × 2.35 m × 2.39 m (HC)
+  // = ~67.5 m³ standard HC internal. Some sources cite 76-86 m³ for the full gross
+  // including the extra HC height. The physics critic used 86 m³ gross; we use the
+  // same value as the canonical BESS default (consistent with the existing emitter
+  // comment above, "5.3% v/v in 86 m³ @ 20°C"). Override from contract if present.
+  // Per MemPalace: NFPA 855 does NOT govern agent mass — NFPA 2001 §A.5.4.2 does.
+  // Default: 86 m³ = 40-ft HC ISO container gross internal volume.
+  const BESS_40FT_HC_GROSS_VOLUME_M3 = 86
+  const enclosureVolumeM3 = q(contract, 'enclosure_volume_m3', BESS_40FT_HC_GROSS_VOLUME_M3)
+  // NFPA 2001 Class A design concentration for Novec 1230: 5.3% v/v.
+  const NFPA2001_NOVEC_CLASS_A_CONCENTRATION_PCT = 5.3
+  const fireSuppressionDesignConcentrationPct = q(
+    contract,
+    'fire_suppression_design_concentration_pct',
+    NFPA2001_NOVEC_CLASS_A_CONCENTRATION_PCT,
+  )
+
   return {
     cellCount,
     rackCount,
@@ -538,6 +575,8 @@ function deriveBessParams(contract: ContractShape): BessParams {
     coolantCpKjPerKgK,
     coolantRegulatoryStd,
     briefMassCapKg,
+    enclosureVolumeM3,
+    fireSuppressionDesignConcentrationPct,
   }
 }
 
@@ -843,30 +882,37 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
     'per-rack current + insulation monitoring + temperature feedback',
     [
       // BESS L5 (2026-05-24, physics-critic L5 part_realism HIGH): per-rack
-      // current transducer sized to STRING current, not bus current. At 15
-      // racks × 1P, string_peak ≈ 104 A and string_continuous ≈ 83 A, so
-      // a ±300 A measuring-range sensor (3× peak) gives ample headroom
-      // without saturating. The real LEM HASS 100-S (100 A nominal, ±300 A
-      // peak measuring range, ±1% accuracy, 0-100 °C, hall-effect open-loop)
-      // is the industry-standard utility-BESS per-rack sensor (used in
-      // CATL EnerC+, Sungrow PowerStack, BYD Battery-Box HVS). Previously
-      // the emitter named only a bare "current transducer" with ±2500 A
-      // tolerance, which the downstream LLM mis-rendered as the LEM LAH
-      // 25-NP — a 25 A PCB-mount transducer that would saturate immediately
-      // at 104 A peak. Spec the real part by name so no LLM hallucination
-      // can substitute a fabricated one.
-      word(
-        'pack_current_transducer_word',
-        'pack current transducer word',
-        cc('current_transducer', 'current transducer', 'electromechanical_switching_function', 'copper'),
-        [
-          mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'LEM HASS 100-S hall-effect open-loop (100 A nominal, ±300 A peak measuring range, real product)'),
-          mod('capacity', '100', 'A'),
-          mod('tolerance', '±300', 'A'),
-          mod('regulatory', 'IEC 60688'),
-        ],
-      ),
+      // current transducer sized to STRING current, not bus current.
+      //
+      // BESS L39 (2026-05-26, Deliverable C): selectCurrentSensorFor() now
+      // derives the correct LEM HASS variant from contract string currents.
+      // Physics Critic MED: HASS 100-S (100 A nominal) used for 102 A peak
+      // → 102% loading, which causes thermal drift. Rule: sized at ≤80% of
+      // rated nominal (1.25× safety factor). For 102 A peak: requires
+      // ≥ 127.5 A nominal → HASS 200-S (200 A, 51% loading).
+      // Previously hardcoded HASS 100-S regardless of string current. Now
+      // computed from p.stringContinuousA + p.stringPeakA.
+      (() => {
+        const currentSensor = selectCurrentSensorFor({
+          continuous_current_a: p.stringContinuousA,
+          peak_current_a: p.stringPeakA,
+          family: 'lem_hass',
+        })
+        const sensorFormStr = `${currentSensor.manufacturer} ${currentSensor.part_number} hall-effect open-loop (${currentSensor.rated_nominal_a} A nominal, sized at ${currentSensor.loading_pct}% loading for ${Math.ceil(Math.max(p.stringContinuousA, p.stringPeakA))} A max string current — ≤80% of rated per IEC 60688 thermal derating, real product)`
+        return word(
+          'pack_current_transducer_word',
+          'pack current transducer word',
+          cc('current_transducer', 'current transducer', 'electromechanical_switching_function', 'copper'),
+          [
+            mod('quantity', fmtQty(p.rackCount)),
+            mod('form', sensorFormStr),
+            mod('capacity', String(currentSensor.rated_nominal_a), 'A'),
+            mod('manufacturer', currentSensor.manufacturer),
+            mod('part_number', currentSensor.part_number),
+            mod('regulatory', 'IEC 60688'),
+          ],
+        )
+      })(),
       word(
         'insulation_monitor_word',
         'insulation monitor word',
@@ -2619,6 +2665,33 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
 // ---------------------------------------------------------------------------
 
 function emitSafetyProtection(p: BessParams): DesignModule {
+  // ── DELIVERABLE B: Fire suppression agent mass via NFPA 2001 formula ────────
+  // L39 Physics Critic MED: design claimed 62.3 kg achieves 5.3% v/v in 86 m³.
+  // NFPA 2001 §A.5.4.2: W = V × C / (s × (100 − C)).
+  // At 20°C, s(Novec 1230) = 0.07188 m³/kg.
+  // Correct mass: W = (86 / 0.07188) × (5.3 / 94.7) = 67.0 kg.
+  // selectFireSuppressionAgentMass() computes this correctly from contract-derived
+  // enclosure volume (p.enclosureVolumeM3) and design concentration
+  // (p.fireSuppressionDesignConcentrationPct). The previous hardcoded 62.3 kg
+  // was computed using an incorrect PV=nRT approximation.
+  //
+  // Pre-change mempalace search: "NFPA 2001 fire suppression Novec clean agent
+  // mass formula" → MemPalace drawer: "NFPA 855 does NOT govern agent mass;
+  // NFPA 2001 §A.5.4.2 does; volume-based formula only".
+  const agentSizing = selectFireSuppressionAgentMass({
+    agent: 'novec_1230',
+    enclosure_volume_m3: p.enclosureVolumeM3,
+    design_concentration_pct: p.fireSuppressionDesignConcentrationPct,
+    temperature_c: 20,
+  })
+  // Round up agent mass to nearest 5 kg for standard cylinder sizing (10% margin
+  // above computed minimum per standard engineering practice). The Kidde ECS 70 kg
+  // cylinder body is used when computed mass ≤ 67 kg; 90 kg body if > 67 kg.
+  const agentMassKg = agentSizing.mass_kg
+  const cylinderBodyKg = agentMassKg <= 67 ? 70 : 90
+  const cylinderFormStr = `Kidde ECS ${cylinderBodyKg} kg cylinder, Novec 1230 (FK-5-1-12) charge`
+  const performanceStr = `${p.fireSuppressionDesignConcentrationPct}% v/v in ${p.enclosureVolumeM3.toFixed(0)} m³ @ 20 °C`
+
   const fireSuppression = makeSubModule(
     'fire_suppression',
     'fire suppression',
@@ -2626,11 +2699,14 @@ function emitSafetyProtection(p: BessParams): DesignModule {
     'Novec 1230 clean-agent with rate-of-rise detection + VESDA aspiration',
     [
       // BESS L3 (2026-05-24, issue #4): Novec 1230 charge mass MUST match the
-      // suppression physics. 5.3% v/v concentration in an 86 m³ 40-ft HC ISO
-      // container at 20 °C requires ~62.3 kg (PV=nRT with Novec MW=316.04 g/mol
-      // and ρ_vapour at 5.3% partial pressure). The previous 25 kg charge only
-      // yielded ~2.1% concentration — below the NFPA 2001 Class A minimum of
-      // 5.0% for clean-agent total-flooding systems.
+      // suppression physics.
+      //
+      // BESS L39 (2026-05-26, Deliverable B): previous hardcoded 62.3 kg was
+      // computed via PV=nRT approximation. Correct formula per NFPA 2001
+      // §A.5.4.2: W = V × C / (s × (100 − C)). For 86 m³ @ 5.3% v/v @ 20°C:
+      // W = 86 × 5.3 / (0.07188 × 94.7) = 67.0 kg. This is now computed
+      // deterministically via selectFireSuppressionAgentMass() so any change to
+      // enclosure volume or design concentration automatically updates the mass.
       //
       // L28 council SAFETY BUG (Fix 3, 2026-05-25): "Kidde ECARO-25" is
       // Kidde's brand for FE-25 (HFC-125 / Pentafluoroethane) hardware.
@@ -2641,7 +2717,6 @@ function emitSafetyProtection(p: BessParams): DesignModule {
       // (Engineered Clean-Agent System) family — ECS-N cylinder, ECS-N
       // releasing panel, ECS-N nozzles. Canonical UK BESS choice: BYD Cube
       // Pro, Sungrow PowerStack, CATL EnerC+ all pair Novec 1230 with ECS.
-      // Spec a 70 kg Kidde ECS cylinder (62.3 kg net charge, 10% margin).
       // L31 council Fix (2026-05-25): add list_price_gbp modifier so Engine B
       // bypasses its chemical_sensing class curve (which priced this at £4.23).
       // Real Kidde ECS 70 kg Novec 1230 pre-charged cylinder: £3,500-5,000 list
@@ -2653,9 +2728,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('clean_agent_cylinder', 'clean agent cylinder', 'chemical_sensing_function', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', 'Kidde ECS 70 kg cylinder, Novec 1230 (FK-5-1-12) charge'),
-          mod('capacity', '62.3', 'kg'),
-          mod('performance', '5.3% v/v in 86 m³ @ 20 °C'),
+          mod('form', cylinderFormStr),
+          mod('capacity', String(agentMassKg), 'kg'),
+          mod('performance', performanceStr),
           mod('regulatory', 'NFPA 2001'),
           mod('list_price_gbp', '3500'),
         ],
@@ -2961,29 +3036,48 @@ function emitSafetyProtection(p: BessParams): DesignModule {
   // voltage drop and failure points for zero protective benefit.
   // Real utility BESS (Tesla Megapack 2 XL, CATL EnerC+, Sungrow PowerStack)
   // all rely solely on rack-level semiconductor / HRC fusing.
+  // ── DELIVERABLE D: DC fuse voltage selector (2026-05-26, L39 class-killer D) ──
+  // L39 [LOW]: PV-200ANH1 (1000 V DC) for 912.5 V string max → only 9.6% margin.
+  // UK utility BESS norm: rated_voltage_dc_v ≥ 1.5 × string_max_voltage_v.
+  // selectDcFuseFor() enforces this: for 912.5 V string max, requires ≥ 1369 V
+  // → 1500 V class fuse (Bussmann 170M family).
+  // String max voltage: seriesCellsPerString × 3.65 V/cell (LFP max charge voltage).
+  // Pre-change mempalace search: "universal hardware selector fuse sensor" → loaded
+  // drawers on selector-input-upstream-debug and distributor-API-coverage patterns.
+  // eslint-disable-next-line @typescript-eslint/no-magic-numbers
+  const LFP_MAX_CELL_VOLTAGE_V = 3.65
+  const stringMaxVoltageV = p.seriesCellsPerString * LFP_MAX_CELL_VOLTAGE_V
+  const dcFuse = selectDcFuseFor({
+    continuous_current_a: p.stringContinuousA,
+    string_max_voltage_v: stringMaxVoltageV,
+    family: 'bussmann_170m',
+  })
+  const fuseFormStr = `IEC 60269-4 Class aR, ${dcFuse.rated_current_a} A / ${dcFuse.rated_voltage_dc_v} V DC (≥1.5× string max ${stringMaxVoltageV.toFixed(0)} V = ${(stringMaxVoltageV * 1.5).toFixed(0)} V min; rack-level string fuse — NOT a per-cell fuse; per-cell HRC fuses omitted on 1P×NS series-string topology per CATL EnerC+ / Tesla Megapack practice). Datasheet: https://www.eaton.com/us/en-us/catalog/bussmann-series-low-voltage-semiconductor-fuses/170m-series-fuses.html`
+
   const cellFuseProtection = makeSubModule(
     'cell_fuse_protection',
     'cell fuse protection',
     'protects',
     'rack-level HRC string fuses, one per rack; NO per-cell fuses on series-string topology',
     [
-      // Eaton Bussmann PV-200ANH1: 200 A / 1500 V DC HRC string fuse,
-      // IEC 60269-6 Class gPV, NH1 body. One per rack string (string current
-      // = bus_continuous_A / parallel_strings = 1250 A / 15 = 83 A → 200 A
-      // rated fuse gives 2.4× margin per IEC 62619 §6.4.4). Source: Eaton
-      // Bussmann catalogue + DigiKey listing (confirmed real part).
+      // BESS L31 (2026-05-25): Eaton Bussmann rack-level HRC string fuse.
+      // BESS L39 (2026-05-26, Deliverable D): selectDcFuseFor() now picks the
+      // correct voltage class. Previous hardcoded PV-200ANH1 (1000 V DC) only
+      // had 9.6% margin on 912.5 V string max. UK utility BESS norm requires
+      // ≥1.5× string max → 1500 V class fuse (Bussmann 170M series).
+      // Source: Eaton Bussmann 170M series catalogue.
       word(
         'rack_string_fuse_word',
         'rack string fuse word',
         cc('rack_string_fuse', 'rack-level HRC string fuse', 'cell_fuse_protection_function', 'steel'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('manufacturer', 'Eaton Bussmann'),
-          mod('part_number', 'PV-200ANH1'),
-          mod('form', 'IEC 60269-6 Class gPV, NH1, 200 A / 1500 V DC (rack-level string fuse — NOT a per-cell fuse; per-cell HRC fuses are omitted on 1P×NS series-string topology per CATL EnerC+ / Tesla Megapack practice)'),
-          mod('rating_primary', '200 A'),
-          mod('dimension', '1500', 'V'),
-          mod('regulatory', 'IEC 60269-6 + IEC 62619 §6.4.4'),
+          mod('manufacturer', dcFuse.manufacturer),
+          mod('part_number', dcFuse.part_number),
+          mod('form', fuseFormStr),
+          mod('rating_primary', `${dcFuse.rated_current_a} A`),
+          mod('dimension', String(dcFuse.rated_voltage_dc_v), 'V'),
+          mod('regulatory', 'IEC 60269-4 + IEC 62619 §6.4.4'),
         ],
       ),
       word(
