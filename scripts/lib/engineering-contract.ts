@@ -156,6 +156,39 @@ export interface EngineeringContract {
   // thermal rejection ≥ power dissipated, current ratings ≥ bus current).
   quantities: Record<string, Quantity>
 
+  // shared_quantities — cross-sub-module engineering values that MUST appear
+  // consistently across the entire design (2026-05-26, L38 class-killer A).
+  // Optional: archetype builders that haven't yet added their shared values
+  // default to {}. BESS archetype is the reference implementation.
+  //
+  // PROBLEM: the same engineering function (coolant chemistry, DC bus voltage,
+  // cell voltage) was being described with DIFFERENT values in different
+  // sub_modules because each sub_module independently hard-coded the value.
+  // The L38 Physics Critic found "water/glycol 80/20" in environmental_interface,
+  // "50/50 EG/DI" in mass_fluid_transport_process, and "EG/DI 80/20 with -40 C
+  // freeze point" in the coolant charge word — three different specs for a
+  // single fluid loop. An 80/20 water/glycol mixture only protects to ~-8°C,
+  // not the -40°C stated.
+  //
+  // SOLUTION: canonical values live HERE. Sub_module emitters call
+  // requireSharedQuantity(contract, key) to READ from this single source.
+  // Gate 24 (shared-quantity-consistency-audit.ts, exit 24) walks the emitted
+  // prose and flags HIGH if any two distinct values appear for the same anchor.
+  //
+  // Universal across all 35 product classes — any class that has a shared
+  // engineering function (fluid chemistry, bus voltage, thermal capacity, cell
+  // voltage) should put it here so all sub_module emitters read from one place.
+  //
+  // Key conventions (BESS examples):
+  //   coolant_chemistry_desc:    e.g. "50/50 propylene glycol / deionised water"
+  //   coolant_freeze_point_c:    e.g. -36
+  //   coolant_density_kg_per_l:  e.g. 1.04
+  //   coolant_thermal_capacity_kj_per_kgK: e.g. 3.65
+  //   target_dc_bus_voltage_v:   e.g. 800 (mirrors quantities.dc_bus_voltage_v)
+  //   cell_nominal_voltage_v:    e.g. 3.2 (mirrors quantities.cell_voltage_v)
+  //   cell_capacity_ah:          e.g. 280 (mirrors quantities.cell_capacity_ah)
+  shared_quantities?: Record<string, string | number>
+
   // Topology constraints — typed edges that downstream LLM proposals must
   // satisfy. Validator runs after each LLM stage and rejects incoherent
   // proposals (dry transformer in oil, etc.) BEFORE they enter the prose.
@@ -404,6 +437,55 @@ export function buildContract(productClass: string, parsedBrief: any): Engineeri
   const builder = ARCHETYPE_REGISTRY[canonical]
   if (!builder) return null
   return builder(parsedBrief)
+}
+
+/**
+ * requireSharedQuantity — read a shared engineering value from the contract.
+ *
+ * MANDATORY usage in deterministic-emitter sub_module emitters that emit prose
+ * containing cross-module engineering values (coolant chemistry, bus voltage,
+ * cell voltage, etc.). Throws if the key is absent so the chain fails early
+ * rather than silently using a stale default.
+ *
+ * Universal pattern (2026-05-26, L38 class-killer A): gate 24
+ * (shared-quantity-consistency-audit.ts) walks emitted prose looking for two
+ * distinct values for the same anchor. If emitters call requireSharedQuantity()
+ * instead of hard-coding, gate 24 finds no inconsistencies because all
+ * sub_modules read from the same frozen source.
+ *
+ * Usage:
+ *   const coolantDesc = requireSharedQuantity(contract, 'coolant_chemistry_desc')
+ *   // → "50/50 propylene glycol / deionised water"
+ *
+ * ContractShape is the partial type used in deterministic-emitter.ts (which
+ * avoids importing EngineeringContract to prevent circular imports). We accept
+ * any object with a shared_quantities field.
+ */
+export function requireSharedQuantity(
+  contract: { shared_quantities?: Record<string, string | number> } | null | undefined,
+  key: string,
+): string | number {
+  const val = contract?.shared_quantities?.[key]
+  if (val === undefined || val === null) {
+    throw new Error(
+      `[requireSharedQuantity] Contract is missing shared_quantities.${key}. ` +
+      `All sub_module emitters that reference this engineering value MUST read ` +
+      `from the contract instead of hard-coding. Add ${key} to the archetype ` +
+      `builder's shared_quantities block (scripts/lib/engineering-contract.ts).`
+    )
+  }
+  return val
+}
+
+/**
+ * getSharedQuantity — non-throwing variant of requireSharedQuantity.
+ * Returns undefined if the key is absent (safe for optional shared values).
+ */
+export function getSharedQuantity(
+  contract: { shared_quantities?: Record<string, string | number> } | null | undefined,
+  key: string,
+): string | number | undefined {
+  return contract?.shared_quantities?.[key]
 }
 
 // ---------------------------------------------------------------------------
@@ -828,6 +910,56 @@ registerArchetype('bess', (brief: any) => {
     topology,
     macro_assembly_prices,
     closures,
+    // shared_quantities — canonical cross-sub-module values (2026-05-26, L38
+    // class-killer A). ALL sub_module emitters that reference these engineering
+    // values MUST call requireSharedQuantity(contract, key) instead of hard-
+    // coding. Gate 24 (shared-quantity-consistency-audit.ts, exit 24) walks the
+    // emitted prose and flags HIGH if two distinct values appear for the same
+    // anchor.
+    //
+    // BESS coolant chemistry choice: 50/50 propylene glycol / deionised water
+    // (MPG/DI). Rationale for UK utility BESS:
+    //   - Freeze point: -36°C (50/50 MPG/DI, ASHRAE 2009 Fundamentals §31.1)
+    //   - Heat capacity: 3.65 kJ/kg·K (50/50 MPG/DI @ 25°C)
+    //   - Density: 1.04 kg/L @ 25°C
+    //   - Toxicity: propylene glycol is GRAS (Generally Recognised As Safe).
+    //     Ethylene glycol (EG) is toxic and requires secondary containment at
+    //     most UK BESS sites under COSHH / EA guidance. UK utility BESS field
+    //     practice (Sungrow PowerStack, BYD Cube Pro, CATL EnerC+ UK installs)
+    //     defaults to MPG for exactly this reason.
+    //   - BS EN 14200 / BS 6580 compliance: inhibited glycol for closed-loop
+    //     heating/cooling systems. Inhibited MPG is available from multiple
+    //     UK industrial suppliers (Fernox, Sentinel, Kilfrost).
+    //   - NOT "water/glycol 80/20" (L38 HIGH finding: 80/20 only protects to
+    //     ~-8°C, completely failing a -40°C brief environment).
+    //   - NOT "EG/DI 50/50" (ethylene glycol — wrong for UK BESS site safety).
+    //   - NOT "50/50 EG/DI" (same — ethylene glycol form rejected).
+    shared_quantities: {
+      // ── Coolant chemistry (canonical — all sub_modules read from here) ──
+      // "50/50 propylene glycol / deionised water" MUST appear in every prose
+      // block that mentions the coolant chemistry. Gate 24 flags HIGH if any
+      // sub_module emits a DIFFERENT description (e.g. "EG/DI 80/20", "80/20
+      // water/glycol", "50/50 EG/DI", "ethylene glycol").
+      coolant_chemistry_desc: '50/50 propylene glycol / deionised water (inhibited MPG/DI)',
+      coolant_freeze_point_c: -36,
+      coolant_density_kg_per_l: 1.04,
+      coolant_thermal_capacity_kj_per_kgK: 3.65,
+      coolant_regulatory_standard: 'BS EN 14200 / BS 6580',
+
+      // ── Electrical bus (mirrors quantities — for emitter convenience) ──
+      target_dc_bus_voltage_v: dcBusVoltage,  // 800
+
+      // ── Cell chemistry (mirrors quantities — for emitter convenience) ──
+      cell_nominal_voltage_v: cellVoltageV,   // 3.2
+      cell_capacity_ah: cellAh,               // 280
+
+      // ── Mass cap (brief-derived — single source for mass literals) ──
+      // All emitters that cite the mass cap MUST read:
+      //   getSharedQuantity(contract, 'brief_mass_cap_kg')
+      // and format via formatMassKg(). Gate 25 (brief-value-literal-scanner)
+      // enforces this at chain start.
+      brief_mass_cap_kg: briefMassCapKg,
+    },
   }
 })
 
@@ -8153,7 +8285,7 @@ registerArchetype('phased_array', (brief: any) => {
       from_part: 'beamforming_network',
       to_part: 'controller_FPGA',
       mechanism: 'electrical_bus',
-      constraint_kind: 'data_rate',
+      constraint_kind: 'data_bandwidth',
       required_value: numElements * 8,  // bits per element × update rate (kHz-level OK)
       required_unit: 'Mbps',
     },

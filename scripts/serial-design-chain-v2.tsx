@@ -74,6 +74,8 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 // Hard-fails with exit code 22 if any HARD-required slot is still missing.
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
+import { runSharedQuantityConsistencyAudit } from '../src/lib/pdf-engine-v2/lib/shared-quantity-consistency-audit'
+import { scanEmitterFileForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords, refreshModulesRadSyntax } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { applyJurisdictionFilterToModules, applyJurisdictionFilterToNlLayer, applyJurisdictionFilterToBriefProse } from './lib/jurisdiction-prose-filter'
@@ -3502,6 +3504,111 @@ async function main() {
     console.error(`[chain] post-Phase-2 modifier dedup: collapsed ${postDedup.modifiers_collapsed} cosmetic-dupe modifier(s)`)
   }
   logAction({ step: 'post_phase2_normalise', sub_modules_rewritten: postProse.sub_modules_rewritten, modifiers_collapsed: postDedup.modifiers_collapsed })
+
+  // ── Gate 24: Shared-Quantity Consistency Audit (exit 24, 2026-05-26, class-killer A) ──────────
+  // Runs AFTER Phase 2 so we check the FINAL emitted state (Phase 2 can
+  // add words via patches, including coolant-chemistry mentions). Fails hard if
+  // any known shared-quantity anchor surfaces with ≥2 distinct normalised values
+  // across any sub_modules (e.g. "propylene glycol" vs "ethylene glycol").
+  {
+    const tGate24 = Date.now()
+    const gate24Result = runSharedQuantityConsistencyAudit(
+      design.modules ?? [],
+      currentProductClass ?? 'unknown',
+    )
+    console.error(
+      `[chain] gate-24 shared-qty-consistency: ${gate24Result.passed ? 'PASS' : 'FAIL'} — ` +
+      `${gate24Result.anchors_checked} anchors checked, ${gate24Result.modifier_values_scanned} values scanned, ` +
+      `${gate24Result.violations.length} violation(s)`
+    )
+    logAction({
+      step: 'gate_24_shared_quantity_consistency',
+      passed: gate24Result.passed,
+      anchors_checked: gate24Result.anchors_checked,
+      modifier_values_scanned: gate24Result.modifier_values_scanned,
+      violations: gate24Result.violations.map((v) => ({
+        anchor_id: v.anchor_id,
+        anchor_label: v.anchor_label,
+        distinct_values: v.distinct_values,
+        occurrence_count: v.occurrences.length,
+      })),
+      latency_ms: Date.now() - tGate24,
+      class_name: gate24Result.class_name,
+    })
+    if (!gate24Result.passed) {
+      console.error(`\n[chain] === FATAL GATE 24 ===\n${gate24Result.error_message}`)
+      const g24State = {
+        projectId: 'chain-v2-' + Date.now(),
+        parsedBrief: parsedResult.data,
+        moduleDecomposition: design,
+        haltReason: `Gate 24 shared-quantity-consistency FAIL: ${gate24Result.violations.length} anchor(s) with contradictory values.`,
+        gate24Result,
+        savedAt: new Date().toISOString(),
+      }
+      writeFileSync(resolve(outDir, 'state.json'), JSON.stringify(g24State, null, 2))
+      process.exit(24)
+    }
+  }
+
+  // ── Gate 25: Brief-Value Literal Scanner (exit 25, 2026-05-26, class-killer C) ──────────────
+  // Runs POST-Phase-2 against the deterministic-emitter.ts SOURCE FILE and
+  // the brief's actual constraint numbers. Fails hard if any brief-derived
+  // numeric appears as a string literal in the emitter (e.g. "28000" when
+  // brief.max_mass_kg = 28000 — stale literal diverges when brief changes).
+  {
+    const tGate25 = Date.now()
+    const bc = parsedResult.data?.constraints ?? {}
+    // Build the flat MinimalBriefConstraints from the nested brief structure.
+    const briefConstraintsForScan = {
+      max_mass_kg: typeof bc.max_mass_kg?.value === 'number' ? bc.max_mass_kg.value : undefined,
+      nameplate_capacity_mwh: typeof bc.target_performance?.value === 'number'
+        && String(bc.target_performance?.unit ?? '').toLowerCase().includes('mwh')
+        ? bc.target_performance.value : undefined,
+      usable_energy_mwh: typeof bc.usable_energy_mwh?.value === 'number' ? bc.usable_energy_mwh.value : undefined,
+      dc_bus_voltage_v: typeof bc.dc_bus_voltage_v?.value === 'number' ? bc.dc_bus_voltage_v.value : undefined,
+      design_life_years: typeof bc.design_life_years?.value === 'number' ? bc.design_life_years.value : undefined,
+      unit_cost_ceiling_gbp: typeof bc.unit_cost_ceiling?.value === 'number' ? bc.unit_cost_ceiling.value : undefined,
+      batch_size: typeof bc.batch_size?.value === 'number' ? bc.batch_size.value : undefined,
+    }
+    const emitterPath = resolve(__dirname, 'lib/deterministic-emitter.ts')
+    const gate25Result = scanEmitterFileForBriefLiterals(
+      emitterPath,
+      briefConstraintsForScan,
+      currentProductClass ?? 'unknown',
+    )
+    console.error(
+      `[chain] gate-25 brief-value-literal-scanner: ${gate25Result.passed ? 'PASS' : 'FAIL'} — ` +
+      `${gate25Result.lines_scanned} lines scanned, ${gate25Result.constraints_checked} constraints checked, ` +
+      `${gate25Result.hits.length} literal hit(s)`
+    )
+    logAction({
+      step: 'gate_25_brief_value_literal_scanner',
+      passed: gate25Result.passed,
+      lines_scanned: gate25Result.lines_scanned,
+      constraints_checked: gate25Result.constraints_checked,
+      hits: gate25Result.hits.map((h) => ({
+        brief_key: h.brief_key,
+        value: h.value,
+        line_number: h.line_number,
+        raw_match: h.raw_match,
+      })),
+      latency_ms: Date.now() - tGate25,
+      class_name: gate25Result.class_name,
+    })
+    if (!gate25Result.passed) {
+      console.error(`\n[chain] === FATAL GATE 25 ===\n${gate25Result.error_message}`)
+      const g25State = {
+        projectId: 'chain-v2-' + Date.now(),
+        parsedBrief: parsedResult.data,
+        moduleDecomposition: design,
+        haltReason: `Gate 25 brief-value-literal-scanner FAIL: ${gate25Result.hits.length} brief literal(s) found in emitter source.`,
+        gate25Result,
+        savedAt: new Date().toISOString(),
+      }
+      writeFileSync(resolve(outDir, 'state.json'), JSON.stringify(g25State, null, 2))
+      process.exit(25)
+    }
+  }
 
   // ── K10 shadow validation (Task #252, 2026-05-19): validate the final
   // cross_module_grammar_links against the typed engineering reference graph

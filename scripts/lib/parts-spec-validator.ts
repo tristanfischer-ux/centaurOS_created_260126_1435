@@ -308,6 +308,22 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     rated_flow_lpm: 900,
     notes: 'Grundfos NB 65-250/245 BQQE (end-suction centrifugal pump, EN 12162): 900 L/min nominal @ ~30 m head, water-glycol compatible. Canonical coolant circulator for utility BESS thermal-management loops (~15 racks × 60 L/min per cold plate = 900 L/min system total). Validated in L30 council (commit cbcc23755). Source: grundfos.com NB-NBE family product page.',
   },
+  // ── Grundfos TPE 50-180 (L38 class-killer B correct sizing, 2026-05-26) ─────
+  // Correct pump for a BESS with ~34 kW thermal load (hardware-selectors.ts
+  // selectCoolantPumpFor(): 34.45 kW → 68 L/min required → 85 L/min with 1.25×
+  // safety factor → TPE 50-180 at 280 L/min nominal, 25 m head, 1.1 kW motor).
+  // Replaces the legacy NB 65-250/245 BQQE (900 L/min) which was 13× over-spec.
+  // Datasheet: https://product.grundfos.com/TPE-50-180-2
+  // (Grundfos TPE 50-180/2-S A-F-A-BAQE: in-line centrifugal, DN50, PN16,
+  //  propylene/ethylene glycol solutions compatible, EC motor IE5, IP54/IP55,
+  //  EN 12162 / EN 809, 3-phase 400 V 50 Hz, ~1.1 kW shaft power.)
+  {
+    manufacturer: 'Grundfos',
+    part_number_pattern: /^TPE\s+50-180/i,
+    category: 'centrifugal_pump',
+    rated_flow_lpm: 280,
+    notes: 'Grundfos TPE 50-180/2-S A-F-A-BAQE (in-line centrifugal, EN 12162): 280 L/min nominal @ 25 m head, ~1.1 kW EC motor (IE5), DN50 flanged, PN16, propylene-glycol rated. Correct size for BESS thermal loads of ~25-45 kW (L38 selectCoolantPumpFor() result; replaces legacy oversized NB 65-250 at 900 L/min). Datasheet: https://product.grundfos.com/TPE-50-180-2',
+  },
   // ── BESS DC fuses (Bussmann 170M family) ──────────────────────
   // 170M68xx subfamily: 1250 A fuses. Lower-current 170M variants exist.
   {

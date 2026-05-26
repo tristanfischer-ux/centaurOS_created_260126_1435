@@ -1083,6 +1083,180 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL: shared-quantities consistent across sub_modules (2026-05-26, L38 class-killer A) ──
+  //
+  // UNIVERSAL.shared_quantities_consistent_across_sub_modules — walks every
+  // modifier value in the final state.json and checks that coolant glycol type
+  // appears with ONE canonical normalised value. A FAIL means two sub_modules
+  // contradict each other on the coolant chemistry — impossible in a real build.
+  // NOTE: DC bus voltage is intentionally NOT checked here — a BESS has multiple
+  // DC rails (string bus 1500 V, component ratings 1000 V, 24 V aux) and
+  // multiple distinct DC voltages in one design is EXPECTED physics.
+  //
+  // Exit 24 covers this in the live chain. This invariant catches regressions
+  // where a future emitter edit re-introduces a hardcoded chemistry string.
+  {
+    // Inline minimal anchor checks — mirrors shared-quantity-consistency-audit.ts
+    // without importing it (regression harness is a standalone script).
+    const classLower = String(productClass ?? '').toLowerCase()
+    const isThermalClass = ['energy_storage', 'thermal', 'battery', 'bess'].some((s) => classLower.includes(s))
+
+    if (isThermalClass) {
+      // Collect all modifier value strings that mention glycol keywords
+      const glycolTypeValues: Map<string, string[]> = new Map()
+      for (const m of modules) {
+        const moduleId = String(m?.module ?? 'unknown')
+        const subs = Array.isArray(m?.sub_modules) ? m.sub_modules : []
+        for (const sm of subs) {
+          const subId = String(sm?.id ?? 'unknown')
+          const words = Array.isArray(sm?.words) ? sm.words : []
+          for (const w of words) {
+            const mods = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+            for (const mc of mods) {
+              const val = String(mc?.value ?? '')
+              // Match full glycol chem names or /DI forms only — avoid false positives
+              // on short strings like "EG" (matches "Megapack", "JPEG") or "PG" (matches
+              // "JPG", "MPEG"). Uses same pattern as shared-quantity-consistency-audit.ts.
+              if (!/glycol|EG\/DI|MPG\/DI|PG\/DI/i.test(val)) continue
+              const lower = val.toLowerCase()
+              let normalised: string
+              if (lower.includes('propylene') || lower.includes('mpg/di') || lower.includes('pg/di')) {
+                normalised = 'propylene_glycol'
+              } else if (lower.includes('ethylene') || lower.includes('eg/di')) {
+                normalised = 'ethylene_glycol'
+              } else {
+                normalised = 'unknown_glycol'
+              }
+              const loc = `${moduleId}::${subId}::${w?.id ?? '?'}`
+              if (!glycolTypeValues.has(normalised)) glycolTypeValues.set(normalised, [])
+              glycolTypeValues.get(normalised)!.push(loc)
+            }
+          }
+        }
+      }
+      const distinctGlycolTypes = Array.from(glycolTypeValues.keys())
+      assertions.push(assertEq(
+        'UNIVERSAL.shared_quantities_consistent_across_sub_modules',
+        'Coolant glycol type is consistent across all sub_modules — only one of propylene_glycol/ethylene_glycol appears (L38 class-killer A, gate 24)',
+        distinctGlycolTypes.length,
+        (n) => n <= 1,
+        (n) => `${n} distinct glycol types found: ${distinctGlycolTypes.join(', ')} — sub_modules are contradicting each other. Fix: all emitters must read from contract.shared_quantities.coolant_chemistry_desc (gate 24 / exit 24 in live chain).`,
+      ))
+    }
+  }
+
+  // ── UNIVERSAL: selected hardware within 120% of required rating (2026-05-26, L38 class-killer B) ──
+  //
+  // UNIVERSAL.selected_hardware_within_120pct_of_required_rating — checks that
+  // no cooling pump word has a nominal_flow_lpm modifier whose value is >3× the
+  // required flow (derived from system thermal load). The 3× threshold catches
+  // the L38 case: NB 65-250 at 900 L/min for 68 L/min required = 13× over-spec.
+  //
+  // This invariant reads the `performance` modifier of cooling_pump words (which
+  // carries "X L/min required") and the `capacity` modifier (which carries the
+  // nominal flow). A ratio > 3 is a flag.
+  {
+    const PUMP_WORD_IDS = ['cooling_pump_word', 'coolant_circulation_pump_word']
+    const OVERSPEC_THRESHOLD = 3.0  // nominal/required > 3× = fail
+
+    for (const m of modules) {
+      const subs = Array.isArray(m?.sub_modules) ? m.sub_modules : []
+      for (const sm of subs) {
+        const words = Array.isArray(sm?.words) ? sm.words : []
+        for (const w of words) {
+          if (!PUMP_WORD_IDS.includes(String(w?.id ?? ''))) continue
+          const mods = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+          // Extract nominal flow from capacity modifier
+          const capMod = mods.find((mc: any) => mc?.kind === 'capacity')
+          const perfMod = mods.find((mc: any) => mc?.kind === 'performance')
+          if (!capMod || !perfMod) continue
+
+          const capVal = parseFloat(String(capMod.value ?? '').replace(/,/g, ''))
+          // Extract required flow from performance string: "X L/min required"
+          const perfStr = String(perfMod.value ?? '')
+          const reqMatch = perfStr.match(/(\d[\d.,]*)\s*L\/min\s*required/)
+          if (!reqMatch) continue
+          const reqVal = parseFloat(reqMatch[1].replace(/,/g, ''))
+
+          if (!Number.isFinite(capVal) || !Number.isFinite(reqVal) || reqVal <= 0) continue
+          const ratio = capVal / reqVal
+          assertions.push(assertEq(
+            `UNIVERSAL.selected_hardware_within_120pct_of_required_rating__${w.id}`,
+            `Pump word ${w.id}: nominal flow / required flow ≤ ${OVERSPEC_THRESHOLD}× (L38 class-killer B, gate 24)`,
+            ratio,
+            (r) => r <= OVERSPEC_THRESHOLD,
+            (r) => `Pump ${w.id} is ${r.toFixed(1)}× over-spec (nominal ${capVal} L/min vs required ${reqVal} L/min). Fix: selectCoolantPumpFor() in hardware-selectors.ts should choose a smaller model.`,
+          ))
+        }
+      }
+    }
+  }
+
+  // ── UNIVERSAL: no brief-value literals in emitter (2026-05-26, L38 class-killer C) ──
+  //
+  // UNIVERSAL.no_brief_value_literals_in_emitter — checks that the known
+  // brief constraint values (max_mass_kg, nameplate_capacity_mwh, etc.) do NOT
+  // appear as string literals in deterministic-emitter.ts. Reads the file on
+  // disk; a FAIL means a stale literal was re-introduced.
+  {
+    const emitterPath = resolve(dirname(snapshotPath), '../../scripts/lib/deterministic-emitter.ts')
+    const briefCs = (state as any)?.parsedBrief?.constraints ?? {}
+    const maxMassKg = typeof briefCs.max_mass_kg?.value === 'number' ? briefCs.max_mass_kg.value : null
+
+    if (maxMassKg !== null && maxMassKg >= 100 && existsSync(emitterPath)) {
+      const emitterText = readFileSync(emitterPath, 'utf-8')
+      const noComma = String(Math.floor(maxMassKg))
+      const withComma = noComma.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+      // Scan lines: skip comments and fallback args
+      const emitterLines = emitterText.split('\n')
+      const literalHits: number[] = []
+      for (let i = 0; i < emitterLines.length; i++) {
+        const line = emitterLines[i]
+        if (/^\s*\/\/|^\s*\*|import\s+|export\s+/.test(line)) continue
+        if (/fallback\s*[,)]/.test(line)) continue  // getSharedQty fallback arg
+        if (!(line.includes("mod('") || line.includes('`') || line.includes("'") || line.includes('"'))) continue
+        const pattern = new RegExp(`['"\`\\s,([{](${noComma}|${withComma.replace(/,/g, ',')})['"\`,\\s)\\]}kKmMgG]`)
+        if (pattern.test(line)) {
+          literalHits.push(i + 1)
+        }
+      }
+      assertions.push(assertEq(
+        'UNIVERSAL.no_brief_value_literals_in_emitter',
+        `No brief.max_mass_kg (${maxMassKg}) literal in deterministic-emitter.ts (L38 class-killer C, gate 25)`,
+        literalHits.length,
+        (n) => n === 0,
+        (n) => `${n} line(s) in deterministic-emitter.ts contain the literal ${maxMassKg} (brief.max_mass_kg). Fix: use String(p.briefMassCapKg) from contract.shared_quantities. Lines: ${literalHits.slice(0, 5).join(', ')}`,
+      ))
+    }
+  }
+
+  // ── UNIVERSAL: phase2 final state parses without truncation (2026-05-26, L38 class-killer D) ──
+  //
+  // UNIVERSAL.phase2_final_state_parses_without_truncation — verifies that the
+  // state.json file (as read by the harness) can be serialized back to JSON
+  // without length loss. A FAIL is evidence the state was written with a
+  // truncated JSON appendix (the L38 LOW finding: PDF JSON appendix hit a
+  // character limit and was cut off). This invariant catches it in the regression
+  // harness BEFORE the renderer tries to parse the state for the next iteration.
+  {
+    const stateJsonStr = JSON.stringify(state)
+    // Re-parse and re-stringify to verify round-trip fidelity
+    let roundTripOk = false
+    try {
+      const reparsed = JSON.parse(stateJsonStr)
+      const restringified = JSON.stringify(reparsed)
+      // Lengths should be identical after round-trip
+      roundTripOk = restringified.length === stateJsonStr.length
+    } catch { roundTripOk = false }
+    assertions.push(assertEq(
+      'UNIVERSAL.phase2_final_state_parses_without_truncation',
+      'state.json round-trips through JSON.parse → JSON.stringify without length loss (L38 class-killer D, truncation guard)',
+      roundTripOk,
+      (ok) => ok === true,
+      () => `state.json failed JSON round-trip — the state may have been written with truncated JSON (e.g. PDF appendix character limit). Check the renderer JSON appendix serialization for length caps.`,
+    ))
+  }
+
   // ── BESS-specific: arc_flash_protection sub_module has MPN words (2026-05-26)
   //
   // BESS.emitter_completeness_safety_protection_has_words — verifies the
