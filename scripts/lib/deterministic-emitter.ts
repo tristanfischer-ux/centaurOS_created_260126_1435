@@ -1365,16 +1365,21 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
       // hard-exits code 10.
       // BESS L4 (2026-05-24, Physics Critic internal_coherence HIGH):
       // slave boards monitor cells per RACK boundary, not system-wide.
-      // Per-rack ceil × rackCount = ceil(250/24) × 15 = 11 × 15 = 165,
-      // not the 157 a system-wide ceil would give. Mirrors the same
-      // formula in engineering-contract.ts BESS slaveCount derivation.
+      //
+      // class-killer #3d (2026-05-26): LTC6813-1 is an 18-channel device,
+      // NOT 24-channel. Physics critic HIGH in CK4: "The LTC6813-1 is an
+      // 18-channel device. 165 boards × 18 = 2970 cells ≠ 3750."
+      // Fix: use 18 channels per board.
+      // Per-rack ceil × rackCount = ceil(250/18) × 15 = 14 × 15 = 210 boards.
       word(
         'bms_slave_module_word',
         'BMS slave module word',
         cc('bms_slave_module', 'BMS slave module', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [
-          mod('quantity', fmtQty(Math.ceil(p.cellsPerRack / 24) * p.rackCount)),
-          mod('form', '24-channel cell-voltage + temperature monitoring board'),
+          mod('quantity', fmtQty(Math.ceil(p.cellsPerRack / 18) * p.rackCount)),
+          mod('form', '18-channel cell-voltage + temperature monitoring board, up to 18 series-connected cells'),
+          mod('manufacturer', 'Analog Devices'),
+          mod('part_number', 'LTC6813-1'),
           mod('regulatory', 'IEC 62619'),
         ],
       ),
