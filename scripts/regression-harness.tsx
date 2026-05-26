@@ -971,6 +971,146 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL: emitter completeness gate passes (2026-05-26) ───────────────
+  //
+  // UNIVERSAL.emitter_completeness_gate_passes — runs the emitter-completeness-
+  // gate against the state.json snapshot and asserts PASS. Applies to ALL
+  // product classes.
+  //
+  // A FAIL here means the deterministic-emitter is still incomplete for one or
+  // more sub_modules. The fix is always in scripts/lib/deterministic-emitter.ts
+  // (or the per-class emitter), never in Phase 2 logic. Exit code 23 covers
+  // this in the live chain; this invariant catches regressions where an emitter
+  // edit accidentally removes MPN-bearing words.
+  //
+  // Architectural invariant from Tristan 2026-05-26: "all fixes should be
+  // permanent and architectural and universal". This closes the class of bugs
+  // where Phase 2 LLM invents real-but-uncurated MPNs that the B1 allowlist
+  // rejects, causing Phase 2 stall.
+  {
+    // Inline the gate logic here (no import needed — regression-harness runs
+    // as a standalone script). Mirrors emitter-completeness-gate.ts exactly.
+    const snapshotModules: any[] = modules
+    const snapshotClass = String(productClass ?? 'unknown')
+    const incompleteSMs: Array<{ module_id: string; sub_module_id: string }> = []
+    for (const m of snapshotModules) {
+      const moduleId = String(m?.module ?? 'unknown_module')
+      const subs = Array.isArray(m?.sub_modules) ? m.sub_modules : []
+      for (const sm of subs) {
+        const subModuleId = String(sm?.id ?? 'unknown_sub_module')
+        const words = Array.isArray(sm?.words) ? sm.words : []
+        const mpnWordCount = words.filter((w: any) => {
+          const mods = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+          return mods.some((mc: any) => {
+            const kind = String(mc?.kind ?? '').toLowerCase().replace(/[\s_-]/g, '')
+            return kind === 'partnumber' || kind === 'part_number' || kind === 'pn'
+          })
+        }).length
+        if (mpnWordCount === 0) {
+          incompleteSMs.push({ module_id: moduleId, sub_module_id: subModuleId })
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'UNIVERSAL.emitter_completeness_gate_passes',
+      'Gate 23 emitter completeness: every sub_module in the design has ≥1 deterministic-emitter word with a part_number modifier (architectural invariant 2026-05-26)',
+      incompleteSMs.length,
+      (n) => n === 0,
+      (n) => `${n} sub_module(s) have zero MPN-bearing words: ${incompleteSMs.slice(0, 8).map(s => `${s.module_id}::${s.sub_module_id}`).join('; ')} — fix is in scripts/lib/deterministic-emitter.ts (or per-class emitter), NOT in Phase 2. See emitter-completeness-gate.ts for the architectural contract.`,
+    ))
+  }
+
+  // ── UNIVERSAL: Phase 2 never added MPN-bearing words (2026-05-26) ────────────
+  //
+  // UNIVERSAL.phase2_never_added_mpn_bearing_words — reads the actions.jsonl
+  // log (if present alongside the state.json) and asserts that no
+  // phase2_repair_N step accepted a patch that added a new word_id with a
+  // part_number modifier.
+  //
+  // A FAIL here means the new-word-with-MPN guard in universal-repair.ts
+  // applyPatches has been bypassed or regressed. The fix is to re-apply the
+  // guard from universal-repair.ts (search for "allowlist-strict" in that file).
+  {
+    const actionsPath = snapshotPath.replace(/state\.json$/, 'actions.jsonl')
+    if (existsSync(actionsPath)) {
+      let mpnAddedByPhase2: string[] = []
+      try {
+        const lines = readFileSync(actionsPath, 'utf-8').split('\n').filter(Boolean)
+        for (const line of lines) {
+          try {
+            const rec = JSON.parse(line)
+            // phase2_repair_N records carry `reasons` array from applyPatches.
+            if (!/^phase2_repair_/.test(String(rec?.step ?? ''))) continue
+            const reasons: string[] = Array.isArray(rec?.patch_reasons) ? rec.patch_reasons
+              : Array.isArray(rec?.reasons) ? rec.reasons : []
+            // A successful add-new-word-with-MPN would appear as a reason
+            // starting with "+" (applied) that includes ".words[+]" AND
+            // the new word would NOT start with "~merge-into-existing".
+            // The [allowlist-strict] rejection starts with that prefix — so
+            // if we see a "+module.sub_modules[N].words[+]" reason that is
+            // NOT an "~merge" and IS followed by a word object with a
+            // part_number modifier, that's the violation signal.
+            // Simple heuristic: look for reasons that match the pattern
+            // "+<module>.*.words[+] (<reason>)" and check if the reason
+            // mentions a part_number context. The rejection log also
+            // produces "[allowlist-strict] reject add_word with part_number"
+            // — that is fine (means the guard WORKED). The violation is
+            // when we do NOT see the rejection but DO see an applied patch.
+            for (const r of reasons) {
+              // Check for an applied (not skipped/merged/rejected) words append
+              if (r.startsWith('+') && /\.words\[\+\]/.test(r) && !r.includes('allowlist-strict')) {
+                // We can't recover the full new_value from the reason string alone;
+                // flag for manual investigation if the pattern looks suspicious.
+                // This is a soft heuristic — the hard gate is in the live chain.
+                // Only flag if the reason also contains "part_number" in context.
+                if (/part_number|MPN/i.test(r)) {
+                  mpnAddedByPhase2.push(`step=${rec.step}: ${r.slice(0, 200)}`)
+                }
+              }
+            }
+          } catch { /* skip malformed JSON lines */ }
+        }
+      } catch { /* actions.jsonl unreadable — skip invariant */ }
+      if (mpnAddedByPhase2.length > 0) {
+        assertions.push(assertEq(
+          'UNIVERSAL.phase2_never_added_mpn_bearing_words',
+          'Phase 2 repair actions.jsonl has zero applied add_word patches with part_number context (architectural invariant 2026-05-26)',
+          mpnAddedByPhase2.length,
+          (n) => n === 0,
+          (n) => `${n} suspect Phase 2 add_word-with-MPN action(s) detected in actions.jsonl — the new-word-with-MPN guard in universal-repair.ts applyPatches may have been bypassed: ${mpnAddedByPhase2.slice(0, 3).join('; ')}`,
+        ))
+      }
+    }
+  }
+
+  // ── BESS-specific: arc_flash_protection sub_module has MPN words (2026-05-26)
+  //
+  // BESS.emitter_completeness_safety_protection_has_words — verifies the
+  // safety_protection::arc_flash_protection sub_module (the specific L37 stall
+  // case) has ≥1 MPN-bearing word. Instance fill guard: if someone later removes
+  // the arc_flash_protection words from the emitter (thinking they're dead code),
+  // this invariant immediately catches the regression and blocks the chain.
+  if (productClass === 'bess' || productClass === 'energy_storage') {
+    const spModule = modules.find((m: any) => m.module === 'safety_protection')
+    const arcFlashSm = spModule?.sub_modules?.find((sm: any) => sm.id === 'arc_flash_protection')
+    if (arcFlashSm) {
+      const arcFlashMpnWords = (arcFlashSm.words ?? []).filter((w: any) => {
+        const mods = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+        return mods.some((mc: any) => {
+          const kind = String(mc?.kind ?? '').toLowerCase().replace(/[\s_-]/g, '')
+          return kind === 'partnumber' || kind === 'part_number' || kind === 'pn'
+        })
+      }).length
+      assertions.push(assertEq(
+        'BESS.emitter_completeness_safety_protection_has_words',
+        'safety_protection::arc_flash_protection has ≥1 deterministic-emitter MPN-bearing word (L37 stall fix, 2026-05-26)',
+        arcFlashMpnWords,
+        (n) => n >= 1,
+        (n) => `arc_flash_protection has ${n} MPN-bearing words — emitter is incomplete; Phase 2 will stall proposing uncurated MPNs (gate 23 should have caught this upstream)`,
+      ))
+    }
+  }
+
   // VF-specific additional invariants
   if (productClass === 'vertical_farm' || productClass === 'verticalfarm') {
     const eo = modules.find((m: any) => m.module === 'energy_conversion_transduction')

@@ -250,6 +250,9 @@ The chain's applyReviewerPatches sees an add_word_to_sub_module-like patch with 
 
 For \`sub_module_word_density\` failures (sub-modules with <5 words), emit add_word_to_sub_module patches with NEW words and full modifier sets.
 
+ARCHITECTURAL CONSTRAINT (2026-05-26 — do not violate):
+You may NOT add new BoM words with part numbers (part_number modifier) — those must come from the deterministic-emitter. The chain HARD REJECTS any patch adding a new word_id with a part_number modifier (exit path via applyPatches allowlist guard). You may only modify existing words' modifiers and add prose-only words (description / commentary / english_sentence updates). When a sub_module is missing BoM coverage, that is an emitter gap to be fixed in deterministic-emitter.ts, not a Phase 2 repair task.
+
 If you genuinely cannot fix all failures within 30 patches, return:
 { "unfixable": true, "reason": "...", "patches": [] }
 
@@ -611,6 +614,53 @@ export function applyPatches(
           continue
         }
       }
+      // ── NEW-WORD-WITH-MPN GUARD (2026-05-26 architectural invariant) ────────
+      // Phase 2 LLM may NEVER add a genuinely new word_id that carries a
+      // part_number modifier. The deterministic-emitter owns every MPN-bearing
+      // word; Phase 2 may only ENRICH existing words or add prose-only words.
+      //
+      // Gate 23 (emitter-completeness-gate.ts) enforces upstream that every
+      // sub_module has emitter MPN words. This guard is the downstream enforcement
+      // that keeps Phase 2 from bypassing gate 23's intent by inventing new MPNs.
+      //
+      // REJECT: add_word (words[+]) where the word_id is NEW (not in cursor) AND
+      //   the word carries a part_number modifier.
+      // ALLOW: add_word with same id as existing word (merge path, handled above).
+      // ALLOW: add_word with no part_number modifier (prose-only enrichment).
+      if (isWordEnrichment) {
+        // We already handled the existing-word merge case above. If we're here,
+        // the word_id is genuinely new (no existing match).
+        const newValForMpnCheck: any = p.new_value
+        const modsForMpnCheck: any[] = Array.isArray(newValForMpnCheck?.modifier_characters)
+          ? newValForMpnCheck.modifier_characters
+          : []
+        const hasPnModifier = modsForMpnCheck.some((mc: any) => {
+          const kind = String(mc?.kind ?? '').toLowerCase().replace(/[\s_-]/g, '')
+          return (kind === 'partnumber' || kind === 'part_number' || kind === 'pn') &&
+            String(mc?.value ?? '').trim().length >= 3
+        })
+        if (hasPnModifier) {
+          const newWordId = String(newValForMpnCheck?.id ?? 'unknown')
+          const mpn = modsForMpnCheck.find((mc: any) => {
+            const kind = String(mc?.kind ?? '').toLowerCase().replace(/[\s_-]/g, '')
+            return kind === 'partnumber' || kind === 'part_number' || kind === 'pn'
+          })?.value ?? 'unknown'
+          // Find sub_module path for log context.
+          const pathStr = `${p.module}.${p.path}`
+          skipped++
+          allowlistRejected++
+          reasons.push(
+            `[allowlist-strict] reject add_word with part_number — Phase 2 LLM may not invent ` +
+            `MPN-bearing words; word_id=${newWordId} mpn=${mpn} sub_module=${pathStr}. ` +
+            `The deterministic-emitter must own all MPN-bearing words. Gate 23 enforces this ` +
+            `upstream. If the emitter is complete for this sub_module, the Phase 2 LLM should ` +
+            `enrich the EXISTING emitter word instead of adding a new one. (${p.reason})`
+          )
+          continue
+        }
+      }
+      // ── END NEW-WORD-WITH-MPN GUARD ──────────────────────────────────────────
+
       // Cross-module link validation (2026-05-19 fix): reject undefined or
       // malformed appends to cross_module_grammar_links. The Phase 2 repair LLM
       // sometimes emits patches with only `op` + `reason`, no `link` payload.

@@ -73,6 +73,7 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 // + web-search fallback from pretraining_extracted_specs + standards tables.
 // Hard-fails with exit code 22 if any HARD-required slot is still missing.
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
+import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords, refreshModulesRadSyntax } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { applyJurisdictionFilterToModules, applyJurisdictionFilterToNlLayer, applyJurisdictionFilterToBriefProse } from './lib/jurisdiction-prose-filter'
@@ -3308,6 +3309,61 @@ async function main() {
     source_counts: verifiedPartsAllowlist.source_counts,
     built_at: verifiedPartsAllowlist.built_at,
   })
+
+  // ── Gate 23: Emitter Completeness Gate (2026-05-26) ────────────────────────
+  //
+  // ARCHITECTURAL INVARIANT: the deterministic-emitter must own every
+  // MPN-bearing word in every sub_module of every class. Phase 2 LLM may
+  // only modify existing words' modifiers / add prose-only words.
+  //
+  // If ANY sub_module has zero words with a part_number modifier, the chain
+  // exits with code 23. The fix is always in deterministic-emitter.ts, never
+  // in Phase 2 logic.
+  //
+  // Root case that mandated this: L37 BESS stalled at iter 13 because
+  // safety_protection::arc_flash_protection and hmi_ergonomics::hmi_panel
+  // had no emitter MPN words — LLM proposed MPNs → B1 allowlist rejected →
+  // LLM proposed again → infinite stall. Gate 23 exits clean before the loop.
+  //
+  // Universal: runs for ALL classes. BESS arc_flash_protection + hmi_panel
+  // are now covered by deterministic-emitter.ts (commit accompanying this gate).
+  {
+    const tGate23 = Date.now()
+    const gate23Result = runEmitterCompletenessGate(
+      design.modules ?? [],
+      currentProductClass ?? 'unknown',
+    )
+    console.error(
+      `[chain] gate-23 emitter-completeness: ${gate23Result.passed ? 'PASS' : 'FAIL'} — ` +
+      `${gate23Result.total_sub_modules_checked} sub_modules checked, ` +
+      `${gate23Result.passing_sub_modules} passing, ` +
+      `${gate23Result.incomplete_sub_modules.length} incomplete`
+    )
+    logAction({
+      step: 'gate_23_emitter_completeness',
+      passed: gate23Result.passed,
+      total_sub_modules_checked: gate23Result.total_sub_modules_checked,
+      passing_sub_modules: gate23Result.passing_sub_modules,
+      incomplete_count: gate23Result.incomplete_sub_modules.length,
+      incomplete_sub_modules: gate23Result.incomplete_sub_modules,
+      latency_ms: Date.now() - tGate23,
+      class_name: gate23Result.class_name,
+    })
+    if (!gate23Result.passed) {
+      console.error(`\n[chain] === FATAL GATE 23 ===\n${gate23Result.error_message}`)
+      // Persist partial state for diagnostics before exit.
+      const g23State = {
+        projectId: 'chain-v2-' + Date.now(),
+        parsedBrief: parsedResult.data,
+        moduleDecomposition: design,
+        haltReason: `Gate 23 emitter-completeness FAIL: ${gate23Result.incomplete_sub_modules.length} sub_modules have zero emitter MPN-bearing words.`,
+        gate23Result,
+        savedAt: new Date().toISOString(),
+      }
+      writeFileSync(resolve(outDir, 'state.json'), JSON.stringify(g23State, null, 2))
+      process.exit(23)
+    }
+  }
 
   // ── Phase 2: Translate + gates + repair loop
   console.error(`\n[chain] === PHASE 2: Translate + Gates + Repair ===`)
