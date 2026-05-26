@@ -39,6 +39,7 @@
 
 import { lookupSpec } from './knowledge/specs-writeback'
 import { lookupStandard } from './knowledge/standards-writeback'
+import { lookupProduct } from './knowledge/products-writeback'
 import type { EngineeringContract } from '../../../../scripts/lib/engineering-contract'
 
 // ── HARD-required quantity slots per product class ──────────────────────────
@@ -112,6 +113,8 @@ function inferJurisdiction(brief: any): string {
 export interface LockGateResult {
   filled_slots: Array<{ spec_key: string; value: string; unit: string; source: 'db' | 'web' | null }>
   filled_standards: Array<{ standard_name: string; scope: string; source: 'db' | 'web' | null }>
+  /** Class-level product enrichment (best-effort; non-fatal). */
+  product_enrichment: { found: boolean; source: 'db' | 'web' | null; key_specs_count: number; standards_count: number }
   hard_miss_slots: string[]
   exit_code_22: boolean
 }
@@ -131,6 +134,7 @@ export async function lockEngineering(
   const result: LockGateResult = {
     filled_slots: [],
     filled_standards: [],
+    product_enrichment: { found: false, source: null, key_specs_count: 0, standards_count: 0 },
     hard_miss_slots: [],
     exit_code_22: false,
   }
@@ -197,6 +201,28 @@ export async function lockEngineering(
     } catch { /* non-fatal */ }
   })
   await Promise.all(standardsPromises)
+
+  // ── Phase 2b: class-level product lookup (best-effort, non-fatal) ─────
+  // Queries pretraining_products for a class-level row (e.g. "BESS container").
+  // If found, captures metadata to the result for the regression harness +
+  // future generator stages. Does NOT mutate the contract.
+  try {
+    const productNameHint = `${productClass} container`.trim()
+    if (productNameHint && productClass) {
+      const pres = await lookupProduct({
+        product_name: productNameHint,
+        product_class: productClass,
+      })
+      if (pres.found) {
+        result.product_enrichment = {
+          found: true,
+          source: pres.source,
+          key_specs_count: Object.keys(pres.key_specs ?? {}).length,
+          standards_count: (pres.standards ?? []).length,
+        }
+      }
+    }
+  } catch { /* non-fatal */ }
 
   // ── Phase 3: HARD-required slot check ─────────────────────────────────
   for (const slot of hardRequired) {

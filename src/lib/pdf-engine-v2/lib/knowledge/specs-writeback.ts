@@ -75,9 +75,11 @@ function getDb(): Database.Database | null {
     db.pragma('journal_mode = WAL')
     db.pragma('busy_timeout = 2000')
 
-    // Ensure dedup index exists — idempotent
+    // NOTE: pre-existing duplicates in pretraining_extracted_specs
+    // (477 dup groups as of 2026-05-26) preclude a UNIQUE index. Dedup is
+    // enforced application-side via stmtExistsSpec pre-check below.
     db.prepare(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_specs_wb_dedup
+      CREATE INDEX IF NOT EXISTS idx_specs_wb_dedup_nonunique
         ON pretraining_extracted_specs(document_id, spec_key)
     `).run()
 
@@ -109,9 +111,16 @@ function getDb(): Database.Database | null {
     `)
 
     stmtInsertSpec = db.prepare(`
-      INSERT OR IGNORE INTO pretraining_extracted_specs
+      INSERT INTO pretraining_extracted_specs
         (document_id, spec_key, spec_value, spec_unit, raw_excerpt)
       VALUES (?, ?, ?, ?, ?)
+    `)
+
+    // App-side dedup pre-check (UNIQUE index not allowed; see comment above)
+    stmtExistsSpec = db.prepare(`
+      SELECT 1 FROM pretraining_extracted_specs
+      WHERE document_id = ? AND spec_key = ?
+      LIMIT 1
     `)
 
     dbHandle = db
@@ -156,10 +165,12 @@ If you cannot find an authoritative value, return: {"value":"","unit":"","source
   try {
     const t0 = Date.now()
     const { callFastExtract } = await import('../openrouter-models')
+    // NOTE: groundWithGoogleSearch only takes effect on Gemini 3.1 Flash-Lite
+    // (the default model in callFastExtract). Do NOT pass a model override.
     const raw = await callFastExtract(prompt, {
-      model: WEB_SEARCH_MODEL,
       maxTokens: 512,
       temperature: 0,
+      thinkingLevel: 'low',
       groundWithGoogleSearch: true,
     })
     const latencyMs = Date.now() - t0
@@ -249,7 +260,7 @@ export async function lookupSpec(args: {
   }
 
   // ── 3. Writeback ─────────────────────────────────────────────────────
-  if (db && stmtInsertDoc && stmtInsertSpec) {
+  if (db && stmtInsertDoc && stmtInsertSpec && stmtExistsSpec) {
     try {
       const nowIso = new Date().toISOString()
       const docResult = stmtInsertDoc.run(
@@ -260,19 +271,51 @@ export async function lookupSpec(args: {
       )
       const docId = Number(docResult.lastInsertRowid)
       if (docId > 0) {
-        stmtInsertSpec.run(
-          docId,
-          spec_key,
-          webResult.value,
-          webResult.unit,
-          // Embed source URL in raw_excerpt per datasheet-citation discipline
-          `${webResult.raw_excerpt} [source: ${webResult.source_url}]`.slice(0, 1024),
-        )
+        // App-side dedup: never insert duplicate (document_id, spec_key).
+        // Since each call creates a fresh spec_documents stub, the duplicate
+        // case here is theoretical — but the guard remains in case the writer
+        // is invoked twice in the same process for the same spec.
+        const exists = stmtExistsSpec.get(docId, spec_key) as { 1: number } | undefined
+        if (!exists) {
+          stmtInsertSpec.run(
+            docId,
+            spec_key,
+            webResult.value,
+            webResult.unit,
+            // Embed source URL in raw_excerpt per datasheet-citation discipline
+            `${webResult.raw_excerpt} [source: ${webResult.source_url}]`.slice(0, 1024),
+          )
+        }
       }
     } catch (err) {
       // Fire-and-forget — never block the chain
       console.warn(`[specs-writeback] writeback failed for ${manufacturer}|${part_number}|${spec_key}: ${(err as Error).message}`)
     }
+  }
+
+  // ── 4. Deferred full-datasheet ingest (fire-and-forget) ──────────────
+  // When the web search returns a manufacturer PDF datasheet URL, schedule
+  // an async ingest pass to extract ALL specs from the document (not just
+  // the single spec_key we asked for). This bootstraps the DB faster than
+  // one-spec-at-a-time lookups. Never blocks the chain.
+  if (
+    webResult.source_url &&
+    /\.pdf(\?|$)/i.test(webResult.source_url) &&
+    process.env.SKIP_SPECS_WEB_SEARCH !== '1'
+  ) {
+    void (async () => {
+      try {
+        const { ingestSpecDocument } = await import('./spec-documents-writeback')
+        const ingestResult = await ingestSpecDocument({
+          datasheet_url: webResult.source_url,
+          manufacturer,
+          part_number,
+        })
+        if (ingestResult.spec_count > 0) {
+          console.error(`[specs-writeback] deferred ingest: ${webResult.source_url} → +${ingestResult.spec_count} specs, +${ingestResult.standards_count} standards`)
+        }
+      } catch { /* fire-and-forget; never block */ }
+    })()
   }
 
   console.error(`[specs-writeback] ${JSON.stringify({ spec_key, part_number, hit: 'web', latency_ms: latencyMs, source_url: webResult.source_url })}`)
@@ -288,5 +331,6 @@ export function _resetForTests(): void {
   stmtLookup = null
   stmtInsertDoc = null
   stmtInsertSpec = null
+  stmtExistsSpec = null
   warnedMissing = false
 }
