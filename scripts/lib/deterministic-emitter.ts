@@ -811,10 +811,12 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         cc('rack_label_holder', 'rack label holder', null, 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'PCB-mount label holder, 24-slot'),
+          // dimension modifier removed — slot count moved to form string to prevent
+          // modifier_consistency conflict when Phase 1 LLM adds a physical-size
+          // dimension (e.g. "100x20 mm") as a second dimension modifier.
+          mod('form', 'PCB-mount label holder, 24-slot, snap-in DIN-rail mount'),
           mod('manufacturer', 'Wago'),
           mod('part_number', '221-2401'),
-          mod('dimension', '24', 'slot'),
         ],
       ),
     ],
@@ -1065,7 +1067,9 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
           // datasheet + KNOWN_PART_AUTHORITATIVE entry). 1700 V was the IGBT
           // transistor rating inside the PCS — the system-level DC-bus limit
           // is 1500 V. Gate 13 (parts-spec-validator) rejects >1500 V claims.
-          mod('dimension', '1500', 'V DC max'),
+          // Use rating_primary (not dimension) to prevent modifier_consistency
+          // conflict when Phase 1 LLM adds a physical-size dimension modifier.
+          mod('rating_primary', '1500 V DC max'),
         ],
       ),
       word(
@@ -1635,7 +1639,9 @@ function emitPowerDistribution(p: BessParams): DesignModule {
         cc('dc_busbar_800v', 'DC busbar 800 V', 'electrical_conducting_function', 'copper'),
         [
           mod('quantity', '×1'),
-          mod('dimension', String(p.dcBusVoltageV), 'V'),
+          // Use rating_primary for voltage (not dimension) to avoid modifier_consistency
+          // conflict when Phase 1 LLM adds a physical-length dimension modifier.
+          mod('rating_primary', `${p.dcBusVoltageV} V DC`),
           mod('capacity', '2000', 'A'),
         ],
       ),
