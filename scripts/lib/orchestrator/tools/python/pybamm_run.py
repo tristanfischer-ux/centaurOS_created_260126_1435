@@ -178,9 +178,9 @@ PROVENANCE = {
             "source": "Industry-typical busbar+contactor+wiring loss factor; real BESS round-trip ηDC ≈ 95-97% with battery contributing 1-2% and balance-of-plant another 1-2%",
             "confidence": "empirical",
         },
-        "BMS_CHANNELS_PER_SLAVE (24)": {
-            "source": "Tesla Megapack, LG RESU, CATL EnerC+ utility-BESS BMS topology: custom 24-channel slave PCBs (industry-typical for ≥1 MWh systems). Aligned 2026-05-25 with deterministic-emitter to eliminate narrative-BoM drift.",
-            "confidence": "industry_typical",
+        "BMS_CHANNELS_PER_SLAVE (18)": {
+            "source": "Analog Devices LTC6813-1: 18-channel cell-voltage + temperature monitoring IC, the deterministic-emitter's pinned part for utility BESS. Per-rack boundary: slave wires are physically confined to one rack's pack — system-wide ceil(N_cells/18) under-counts by mishandling the per-rack remainder. Correct formula: ceil(cells_per_rack/18) × rack_count. Aligned 2026-05-26 with deterministic-emitter (class-killer #3d fix) to eliminate drift-detector code-12 exit.",
+            "confidence": "datasheet",
         },
         "TARGET_CELLS_PER_RACK (280)": {
             "source": "40-ft ISO container 8×2 rack layout heuristic; industry-typical",
@@ -207,17 +207,21 @@ MAX_CELL_VOLTAGE_V = {
 #   - ISL94212 (Renesas, 12-ch) — older systems, lower blast radius per
 #     IC failure but more ICs needed for a given cell count
 #   - BQ79616-Q1 (TI, 16-ch) — common in CATL EnerC+
-#   - LTC6813 (ADI, 18-ch) — premium-tier
+#   - LTC6813-1 (ADI, 18-ch) — premium-tier; pinned by deterministic-emitter
 #   - Custom 24-ch PCBs (Tesla Megapack, LG RESU, CATL EnerC+ V2) —
 #     lower IC count, lower BoM cost, accepted blast-radius trade-off
-# The deterministic-emitter pins "Custom 24-channel" BMS slave PCBs for
-# utility BESS. Previously this Python tool used 12-ch (lowest-risk) which
-# generated bms_slave_count = ceil(N_cells / 12); the emitter generated
-# slaves at 24-ch with ~5% redundancy. The chain's drift detector (gate 12)
-# flagged the resulting 313 vs 165 mismatch as a narrative-BoM drift.
-# Aligned 2026-05-25 to 24-ch matching the emitter — industry-typical for
-# utility BESS at 1-10 MWh scale. Drawer: forgeos_gotchas_a8722b28aa588276.
-BMS_CHANNELS_PER_SLAVE = 24
+# The deterministic-emitter pins Analog Devices LTC6813-1 (18-channel) for
+# utility BESS (class-killer #3d fix, 2026-05-26). The formula MUST be
+# per-rack: ceil(cells_per_rack / 18) × rack_count because slave voltage-
+# sense wires are physically confined to one rack's pack — they cannot span
+# rack boundaries per IEC 62619 §6.4. System-wide ceil(N_cells / 18)
+# under-counts by mishandling the per-rack remainder (e.g. 250 % 18 = 16
+# leftover cells per rack require a full extra board each rack; system-wide
+# division loses those 15 extra boards — 195 vs 210 for 15 racks).
+# Previously used 24-ch (2026-05-25 alignment) which gave 157 system-wide;
+# emitter was already at 18-ch per-rack giving 210; drift-detector (gate 12)
+# flagged code-12 exit (25.2% drift). Drawer: forgeos_gotchas_a8722b28aa588276.
+BMS_CHANNELS_PER_SLAVE = 18
 
 # DC bus voltage derating — leave 8% headroom above max cell voltage for
 # charge over-voltage transients before SCPD trip.
@@ -426,8 +430,11 @@ def compute(payload: dict) -> dict:
     cell_mass_kg = CELL_MASS_KG_BY_CHEMISTRY.get(chemistry, 5.3)
     total_cell_mass_kg = round(cell_count_rounded * cell_mass_kg, 1)
 
-    # BMS slave board sizing
-    bms_slave_count = math.ceil(cell_count_rounded / BMS_CHANNELS_PER_SLAVE)
+    # BMS slave board sizing — per-rack boundary (LTC6813-1 is 18-ch; wires
+    # are physically confined to one rack's pack, cannot span rack boundaries
+    # per IEC 62619 §6.4). Use ceil(cells_per_rack / 18) × rack_count, NOT
+    # system-wide ceil(cell_count / 18) which under-counts per-rack remainders.
+    bms_slave_count = math.ceil(cells_per_rack / BMS_CHANNELS_PER_SLAVE) * rack_count
     bms_total_channels = bms_slave_count * BMS_CHANNELS_PER_SLAVE
 
     # Build #18p-fix2 (2026-05-22): correct per-cell current for series-parallel

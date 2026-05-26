@@ -117,7 +117,7 @@ const stepPybamm: ToolStep = {
       dimension_basis: 'count' as const,
       dimension_value: out.bms_slave_count,
       total_gbp: 45 * out.bms_slave_count,
-      source_detail: `pybamm-derived: £45/slave × ${out.bms_slave_count} slaves = £${(45 * out.bms_slave_count).toLocaleString()} (ISL94212 12-ch isolated BMS slave; ${out.bms_total_channels} total channels for ${out.cell_count} cells)`,
+      source_detail: `pybamm-derived: £45/slave × ${out.bms_slave_count} slaves = £${(45 * out.bms_slave_count).toLocaleString()} (LTC6813-1 18-ch cell-voltage+temp board, per-rack boundary; ${out.bms_total_channels} total channels for ${out.cell_count} cells)`,
     }
     return {
       ...c,
@@ -134,7 +134,7 @@ const stepPybamm: ToolStep = {
         rack_count: { value: out.rack_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'pack', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('rack_count') },
         cells_per_rack: { value: out.cells_per_rack, unit: '', family: 'dimensionless', basis: 'rated', scope: 'rack', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('cells_per_rack') },
         total_cell_mass_kg: { value: out.total_cell_mass_kg, unit: 'kg', family: 'mass', basis: 'continuous', scope: 'pack', uncertainty_pct: 2, temporal_resolution_s: null, condition: 'cells only, exc. racks/wiring', provenance: prov('total_cell_mass_kg') },
-        bms_slave_count: { value: out.bms_slave_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'pack', uncertainty_pct: 0, temporal_resolution_s: null, condition: '12-ch slave', provenance: prov('bms_slave_count') },
+        bms_slave_count: { value: out.bms_slave_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'pack', uncertainty_pct: 0, temporal_resolution_s: null, condition: '18-ch LTC6813-1, per-rack boundary: ceil(cells_per_rack/18)×rack_count', provenance: prov('bms_slave_count') },
         bms_total_channels: { value: out.bms_total_channels, unit: '', family: 'dimensionless', basis: 'rated', scope: 'pack', uncertainty_pct: 0, temporal_resolution_s: null, condition: null, provenance: prov('bms_total_channels') },
         cold_plate_total_capacity_min_kw: { value: out.cold_plate_total_capacity_min_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 10, temporal_resolution_s: null, condition: 'sized for cell dissipation × 1.25', provenance: prov('cold_plate_total_capacity_min_kw') },
         cold_plate_per_rack_min_capacity_kw: { value: out.cold_plate_per_rack_min_capacity_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'rack', uncertainty_pct: 10, temporal_resolution_s: null, condition: null, provenance: prov('cold_plate_per_rack_min_capacity_kw') },
