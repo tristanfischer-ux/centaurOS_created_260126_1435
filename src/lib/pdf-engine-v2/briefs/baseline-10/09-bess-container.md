@@ -1,16 +1,16 @@
 # BESS Test Brief
 
-We are designing a containerised 3.5 MWh Battery Energy Storage System, 1 MW PCS, LFP prismatic cells, housed in a 40-foot ISO container.
+We are designing a containerised 2.5 MWh Battery Energy Storage System, 1 MW PCS, LFP prismatic cells, housed in a 40-foot ISO container.
 
 Target market: UK grid-scale frequency response and capacity market, plus C&I peak shaving. Factory-assembled and deployable within 5 working days of delivery to site.
 
 Key constraints:
-- Unit cost ceiling: £180,000 ex-works
-- Maximum gross mass: 28,000 kg (road-transportable without abnormal-load escort)
+- Unit cost ceiling: £450,000 ex-works (≈£180/kWh usable; premium-tier safety-certified BoM)
+- Maximum gross mass: 35,000 kg (road-transportable; may require notification or specialist trailer for some routes)
 - External envelope: 12,192 × 2,438 × 2,896 mm (standard 40-foot ISO)
-- Usable energy: 3.5 MWh minimum at 25 °C, 80% depth of discharge, beginning of life
-- Power rating: 1 MW continuous, 1.25 MW peak for 15 minutes
-- Cell chemistry: LFP prismatic (CATL 280 Ah or equivalent)
+- Usable energy: 2.5 MWh minimum at 25 °C, 80% depth of discharge, beginning of life (design over-delivers to ≥2.65 MWh)
+- Power rating: 1.0 MW continuous; transient ride-through to 1.10 MW for ≤ 60 s (transformer-limited)
+- Cell chemistry: LFP prismatic (CATL 280 Ah, EVE 280 Ah, or equivalent ≥280 Ah class)
 - DC bus voltage: ~800 V nominal (system voltage), AC output at 400 V / 50 Hz via the PCS
 - Design life: 15 years or 6,000 equivalent full cycles at 80% DoD
 - Operating temperature: -20 °C to +50 °C ambient
