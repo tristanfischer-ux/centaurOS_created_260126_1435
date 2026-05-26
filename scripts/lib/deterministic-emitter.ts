@@ -501,8 +501,12 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         [
           mod('quantity', fmtQty(totalBusbars)),
           mod('capacity', '350', 'A'),
-          mod('dimension', '30×4', 'mm'),
-          mod('form', 'tinned electrolytic copper bar, 120 mm² cross-section (2.92 A/mm² @ 350 A continuous, IEC 61439-1)'),
+          // dimension modifier REMOVED to prevent modifier_consistency conflict:
+          // Phase 1 LLM adds a second dimension like "30x4 mm × 120 mm length"
+          // which conflicts with "30×4 mm", stripping both → commodity floor 1 mod.
+          // Size spec moved to form string to survive the conflict.
+          mod('form', 'tinned electrolytic copper bar, 30×4 mm cross-section (120 mm²), 2.92 A/mm² @ 350 A continuous per IEC 61439-1'),
+          mod('material', 'ETP copper C11000'),
         ],
       ),
       // BESS L19 (2026-05-25, Physics Critic engineering_plausibility HIGH —
@@ -726,7 +730,10 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         cc('compression_plate', 'compression plate', null, 'steel'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('dimension', '3.5', 'kN'),
+          mod('form', 'S355 steel compression endplate, laser-cut, threaded M12 stud holes'),
+          mod('material', 'S355 structural steel, hot-dip galvanised'),
+          mod('dimension', '3.5', 'kN preload'),
+          mod('regulatory', 'BS EN 1993-1-1'),
         ],
       ),
       word(
@@ -2083,8 +2090,10 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
         cc('louvre_vent_panel', 'louvre vent panel', null, 'steel'),
         [
           mod('quantity', '×2'),
-          mod('form', 'powder-coated steel louvre vent with insect mesh, 600×600 mm'),
-          mod('dimension', '600×600', 'mm'),
+          // dimension removed — Phase 1 LLM adds conflicting dimension, both get stripped.
+          // Size spec kept in form only.
+          mod('form', 'powder-coated steel louvre vent, 600×600 mm face, stainless insect mesh, 30° blade angle'),
+          mod('material', 'electrogalvanised steel, RAL 7035'),
           mod('regulatory', 'IP41'),
         ],
       ),
@@ -2209,9 +2218,12 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
         cc('cold_plate_per_rack', 'aluminium cold plate per rack', 'thermal_transfer_function', 'aluminium'),
         [
           mod('quantity', fmtQty(coldPlateCount)),
-          mod('form', 'aluminium 6061-T6'),
-          mod('dimension', '600×400×20', 'mm'),
-          mod('performance', 'microchannel glycol/water 60 L/min per rack'),
+          // dimension removed — Phase 1 LLM adds conflicting dimension, both stripped.
+          // Size spec kept in form string.
+          mod('form', 'aluminium 6061-T6 microchannel cold plate, 600×400×20 mm face, Ø19 mm inlet/outlet fittings'),
+          mod('material', 'aluminium alloy 6061-T6, hard-anodised'),
+          mod('performance', 'glycol/water 60 L/min per rack @ 35 kPa drop'),
+          mod('regulatory', 'BS EN ISO 6520-1'),
         ],
       ),
       // Coolant distribution manifold — 8-way header distributes glycol/water
@@ -2500,7 +2512,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('smoke_vent_interlock_mount', 'smoke vent interlock mount bracket', null, 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', 'DIN-rail bracket, hot-dip galvanised, M6 fixing'),
+          mod('form', 'DIN-rail bracket, hot-dip galvanised, M6 fixing, 35 mm top-hat profile'),
+          mod('material', 'S235 steel, hot-dip galvanised per ISO 1461'),
+          mod('regulatory', 'IEC 60715'),
         ],
       ),
       word(
@@ -2581,7 +2595,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('safety_label_mount', 'safety label mount hardware', null, 'steel'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'stainless self-adhesive + rivet backing'),
+          mod('form', 'self-adhesive + 3-rivet stainless backing plate, 50×30 mm, for vinyl label retention in high-vibration environment'),
+          mod('material', 'SS316 stainless steel'),
+          mod('regulatory', 'BS EN ISO 7010'),
         ],
       ),
     ],
@@ -2630,7 +2646,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('gas_sensor_mount', 'gas sensor DIN mount bracket', null, 'steel'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'DIN rail clamp, stainless'),
+          mod('form', 'DIN-rail snap-mount bracket for Crowcon TXgard transmitter body, 35 mm top-hat, SS316'),
+          mod('material', 'SS316 stainless steel, passivated'),
+          mod('regulatory', 'IEC 60715'),
         ],
       ),
       word(
@@ -2641,7 +2659,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('quantity', fmtQty(p.rackCount)),
           // Use full-unit string to prevent LLM reviewer from adding a bare "2"
           // dimension modifier that conflicts with the "2 m" emitter value.
-          mod('form', '4-core shielded 0.5 mm² twisted pair, fire-rated, 2 m per bay'),
+          mod('form', '4-core shielded 0.5 mm² twisted pair, fire-rated, 2 m per bay, prefabricated with M12 sensor connector'),
+          mod('material', 'copper, LSZH jacket'),
+          mod('regulatory', 'BS EN 50174-2'),
         ],
       ),
       word(
