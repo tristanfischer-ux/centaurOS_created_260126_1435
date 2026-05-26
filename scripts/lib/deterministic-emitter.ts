@@ -1124,12 +1124,28 @@ function emitPowerDistribution(p: BessParams): DesignModule {
   // Driving a contactor above its rated voltage voids IEC 60947-2 arc-quench
   // guarantees and risks catastrophic arc-blast during a fault.
   //
-  // Fix: replace with TE Connectivity EV200HAANA — 500 A continuous, 1500 V
-  // DC bi-directional, IEC 60947-4-1, hermetically sealed. This is the exact
-  // same confirmed-real part the Radical demo verified via Digi-Key at
-  // £139.16 (commit c51268b5 demo output). Provides 1500 V / 912.5 V = 1.64×
-  // voltage margin — well within safe operating envelope for a 250S LFP pack.
-  // Source: TE Connectivity EV200HAANA datasheet + Digi-Key catalogue.
+  // L33 council SAFETY BLOCKER FIX (2026-05-26, commit replaces 056ce0aad):
+  // TE Connectivity EV200HAANA actual datasheet rates 900 V DC max
+  // (confirmed: OnlineComponents "Maximum DC Voltage Rating: 900 V",
+  // https://www.onlinecomponents.com/en/productdetail/te-connectivity-kilovac-brand/ev200haana-11634568.html).
+  // The 250S LFP string max charge voltage = 250 × 3.65 V = 912.5 V —
+  // 13 V OVER the EV200HAANA's 900 V rating. Sub-agent S (commit 056ce0aad)
+  // hallucinated "1500 V"; the actual rated voltage is 900 V.
+  //
+  // Replacement: Schaltbau C310K/500
+  // Rated operational voltage Ue: 1,500 V DC @ PD2 (per datasheet page 5,
+  // "Specifications – Version «K» for Ue = 1,500 V DC", per IEC/UL 60947-4-1
+  // + GB/T 14048.4). Provides 1500 V / 912.5 V = 1.64× voltage margin.
+  // Rated continuous current Ith: 500 A @ 2×150 mm² / 40°C (or 400 A @
+  // 240 mm² / 70°C) per same datasheet page 5.
+  // Source: https://2024.schaltbau.com/media/c310_en.pdf (Schaltbau GmbH
+  // C2215/2407/0, "Specifications – Version «K» for Ue = 1,500 V DC",
+  // "Rated operational voltage Ue: 1,000 V @ PD3 / 1,500 V @ PD2").
+  //
+  // NOT the C310A (1,000 V version) — that variant (Ue = 1,000 V DC) has
+  // insufficient margin for 912.5 V. The C310K is the 1,500 V variant.
+  // NOT the C310/300 — that is 300 A continuous, insufficient for per-rack
+  // peak current at larger rack counts.
   const perRackContactorCapacityA = Math.max(160, Math.ceil(p.stringPeakA * 1.25 / 20) * 20)  // round to nearest 20 A frame, min 160 A
   // Max string voltage at full charge (3.65 V/cell × series cells).
   // Used in form string for documentation — the emitted dimension is 1500 V
@@ -1150,9 +1166,9 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('quantity', fmtQty(p.rackCount)),
           mod('dimension', '1500', 'V'),
           mod('capacity', String(perRackContactorCapacityA), 'A'),
-          mod('form', `TE Connectivity EV200HAANA (500 A continuous / 1500 V DC bi-directional — replaces Gigavac MX12 which was 800 V rated vs ${maxStringVoltageV} V max string charge voltage)`),
-          mod('manufacturer', 'TE Connectivity'),
-          mod('part_number', 'EV200HAANA'),
+          mod('form', `Schaltbau C310K/500 (500 A continuous / 1,500 V DC bi-directional — replaces EV200HAANA which is rated 900 V DC max, insufficient for ${maxStringVoltageV} V max string charge voltage)`),
+          mod('manufacturer', 'Schaltbau'),
+          mod('part_number', 'C310K/500'),
           mod('regulatory', 'IEC 60947-4-1'),
         ],
       ),
@@ -1192,14 +1208,24 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('regulatory', 'UL 9540A'),
         ],
       ),
+      // L33 fix: dc_precharge_contactor_word was emitting 800 V — also
+      // insufficient for the 912.5 V string. Replaced with Schaltbau C310K/150
+      // (same K-variant = 1,500 V DC @ PD2; 150 A continuous — adequate for
+      // the ~10-50 A precharge current through a current-limiting resistor).
+      // Source: https://2024.schaltbau.com/media/c310_en.pdf page 5,
+      // "Rated operational voltage Ue: 1,000 V @ PD3 / 1,500 V @ PD2".
       word(
         'dc_precharge_contactor_word',
         'DC pre-charge contactor word',
         cc('dc_precharge_contactor', 'DC pre-charge contactor', 'electromechanical_switching_function', 'copper'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('dimension', '800', 'V'),
-          mod('capacity', '100', 'A'),
+          mod('dimension', '1500', 'V'),
+          mod('capacity', '150', 'A'),
+          mod('form', 'Schaltbau C310K/150 (150 A continuous / 1,500 V DC bi-directional — precharge duty ~10-50 A via current-limiting resistor)'),
+          mod('manufacturer', 'Schaltbau'),
+          mod('part_number', 'C310K/150'),
+          mod('regulatory', 'IEC 60947-4-1'),
         ],
       ),
       // BESS L21 (2026-05-25, Physics Critic engineering_plausibility HIGH —
@@ -1357,7 +1383,7 @@ function emitPowerDistribution(p: BessParams): DesignModule {
 
   return {
     module: 'power_distribution',
-    module_brief: `Routes ${p.busContinuousA.toFixed(0)} A continuous (${p.busPeakA.toFixed(0)} A peak) at ${p.dcBusVoltageV} V DC from ${p.rackCount} racks (${p.stringContinuousA.toFixed(0)} A continuous per-rack via TE Connectivity EV200HAANA 1500 V DC contactors) through a Schaltbau C330 2000 A / 1500 V DC main bus contactor and HRC fuses to PCS, and the PCS AC output through ${acBreakerContinuousA} A switchgear (ABB Emax E2.2 2500 A frame, sized for 1.25 × peak ${p.peakPowerKw.toFixed(0)} kW / 400 V 3-phase per IEC 60947-2) to the grid PCC. Chassis-bond earth path uses nVent ERIFLEX MBJ50-300-10 50 mm² tinned copper braids (NOT a Raychem heat-shrink boot).`,
+    module_brief: `Routes ${p.busContinuousA.toFixed(0)} A continuous (${p.busPeakA.toFixed(0)} A peak) at ${p.dcBusVoltageV} V DC from ${p.rackCount} racks (${p.stringContinuousA.toFixed(0)} A continuous per-rack via Schaltbau C310K/500 1,500 V DC contactors, IEC 60947-4-1) through a Schaltbau C330 2000 A / 1500 V DC main bus contactor and HRC fuses to PCS, and the PCS AC output through ${acBreakerContinuousA} A switchgear (ABB Emax E2.2 2500 A frame, sized for 1.25 × peak ${p.peakPowerKw.toFixed(0)} kW / 400 V 3-phase per IEC 60947-2) to the grid PCC. Chassis-bond earth path uses nVent ERIFLEX MBJ50-300-10 50 mm² tinned copper braids (NOT a Raychem heat-shrink boot).`,
     overview_paragraph_en: '',
     derived_parameters: {
       bus_continuous_current_a: p.busContinuousA,

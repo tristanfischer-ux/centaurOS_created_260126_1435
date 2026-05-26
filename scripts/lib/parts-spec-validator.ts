@@ -98,19 +98,65 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     category: 'hvdc_contactor',
     rated_current_a: 500,
     rated_voltage_dc_v: 800,
-    notes: 'Gigavac MX12 series: 350-500 A continuous, 800 V DC. WARNING: unsuitable for 250S LFP packs (max charge 912.5 V > 800 V rated) — use EV200HAANA (1500 V) instead.',
+    notes: 'Gigavac MX12 series: 350-500 A continuous, 800 V DC. WARNING: unsuitable for 250S LFP packs (max charge 912.5 V > 800 V rated) — use Schaltbau C310K/500 (1,500 V DC) instead.',
   },
-  // L30 council FIX 3: per-rack contactor for 250S LFP strings. Max charge
-  // voltage 250 × 3.65 V = 912.5 V exceeds Gigavac MX12 800 V rating.
-  // TE Connectivity EV200HAANA is a confirmed-real part (Digi-Key £139.16,
-  // verified in Radical demo commit c51268b5).
+  // L33 council SAFETY BLOCKER FIX (2026-05-26): TE EV200HAANA actual
+  // rated voltage is 900 V DC — NOT 1500 V. Sub-agent S (commit 056ce0aad)
+  // hallucinated "1500 V". Confirmed 900 V max from:
+  // https://www.onlinecomponents.com/en/productdetail/te-connectivity-kilovac-brand/ev200haana-11634568.html
+  // ("Maximum DC Voltage Rating: 900 V").
+  // This entry is kept so gate 13 CATCHES any re-emission of EV200HAANA and
+  // flags it as insufficient for 250S LFP (912.5 V string > 900 V rated).
+  // NOT to be used as the per-rack contactor — use C310K/500 below instead.
   {
     manufacturer: 'TE Connectivity',
     part_number_pattern: /^EV200HAANA$/i,
     category: 'hvdc_contactor',
     rated_current_a: 500,
+    rated_voltage_dc_v: 900,
+    notes: 'TE Connectivity EV200HAANA: 500 A continuous, 900 V DC max (NOT 1500 V — sub-agent S hallucinated 1500 V in commit 056ce0aad; L33 council caught as safety blocker). Source: https://www.onlinecomponents.com/en/productdetail/te-connectivity-kilovac-brand/ev200haana-11634568.html ("Maximum DC Voltage Rating: 900 V"). UNSUITABLE for 250S LFP packs (912.5 V string > 900 V rating). Use Schaltbau C310K/500 instead.',
+  },
+  // L33 SAFETY FIX: Schaltbau C310K/500 — per-rack contactor for 250S LFP
+  // strings (max charge 912.5 V). Replaces TE EV200HAANA which is 900 V max.
+  //
+  // Datasheet: https://2024.schaltbau.com/media/c310_en.pdf
+  // (Schaltbau GmbH C2215/2407/0, document reference page 5,
+  //  "Specifications – Version «K» for Ue = 1,500 V DC")
+  // Verbatim rated-voltage line:
+  //   "Rated operational voltage Ue: 1,000 V @ PD3 / 1,500 V @ PD2"
+  // Verbatim rated-current line:
+  //   "Conv. thermal current Ith: 500 A (2x 150 mm²) @ Ta = 40°C"
+  //   (or "400 A (240 mm²) @ Ta = 70°C")
+  // Standards: IEC 60947-4-1 / UL 60947-4-1 / GB/T 14048.4
+  // Approvals: CE, CCC (China), EAC (Russia/EAEU), UL, UKCA
+  //
+  // Variant disambiguation (critical — C310 family has three voltage classes):
+  //   C310K = 1,500 V DC @ PD2 — THIS variant. "K" = large arc chamber.
+  //   C310A = 1,000 V DC     — insufficient for 912.5 V with engineering margin.
+  //   C310S = 60 V DC        — low-voltage version only.
+  // NOT the C310/300 (300 A continuous) — insufficient for per-rack peak at
+  //   larger stack configurations. C310K/500 is the 500 A variant.
+  // NOT the C330 — that is the 2,000 A main bus contactor (separate role).
+  {
+    manufacturer: 'Schaltbau',
+    part_number_pattern: /^C310K\/500(?:[\s-].*)?$/i,
+    category: 'hvdc_contactor',
+    rated_current_a: 500,
     rated_voltage_dc_v: 1500,
-    notes: 'TE Connectivity EV200HAANA: 500 A continuous, 1500 V DC bi-directional, hermetically sealed, IEC 60947-4-1. Confirmed real on Digi-Key at £139.16 (Radical demo 2026-05-10 commit c51268b5). Canonical per-rack contactor for 250S LFP packs (912.5 V max charge).',
+    notes: 'Schaltbau C310K/500: 500 A continuous (2×150 mm² / 40°C), 1,500 V DC bi-directional @ PD2, IEC/UL 60947-4-1, GB/T 14048.4. CE/UL/CCC/UKCA approved. Canonical per-rack contactor for 250S LFP packs (912.5 V max charge) per L33 safety fix. Datasheet: https://2024.schaltbau.com/media/c310_en.pdf page 5.',
+  },
+  // Schaltbau C310K/150 — precharge contactor for 250S LFP strings.
+  // Same K-variant (1,500 V DC @ PD2); lower current class for precharge
+  // duty (~10-50 A through current-limiting resistor). L33 fix: replaced the
+  // bare 800 V emission on dc_precharge_contactor_word.
+  // Source: https://2024.schaltbau.com/media/c310_en.pdf page 5.
+  {
+    manufacturer: 'Schaltbau',
+    part_number_pattern: /^C310K\/150(?:[\s/].*)?$/i,
+    category: 'hvdc_contactor',
+    rated_current_a: 150,
+    rated_voltage_dc_v: 1500,
+    notes: 'Schaltbau C310K/150: 150 A continuous (50 mm² / 40°C), 1,500 V DC bi-directional @ PD2, IEC/UL 60947-4-1. Used as dc_precharge_contactor on 250S LFP strings (precharge duty ~10-50 A). NOT C310K/500 (500 A — that is the per-rack main contactor). Datasheet: https://2024.schaltbau.com/media/c310_en.pdf.',
   },
   // ── BESS DC fuses (Bussmann 170M family) ──────────────────────
   // 170M68xx subfamily: 1250 A fuses. Lower-current 170M variants exist.
