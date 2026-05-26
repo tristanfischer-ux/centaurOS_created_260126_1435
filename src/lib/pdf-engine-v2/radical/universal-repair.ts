@@ -19,6 +19,8 @@
 import type { ModuleSpec, CrossModuleGrammarLink } from '../types/module-decomposition'
 import type { GateResult } from './universal-arithmetic-gates'
 import { normaliseKind, normaliseModifierValue } from './universal-grammar-gates'
+import type { VerifiedPartsAllowlist } from './allowlist-builder'
+import { allowlistContainsMpn, renderAllowlistForPrompt } from './allowlist-builder'
 
 /**
  * In-place dedup of modifier_characters on a single word. Collapses entries
@@ -263,13 +265,39 @@ export async function repair(opts: {
   /** parsedBrief from the chain — used to build the jurisdiction guardrail.
    *  Optional for backwards-compatibility; when absent falls back to UNKNOWN. */
   parsedBrief?: any
+  /**
+   * Verified-parts allowlist built at chain start from KNOWN_PART_AUTHORITATIVE
+   * + Stage 17.6 RAG candidates + deterministic-emitter emissions.
+   *
+   * When provided, the allowlist summary is injected into the system prompt so
+   * the repair LLM knows which MPNs are approved. The HARD REJECTION happens
+   * in applyPatches — this injection is the soft signal; applyPatches is the
+   * hard gate.
+   *
+   * Optional for backwards-compatibility (old callers that don't pass it still
+   * work; they just lose the prompt-level signal). Without it, applyPatches
+   * also skips MPN validation (allowlist guard only fires when passed).
+   *
+   * Codified 2026-05-26 per handover 2026-05-26T05-34-4dd3f4a39.md Shift B
+   * item 1: Phase 2 verified-parts allowlist class-killer fix.
+   */
+  verifiedPartsAllowlist?: VerifiedPartsAllowlist
 }): Promise<RepairResult> {
   // Build a jurisdiction-aware system message that adds the guardrail block
   // after the core SYSTEM template. This prevents the repair LLM from emitting
   // foreign-jurisdiction standards (e.g. UL/NEC/ASTM for UK briefs) or known
   // incompatible brand-product combinations (ECARO-25 + Novec 1230, EBS-500).
   const jurisdictionGuardrail = buildJurisdictionGuardrail(opts.parsedBrief ?? null)
-  const systemWithGuardrail = SYSTEM + '\n' + jurisdictionGuardrail
+
+  // Allowlist prompt injection: tell the LLM which MPNs are approved so it
+  // prefers them and avoids inventing new ones. The hard rejection happens in
+  // applyPatches; this is the soft "please don't" signal that reduces the
+  // number of patches that reach the hard gate.
+  const allowlistBlock = opts.verifiedPartsAllowlist
+    ? '\n' + renderAllowlistForPrompt(opts.verifiedPartsAllowlist) + '\n'
+    : ''
+
+  const systemWithGuardrail = SYSTEM + '\n' + jurisdictionGuardrail + allowlistBlock
 
   const userContent = `CURRENT DESIGN:
 ${JSON.stringify({ modules: opts.modules, cross_module_grammar_links: opts.crossLinks }, null, 2)}
@@ -397,9 +425,33 @@ function validateNoDanglingLink(modules: ModuleSpec[], patch: RepairPatch): stri
   return null
 }
 
-export function applyPatches(modules: ModuleSpec[], crossLinks: CrossModuleGrammarLink[], patches: RepairPatch[]): {
+/**
+ * Options for applyPatches.
+ *
+ * verifiedPartsAllowlist: when provided, every patch that introduces or
+ * modifies a modifier_characters[kind=part_number] value MUST match an
+ * allowlist entry. Patches introducing non-allowlist MPNs are HARD REJECTED
+ * (dropped, logged) — the chain continues without them.
+ *
+ * This is the structural enforcement counterpart to the soft prompt-level
+ * signal sent via repair(opts.verifiedPartsAllowlist). Both together kill
+ * the EBS-500 / EV200HAANA-1500V-claim / ECARO-25 hallucination family.
+ *
+ * Codified 2026-05-26 per handover 2026-05-26T05-34-4dd3f4a39.md Shift B.
+ */
+export interface ApplyPatchesOptions {
+  verifiedPartsAllowlist?: VerifiedPartsAllowlist
+}
+
+export function applyPatches(
+  modules: ModuleSpec[],
+  crossLinks: CrossModuleGrammarLink[],
+  patches: RepairPatch[],
+  opts: ApplyPatchesOptions = {},
+): {
   applied: number
   skipped: number
+  allowlist_rejected: number
   reasons: string[]
   hash_before: string
   hash_after: string
@@ -408,9 +460,87 @@ export function applyPatches(modules: ModuleSpec[], crossLinks: CrossModuleGramm
   const hashBefore = shortHash({ modules, crossLinks })
   let applied = 0
   let skipped = 0
+  let allowlistRejected = 0
   const reasons: string[] = []
 
   for (const p of patches) {
+    // ── ALLOWLIST CHECK (2026-05-26 Phase 2 class-killer fix) ────────────
+    // When a verifiedPartsAllowlist is provided, inspect every patch whose
+    // path targets a modifier_characters[kind=part_number] field OR whose
+    // new_value contains a modifier with kind=part_number. If the MPN is
+    // NOT in the allowlist → HARD REJECT the entire patch, log the rejection
+    // reason (MPN + allowlist size + path), and continue to the next patch.
+    //
+    // Why reject the whole patch rather than just stripping the MPN:
+    //   A Phase 2 patch that adds a word with a hallucinated MPN is not
+    //   salvageable by removing the MPN — the word itself was invented to
+    //   carry that MPN. Dropping the patch leaves the design unchanged
+    //   (safer than an orphan word with no part identity) and forces the
+    //   repair LLM to pick an allowlist MPN in the next iteration instead.
+    //
+    // Coverage: catches (a) direct edits to part_number modifier values,
+    // (b) add-word patches that carry a part_number in modifier_characters.
+    // Does NOT catch patches that add a part_number modifier to an already-
+    // existing word via a partial object merge — those are caught by the
+    // word-enrichment merge branch below which also runs the same check.
+    if (opts.verifiedPartsAllowlist) {
+      const allownlist = opts.verifiedPartsAllowlist
+      const newVal: any = p.new_value
+
+      // Case A: patch directly sets a part_number value (path ends in part_number
+      // OR the last path token is a modifier_characters entry whose kind=part_number).
+      const directPnEdit =
+        p.path.includes('part_number') ||
+        (typeof newVal === 'string' && p.path.endsWith('.value') && p.path.includes('part_number'))
+      if (directPnEdit && typeof newVal === 'string' && newVal.trim().length >= 3) {
+        const match = allowlistContainsMpn(allownlist, newVal)
+        if (!match) {
+          allowlistRejected++
+          reasons.push(
+            `ALLOWLIST_REJECT ${p.module}.${p.path}: MPN="${newVal}" not in verified-parts allowlist ` +
+            `(${allownlist.entries.length} entries; sources: ` +
+            `KPA=${allownlist.source_counts.KNOWN_PART_AUTHORITATIVE}, ` +
+            `emitter=${allownlist.source_counts.deterministic_emitter}, ` +
+            `rag=${allownlist.source_counts.rag_library}). ` +
+            `Patch dropped. (${p.reason})`
+          )
+          skipped++
+          continue
+        }
+      }
+
+      // Case B: patch adds/replaces a word (new_value is object with modifier_characters).
+      // Extract any part_number modifier from the new word and validate it.
+      if (newVal && typeof newVal === 'object' && !Array.isArray(newVal)) {
+        const mods: any[] = Array.isArray(newVal.modifier_characters) ? newVal.modifier_characters : []
+        for (const mc of mods) {
+          if (mc?.kind === 'part_number') {
+            const pnVal = String(mc.value ?? '').trim()
+            if (pnVal.length >= 3) {
+              const match = allowlistContainsMpn(allownlist, pnVal)
+              if (!match) {
+                allowlistRejected++
+                reasons.push(
+                  `ALLOWLIST_REJECT ${p.module}.${p.path}: word patch contains MPN="${pnVal}" ` +
+                  `not in verified-parts allowlist (${allownlist.entries.length} entries). ` +
+                  `Patch dropped. (${p.reason})`
+                )
+                skipped++
+                break  // break inner loop; continue will skip this patch via outer flag
+              }
+            }
+          }
+        }
+        // If we pushed a rejection reason in the mods loop, skipped was already incremented.
+        // The break above exits the mods loop but we're still in the outer for loop.
+        // Use the reasons array as signal: last reason starts with ALLOWLIST_REJECT → continue.
+        if (reasons.length > 0 && reasons[reasons.length - 1].startsWith('ALLOWLIST_REJECT')) {
+          continue
+        }
+      }
+    }
+    // ── END ALLOWLIST CHECK ──────────────────────────────────────────────
+
     // Validate against dangling links BEFORE applying — iter-22 bug: repair
     // LLM kept "fixing" dangling refs by adding more links to non-existent
     // sub-modules, creating infinite cycle.
@@ -569,6 +699,7 @@ export function applyPatches(modules: ModuleSpec[], crossLinks: CrossModuleGramm
   return {
     applied,
     skipped,
+    allowlist_rejected: allowlistRejected,
     reasons,
     hash_before: hashBefore,
     hash_after: hashAfter,

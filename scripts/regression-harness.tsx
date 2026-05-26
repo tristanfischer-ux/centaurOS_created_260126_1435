@@ -594,6 +594,58 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
 
     // Suppress unused-var warning for the eosCheck (kept for future invariants)
     void eosCheck
+
+    // BESS.phase2_only_allowlist_mpns (2026-05-26 class-killer, handover
+    // 2026-05-26T05-34-4dd3f4a39.md Shift B item 1).
+    //
+    // Every BoM word in final state.json that carries a Phase-2-sourced
+    // part_number MUST be from the verified-parts allowlist at chain start.
+    // The "Phase 2 sourced" signal is conservative: we cannot tag individual
+    // words by source in the current state schema, so we check ALL words —
+    // any hallucinated MPN that slipped through applyPatches (e.g. if the
+    // allowlist guard was bypassed) will be caught here.
+    //
+    // Specifically: no word should carry a known-hallucinated MPN that was
+    // documented in drawer forgeos_gotchas_1c9b53af5c9aaf32. The list is
+    // additive — future hallucinations get added when observed.
+    //
+    // This invariant does NOT check allowlist completeness (that would require
+    // running the full allowlist builder, which needs the forge-truth.db and
+    // chain output dir). It checks only the KNOWN-BAD list — a hard whitelist
+    // of MPNs that are definitively hallucinated.
+    const KNOWN_HALLUCINATED_MPNS: Array<{ pn: RegExp; note: string }> = [
+      { pn: /^EBS-500$/i,            note: 'nVent ERIFLEX EBS-500 does not exist; use MBJ50-300-10 (drawer forgeos_gotchas_1c9b53af5c9aaf32)' },
+      { pn: /^EV200HAANA-1500V$/i,   note: 'TE EV200HAANA-1500V claim — real PN is EV200HAANA (no suffix); 1500V is in model name not suffix (drawer forgeos_gotchas_1c9b53af5c9aaf32)' },
+      { pn: /^ECARO-25/i,            note: 'ECARO-25 is a fire-suppression SYSTEM brand (Fike), not a part_number; should be in regulatory not part_number (drawer forgeos_gotchas_1c9b53af5c9aaf32)' },
+      { pn: /^UL\s+1007/i,           note: 'UL 1007/1577 is a regulatory standard, not an MPN; should use kind=regulatory not part_number' },
+      { pn: /^UL\s+1577/i,           note: 'UL 1577 is a regulatory standard, not an MPN; should use kind=regulatory not part_number' },
+      { pn: /^ASTM\s+D3306/i,        note: 'ASTM D3306 is a coolant standard, not an MPN; should use kind=regulatory not part_number' },
+    ]
+    const hallucinatedPnViolations: string[] = []
+    const allBessModules = state?.moduleDecomposition?.modules ?? []
+    for (const m of allBessModules) {
+      for (const sm of (m.sub_modules ?? [])) {
+        for (const w of (sm.words ?? [])) {
+          const mods: Array<{ kind: string; value: string }> = Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+          for (const mc of mods) {
+            if (mc.kind !== 'part_number') continue
+            const pnVal = String(mc.value ?? '').trim()
+            for (const known of KNOWN_HALLUCINATED_MPNS) {
+              if (known.pn.test(pnVal)) {
+                hallucinatedPnViolations.push(`word=${w.id ?? '?'} in ${m.module}::${sm.id}: part_number="${pnVal}" — ${known.note}`)
+              }
+            }
+          }
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'BESS.phase2_only_allowlist_mpns',
+      'No known-hallucinated MPNs in final state (EBS-500, EV200HAANA-1500V, ECARO-25-as-pn, UL 1007/1577-as-pn, ASTM D3306-as-pn)',
+      hallucinatedPnViolations.length,
+      (n) => n === 0,
+      (n) => `${n} known-hallucinated MPN(s) found in final state — Phase 2 allowlist guard may have been bypassed or allowlist was missing: ${hallucinatedPnViolations.slice(0, 5).join('; ')}`,
+    ))
   }
 
   // === Additional universal invariants ===

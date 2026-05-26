@@ -75,6 +75,7 @@ import { translate } from '../src/lib/pdf-engine-v2/radical/universal-translator
 import { runArithmeticGates } from '../src/lib/pdf-engine-v2/radical/universal-arithmetic-gates'
 import { runGrammarGates } from '../src/lib/pdf-engine-v2/radical/universal-grammar-gates'
 import { repair, applyPatches, dedupAllModifiers } from '../src/lib/pdf-engine-v2/radical/universal-repair'
+import { buildVerifiedPartsAllowlist } from '../src/lib/pdf-engine-v2/radical/allowlist-builder'
 import { parseJsonFromLlm } from '../src/lib/pdf-engine-v2/lib/llm-json'
 import type { KeyMetrics, BriefRevisionEntry } from '../src/lib/pdf-engine-v2/types/module-decomposition'
 import { formatFloorsForPrompt, getClassFloors } from '../src/lib/pdf-engine-v2/class-floors'
@@ -3220,6 +3221,36 @@ async function main() {
     logAction({ step: 'brief_target_reconciliation', ok: false, error: String(err).slice(0, 200) })
   }
 
+  // ── Verified-parts allowlist (2026-05-26 Phase 2 class-killer fix) ──────────
+  //
+  // Build the allowlist BEFORE the Phase 2 repair loop starts. Three sources:
+  //   1. KNOWN_PART_AUTHORITATIVE — curated manufacturer-datasheet entries
+  //   2. Stage 17.6 RAG library candidates — real parts from forge-truth.db
+  //   3. Deterministic-emitter emitted parts — MPNs already in design.modules
+  //
+  // The allowlist is passed to every repair() call (soft prompt signal) and
+  // every applyPatches() call (hard rejection). Patches that introduce MPNs
+  // not in the allowlist are dropped before they enter state.json.
+  //
+  // Drawer: forgeos_gotchas_1c9b53af5c9aaf32 (EBS-500, EV200HAANA-1500V claim,
+  // ECARO-25 hallucination family). Codified 2026-05-26.
+  const verifiedPartsAllowlist = buildVerifiedPartsAllowlist({
+    modules: design.modules ?? [],
+    libCandidatesPath: resolve(outDir, '4-library-candidates.json'),
+  })
+  console.error(
+    `[chain] verified-parts allowlist: ${verifiedPartsAllowlist.entries.length} entries ` +
+    `(KPA=${verifiedPartsAllowlist.source_counts.KNOWN_PART_AUTHORITATIVE}, ` +
+    `emitter=${verifiedPartsAllowlist.source_counts.deterministic_emitter}, ` +
+    `rag=${verifiedPartsAllowlist.source_counts.rag_library})`
+  )
+  logAction({
+    step: 'verified_parts_allowlist_built',
+    total_entries: verifiedPartsAllowlist.entries.length,
+    source_counts: verifiedPartsAllowlist.source_counts,
+    built_at: verifiedPartsAllowlist.built_at,
+  })
+
   // ── Phase 2: Translate + gates + repair loop
   console.error(`\n[chain] === PHASE 2: Translate + Gates + Repair ===`)
   // apiKey was declared in Phase D-prep above; reuse it here.
@@ -3300,16 +3331,26 @@ async function main() {
       // citations (UL/NEC/ASTM for UK briefs) and known incompatible
       // brand-product combinations on every repair iteration.
       parsedBrief: parsedResult.data,
+      // 2026-05-26 class-killer: inject verified-parts allowlist as soft
+      // prompt signal. Hard enforcement happens in applyPatches below.
+      verifiedPartsAllowlist,
     })
     if (rep.unfixable) {
       console.error(`[chain] Phase 2: repair LLM returned unfixable: ${rep.reason}`)
       logAction({ step: `phase2_repair_${repairIter}`, unfixable: true, reason: rep.reason })
       break
     }
-    const applied = applyPatches(design.modules, design.cross_module_grammar_links ?? (design.cross_module_grammar_links = []), rep.patches)
-    console.error(`[chain] Phase 2 iter ${repairIter}: applied ${applied.applied} patches, skipped ${applied.skipped}, state_changed=${applied.state_changed}`)
+    const applied = applyPatches(
+      design.modules,
+      design.cross_module_grammar_links ?? (design.cross_module_grammar_links = []),
+      rep.patches,
+      // 2026-05-26 class-killer: pass allowlist for hard MPN rejection.
+      // Patches introducing MPNs not in allowlist are dropped before state.json.
+      { verifiedPartsAllowlist },
+    )
+    console.error(`[chain] Phase 2 iter ${repairIter}: applied ${applied.applied} patches, skipped ${applied.skipped}, allowlist_rejected=${applied.allowlist_rejected}, state_changed=${applied.state_changed}`)
     for (const r of applied.reasons) console.error(`    ${r}`)
-    logAction({ step: `phase2_repair_${repairIter}`, patches: rep.patches, applied: applied.applied, skipped: applied.skipped, state_changed: applied.state_changed, reasons: applied.reasons })
+    logAction({ step: `phase2_repair_${repairIter}`, patches: rep.patches, applied: applied.applied, skipped: applied.skipped, allowlist_rejected: applied.allowlist_rejected, state_changed: applied.state_changed, reasons: applied.reasons })
     // L31 guardrail (2026-05-25): run the jurisdiction prose filter immediately
     // after every applyPatches call so foreign-jurisdiction citations introduced
     // by THIS repair iter are stripped before the next gate evaluation sees them.
