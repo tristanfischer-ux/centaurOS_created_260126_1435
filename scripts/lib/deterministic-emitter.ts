@@ -2144,8 +2144,15 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
         cc('coolant_supply_pipe', 'coolant supply pipe', 'fluid_flow_state', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('dimension', '25', 'mm'),
-          mod('form', 'SS304'),
+          // class-killer #2 physics fix (2026-05-26): DN25 gives v = 0.015/0.000491 = 30.5 m/s
+          // at 900 L/min — far above the 3 m/s max for HVAC piping. Grundfos NB 65-250 pump has
+          // DN65 flanged connections (65 = nominal bore in mm). DN65 gives v = 0.015/0.00332 = 4.5 m/s
+          // — still above 3 m/s so use DN80 (v = 0.015/0.00503 = 3.0 m/s, exactly at the limit).
+          // Actual practice: Sungrow PowerStack / CATL EnerC+ use DN80 galvanised steel headers
+          // for 800-1000 L/min BESS coolant loops. Corrected from DN25 → DN80.
+          mod('dimension', '80', 'mm'),
+          mod('form', 'DN80 SS304 schedule 10S, PN16, flanged'),
+          mod('regulatory', 'EN 10216-5'),
         ],
       ),
       word(
@@ -2154,8 +2161,9 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
         cc('coolant_return_pipe', 'coolant return pipe', 'fluid_flow_state', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('dimension', '25', 'mm'),
-          mod('form', 'SS304'),
+          mod('dimension', '80', 'mm'),
+          mod('form', 'DN80 SS304 schedule 10S, PN16, flanged'),
+          mod('regulatory', 'EN 10216-5'),
         ],
       ),
       word(
