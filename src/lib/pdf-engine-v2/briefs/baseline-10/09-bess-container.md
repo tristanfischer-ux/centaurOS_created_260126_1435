@@ -5,7 +5,7 @@ We are designing a containerised 2.5 MWh Battery Energy Storage System, 1 MW PCS
 Target market: UK grid-scale frequency response and capacity market, plus C&I peak shaving. Factory-assembled and deployable within 5 working days of delivery to site.
 
 Key constraints:
-- Unit cost ceiling: £1,300,000 ex-works (≈£520/kWh usable / £390/kWh nameplate; premium-tier UK-certified BoM with Schaltbau / ABB / Beckhoff / Pfannenberg switchgear, IEC 62619 + UL 9540A + NFPA 855 + G99 Issue 6 compliance, factory-acceptance tested)
+- Unit cost: £1,700,000 ex-works target — within the premium UK-certified band £1.5-1.9M ex-works (≈£600-760/kWh usable). Industry reference: commodity-tier utility BESS (Tier-1 Chinese components, no UK certifications) lands £550-750k ex-works for the same 2.5 MWh usable; premium UK-certified band (Schaltbau / ABB / Beckhoff / Pfannenberg / Siemens switchgear, IEC 62619 + UL 9540A + NFPA 855 + G99 Issue 6 compliance, factory-acceptance tested) lands £1.5-1.9M ex-works. This design targets the premium band.
 - Maximum gross mass: 35,000 kg (road-transportable; may require notification or specialist trailer for some routes)
 - External envelope: 12,192 × 2,438 × 2,896 mm (standard 40-foot ISO)
 - Usable energy: 2.5 MWh minimum at 25 °C, 80% depth of discharge, beginning of life (design over-delivers to ≥2.65 MWh)
