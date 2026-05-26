@@ -932,12 +932,17 @@ def place_camera(env_w: float, env_d: float, env_h: float,
     """
     diag = math.sqrt(env_w * env_w + env_d * env_d + env_h * env_h)
     target_extent = diag / 2.0
+    # 2026-05-26: tighter framing. Previous fit=0.50/0.45 left ~50% of canvas
+    # as empty whitespace on per-module renders. Tristan flagged page 32
+    # Module 5 render as "container only ~15% of canvas". Bumping to
+    # 0.72/0.65 brings the envelope to ~70% of frame width while keeping
+    # consistent elevation/lens behaviour. Wide/cover unchanged.
     if look_at is not None and focal_size is not None:
-        fit = 0.45
+        fit = 0.65
     elif wide:
         fit = 0.26
     else:
-        fit = 0.50
+        fit = 0.72
     centre = (0.0, 0.0, 0.0)
     elevation_angle = math.radians(28.0)  # consistent ¾ view, cover + module
     distance = target_extent / fit
@@ -1013,6 +1018,21 @@ def configure_render(out_path: str, wide: bool) -> None:
             break
         except (TypeError, ValueError):
             continue
+
+    # 2026-05-26: kill scene-level shadows. add_lighting() sets
+    # light_data.use_shadow=False per-light, but in Blender 5.x EEVEE Next
+    # the per-light flag is overridden by scene.eevee.use_shadows when the
+    # latter is True (default). Result: a soft directional shadow halos
+    # the focal envelope on per-module renders — Tristan flagged page 32
+    # Module 5 as "shadow in bottom right seems pointless". Set BOTH names
+    # since Blender 4.x used `use_shadows` and 5.x renamed to `use_shadow`.
+    eevee = getattr(scene, "eevee", None)
+    if eevee is not None:
+        for attr in ("use_shadow", "use_shadows", "use_shadow_high_bitdepth"):
+            try:
+                setattr(eevee, attr, False)
+            except (AttributeError, TypeError):
+                continue
 
     scene.render.image_settings.file_format = "PNG"
     scene.render.image_settings.color_mode = "RGBA"
