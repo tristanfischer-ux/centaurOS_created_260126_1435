@@ -149,7 +149,12 @@ export const KNOWN_MIS_PINS: MisPinRule[] = [
     // legitimately uses polymer (vent seals are typically EPDM /
     // fluorocarbon rubber; gaskets are silicone; brackets are mild steel
     // or polymer). Only the rupture element itself must be metallic.
-    character_id_pattern: /^(?!.*(_seal|_gasket|_frame_mount|_clamp|_bracket|_mount|_housing)$).*(deflagration|burst_disc|rupture_disc|explosion_vent|pressure_relief_disc).*$/i,
+    // BESS L33 (2026-05-26) refinement: also exclude `_label`, `_warning`,
+    // `_signage`, `_placard`, `_sticker` suffixes — these are labelling /
+    // signage words (warning placards, NFPA 68 stickers) that are correctly
+    // polymer but must never be subject to the "must rupture at low pressure"
+    // rule. A label is not the vent it identifies.
+    character_id_pattern: /^(?!.*(_seal|_gasket|_frame_mount|_clamp|_bracket|_mount|_housing|_label|_warning|_signage|_placard|_sticker)$).*(deflagration|burst_disc|rupture_disc|explosion_vent|pressure_relief_disc).*$/i,
     // BESS L21 (2026-05-25) additional refinement: also exclude based on
     // word_id suffix. The chain can create a `vent_seal_word` whose
     // content_character.character_id is `deflagration_vent_panel` (a
@@ -157,7 +162,12 @@ export const KNOWN_MIS_PINS: MisPinRule[] = [
     // as the panel). When word_id signals seal/gasket/bracket, that takes
     // precedence: the word is the seal hardware regardless of what the
     // misclassified character_id says.
-    exclude_word_id: /(_seal|_gasket|_frame_mount|_clamp|_bracket|_mount|_housing)_word$|^(vent_seal|vent_gasket|vent_frame_mount|vent_clamp|vent_bracket)/i,
+    // BESS L33 (2026-05-26) refinement: word_id exclusion also covers
+    // labelling/signage suffixes (_label, _warning, _signage, _placard,
+    // _sticker). These are warning placards — legitimately polymer — not
+    // subject to the NFPA 68 rupture-pressure rule. Applied universally:
+    // any KNOWN_MIS_PIN rule that walks word_ids must skip labelling words.
+    exclude_word_id: /(_seal|_gasket|_frame_mount|_clamp|_bracket|_mount|_housing|_label|_warning|_signage|_placard|_sticker)_word$|^(vent_seal|vent_gasket|vent_frame_mount|vent_clamp|vent_bracket)/i,
     // Use material_radical (canonical taxonomy) instead of form (free text)
     // — form fields can contain negations like "NOT polycarbonate" that
     // false-positive on a substring match.
