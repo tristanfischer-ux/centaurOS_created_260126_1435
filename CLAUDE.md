@@ -12,6 +12,19 @@
 
 **Databases** → [`./DATABASES.md`](./DATABASES.md). 7 SQLite databases + 6 Supabase projects. **The 30k-supplier database is `~/.forge-truth/forge-truth.db` table `companies` (27,953 rows)** with profile filters `bess-supplier-discovery-20260422` (330 BESS rows), `manufacturing` (11,586), `cleantech-uk` (4,224). The investor SQLite is misleadingly named `forge-capital-corrupted.db` but is fully functional. Crawler corpus (99 GB) at `~/Developer/Forge-Capital/nightshift/crawler/corpus.db`.
 
+**PDF Engine v2 corpus tables (added to doc 2026-05-26)** — `~/.forge-truth/forge-truth.db` also holds the **self-building DB** the chain SHOULD read at runtime. Rows + writeback status:
+
+| Table | Rows | Writeback | Runtime read |
+|---|---|---|---|
+| `pretraining_extracted_parts` | 36,805 | ✓ via `lib/distributors/library-writeback.ts` | ✓ Stage 17.6 RAG |
+| `pretraining_extracted_specs` | 15,027 | ❌ NO writeback path | ❌ baked into TS class graphs only |
+| `pretraining_extracted_standards` | 4,094 | ❌ NO writeback path | ❌ baked into TS class graphs only |
+| `pretraining_extracted_suppliers` | 1,698 | ❌ NO writeback path | ❌ |
+| `pretraining_spec_documents` | 1,152 | ⚠ synthetic stubs only | ⚠ |
+| `pretraining_products` | 587 | ❌ NO writeback path | ❌ |
+
+Chain at runtime reads BAKED 2026-05-18 TypeScript snapshots in `src/lib/pdf-engine-v2/class-reference-graphs/*.ts` (20 class graphs). Closing this gap to wire LIVE DB reads + writebacks for specs / standards / suppliers / products is the next major architectural move. Drawer: `forgeos_gotchas_25df555e549213ca`. Principle: `forgeos_decisions_e9cf4b858260f428` (growing-DB: DB-first → web-search-on-miss → write-back → grow over time).
+
 **Cross-references in MemPalace**:
 - `forge_capital_env_paths_two_locations` — secrets in TWO places, check `~/secrets/` FIRST
 - `forge_capital_corpus_db_location` — corpus.db is NOT in `~/.forge-capital/`
