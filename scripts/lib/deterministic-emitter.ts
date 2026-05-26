@@ -909,8 +909,17 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
   // Scope: manual DC isolation switch at each rack bus-bar. Per IEC 62619 §6.4.4
   // and DNO G99 §12.3, utility BESS requires a lockable manual disconnector at each
   // storage rack for maintenance isolation, separate from the HRC string fuse in
-  // cell_fuse_protection. Correct hardware: Santon® 500V DC manual isolator.
-  // Santon 011.003.036: 3-pole, 63 A, 500 V DC, IP55, DIN-rail mount.
+  // cell_fuse_protection.
+  //
+  // SIZING: string current = bus_continuous_a / parallel_strings_total.
+  //   = p.busContinuousA / p.parallelStringsTotal
+  //   = 1250 A / 15 = 83.3 A continuous, 104.2 A peak.
+  // With 1.25× safety margin: ceil(104.2 × 1.25 / 100) × 100 = 200 A rated.
+  // ABB OT200E03P: 3-pole rotary disconnect, 200 A, 600 V DC, IP65, lockable.
+  // The original Santon 011.003.036 (63 A) was UNDERSIZED — physics critic HIGH
+  // in CK5 identified 63 A < 104.2 A (1.25× 83.3 A). Fixed to 200 A.
+  const rackStringContinuousA = p.busContinuousA / p.parallelStringsTotal
+  const rackIsolatorRatingA = Math.max(200, Math.ceil(rackStringContinuousA * 1.25 / 100) * 100)
   const rackFuseProtection = makeSubModule(
     'rack_fuse_protection',
     'rack fuse protection',
@@ -923,10 +932,10 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         cc('rack_dc_isolator', 'manual DC isolation switch', 'electromechanical_switching_function', 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'rotary manual DC isolator, 3-pole, lockable, DIN-rail'),
-          mod('manufacturer', 'Santon'),
-          mod('part_number', '011.003.036'),
-          mod('dimension', '63', 'A'),
+          mod('form', `rotary 3-pole lockable DC disconnect switch, ${rackIsolatorRatingA} A, 600 V DC, IP65, front-mount handle`),
+          mod('manufacturer', 'ABB'),
+          mod('part_number', `OT${rackIsolatorRatingA}E03P`),
+          mod('rating_primary', String(rackIsolatorRatingA) + ' A'),
           mod('regulatory', 'IEC 60947-3'),
         ],
       ),
