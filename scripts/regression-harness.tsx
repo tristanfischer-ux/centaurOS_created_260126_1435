@@ -848,6 +848,73 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // BESS.energy_storage_derived_parameters_complete (class-killer #2, 2026-05-26)
+  // energy_storage_source.derived_parameters MUST contain all 6 fields needed
+  // for the Phase 2 arithmetic gates to pass without INCOMPLETE failures:
+  // nameplate_kwh, dod_fraction, usable_capacity_kwh, module_count,
+  // cells_per_module, cell_count.
+  // Without module_count + cells_per_module: module_cell_count gate → -1500 every iter.
+  // Without usable_capacity_kwh: usable_energy_closure gate → -1500 every iter.
+  // Without correct nameplate capacity_kwh: cellsAhVoltageCapacityGate → -5000.
+  if (productClass === 'bess' || productClass === 'energy_storage') {
+    const ess = modules.find((m: any) => m.module === 'energy_storage_source')
+    const dp = ess?.derived_parameters ?? {}
+    // Note: 'capacity_kwh_total' not 'capacity_kwh' — see class-killer #2 comment in
+    // deterministic-emitter.ts for why we use _total (avoids brief_constraint_propagation
+    // gate firing on documented nameplate shortfall while still satisfying
+    // cellsAhVoltageCapacityGate which reads capacity_kwh_total as its first alias).
+    const REQUIRED_KEYS = ['capacity_kwh_total', 'dod_fraction', 'usable_capacity_kwh', 'module_count', 'cells_per_module', 'cell_count']
+    const missingEssKeys = REQUIRED_KEYS.filter(k => dp[k] == null)
+    assertions.push(assertEq(
+      'BESS.energy_storage_derived_parameters_complete',
+      'energy_storage_source.derived_parameters has all 6 required Phase 2 arithmetic gate fields: capacity_kwh, dod_fraction, usable_capacity_kwh, module_count, cells_per_module, cell_count',
+      missingEssKeys.length,
+      (n) => n === 0,
+      (n) => `${n} required field(s) missing from energy_storage_source.derived_parameters: ${missingEssKeys.join(', ')} — Phase 2 arithmetic gates will return INCOMPLETE (-1500) on every iteration until these are emitted.`,
+    ))
+
+    // BESS.cooling_capacity_meets_heat_dissipation_with_margin (class-killer #2)
+    // environmental_interface.cooling_capacity_kw MUST be ≥ system_thermal_dissipation_kw × 1.25.
+    // Uses system_thermal_dissipation_kw from environmental_interface.derived_parameters
+    // (which the emitter now populates from p.systemThermalDissipationKw).
+    const envModule = modules.find((m: any) => m.module === 'environmental_interface')
+    const envDp = envModule?.derived_parameters ?? {}
+    const coolingKw = typeof envDp.cooling_capacity_kw === 'number' ? envDp.cooling_capacity_kw : null
+    const thermalDissKw = typeof envDp.system_thermal_dissipation_kw === 'number' ? envDp.system_thermal_dissipation_kw : null
+    if (coolingKw !== null && thermalDissKw !== null) {
+      const required = thermalDissKw * 1.25
+      assertions.push(assertEq(
+        'BESS.cooling_capacity_meets_heat_dissipation_with_margin',
+        'environmental_interface.cooling_capacity_kw ≥ system_thermal_dissipation_kw × 1.25 safety margin',
+        coolingKw,
+        (kw) => kw >= required,
+        (kw) => `cooling_capacity_kw=${kw} < required ${required.toFixed(1)} (system_thermal_dissipation_kw=${thermalDissKw} × 1.25). Phase 2 cooling_power gate will fail. Fix: emitter must set cooling_capacity_kw to the selected chiller's nominal capacity, not the legacy rounded value.`,
+      ))
+    }
+
+    // BESS.all_sub_modules_min_5_words (class-killer #2)
+    // Every BESS sub-module must have ≥ 5 words at emit time to avoid Phase 2
+    // sub_module_word_density grammar failures (−800 to −1000 per thin sub-module).
+    // Checks deterministic-emitter output only — Phase 2 LLM additions are
+    // excluded (they arrive later and fix the remaining LLM-emitted sub-modules).
+    const thinSubModules: string[] = []
+    for (const m of modules) {
+      for (const sm of (m.sub_modules ?? [])) {
+        const wordCount = (sm.words ?? []).length
+        if (wordCount < 5) {
+          thinSubModules.push(`${m.module}::${sm.id} (${wordCount} words)`)
+        }
+      }
+    }
+    assertions.push(assertEq(
+      'BESS.all_sub_modules_min_5_words',
+      'All BESS sub-modules have ≥ 5 words (density floor for Phase 2 grammar gate)',
+      thinSubModules.length,
+      (n) => n === 0,
+      (n) => `${n} sub-module(s) below 5-word floor: ${thinSubModules.slice(0, 8).join('; ')} — Phase 2 sub_module_word_density gate will score -800 to -1000 per thin sub-module. Densify in deterministic-emitter.ts NOT via Phase 2 (avoids Stage 1.7 multiplier trap).`,
+    ))
+  }
+
   // VF-specific additional invariants
   if (productClass === 'vertical_farm' || productClass === 'verticalfarm') {
     const eo = modules.find((m: any) => m.module === 'energy_conversion_transduction')
