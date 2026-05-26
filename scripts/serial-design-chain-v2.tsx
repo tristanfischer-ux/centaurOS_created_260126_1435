@@ -69,7 +69,7 @@ import type { ContractInProgress as OrchestratorContract } from './lib/orchestra
 // or OPENAI_API_KEY unset (class-only filter, no semantic match).
 import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator/library-candidate-query'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
-import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
+import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords, refreshModulesRadSyntax } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { applyJurisdictionFilterToModules, applyJurisdictionFilterToNlLayer, applyJurisdictionFilterToBriefProse } from './lib/jurisdiction-prose-filter'
 import { translate } from '../src/lib/pdf-engine-v2/radical/universal-translator'
 import { runArithmeticGates } from '../src/lib/pdf-engine-v2/radical/universal-arithmetic-gates'
@@ -3859,6 +3859,16 @@ async function main() {
     : (designDecisions.length > 0 || v5GateFlagged ? 'accepted_with_decisions' : 'not_accepted')
 
   // ── Save final state, build NL layer, render PDF
+  // L32 data-binding fix (2026-05-26): refresh rad_syntax on every sub-module
+  // from its current words[] modifier_characters BEFORE building the NL layer.
+  // Stage 1.7 emits rad_syntax at LLM-call time; subsequent stages (deterministic-
+  // emitter, safety-guard merge, Phase 2 repair) mutate modifier_characters
+  // in-place without refreshing rad_syntax. Without this call, paragraph_rad
+  // contains stale values (e.g. DN25 instead of DN100, OT400 instead of OT1600)
+  // that diverge from what the word-slots actually say, poisoning the physics
+  // critic's input and causing gate 14 (sizing) to flag phantom violations.
+  refreshModulesRadSyntax((design.modules ?? []) as any)
+  console.error('[chain] refreshModulesRadSyntax: rad_syntax re-derived from words[] modifier_characters')
   const nl = buildNaturalLanguageLayer((design.modules ?? []) as any)
   for (const m of design.modules ?? []) {
     const entry = (nl as any).by_module?.[m.module]

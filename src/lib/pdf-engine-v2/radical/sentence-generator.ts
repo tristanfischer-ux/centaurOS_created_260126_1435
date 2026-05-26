@@ -1152,19 +1152,54 @@ export function buildNaturalLanguageLayer(
  * "character_id (modifier1, modifier2)", words joined by " ⊕ ".
  * For multi-word sub-modules, brackets per-word clauses to disambiguate
  * within-word ⊕ from between-word ⊕ (council 2026-05-12 P3 fix).
+ *
+ * L32 data-binding fix (2026-05-26): the previous WS-A R-C1 shortcut
+ * trusted the LLM-emitted `rad_syntax` verbatim. The problem: Stage 1.7
+ * emits `rad_syntax` at LLM-call time, but subsequent stages (deterministic-
+ * emitter, safety-guard merge, Phase 2 repair) update `modifier_characters`
+ * in-place WITHOUT refreshing `rad_syntax`. The frozen `rad_syntax` then
+ * diverged from the actual word modifiers — e.g. `coolant_distribution_manifold`
+ * had `rad_syntax = "… DN25 …"` while the word-slot `dimension = 100 mm`
+ * (DN100), causing `paragraph_rad` and `grammar_trace` to disagree.
+ *
+ * Fix: always build the RAD sentence deterministically from the current
+ * `words[]` modifier_characters. The `rad_syntax` field on `SubModuleSpec`
+ * is now only a persistence hint — callers that need it in sync must call
+ * `refreshModulesRadSyntax()` before serialising.
  */
 function generateSubmoduleRadSentence(sub: SubModuleSpec): string {
-  // WS-A council R-C1 (2026-05-13): prefer the LLM-emitted verbatim §4.5
-  // RAD-syntax line over the deterministic build when present. Falls back
-  // to the deterministic word-by-word render for the legacy path.
-  if (typeof sub.rad_syntax === 'string' && sub.rad_syntax.trim().length > 0) {
-    return sub.rad_syntax.trim()
-  }
   const words = sub.words ?? []
   if (words.length === 0) return `<${sub.id}>`
   const wordClauses = words.map(w => renderWordRadClause(w))
   if (wordClauses.length === 1) return wordClauses[0]
   return wordClauses.map(w => `[${w}]`).join(` ${GRAMMAR_OPERATORS.WITHIN_WORD} `)
+}
+
+/**
+ * Refresh the `rad_syntax` field on every sub-module in every module so that
+ * it matches the current `words[]` modifier_characters. Must be called after
+ * any stage that mutates `modifier_characters` in-place (deterministic-emitter,
+ * safety-guard merge, Phase 2 repair) and before `buildNaturalLanguageLayer()`.
+ *
+ * L32 data-binding fix (2026-05-26): ensures that code paths reading
+ * `sub.rad_syntax` directly (jurisdiction-prose-filter, registry-accumulation,
+ * holistic-review-repair) also see the up-to-date values. Without this call,
+ * those paths would still propagate stale values emitted at Stage 1.7.
+ */
+export function refreshModulesRadSyntax(modules: ReadonlyArray<ModuleSpec>): void {
+  for (const moduleSpec of modules) {
+    for (const sub of moduleSpec.sub_modules ?? []) {
+      const words = sub.words ?? []
+      if (words.length === 0) continue
+      const wordClauses = words.map(w => renderWordRadClause(w))
+      const fresh = words.length === 1
+        ? wordClauses[0]
+        : wordClauses.map(w => `[${w}]`).join(` ${GRAMMAR_OPERATORS.WITHIN_WORD} `)
+      // TypeScript: sub_modules is ReadonlyArray in the type but the runtime
+      // object is mutable (same pattern as other chain-side mutations).
+      ;(sub as any).rad_syntax = fresh
+    }
+  }
 }
 
 /**

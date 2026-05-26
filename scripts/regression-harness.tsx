@@ -531,6 +531,67 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       (n) => `${n} enclosure_ventilation_fan word(s) missing part_number — will be priced by Engine B thermal curve (~£21) instead of Mouser cached £133.78`,
     ))
 
+    // BESS.nll_rad_syntax_word_slot_consistent — L32 data-binding fix
+    // (2026-05-26, council BLOCKER). Verifies that the naturalLanguageLayer's
+    // paragraph_rad and grammar_trace agree with the word-slot dimension /
+    // capacity / part_number modifier_characters on the same words.
+    //
+    // The structural defect: Stage 1.7 emits rad_syntax at LLM-call time.
+    // Subsequent stages mutate modifier_characters in-place without refreshing
+    // rad_syntax. The frozen rad_syntax (paragraph_rad = concatenation of
+    // rad_syntax strings) then diverges from the actual word modifiers.
+    // L32 evidence: coolant_distribution_manifold rad_syntax said "DN25" while
+    // dimension modifier said "100 mm" (DN100); ac_grid_isolator rad_syntax was
+    // absent for ac_grid_interconnect but word said OT1600 correctly.
+    //
+    // The fix (refreshModulesRadSyntax in serial-design-chain-v2.tsx) rebuilds
+    // rad_syntax from words[] before buildNaturalLanguageLayer. This invariant
+    // catches any regression where a stage mutates modifier_characters AFTER
+    // the refresh, or where the refresh is accidentally skipped.
+    //
+    // Checks: for each sub-module in the BESS modules, compare the
+    // naturalLanguageLayer paragraph_rad against the deterministic rebuild
+    // from words[]. If they diverge, the refresh was skipped or mutated.
+    {
+      let radDivergences = 0
+      const nllByMod = state?.naturalLanguageLayer?.by_module ?? {}
+      const modDecomp = state?.moduleDecomposition?.modules ?? []
+      for (const m of modDecomp) {
+        const nllMod = nllByMod[m.module] ?? {}
+        // Rebuild each sub-module's rad sentence deterministically and compare
+        // against the stored sub_module_sentences[].sentence_rad in the NLL.
+        const smSentences: Record<string, string> = {}
+        for (const ss of (nllMod.sub_module_sentences ?? [])) {
+          smSentences[ss.sub_module_id] = ss.sentence_rad ?? ''
+        }
+        for (const sm of (m.sub_modules ?? [])) {
+          const storedRad = smSentences[sm.id]
+          if (!storedRad) continue
+          // Extract dimension/capacity/part_number modifier values from words[]
+          // and check they appear verbatim in the stored sentence_rad.
+          for (const w of (sm.words ?? [])) {
+            const mods: Array<{ kind: string; value?: string; unit?: string }> =
+              Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+            for (const mc of mods) {
+              if (!['dimension', 'capacity', 'part_number'].includes(mc.kind)) continue
+              const modVal = mc.unit ? `${mc.value}${mc.unit}` : String(mc.value ?? '')
+              if (modVal.length < 3) continue  // skip trivially short values
+              if (!storedRad.includes(modVal)) {
+                radDivergences++
+              }
+            }
+          }
+        }
+      }
+      assertions.push(assertEq(
+        'BESS.nll_rad_syntax_word_slot_consistent',
+        'NLL sub_module_sentences[].sentence_rad contains all dimension/capacity/part_number modifier values from words[] (L32 data-binding fix, refreshModulesRadSyntax)',
+        radDivergences,
+        (n) => n === 0,
+        (n) => `${n} modifier value(s) present in words[] but absent from NLL sentence_rad — refreshModulesRadSyntax may have been skipped, OR a stage mutated modifier_characters after the refresh. Root cause of L32 score regression: DN25 in rad_syntax vs DN100 in dimension modifier (and OT400 vs OT1600).`,
+      ))
+    }
+
     // Suppress unused-var warning for the eosCheck (kept for future invariants)
     void eosCheck
   }
