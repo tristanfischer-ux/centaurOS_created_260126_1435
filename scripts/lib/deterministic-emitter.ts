@@ -2461,28 +2461,32 @@ function emitSafetyProtection(p: BessParams): DesignModule {
       word(
         'smoke_vent_interlock_word',
         'smoke vent interlock word',
-        cc('smoke_vent_interlock', 'smoke vent interlock', 'electromechanical_switching_function', 'steel'),
+        cc('smoke_vent_interlock', 'smoke vent interlock solenoid', 'electromechanical_switching_function', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', 'MOV-actuated'),
+          mod('form', 'fail-safe NC solenoid, 24 V DC, activates smoke exhaust damper on fire alarm'),
+          mod('manufacturer', 'Belimo'),
+          mod('part_number', 'FG24-SR'),
+          mod('regulatory', 'EN 15650'),
         ],
       ),
       word(
         'smoke_vent_interlock_mount_word',
         'smoke vent interlock mount word',
-        cc('smoke_vent_interlock_mount', 'smoke vent interlock mount', null, 'steel'),
+        cc('smoke_vent_interlock_mount', 'smoke vent interlock mount bracket', null, 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', 'DIN rail bracket'),
+          mod('form', 'DIN-rail bracket, hot-dip galvanised, M6 fixing'),
         ],
       ),
       word(
         'deflagration_vent_seal_word',
         'deflagration vent seal word',
-        cc('deflagration_vent_seal', 'deflagration vent seal', null, 'polymer_thermoplastic'),
+        cc('deflagration_vent_seal', 'deflagration vent perimeter seal', null, 'polymer_thermoplastic'),
         [
           mod('quantity', '×4'),
-          mod('form', 'EPDM perimeter seal, fire-rated'),
+          mod('form', 'EPDM perimeter seal strip, fire-rated to 300 °C, 50×10 mm cross-section'),
+          mod('regulatory', 'EN 14797'),
         ],
       ),
       word(
@@ -2510,6 +2514,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('high_voltage_safety_label', 'high-voltage safety label', null, 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
+          mod('form', 'self-adhesive vinyl, "DANGER HIGH VOLTAGE", 150×75 mm, yellow/black ISO 7010 W012'),
+          mod('manufacturer', 'Brady'),
+          mod('regulatory', 'BS EN ISO 7010'),
         ],
       ),
       word(
@@ -2518,6 +2525,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('arc_flash_hazard_label', 'arc-flash hazard label', null, 'polymer_thermoplastic'),
         [
           mod('quantity', '×4'),
+          mod('form', 'arc-flash boundary + PPE requirement label per NFPA 70E / IEC 61482-1-2'),
+          mod('manufacturer', 'Brady'),
+          mod('regulatory', 'NFPA 70E'),
         ],
       ),
       word(
@@ -2526,6 +2536,8 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('iec62619_compliance_label', 'IEC 62619 compliance label', null, 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
+          mod('form', 'laminated compliance plate, 200×100 mm, system ID + standard reference'),
+          mod('manufacturer', 'Brady'),
           mod('regulatory', 'IEC 62619'),
         ],
       ),
@@ -2570,7 +2582,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('gas_sensor', 'gas sensor transmitter', 'chemical_sensing_function', 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'H2/CO/HF multi-gas'),
+          mod('form', 'H2/CO/HF multi-gas transmitter, 4–20 mA output, IP65'),
+          mod('manufacturer', 'Crowcon'),
+          mod('part_number', 'TXgard-IS+'),
           mod('regulatory', 'NFPA 855 + IEC 62619'),
         ],
       ),
@@ -2580,7 +2594,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('gas_detector_controller', 'gas detection controller panel', 'electromechanical_switching_function', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', '16-zone addressable controller with relay output to BMS fire-abort'),
+          mod('form', '16-zone addressable controller, relay outputs to BMS fire-abort + ventilation'),
+          mod('manufacturer', 'Crowcon'),
+          mod('part_number', 'Vortex'),
           mod('regulatory', 'EN 50194-1'),
         ],
       ),
