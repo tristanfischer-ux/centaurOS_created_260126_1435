@@ -2670,7 +2670,8 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('gas_sensor_label', 'gas sensor identification label', null, 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'zone identification + gas species sticker set'),
+          mod('form', 'zone ID + gas species (H2/CO/HF) sticker set, outdoor UV-resistant vinyl, 60×40 mm'),
+          mod('material', 'vinyl polyester laminate, UV-stable'),
         ],
       ),
     ],
@@ -2718,7 +2719,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('fuse_holder', 'NH1 fuse holder / disconnector', 'electromechanical_switching_function', 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'DIN rail mount, NH1 size, 1500 V DC rated'),
+          mod('form', 'DIN-rail NH1 fuse base / disconnector, 1500 V DC rated, finger-safe cover'),
+          mod('manufacturer', 'Eaton Bussmann'),
+          mod('part_number', 'BK/NH1-T'),
           mod('regulatory', 'IEC 60947-3'),
         ],
       ),
