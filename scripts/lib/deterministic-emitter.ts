@@ -2347,7 +2347,10 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('suppression_nozzle', 'suppression nozzle', 'pressure_vessel_function', 'copper'),
         [
           mod('quantity', '×4'),
-          mod('form', 'brass'),
+          mod('form', '360° hemisphere nozzle for FK-5-1-12 clean agent, brass, threaded NPT-1/2'),
+          mod('manufacturer', 'Kidde'),
+          mod('part_number', 'ECS-N-360'),
+          mod('regulatory', 'NFPA 2001'),
         ],
       ),
       word(
@@ -2356,8 +2359,11 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('thermal_detector', 'thermal detector', 'thermal_transfer_function', 'ceramic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'rate-of-rise + fixed'),
+          mod('form', 'rate-of-rise + fixed-temperature heat detector'),
           mod('dimension', '88', '°C'),
+          mod('manufacturer', 'Apollo Fire Detectors'),
+          mod('part_number', '58000-300APO'),
+          mod('regulatory', 'BS EN 54-5'),
         ],
       ),
       word(
@@ -2366,7 +2372,10 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('smoke_aspirating_detector', 'smoke aspirating detector', 'chemical_sensing_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
-          mod('form', 'VESDA-E'),
+          mod('form', 'very early smoke detection aspirating system, 4-port, 200 m pipe network'),
+          mod('manufacturer', 'Xtralis'),
+          mod('part_number', 'VESDA-E VEU'),
+          mod('regulatory', 'BS EN 54-20'),
         ],
       ),
       // L31 (2026-05-25): added 5th word to bring fire_suppression to ≥5 words,
@@ -2379,7 +2388,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('suppression_releasing_panel', 'Kidde ECS releasing panel', 'electromechanical_switching_function', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', 'Kidde ECS-N releasing panel, 24 V DC activation, 2-zone'),
+          mod('form', '2-zone releasing panel, 24 V DC activation, supervised solenoid outputs'),
+          mod('manufacturer', 'Kidde'),
+          mod('part_number', 'KiddeECS-RP2'),
           mod('regulatory', 'NFPA 2001 + EN 15004'),
         ],
       ),
@@ -3263,6 +3274,25 @@ function emitCrossModuleGrammarLinks(p: BessParams): CrossModuleGrammarLink[] {
       mechanism: 'ac_busbar',
       type: 'mutual',
       detail: '400 V AC PCS output to MV transformer primary',
+    },
+    // class-killer #3 (2026-05-26): cross_module_required_links gate requires
+    // energy_storage_source ↔ safety_protection [safety] and
+    // energy_storage_source ↔ maintenance_serviceability [service].
+    // Both were absent from the emitter, causing Phase 2 repair to add them
+    // with every iteration but the gate not recognising them (allowlist blocks).
+    {
+      from_module: 'energy_storage_source',
+      to_module: 'safety_protection',
+      mechanism: 'safety_interlock',
+      type: 'mutual',
+      detail: 'Cell-level + module-level + pack-level safety chain: HRC string fuses, thermal runaway detection, Novec 1230 suppression, deflagration vents — all physically co-located with and fed from the cell pack.',
+    },
+    {
+      from_module: 'energy_storage_source',
+      to_module: 'maintenance_serviceability',
+      mechanism: 'service_access',
+      type: 'mutual',
+      detail: 'BMS master serial port + rack-level DC isolation switches for field maintenance; rack service hatches in structure_containment aligned to rack positions.',
     },
   ]
 }
