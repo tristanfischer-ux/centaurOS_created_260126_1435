@@ -937,6 +937,38 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       (n) => n === 0,
       (n) => `${n} sub-module(s) below 5-word floor: ${thinSubModules.slice(0, 8).join('; ')} — Phase 2 sub_module_word_density gate will score -800 to -1000 per thin sub-module. Densify in deterministic-emitter.ts NOT via Phase 2 (avoids Stage 1.7 multiplier trap).`,
     ))
+
+    // BESS.bms_slave_channel_count (class-killer #3d, 2026-05-26)
+    // LTC6813-1 is an 18-channel device. The old emitter used 24, producing
+    // 165 boards × 18 = 2970 cells < 3750. Fix: floor uses 18 channels.
+    // Invariant: bms_slave_module_word quantity === ceil(cells_per_rack / 18) × rack_count
+    const controlModule = modules.find((m: any) => m.module === 'control_compute_communication')
+    const bmsMasterSub = controlModule?.sub_modules?.find((s: any) => s.sub_module === 'bms_master' || s.id === 'bms_master' || s.sub_module_id === 'bms_master')
+    const bmsSlaveWord = bmsMasterSub?.words?.find((w: any) => w.id === 'bms_slave_module_word' || (w.content_character?.character_id ?? '').includes('bms_slave'))
+    const bmsSlaveQtyMod = bmsSlaveWord?.modifier_characters?.find((mc: any) => mc.kind === 'quantity')
+    if (bmsSlaveQtyMod) {
+      const bmsSlaveQtyStr = String(bmsSlaveQtyMod.value ?? '')
+      const bmsSlaveQtyMatch = bmsSlaveQtyStr.replace(/[×x]/g, '').match(/(\d+)/)
+      const bmsSlaveQty = bmsSlaveQtyMatch ? parseInt(bmsSlaveQtyMatch[1], 10) : 0
+      const contractCellsPerRack = Math.round(Number(
+        (state as any).orchestratorContract?.quantities?.cells_per_rack?.value
+        ?? (state as any).orchestratorContract?.quantities?.series_cells_per_string?.value
+        ?? 250
+      ))
+      const contractRackCount = Math.round(Number(
+        (state as any).orchestratorContract?.quantities?.rack_count?.value
+        ?? (state as any).orchestratorContract?.quantities?.n_racks?.value
+        ?? 15
+      ))
+      const expectedBmsSlaveQty = Math.ceil(contractCellsPerRack / 18) * contractRackCount
+      assertions.push(assertEq(
+        'BESS.bms_slave_channel_count',
+        `BMS slave count = ceil(cells_per_rack/18) × rack_count (LTC6813-1 is 18-channel — was wrongly 24-channel causing physics critic HIGH)`,
+        bmsSlaveQty,
+        (n) => n === expectedBmsSlaveQty,
+        (n) => `bms_slave quantity=${n}, expected=${expectedBmsSlaveQty} (cells_per_rack=${contractCellsPerRack}, rack_count=${contractRackCount}, 18 channels/board)`,
+      ))
+    }
   }
 
   // VF-specific additional invariants
