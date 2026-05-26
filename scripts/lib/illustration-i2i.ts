@@ -385,13 +385,262 @@ function styleForClass(productClass: string): string {
 // gpt-image-1 garbled-text drawer. Imperative form lands more reliably.
 const NO_TEXT_NEGATIVE = `Do NOT include any text, words, letters, numbers, typography, written labels, dimension callouts, or watermarks in the image whatsoever. Surfaces must be unmarked.`
 
+// ---------------------------------------------------------------------------
+// Per-class primary structural feature — for internal-count enforcement
+// ---------------------------------------------------------------------------
+//
+// Each entry identifies ONE deterministic quantity key from
+// state.engineeringContract.quantities whose numeric value is the
+// canonical "primary structural feature count" for that class (the thing
+// the buyer's eye immediately counts: racks in a BESS, grow tiers in a VF,
+// blades on a turbine, etc.).
+//
+// Universal fallback: if product_class is absent from this map the count
+// block is SKIPPED entirely — no fabrication for unknown classes.
+//
+// quantity_key:  the key to read from state.engineeringContract.quantities
+// noun:          singular noun used in the prompt
+// noun_plural:   plural noun used in the prompt
+// arrangement_hint: optional guidance on spatial arrangement
+
+interface PrimaryFeature {
+  quantity_key: string
+  noun: string
+  noun_plural: string
+  arrangement_hint: string
+}
+
+const PRIMARY_FEATURE_BY_CLASS: Record<string, PrimaryFeature> = {
+  // ---- Energy storage / BESS -------------------------------------------------
+  bess: {
+    quantity_key: 'rack_count',
+    noun: 'battery rack',
+    noun_plural: 'battery racks',
+    arrangement_hint: 'arranged side-by-side in a single row along the container long axis',
+  },
+  // ---- Vertical farm ---------------------------------------------------------
+  vertical_farm: {
+    quantity_key: 'tray_count',
+    noun: 'grow tray',
+    noun_plural: 'grow trays',
+    arrangement_hint: 'stacked vertically in trolley columns visible in rows from the front',
+  },
+  // ---- HAPS (high-altitude pseudo-satellite) ---------------------------------
+  haps: {
+    quantity_key: 'wing_area_m2',  // no rack-like count; use module count fallback
+    noun: 'solar panel bay',
+    noun_plural: 'solar panel bays',
+    arrangement_hint: 'distributed along the full wingspan from root to tip',
+  },
+  // ---- Drone -----------------------------------------------------------------
+  drone: {
+    quantity_key: 'motor_count',
+    noun: 'motor and propeller arm',
+    noun_plural: 'motor and propeller arms',
+    arrangement_hint: 'evenly distributed around the central frame',
+  },
+  // ---- AUV (autonomous underwater vehicle) -----------------------------------
+  auv: {
+    quantity_key: 'thruster_count',
+    noun: 'thruster',
+    noun_plural: 'thrusters',
+    arrangement_hint: 'mounted at the stern and on lateral frames',
+  },
+  // ---- Wind turbine ----------------------------------------------------------
+  wind_turbine: {
+    quantity_key: 'blade_count',
+    noun: 'blade',
+    noun_plural: 'blades',
+    arrangement_hint: 'attached to the hub at equal 120° intervals',
+  },
+  // ---- H2 electrolyser -------------------------------------------------------
+  h2_electrolyser: {
+    quantity_key: 'stack_count',
+    noun: 'electrolyser stack',
+    noun_plural: 'electrolyser stacks',
+    arrangement_hint: 'arranged in a rack or skid frame within the enclosure',
+  },
+  // ---- PEMFC (proton-exchange membrane fuel cell) ----------------------------
+  pemfc: {
+    quantity_key: 'cells_count',
+    noun: 'membrane electrode assembly cell',
+    noun_plural: 'membrane electrode assembly cells',
+    arrangement_hint: 'stacked in series within the fuel-cell stack housing',
+  },
+  // ---- CNC machine -----------------------------------------------------------
+  cnc_machine: {
+    quantity_key: 'axis_count',
+    noun: 'machining axis',
+    noun_plural: 'machining axes',
+    arrangement_hint: 'reflected in the number of controlled linear and rotary stages visible on the machine',
+  },
+  // ---- EV charger ------------------------------------------------------------
+  // No single "count" quantity — use module count fallback (quantity_key absent → fallback)
+  // ---- eVTOL -----------------------------------------------------------------
+  evtol: {
+    quantity_key: 'motor_count',
+    noun: 'lift motor and rotor',
+    noun_plural: 'lift motors and rotors',
+    arrangement_hint: 'mounted at wingtip and canard positions around the fuselage',
+  },
+  // ---- Humanoid robot --------------------------------------------------------
+  humanoid: {
+    quantity_key: 'dof_count_total',
+    noun: 'degrees-of-freedom joint',
+    noun_plural: 'degrees-of-freedom joints',
+    arrangement_hint: 'distributed across hips, knees, ankles, shoulders, elbows, wrists, and neck',
+  },
+  // ---- Bioreactor ------------------------------------------------------------
+  // Single vessel — no repeating count. quantity_key absent → fallback to module count.
+}
+
+// ---------------------------------------------------------------------------
+// Per-class exterior engineering detail
+// ---------------------------------------------------------------------------
+//
+// String describing what exterior engineering features the product class
+// MUST show. Gemini i2i tends to produce "clean studio props" without
+// these — the buyer's eye reads them as unrealistic on sight.
+//
+// Universal fallback: if product_class absent from this map, the exterior
+// detail block is SKIPPED — no fabrication.
+
+const EXTERIOR_DETAIL_BY_CLASS: Record<string, string> = {
+  // ---- Energy storage / BESS -------------------------------------------------
+  bess: 'FLAT roof (no decorative slope, no colour stripes) with roof-walk planks, HVAC/chiller penetrations, and deflagration vent panels (flush louvres per NFPA 68). Sides show cable glands and earth-bonding lugs near the door end, fire-detection externals (addressable smoke/heat detector heads) on the exterior wall, and a hinged access door with a slam-latch handle.',
+  // ---- Vertical farm ---------------------------------------------------------
+  vertical_farm: 'Side-mounted irrigation supply and return manifold ports, electrical service entry gland (HV cable entry + earthing label), a hinged control panel access door, and a condensate drain outlet at the base.',
+  // ---- HAPS ------------------------------------------------------------------
+  haps: 'Control-surface actuator fairings at the trailing edge, pitot-static sensor ports near the nose, stubby antenna mounts underneath the fuselage pod, and retracted-landing-gear bay covers on the underbelly.',
+  // ---- Drone -----------------------------------------------------------------
+  drone: 'Visible motor nacelles with prop-guard mounts, landing gear legs with anti-vibration feet, battery bay hatch on the underside, and payload gimbal mount below centre.',
+  // ---- AUV -------------------------------------------------------------------
+  auv: 'Flood-port grid on the forward fairing, pressure-rated connector penetrators on the end-cap, acoustic transducer dome on the nose, syntactic foam blocks bonded to the hull sides, and lift-point slots on the top rail.',
+  // ---- Wind turbine ----------------------------------------------------------
+  wind_turbine: 'Blade root bolted flanges, nacelle ventilation louvres, lightning-receptor tips on each blade, and a service crane pick-point beam visible at the nacelle top.',
+  // ---- H2 electrolyser -------------------------------------------------------
+  h2_electrolyser: 'Visible H2 and O2 outlet flanges on the stack manifold, safety pressure-relief valve (red handle) on the hydrogen circuit, deionised-water inlet port, and HV power-cable entry glands on the rectifier cabinet.',
+  // ---- PEMFC -----------------------------------------------------------------
+  pemfc: 'H2 inlet and exhaust ports with colour-coded fittings (green = hydrogen, blue = coolant), air-intake filter box with pre-filter housing, coolant manifold with bleed nipples, and mounting flange with anti-vibration isolators.',
+  // ---- EV charger ------------------------------------------------------------
+  ev_charger: 'Liquid-cooled charging cable with CCS2 holster, RFID reader on the front fascia, ventilation slots on the lower side panels, ground-fault indicator LED strip visible on the pedestal, and padlock hasp on the access panel.',
+  // ---- Heat pump (residential / commercial) ----------------------------------
+  heat_pump_residential: 'Top-discharge fan grille with finger-guard mesh, refrigerant service ports (Schrader valves) on the side panel, electrical conduit entry at the base, and vibration-isolation feet.',
+  // ---- CNC machine -----------------------------------------------------------
+  cnc_machine: 'Chip-conveyor outlet at the base rear, coolant spray nozzle fittings inside the guarding, pneumatic quick-connects on the side panel, and an emergency-stop mushroom button at each operator station.',
+  // ---- eVTOL -----------------------------------------------------------------
+  evtol: 'Visible rotor hub retention bolts, passenger door sill step, emergency parachute hatch cover on the fuselage top, and nav/strobe light pods at wingtips.',
+  // ---- Bioreactor ------------------------------------------------------------
+  bioreactor: 'Sterile sparger port at the vessel bottom, agitator shaft seal housing at the top with sterile vent filter, sample valve (tri-clamp, 316L), and jacket supply/return flanges on the side.',
+  // ---- Edge AI server rack ---------------------------------------------------
+  edge_ai: 'Blanking panels in unused 1U slots, power-distribution unit (PDU) strip on the right rail, grounding lug on the frame, cable management arm folded at the rear, and front-door lock cylinder.',
+  // ---- SMR (small modular reactor) -------------------------------------------
+  smr: 'Containment dome hatch with bolted flange ring, primary coolant isolation valve handles visible at grade, passive safety water tank inlet on the shield building, and dosimetry instrument ports on the outer wall.',
+  // ---- Quantum computer ------------------------------------------------------
+  quantum_computer: 'Dilution refrigerator flange stack (gold-coloured can series narrowing from top), coaxial cable tree entering the topmost flange, vacuum pump service port at the base, and vibration-isolation active-pneumatic mounts.',
+}
+
+// ---------------------------------------------------------------------------
+// Internal count helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve the primary structural feature count for the given product class.
+ * Reads from state.engineeringContract.quantities[quantity_key].value,
+ * falling back to the module count when the key is absent.
+ * Returns null if neither source yields a valid positive integer.
+ */
+function resolvePrimaryFeatureCount(
+  state: any,
+  productClass: string,
+): { count: number; noun: string; noun_plural: string; arrangement_hint: string } | null {
+  const feat = PRIMARY_FEATURE_BY_CLASS[productClass]
+  if (!feat) return null  // unknown class — skip block
+
+  // Attempt contract quantities first
+  const quantities = state?.engineeringContract?.quantities ?? {}
+  const qty = quantities[feat.quantity_key]
+  const contractValue = qty?.value !== undefined ? Number(qty.value) : NaN
+
+  if (Number.isFinite(contractValue) && contractValue > 0 && Number.isInteger(contractValue)) {
+    return { count: contractValue, noun: feat.noun, noun_plural: feat.noun_plural, arrangement_hint: feat.arrangement_hint }
+  }
+
+  // Fallback: total module count from moduleDecomposition
+  const modules: any[] = state?.moduleDecomposition?.modules ?? []
+  if (modules.length > 0) {
+    // Only use module count if it's semantically meaningful for this class
+    // (i.e. the quantity_key miss was a data-availability issue, not a
+    // "this class doesn't have a repeating structural count" situation).
+    // We don't fabricate — return null so the prompt block is omitted.
+    return null
+  }
+
+  return null
+}
+
 export function composeHeroPrompt(state: any): string {
   const b = summariseBrief(state)
-  const envBlock = b.envelope_text
-    ? `Envelope: ${b.envelope_text}.`
-    : ''
   const style = styleForClass(b.product_class)
-  return `${style.charAt(0).toUpperCase() + style.slice(1)} of ${b.product_display ? `a ${b.product_display}` : 'an industrial engineering system'}. ${envBlock} The visible engineering modules are: ${b.module_list_text}.
+
+  // --- FIX 1: STRICT DIMENSIONS block ---
+  // Conditional on envelope_text being non-null. When present, replace the
+  // soft "Envelope: X m long × Y m wide × Z m tall." with a hard constraint
+  // block that survives Gemini's tendency to free-style proportions.
+  let strictDimensionsBlock = ''
+  if (b.envelope_text) {
+    // Parse the three values back out of the formatted string so we can
+    // emit them individually with ratio context.
+    const maxDim = state?.parsedBrief?.constraints?.max_dimensions_mm
+    if (maxDim?.w && maxDim?.d && maxDim?.h) {
+      const lengthM = (Number(maxDim.w) / 1000).toFixed(1)
+      const widthM  = (Number(maxDim.d) / 1000).toFixed(1)
+      const heightM = (Number(maxDim.h) / 1000).toFixed(1)
+      const lengthNum = Number(maxDim.w)
+      const widthNum  = Number(maxDim.d)
+      const ratio = widthNum > 0 ? (lengthNum / widthNum).toFixed(1) : null
+      const ratioHint = ratio ? ` The width:length ratio is approximately 1:${ratio} — this is a LONG, narrow object, not a cube or stubby box.` : ''
+      strictDimensionsBlock = `
+**STRICT DIMENSIONS** (do not shorten, do not scale, do not pad — these are hard constraints):
+  Length: ${lengthM} m
+  Width:  ${widthM} m
+  Height: ${heightM} m
+${ratioHint}
+The rendered object MUST visually honour these proportions. A buyer familiar with this product class will immediately spot wrong proportions.`
+    } else {
+      // Fallback: use the pre-formatted envelope_text string
+      strictDimensionsBlock = `
+**STRICT DIMENSIONS** (do not shorten, do not scale, do not pad):
+  ${b.envelope_text}
+The rendered object MUST visually honour these proportions.`
+    }
+  }
+
+  // --- FIX 2: INTERNAL COUNT block ---
+  // Conditional on PRIMARY_FEATURE_BY_CLASS having an entry for this class
+  // AND the contract supplying a valid count. Skip entirely otherwise.
+  let internalCountBlock = ''
+  const primaryFeature = resolvePrimaryFeatureCount(state, b.product_class)
+  if (primaryFeature) {
+    internalCountBlock = `
+**INTERNAL COUNT** (exact — do not invent fewer or more):
+  The interior shows EXACTLY ${primaryFeature.count} ${primaryFeature.noun_plural} ${primaryFeature.arrangement_hint}.
+  Do not show fewer; do not invent more. A buyer will count them.`
+  }
+
+  // --- FIX 3: EXTERIOR DETAIL block ---
+  // Conditional on EXTERIOR_DETAIL_BY_CLASS having an entry for this class.
+  const exteriorDetail = EXTERIOR_DETAIL_BY_CLASS[b.product_class]
+  const exteriorDetailBlock = exteriorDetail
+    ? `
+**EXTERIOR ENGINEERING DETAIL** (required — these are NOT decorative):
+  ${exteriorDetail}`
+    : ''
+
+  return `${style.charAt(0).toUpperCase() + style.slice(1)} of ${b.product_display ? `a ${b.product_display}` : 'an industrial engineering system'}. The visible engineering modules are: ${b.module_list_text}.
+${strictDimensionsBlock}
+${internalCountBlock}
+${exteriorDetailBlock}
 
 Use the provided reference image (a Blender wireframe of the structural layout) ONLY for the OVERALL POSITIONS and PROPORTIONS — where modules sit, how big the envelope is, how doors and access panels are arranged. Do NOT replicate the schematic style. The OUTPUT must match the style description above.
 

@@ -320,7 +320,7 @@ _MODULE_VISUAL_PROFILES: dict = {
     "fire_safety":             {"accent_rgb": (1.00, 0.00, 0.00), "dominant_feature": "red_cylinder_nozzle_array", "camera_hint": "three_quarter"},
     # Controls / SCADA / HMI: rack-mounted display panel + LED indicators.
     # Camera: front-on to show panel face.
-    "power_distribution":      {"accent_rgb": (0.18, 0.20, 0.24), "dominant_feature": "busbar_array_fuse_panel", "camera_hint": "front"},
+    "power_distribution":      {"accent_rgb": (0.95, 0.55, 0.00), "dominant_feature": "busbar_array_fuse_panel", "camera_hint": "front"},
     "hmi_ergonomics":          {"accent_rgb": (0.05, 0.42, 1.00), "dominant_feature": "display_panel_led_indicators", "camera_hint": "front"},
     "controls":                {"accent_rgb": (0.05, 0.42, 1.00), "dominant_feature": "display_panel_led_indicators", "camera_hint": "front"},
     "scada":                   {"accent_rgb": (0.05, 0.42, 1.00), "dominant_feature": "display_panel_led_indicators", "camera_hint": "front"},
@@ -631,18 +631,27 @@ def nine_shot_cameras(bbox, distance_factor=2.8, elevation_factor=0.6):
 def per_module_camera_pair(bbox, distance_factor=2.8, elevation_factor=0.6):
     """Phase A item 4 (2026-05-24): 2-angle pair per module — corner-FR (the
     canonical 3/4 iso view) + top-front (looking down at 60° to reveal
-    component layout). Returns list of 2 camera specs."""
+    component layout). Returns list of 2 camera specs.
+
+    2026-05-26: top-front ortho_scale tightened from max_dim * 1.45 to
+    max_dim * 0.95 so the container fills ~70% of canvas (was ~35%).
+    The ortho camera's framing is purely controlled by ortho_scale — it
+    does NOT depend on camera distance — so the previous larger value
+    left the container as a small strip at the bottom of an otherwise
+    empty white frame.  corner-FR uses max_dim * 1.45 (unchanged).
+    """
     (xmin, xmax), (ymin, ymax), (zmin, zmax) = bbox
     cx, cy, cz = (xmin+xmax)/2, (ymin+ymax)/2, (zmin+zmax)/2
     max_dim = max(xmax-xmin, ymax-ymin, zmax-zmin)
     radius = max_dim * distance_factor
     elev = max_dim * elevation_factor
-    ortho_scale = max_dim * 1.45
+    ortho_scale_corner = max_dim * 1.45   # corner-FR: same as before
+    ortho_scale_top = max_dim * 0.95      # top-front: tighter so container fills ~70%
     target = (cx, cy, cz)
     diag = radius / math.sqrt(2)
     return [
-        {"name": "corner-FR", "loc": (cx + diag, cy + diag, cz + elev), "target": target, "ortho_scale": ortho_scale},
-        {"name": "top-front", "loc": (cx, cy - diag * 0.5, cz + radius * 0.95), "target": target, "ortho_scale": ortho_scale},
+        {"name": "corner-FR", "loc": (cx + diag, cy + diag, cz + elev), "target": target, "ortho_scale": ortho_scale_corner},
+        {"name": "top-front", "loc": (cx, cy - diag * 0.5, cz + radius * 0.95), "target": target, "ortho_scale": ortho_scale_top},
     ]
 
 
@@ -842,34 +851,90 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
                 obj.data.materials.append(m)
 
     # ─── Pass 3: per-module pages with Freestyle ───
+    # 2026-05-26: kill scene-level shadows before per-module renders.
+    # init_scene() sets use_soft_shadows=True for the hero pass (adds depth).
+    # For the per-module schematic pages, shadows create a large diagonal dark
+    # wash across the canvas (especially pronounced in the top-front view where
+    # the sun angle produces a stretched shadow extending off-canvas).
+    # Drawer: forgeos_gotchas_e559ba6d5818fbf4 — Blender 5.x EEVEE Next ignores
+    # per-light use_shadow unless scene.eevee.use_shadow* is ALSO False.
+    # Set all three attribute names (4.x = use_shadows, 5.x = use_shadow,
+    # and use_shadow_high_bitdepth) to guarantee coverage across Blender versions.
+    eevee = getattr(scene, "eevee", None)
+    if eevee is not None:
+        for _attr in ("use_shadow", "use_shadows", "use_shadow_high_bitdepth", "use_soft_shadows"):
+            try:
+                setattr(eevee, _attr, False)
+            except (AttributeError, TypeError):
+                continue
+
     enable_freestyle()
     GHOST_LIGHT, ENCLOSURE_GHOST = make_ghost_materials()
     structure_names = set(o.name for o in module_objects.get(structure_module_id, []) if structure_module_id)
     all_orig = snapshot_all_materials()
+    # Track per-module scale overrides so we can undo them.
+    _focal_scale_overrides: dict[str, tuple] = {}
 
     def apply_focal_palette(focal_module_id):
+        # 2026-05-26: instead of restoring the template-assigned material
+        # (which may be a grey engineering material like MAT["pcs"] = 0.45,0.55,0.68),
+        # replace focal objects with the module's saturated accent colour from
+        # _MODULE_VISUAL_PROFILES.  This guarantees pop at camera distance
+        # regardless of what material the template author assigned.
+        # Universal across all 35 product classes — no per-class branching.
         focal_names = set(o.name for o in module_objects.get(focal_module_id, []))
+        profile = get_module_profile(focal_module_id)
+        if profile:
+            accent_srgb = profile["accent_rgb"]
+        else:
+            # Fallback: use a bright magenta so unknown modules are clearly
+            # identifiable rather than blending into the grey ghost field.
+            accent_srgb = (1.00, 0.10, 0.55)
+        accent_lin = _to_linear(accent_srgb)
+        focal_mat = make_mat(
+            f"m_focal_{focal_module_id[:20]}",
+            accent_lin,
+            metallic=0.0,
+            roughness=0.55,
+        )
         for obj_name, orig_mats in all_orig.items():
             obj = bpy.data.objects.get(obj_name)
             if obj is None:
                 continue
             obj.data.materials.clear()
             if obj_name in focal_names:
-                for m in orig_mats:
-                    obj.data.materials.append(m)
+                obj.data.materials.append(focal_mat)
             elif obj_name in structure_names and focal_module_id != structure_module_id:
                 obj.data.materials.append(ENCLOSURE_GHOST)
             else:
                 obj.data.materials.append(GHOST_LIGHT)
 
+    def apply_focal_scale(focal_module_id, scale_factor=1.05):
+        """Scale focal objects up by scale_factor (1.05 = 5%) so they
+        visually protrude from the ghost sibling field — provides a subtle
+        outline effect without Freestyle annotation complexity.
+        Stores original scale in _focal_scale_overrides for restoration."""
+        for obj in module_objects.get(focal_module_id, []):
+            _focal_scale_overrides[obj.name] = (obj.scale.x, obj.scale.y, obj.scale.z)
+            obj.scale = (obj.scale.x * scale_factor,
+                         obj.scale.y * scale_factor,
+                         obj.scale.z * scale_factor)
+
+    def restore_focal_scale(focal_module_id):
+        for obj in module_objects.get(focal_module_id, []):
+            orig = _focal_scale_overrides.pop(obj.name, None)
+            if orig is not None:
+                obj.scale = orig
+
     for module_id, mod_objs in module_objects.items():
         if not mod_objs:
             continue
         apply_focal_palette(module_id)
+        apply_focal_scale(module_id, scale_factor=1.05)
         bbox_mod = compute_scene_bbox()
         # Phase A item 4 (2026-05-24): 2-angle per module — corner-FR (primary)
         # + top-front (alternate view to reveal vertical layout). Each is
-        # written as module-<id>.png (primary) and module-<id>-top.png.
+        # written as module-<id>.png (primary) and module-<id>-top-front.png.
         cam_pair = per_module_camera_pair(bbox_mod)
         for cam_idx, cam_spec in enumerate(cam_pair):
             clear_cameras()
@@ -878,6 +943,7 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
             scene.render.filepath = str(out_dir / f"module-{module_id}{suffix}.png")
             bpy.ops.render.render(write_still=True)
             print(f"[forge] module-{module_id}{suffix}.png")
+        restore_focal_scale(module_id)
 
     restore_materials_from_snap(all_orig)
     print(f"[forge] DONE — {out_dir}")
