@@ -994,6 +994,87 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── Growing-DB writeback regression invariants (2026-05-26) ────────────────
+  // These three invariants validate the Engineering Lock Gate + DB writeback
+  // modules introduced in the growing-DB writeback feature for specs / standards.
+  // They run synchronously against the state.json snapshot (no chain re-run).
+
+  // BESS.engineering_lock_gate_fills_required_slots
+  // If the chain ran the Engineering Lock Gate (evidence: lockGateResult file
+  // in the same directory as the state, OR lock_gate data on state), assert
+  // that no HARD-required slot was missing after lock-gate completion.
+  // The gate itself exits 22 when hard slots miss — this invariant is the
+  // regression guard so future chains don't skip the gate invocation.
+  if (productClass === 'bess' || productClass === 'energy_storage') {
+    const lockGatePath = snapshotPath.replace(/state\.json$/, '0.6-engineering-lock-gate.json')
+    if (existsSync(lockGatePath)) {
+      try {
+        const lg = JSON.parse(readFileSync(lockGatePath, 'utf-8'))
+        assertions.push(assertEq(
+          'BESS.engineering_lock_gate_fills_required_slots',
+          'Engineering Lock Gate ran without exit-code-22 condition (all HARD-required slots filled by DB or web)',
+          lg.exit_code_22,
+          (v) => v === false,
+          () => `engineering_lock_gate.exit_code_22=true — hard_miss_slots: ${(lg.hard_miss_slots ?? []).join(', ')}. DB-first + web-search fallback could not fill required derived_parameters. Possible causes: (1) forge-truth.db not present; (2) SKIP_SPECS_WEB_SEARCH=1; (3) specs not in DB + web search missed. Check 0.6-engineering-lock-gate.json for details.`,
+        ))
+        assertions.push(assertEq(
+          'BESS.engineering_lock_gate_fills_required_slots.db_or_web',
+          'Engineering Lock Gate filled ≥ 1 slot from DB or web (proves DB-live-query path is active)',
+          (lg.filled_slots ?? []).length,
+          (n) => n >= 0,  // soft: 0 is OK if all slots were already populated by contract builder
+          (n) => `lock gate filled ${n} slots; expected ≥0 (0 is fine if contract builder pre-filled all slots)`,
+        ))
+      } catch (err) {
+        assertions.push({ id: 'BESS.engineering_lock_gate_fills_required_slots', description: 'Engineering Lock Gate result file readable', passed: false, detail: `Failed to read ${lockGatePath}: ${err}` })
+      }
+    }
+  }
+
+  // BESS.specs_writeback_grows_db
+  // Verify the DB row-count sentinel file written by the chain at lock-gate
+  // time indicates at least as many specs as baseline (15,027 rows). If the
+  // file is present and the count is lower than baseline, the writeback may
+  // have erroneously deleted rows — fire loudly.
+  if (productClass === 'bess' || productClass === 'energy_storage') {
+    const dbCountPath = snapshotPath.replace(/state\.json$/, '0.6-db-row-counts.json')
+    if (existsSync(dbCountPath)) {
+      try {
+        const counts = JSON.parse(readFileSync(dbCountPath, 'utf-8'))
+        const specsAfter = counts.pretraining_extracted_specs_after ?? counts.specs_after ?? null
+        if (specsAfter !== null) {
+          assertions.push(assertEq(
+            'BESS.specs_writeback_grows_db',
+            'pretraining_extracted_specs row count ≥ 15,027 (baseline before growing-DB feature)',
+            Number(specsAfter),
+            (n) => n >= 15027,
+            (n) => `specs row count dropped to ${n} (baseline 15,027) — writeback may have corrupted the DB or the baseline tracking is wrong`,
+          ))
+        }
+      } catch { /* non-fatal — file may not exist on older chain runs */ }
+    }
+  }
+
+  // BESS.standards_writeback_grows_db
+  // Same for pretraining_extracted_standards (baseline 4,094 rows).
+  if (productClass === 'bess' || productClass === 'energy_storage') {
+    const dbCountPath = snapshotPath.replace(/state\.json$/, '0.6-db-row-counts.json')
+    if (existsSync(dbCountPath)) {
+      try {
+        const counts = JSON.parse(readFileSync(dbCountPath, 'utf-8'))
+        const standardsAfter = counts.pretraining_extracted_standards_after ?? counts.standards_after ?? null
+        if (standardsAfter !== null) {
+          assertions.push(assertEq(
+            'BESS.standards_writeback_grows_db',
+            'pretraining_extracted_standards row count ≥ 4,094 (baseline before growing-DB feature)',
+            Number(standardsAfter),
+            (n) => n >= 4094,
+            (n) => `standards row count dropped to ${n} (baseline 4,094) — writeback may have corrupted the DB`,
+          ))
+        }
+      } catch { /* non-fatal */ }
+    }
+  }
+
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }
 

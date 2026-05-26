@@ -27,7 +27,97 @@
  * curated, library data is scraped.
  */
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { homedir } from 'node:os'
+
+// ── LIVE-DB SPEC FALLBACK (Module 6 — growing-DB principle 2026-05-26) ──────
+// When a part is NOT in KNOWN_PART_AUTHORITATIVE, attempt a SYNCHRONOUS
+// DB query against ~/.forge-truth/forge-truth.db pretraining_extracted_specs.
+// This gives the validator automatic coverage of the 15,027-row spec DB without
+// requiring a new KNOWN_PART_AUTHORITATIVE entry for every part.
+//
+// Only the spec_key→rated_current_a, rated_voltage_dc_v, rated_power_kw,
+// rated_current_a are used (numeric values parsed from spec_value+spec_unit).
+// Full async web-search fallback happens at the Engineering Lock Gate (step 3.5)
+// before validation; by the time the validator runs (gate 13) the DB should
+// already have entries for any part the lock gate looked up.
+//
+// Uses better-sqlite3 directly (synchronous — matches the validator's sync API).
+// Fails gracefully if DB unavailable or the spec key isn't found.
+let _dbSpec: import('better-sqlite3').Database | null | undefined = undefined
+let _stmtSpecLookup: import('better-sqlite3').Statement | null = null
+let _dbSpecWarnedMissing = false
+
+function _getSpecDb(): import('better-sqlite3').Database | null {
+  if (_dbSpec !== undefined) return _dbSpec
+  if (process.env.SKIP_LIBRARY_WRITEBACK === '1' || process.env.NODE_ENV === 'test') {
+    _dbSpec = null
+    return null
+  }
+  try {
+    const dbPath = resolve(homedir(), '.forge-truth', 'forge-truth.db')
+    if (!existsSync(dbPath)) {
+      _dbSpec = null
+      return null
+    }
+    // Dynamic require keeps the import optional (CI without better-sqlite3)
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Database = require('better-sqlite3') as typeof import('better-sqlite3')
+    const db = new Database(dbPath, { readonly: true })
+    db.pragma('journal_mode = WAL')
+    _stmtSpecLookup = db.prepare(`
+      SELECT s.spec_key, s.spec_value, s.spec_unit
+      FROM pretraining_extracted_specs s
+      JOIN pretraining_spec_documents d ON s.document_id = d.id
+      WHERE LOWER(s.spec_key) = LOWER(?)
+        AND (
+          LOWER(COALESCE(d.manufacturer,'')) LIKE LOWER('%' || ? || '%')
+          OR LOWER(COALESCE(d.product_name,'')) LIKE LOWER('%' || ? || '%')
+        )
+      ORDER BY
+        CASE d.source_type
+          WHEN 'datasheet' THEN 0
+          WHEN 'manufacturer' THEN 1
+          ELSE 2
+        END ASC
+      LIMIT 1
+    `)
+    _dbSpec = db
+    return db
+  } catch {
+    if (!_dbSpecWarnedMissing) {
+      console.warn('[parts-spec-validator] DB fallback init failed — using KNOWN_PART_AUTHORITATIVE only')
+      _dbSpecWarnedMissing = true
+    }
+    _dbSpec = null
+    return null
+  }
+}
+
+/**
+ * Synchronous DB lookup for a spec value.
+ * Returns the numeric value or null if not found / unparseable.
+ * Called ONLY when the part is not in KNOWN_PART_AUTHORITATIVE.
+ */
+function lookupSpecFromDb(
+  manufacturer: string,
+  partNumber: string,
+  specKey: string,
+): number | null {
+  const db = _getSpecDb()
+  if (!db || !_stmtSpecLookup) return null
+  try {
+    const row = _stmtSpecLookup.get(specKey, manufacturer, partNumber) as
+      | { spec_key: string; spec_value: string; spec_unit: string }
+      | undefined
+    if (!row || !row.spec_value) return null
+    const n = parseFloat(row.spec_value.replace(/[^0-9.\-]/g, ''))
+    return isNaN(n) ? null : n
+  } catch {
+    return null
+  }
+}
 
 // ── AUTHORITATIVE PARTS TABLE ────────────────────────────────────────────────
 // Source: manufacturer datasheets (verified entries cite source).
@@ -1197,9 +1287,69 @@ export function validateEmittedParts(state: any): PartsValidationResult {
     if (pn) {
       auth = findAuth({ manufacturer: mfr, part_number: pn })
       if (!auth) {
-        // Known manufacturer, unknown PN — skip rather than misattribute.
-        parts_unknown += 1
-        continue
+        // Module 6 (2026-05-26): fall through to live DB lookup before skipping.
+        // The DB has 15,027 spec rows. If the part is in there (from the
+        // Engineering Lock Gate's writeback pass), build a synthetic AuthSpec
+        // for the claimed spec keys. KNOWN_PART_AUTHORITATIVE remains the
+        // manual override layer for high-confidence curated entries.
+        const mods: Array<{ kind: string; value: string }> = Array.isArray(word?.modifier_characters)
+          ? word.modifier_characters
+          : []
+        const claimedAObj = claimedCurrentFromModifiers(mods)
+        const claimedV = claimedVoltageFromModifiers(mods)
+        const claimedKw = claimedPowerKwFromModifiers(mods)
+
+        let dbFallbackUsed = false
+        if (claimedAObj != null) {
+          const dbA = lookupSpecFromDb(mfr, pn, 'rated_current_a')
+            ?? lookupSpecFromDb(mfr, pn, 'rated_current_continuous_a')
+          if (dbA != null && dbA > 0) {
+            auth = {
+              manufacturer: mfr,
+              part_number_pattern: new RegExp(pn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+              category: 'db_fallback',
+              rated_current_a: dbA,
+              notes: `DB-fallback spec (pretraining_extracted_specs): rated_current_a=${dbA}A`,
+            }
+            dbFallbackUsed = true
+          }
+        }
+        if (!dbFallbackUsed && claimedV != null) {
+          const dbV = lookupSpecFromDb(mfr, pn, 'rated_voltage_dc_v')
+            ?? lookupSpecFromDb(mfr, pn, 'rated_voltage_v')
+            ?? lookupSpecFromDb(mfr, pn, 'max_dc_voltage_v')
+          if (dbV != null && dbV > 0) {
+            auth = {
+              manufacturer: mfr,
+              part_number_pattern: new RegExp(pn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+              category: 'db_fallback',
+              rated_voltage_dc_v: dbV,
+              notes: `DB-fallback spec (pretraining_extracted_specs): rated_voltage_dc_v=${dbV}V`,
+            }
+            dbFallbackUsed = true
+          }
+        }
+        if (!dbFallbackUsed && claimedKw != null) {
+          const dbKw = lookupSpecFromDb(mfr, pn, 'rated_power_kw')
+            ?? lookupSpecFromDb(mfr, pn, 'rated_cooling_kw')
+            ?? lookupSpecFromDb(mfr, pn, 'rated_thermal_kw')
+          if (dbKw != null && dbKw > 0) {
+            auth = {
+              manufacturer: mfr,
+              part_number_pattern: new RegExp(pn.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+              category: 'db_fallback',
+              rated_power_kw: dbKw,
+              notes: `DB-fallback spec (pretraining_extracted_specs): rated_power_kw=${dbKw}kW`,
+            }
+            dbFallbackUsed = true
+          }
+        }
+
+        if (!auth) {
+          // Not in KNOWN_PART_AUTHORITATIVE AND not in DB — skip rather than misattribute.
+          parts_unknown += 1
+          continue
+        }
       }
     } else {
       const sameMfr = KNOWN_PART_AUTHORITATIVE.filter(

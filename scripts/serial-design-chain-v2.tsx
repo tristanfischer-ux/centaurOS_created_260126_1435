@@ -68,6 +68,11 @@ import type { ContractInProgress as OrchestratorContract } from './lib/orchestra
 // Universal across product classes. Graceful degradation when DB missing
 // or OPENAI_API_KEY unset (class-only filter, no semantic match).
 import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator/library-candidate-query'
+// Engineering Lock Gate (2026-05-26): runs BETWEEN contract emit (step 3) and
+// research synthesis (step 4). Fills missing derived_parameters via DB-first
+// + web-search fallback from pretraining_extracted_specs + standards tables.
+// Hard-fails with exit code 22 if any HARD-required slot is still missing.
+import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords, refreshModulesRadSyntax } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { applyJurisdictionFilterToModules, applyJurisdictionFilterToNlLayer, applyJurisdictionFilterToBriefProse } from './lib/jurisdiction-prose-filter'
@@ -2159,6 +2164,59 @@ async function main() {
   } catch (err) {
     console.error(`[chain] engineering_contract build failed: ${(err as Error).message}; continuing without Contract (LLM-only fallback)`)
     logAction({ step: 'engineering_contract_built', ok: false, error: String(err).slice(0, 200) })
+  }
+
+  // ── Engineering Lock Gate (2026-05-26): DB-first spec + standards fill ────
+  // Runs BETWEEN contract emit and research synthesis. Uses pretraining_extracted_specs
+  // + pretraining_extracted_standards (15k + 4k rows) with web-search fallback.
+  // Hard-fails with exit code 22 if any HARD-required slot is still missing.
+  // Pre-change mempalace search: library-writeback distributor cascade pattern → 5 drawers loaded
+  let lockGateResult: import('../src/lib/pdf-engine-v2/lib/engineering-lock-gate').LockGateResult | null = null
+  if (engineeringContract) {
+    const tLockGate = Date.now()
+    try {
+      lockGateResult = await lockEngineering(engineeringContract, parsedResult.data)
+      const latencyMs = Date.now() - tLockGate
+      writeFileSync(
+        resolve(outDir, '0.6-engineering-lock-gate.json'),
+        JSON.stringify(lockGateResult, null, 2),
+      )
+      // DB row-count sentinel for regression invariants BESS.specs_writeback_grows_db
+      // and BESS.standards_writeback_grows_db. Written after lock gate so counts
+      // reflect any insertions performed by lookupSpec / lookupStandard.
+      try {
+        const { execFileSync: execSync2 } = await import('node:child_process')
+        const dbPath = resolve(homedir(), '.forge-truth', 'forge-truth.db')
+        if (existsSync(dbPath)) {
+          const specsCount = execSync2('sqlite3', [dbPath, 'SELECT COUNT(*) FROM pretraining_extracted_specs;'], { encoding: 'utf-8' }).trim()
+          const standardsCount = execSync2('sqlite3', [dbPath, 'SELECT COUNT(*) FROM pretraining_extracted_standards;'], { encoding: 'utf-8' }).trim()
+          writeFileSync(
+            resolve(outDir, '0.6-db-row-counts.json'),
+            JSON.stringify({
+              pretraining_extracted_specs_after: parseInt(specsCount, 10),
+              pretraining_extracted_standards_after: parseInt(standardsCount, 10),
+              captured_at: new Date().toISOString(),
+            }, null, 2),
+          )
+        }
+      } catch { /* non-fatal */ }
+      logAction({
+        step: 'engineering_lock_gate',
+        filled_slots: lockGateResult.filled_slots.length,
+        filled_standards: lockGateResult.filled_standards.length,
+        hard_miss_slots: lockGateResult.hard_miss_slots,
+        exit_code_22: lockGateResult.exit_code_22,
+        latency_ms: latencyMs,
+        ok: !lockGateResult.exit_code_22,
+      })
+      if (lockGateResult.exit_code_22) {
+        console.error(`[chain] HARD FAIL: Engineering Lock Gate exit code 22 — missing slots: ${lockGateResult.hard_miss_slots.join(', ')}`)
+        process.exit(22)
+      }
+    } catch (err) {
+      console.error(`[chain] Engineering Lock Gate threw: ${(err as Error).message}; continuing without lock`)
+      logAction({ step: 'engineering_lock_gate', ok: false, error: String(err).slice(0, 200) })
+    }
   }
 
   // ── G0 deterministic physics ledger (Task #253, 2026-05-19): runs AFTER
