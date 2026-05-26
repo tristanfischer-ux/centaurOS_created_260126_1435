@@ -892,6 +892,30 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       ))
     }
 
+    // BESS.system_rte_not_pcs_only (class-killer #2, 2026-05-26)
+    // energy_conversion_transduction.derived_parameters MUST carry
+    // round_trip_efficiency_percent as a DISTINCT field from efficiency_percent.
+    // headline-deriver.ts:267 reads round_trip_efficiency_percent FIRST, then
+    // falls back to efficiency_percent. Without round_trip_efficiency_percent the
+    // deriver reports system utilisation = 98% (PCS-only), which the skeleton
+    // critic flags as HIGH engineering_plausibility (98% AC-to-AC RTE is
+    // physically impossible for a complete BESS with transformer + aux loads).
+    // System-level AC-to-AC RTE ≈ 86% (cell 96% × PCS 98%² × transformer 98.5%²
+    // × aux parasitic ~4%). Must be ≤ 92% (typical industry benchmark).
+    const ectModule = modules.find((m: any) => m.module === 'energy_conversion_transduction')
+    const ectDp = ectModule?.derived_parameters ?? {}
+    const rtePercent = typeof ectDp.round_trip_efficiency_percent === 'number'
+      ? ectDp.round_trip_efficiency_percent : null
+    if (rtePercent !== null) {
+      assertions.push(assertEq(
+        'BESS.system_rte_not_pcs_only',
+        'energy_conversion_transduction.derived_parameters.round_trip_efficiency_percent ≤ 92% (system-level AC-to-AC, not PCS-only)',
+        rtePercent,
+        (pct) => pct <= 92,
+        (pct) => `round_trip_efficiency_percent=${pct}% — exceeds 92% industry ceiling for system-level AC-to-AC BESS RTE. If this is PCS-only efficiency (98%), the field name is WRONG — use 'efficiency_percent' for PCS-only and emit round_trip_efficiency_percent with compounded system RTE (~86%). headline-deriver will otherwise claim 98% system utilisation.`,
+      ))
+    }
+
     // BESS.all_sub_modules_min_5_words (class-killer #2)
     // Every BESS sub-module must have ≥ 5 words at emit time to avoid Phase 2
     // sub_module_word_density grammar failures (−800 to −1000 per thin sub-module).
