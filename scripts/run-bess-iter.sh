@@ -48,9 +48,9 @@ echo "[iter-$ITER] starting BESS pipeline at $(date -u +%H:%M:%SZ)" | tee "$LOG_
 
 cd "$REPO_ROOT"
 set +e
-npx tsx src/lib/pdf-engine-v2/run.ts \
-  --output-prefix "bess-iter-${ITER}" \
-  --brief "$BRIEF_TEXT" 2>&1 | tee -a "$LOG_FILE"
+# Canonical chain entry is scripts/serial-design-chain-v2.tsx (positional: brief outDir).
+# Old src/lib/pdf-engine-v2/run.ts was archived in commit 9783dce5b "chain v5".
+npx tsx scripts/serial-design-chain-v2.tsx "$BRIEF" "$OUT_DIR" 2>&1 | tee -a "$LOG_FILE"
 EXIT=${PIPESTATUS[0]}
 set -e
 
@@ -58,17 +58,11 @@ END=$(date +%s)
 DURATION_S=$((END - START))
 echo "[iter-$ITER] pipeline exit=$EXIT duration=${DURATION_S}s" | tee -a "$LOG_FILE"
 
-# Collect outputs that the pipeline writes to the repo root.
-STATE_SRC=$(ls -t "$REPO_ROOT"/radical-phase5-state-*.json 2>/dev/null | head -1 || true)
-PDF_SRC=$(ls -t "$REPO_ROOT"/radical-phase5-*.pdf 2>/dev/null | grep -v "state" | head -1 || true)
-
-if [ -n "$STATE_SRC" ] && [ -f "$STATE_SRC" ]; then
-  cp "$STATE_SRC" "$OUT_DIR/state.json"
-  echo "[iter-$ITER] state.json copied ($(wc -c < "$OUT_DIR/state.json") bytes)" | tee -a "$LOG_FILE"
-fi
-if [ -n "$PDF_SRC" ] && [ -f "$PDF_SRC" ]; then
-  cp "$PDF_SRC" "$OUT_DIR/radical.pdf"
-  echo "[iter-$ITER] radical.pdf copied ($(wc -c < "$OUT_DIR/radical.pdf") bytes)" | tee -a "$LOG_FILE"
+# Chain writes <outDir>/chain-v2.pdf + <outDir>/state.json directly — no copy step needed.
+# Scorer expects radical.pdf at <bess-container>/radical.pdf, so alias.
+if [ -f "$OUT_DIR/chain-v2.pdf" ]; then
+  cp -f "$OUT_DIR/chain-v2.pdf" "$OUT_DIR/radical.pdf"
+  echo "[iter-$ITER] radical.pdf aliased from chain-v2.pdf ($(wc -c < "$OUT_DIR/radical.pdf") bytes)" | tee -a "$LOG_FILE"
 fi
 
 if [ "$EXIT" -eq 0 ] && [ -f "$OUT_DIR/radical.pdf" ]; then
