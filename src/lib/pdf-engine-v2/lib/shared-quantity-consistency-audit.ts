@@ -258,6 +258,61 @@ export const IRRELEVANT_MODIFIER_PATTERNS: IrrelevantModifierRule[] = [
     example: '50 Hz on a steel structural panel — frequency ratings belong to electrical/electronic parts',
     class_scope: undefined,
   },
+
+  // ── Voltage-domain placement (L40 [MED] — universal class-killer, 2026-05-27) ──────────────────
+  //
+  // L40 finding: "Ritz RVT-11 (11kV/110V) placed inside AC distribution
+  // sub-module operating at 400 V AC. The 11 kV step-up transformer is
+  // external pad-mounted, so HV VTs belong in external switchgear, not
+  // internal 400V panel."
+  //
+  // Two rules:
+  //   A) Words emitting a voltage >= 1 kV (HV-rated) MUST NOT appear in
+  //      LV sub_modules (operating at 400 V AC / 230 V AC / LV bus).
+  //      These parts belong in external HV switchgear / pad-mounted gear.
+  //   B) Words emitting a voltage < 690 V (LV-rated) MUST NOT appear in
+  //      HV sub_modules (external pad-mount / MV switchgear).
+  //
+  // Sub-module pattern matching uses the sub_module id, so the match is
+  // against the word.id (which typically embeds its sub-module context).
+  // The gate also matches against the enclosing sub_module.id via the
+  // runIrrelevantModifierAudit walker which passes wordId from w.id —
+  // see the sub_module_id check in the finding's location field.
+  //
+  // NOTE: The part_class_pattern here matches BOTH the word ID AND must be
+  // interpreted carefully — we match word IDs that contain LV distribution
+  // context (e.g. ac_distribution_*, lv_*, 400v_*, internal_*) for rule A,
+  // and hv_*/external_pad_* for rule B. The forbidden_modifier is the
+  // voltage value on the word itself.
+  //
+  // Rule A: HV-rated words in LV sub-modules.
+  {
+    id: 'hv_word_in_lv_sub_module',
+    // Matches word IDs that suggest an LV / internal-distribution context.
+    // Patterns: lv_, low_voltage, 400v, 230v, internal_distribution,
+    //   ac_distribution, mv_switchgear is NOT LV so we exclude mv_.
+    part_class_pattern: /(?:^|_)(?:lv_|low_voltage|400v|230v|internal_distribution|ac_distribution|ac_panel|lv_panel|distribution_board)/i,
+    // Matches any kV rating (1 kV and above): "11kV", "33 kV", "3.3kV", "0.69 kV"
+    // Lower bound: values < 1.0 kV are LV (acceptable in LV sub-modules).
+    // Upper bound: none (catches 11kV, 33kV, 132kV, etc.)
+    forbidden_modifier: /\b(?:[1-9]\d*(?:\.\d+)?|0\.(?:69|7[0-9]|[89]\d*))\s*kV\b/i,
+    severity: 'HIGH',
+    example: 'Ritz RVT-11 (11kV rated) placed in ac_distribution sub-module operating at 400 V AC — 11 kV instrument transformers belong in external HV switchgear, not internal LV panel',
+    class_scope: undefined,  // universal
+  },
+  // Rule B: LV-rated words in HV sub-modules.
+  {
+    id: 'lv_word_in_hv_sub_module',
+    // Matches word IDs that suggest an HV / external switchgear context.
+    part_class_pattern: /(?:^|_)(?:hv_|high_voltage|external_pad|mv_switchgear|pad_mounted|external_switchgear|medium_voltage|mv_)/i,
+    // Matches any rating clearly in the LV range: up to 690 V (IEC LV threshold).
+    // Patterns: "400 V AC", "230 V", "48 V DC", "24V", "690V".
+    // Exclude kV values — those would be HV and shouldn't fire this rule.
+    forbidden_modifier: /\b(?:[1-9]\d{0,2}|69\d)\s*V\s*(?:AC|DC|ac|dc|)\b(?!\s*\/\s*\d+\s*kV)/i,
+    severity: 'MED',
+    example: '400 V AC distribution relay placed inside hv_switchgear sub-module — LV control gear should not be inside HV switchgear word slots',
+    class_scope: undefined,  // universal
+  },
 ]
 
 // ── Violation type for cross-domain checks ────────────────────────────────────

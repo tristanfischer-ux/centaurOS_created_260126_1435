@@ -1634,6 +1634,90 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     ))
   }
 
+  // ── UNIVERSAL: per-rack quantity consistent (2026-05-27, L40 gate 26 class-killer C) ──
+  //
+  // UNIVERSAL.per_rack_quantity_consistent — runs the gate 26 algorithm on
+  // the state.json snapshot, asserts no HIGH findings.
+  //
+  // Closes L40 [HIGH]: "Fourteen Wieland cold plates per rack" in prose vs
+  // JSON quantity x14 total. Gate 26 catches any future prose-vs-BoM multiplier
+  // mismatch universally. The regression harness mirrors the gate logic so that
+  // snapshots from BESS, HAPS, VF, EV and all other classes are automatically
+  // checked without a chain re-run.
+  {
+    // Inline the gate logic via the same import path used in the chain.
+    // The harness runs synchronously; dynamic import not needed here.
+    try {
+      const { runPerRackQuantityAudit } = require('../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit')
+      const contractQtys = (
+        (state?.orchestratorContract as Record<string, unknown> | undefined)?.quantities ?? {}
+      ) as Record<string, unknown>
+      const pqResult = runPerRackQuantityAudit(modules, contractQtys, productClass ?? 'unknown')
+      assertions.push(assertEq(
+        'UNIVERSAL.per_rack_quantity_consistent',
+        'No per-rack quantity mismatches (gate 26): prose "N per <denominator>" must match BoM quantity = N × denominator_count within 5% (L40 [HIGH] class-killer C)',
+        pqResult.high_count,
+        (n: number) => n === 0,
+        (n: number) => `${n} per-rack quantity mismatch(es): ${pqResult.findings.slice(0, 3).map((f: { note: string }) => f.note).join('; ')}. Fix: update deterministic-emitter.ts to emit multiplied totals.`,
+      ))
+    } catch (err) {
+      assertions.push({ id: 'UNIVERSAL.per_rack_quantity_consistent', description: 'Gate 26 per-rack quantity audit', passed: false, detail: `Failed to load per-rack-quantity-audit module: ${err}` })
+    }
+  }
+
+  // ── UNIVERSAL: no voltage-domain mismatch (2026-05-27, L40 gate 24 extension B) ──
+  //
+  // UNIVERSAL.no_voltage_domain_mismatch — verifies VOLTAGE_DOMAIN_PATTERNS
+  // (just added to IRRELEVANT_MODIFIER_PATTERNS in shared-quantity-consistency-audit.ts)
+  // reports no HIGH findings on this snapshot.
+  //
+  // Closes L40 [MED]: Ritz RVT-11 (11kV/110V) placed inside AC distribution
+  // sub-module operating at 400 V AC. HV-rated words must not appear in LV
+  // sub-modules, and vice-versa.
+  {
+    try {
+      const { runIrrelevantModifierAudit } = require('../src/lib/pdf-engine-v2/lib/shared-quantity-consistency-audit')
+      const vdResult = runIrrelevantModifierAudit(modules, productClass ?? 'unknown')
+      const vdHighFindings = vdResult.violations.filter((v: { severity: string; rule_id: string }) =>
+        v.severity === 'HIGH' && (v.rule_id === 'hv_word_in_lv_sub_module' || v.rule_id === 'lv_word_in_hv_sub_module')
+      )
+      assertions.push(assertEq(
+        'UNIVERSAL.no_voltage_domain_mismatch',
+        'No voltage-domain placement mismatches (gate 24 VOLTAGE_DOMAIN_PATTERNS): HV-rated words must not appear in LV sub-modules and vice-versa (L40 [MED] class-killer B)',
+        vdHighFindings.length,
+        (n: number) => n === 0,
+        (n: number) => `${n} voltage-domain violation(s): ${vdHighFindings.slice(0, 3).map((v: { location: string }) => v.location).join('; ')}. Fix: relocate HV words to external switchgear sub-module or replace with LV-rated equivalent.`,
+      ))
+    } catch (err) {
+      assertions.push({ id: 'UNIVERSAL.no_voltage_domain_mismatch', description: 'Gate 24 voltage-domain placement audit', passed: false, detail: `Failed to load shared-quantity-consistency-audit module: ${err}` })
+    }
+  }
+
+  // ── UNIVERSAL: manufacturer attribution canonical (2026-05-27, L40 gate 27 class-killer D) ──
+  //
+  // UNIVERSAL.manufacturer_attribution_canonical — runs the gate 27 algorithm
+  // (MFR_PART_PATTERNS) on this snapshot, asserts no HIGH findings.
+  //
+  // Closes L40 [LOW]: "Roxtec ICG/501-M25 actually manufactured by Hawke
+  // International, not Roxtec." MFR_PART_PATTERNS seeds 16 known-confused
+  // manufacturer/PN families; gate 27 catches any future wrong-attribution
+  // before the PDF is rendered.
+  {
+    try {
+      const { runManufacturerAttributionAudit } = require('../src/lib/pdf-engine-v2/lib/manufacturer-attribution-audit')
+      const maResult = runManufacturerAttributionAudit(modules, undefined, productClass ?? 'unknown')
+      assertions.push(assertEq(
+        'UNIVERSAL.manufacturer_attribution_canonical',
+        'No manufacturer attribution errors (gate 27): emitted manufacturer matches MFR_PART_PATTERNS canonical for all PN-matched words (L40 [LOW] class-killer D)',
+        maResult.high_count,
+        (n: number) => n === 0,
+        (n: number) => `${n} wrong-manufacturer attribution(s) in ${maResult.words_checked} BoM words checked: ${maResult.findings.slice(0, 3).map((f: { message: string }) => f.message).join('; ')}. Fix: update emitter to emit canonical_mfr from MFR_PART_PATTERNS.`,
+      ))
+    } catch (err) {
+      assertions.push({ id: 'UNIVERSAL.manufacturer_attribution_canonical', description: 'Gate 27 manufacturer attribution audit', passed: false, detail: `Failed to load manufacturer-attribution-audit module: ${err}` })
+    }
+  }
+
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }
 

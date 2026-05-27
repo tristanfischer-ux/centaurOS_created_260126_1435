@@ -75,6 +75,8 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
 import { runSharedQuantityConsistencyAudit } from '../src/lib/pdf-engine-v2/lib/shared-quantity-consistency-audit'
+import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
+import { runManufacturerAttributionAudit } from '../src/lib/pdf-engine-v2/lib/manufacturer-attribution-audit'
 import { scanEmitterFileForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords, refreshModulesRadSyntax } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
@@ -3607,6 +3609,108 @@ async function main() {
       }
       writeFileSync(resolve(outDir, 'state.json'), JSON.stringify(g25State, null, 2))
       process.exit(25)
+    }
+  }
+
+  // ── Gate 26: Per-Rack-vs-Total Quantity Audit (exit 26, 2026-05-27, L40 class-killer C) ─────────
+  // Runs AFTER Phase 2 post-normalisation, same point as gates 24/25.
+  // Scans narrative prose for "N per <denominator>" patterns and asserts
+  // BoM word quantity = N × denominator_count within 5% tolerance.
+  // Catches L40 [HIGH]: "Fourteen Wieland cold plates per rack" in prose vs
+  // JSON quantity x14 total (should be 14 × 14 racks = 196 total).
+  {
+    const tGate26 = Date.now()
+    // Extract quantities from the engineering contract (may be null if orchestrator
+    // did not run — gate degrades gracefully when denominator_count cannot be resolved).
+    const contractQtys26 = (
+      (orchEngineeringContract as Record<string, unknown> | null)?.quantities ?? {}
+    ) as Record<string, unknown>
+    const gate26Result = runPerRackQuantityAudit(
+      design.modules ?? [],
+      contractQtys26,
+      currentProductClass ?? 'unknown',
+    )
+    console.error(
+      `[chain] gate-26 per-rack-quantity: ${gate26Result.passed ? 'PASS' : 'FAIL'} — ` +
+      `${gate26Result.prose_hits_scanned} prose hits scanned, ` +
+      `${gate26Result.high_count} HIGH finding(s)`
+    )
+    logAction({
+      step: 'gate_26_per_rack_quantity',
+      passed: gate26Result.passed,
+      prose_hits_scanned: gate26Result.prose_hits_scanned,
+      high_count: gate26Result.high_count,
+      findings: gate26Result.findings.map((f) => ({
+        location: f.location,
+        prose_snippet: f.prose_snippet,
+        bom_word_id: f.bom_word_id,
+        expected_total: f.expected_total,
+        bom_quantity: f.bom_quantity,
+      })),
+      latency_ms: Date.now() - tGate26,
+      class_name: gate26Result.class_name,
+    })
+    if (!gate26Result.passed) {
+      console.error(`\n[chain] === FATAL GATE 26 ===\n${gate26Result.error_message}`)
+      const g26State = {
+        projectId: 'chain-v2-' + Date.now(),
+        parsedBrief: parsedResult.data,
+        moduleDecomposition: design,
+        haltReason: `Gate 26 per-rack-quantity FAIL: ${gate26Result.high_count} finding(s).`,
+        gate26Result,
+        savedAt: new Date().toISOString(),
+      }
+      writeFileSync(resolve(outDir, 'state.json'), JSON.stringify(g26State, null, 2))
+      process.exit(26)
+    }
+  }
+
+  // ── Gate 27: Manufacturer Attribution Audit (exit 27, 2026-05-27, L40 class-killer D) ─────────
+  // Runs AFTER Phase 2 post-normalisation, same point as gates 24-26.
+  // Checks every BoM word's (manufacturer, part_number) pair against the
+  // MFR_PART_PATTERNS table. Fails HIGH when a part-number pattern maps to a
+  // canonical manufacturer that differs from the emitted one.
+  // Catches L40 [LOW]: Roxtec ICG/501-M25 — ICG series is Hawke International.
+  {
+    const tGate27 = Date.now()
+    const gate27Result = runManufacturerAttributionAudit(
+      design.modules ?? [],
+      undefined,  // defaults to MFR_PART_PATTERNS
+      currentProductClass ?? 'unknown',
+    )
+    console.error(
+      `[chain] gate-27 manufacturer-attribution: ${gate27Result.passed ? 'PASS' : 'FAIL'} — ` +
+      `${gate27Result.words_checked} words checked, ` +
+      `${gate27Result.high_count} HIGH finding(s)`
+    )
+    logAction({
+      step: 'gate_27_manufacturer_attribution',
+      passed: gate27Result.passed,
+      words_checked: gate27Result.words_checked,
+      high_count: gate27Result.high_count,
+      findings: gate27Result.findings.map((f) => ({
+        location: f.location,
+        word_id: f.word_id,
+        emitted_manufacturer: f.emitted_manufacturer,
+        emitted_part_number: f.emitted_part_number,
+        canonical_mfr: f.canonical_mfr,
+        pattern_id: f.pattern_id,
+      })),
+      latency_ms: Date.now() - tGate27,
+      class_name: gate27Result.class_name,
+    })
+    if (!gate27Result.passed) {
+      console.error(`\n[chain] === FATAL GATE 27 ===\n${gate27Result.error_message}`)
+      const g27State = {
+        projectId: 'chain-v2-' + Date.now(),
+        parsedBrief: parsedResult.data,
+        moduleDecomposition: design,
+        haltReason: `Gate 27 manufacturer-attribution FAIL: ${gate27Result.high_count} finding(s).`,
+        gate27Result,
+        savedAt: new Date().toISOString(),
+      }
+      writeFileSync(resolve(outDir, 'state.json'), JSON.stringify(g27State, null, 2))
+      process.exit(27)
     }
   }
 
