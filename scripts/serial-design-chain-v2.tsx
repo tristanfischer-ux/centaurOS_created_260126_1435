@@ -79,6 +79,7 @@ import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-q
 import { runManufacturerAttributionAudit } from '../src/lib/pdf-engine-v2/lib/manufacturer-attribution-audit'
 import { scanMultipleFilesForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { runStateParseGuard } from '../src/lib/pdf-engine-v2/lib/state-parse-guard'
+import { runSubModuleDomainGuard } from '../src/lib/pdf-engine-v2/lib/submodule-domain-guard'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords, refreshModulesRadSyntax } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { applyJurisdictionFilterToModules, applyJurisdictionFilterToNlLayer, applyJurisdictionFilterToBriefProse } from './lib/jurisdiction-prose-filter'
@@ -3782,6 +3783,50 @@ async function main() {
       }
       writeFileSync(resolve(outDir, 'state.json'), JSON.stringify(g28State, null, 2))
       process.exit(28)
+    }
+  }
+
+  // ── Gate 29: Sub-Module Domain Guard (exit 29, 2026-05-27, L46 council 3/4 seats) ─
+  // HARD FAIL: walks every (sub_module, word) pair and asserts that words
+  // whose content_character.character_id starts with `dc_` (or contains `_dc_`)
+  // are NOT pinned inside sub_modules starting with `ac_` (or containing `_ac_`),
+  // and vice-versa. Catches the L46 dc_power_cable_word + dc_power_cable_insulation_word
+  // appearing inside power_distribution::ac_switchgear. Runs AFTER gate 28
+  // (state-parse), BEFORE K10 shadow + render — the chain MUST not render
+  // when this incoherence is present.
+  //
+  // Root cause is upstream (deterministic-emitter slot lists, Step 5/7/8/8.5
+  // reviewer prompts, or applyReviewerPatches add_word_to_sub_module branch).
+  // This gate does NOT silently relocate words; the chain operator updates
+  // the offending step to stop the smear.
+  {
+    const tGate29 = Date.now()
+    const gate29Result = runSubModuleDomainGuard(design.modules ?? [])
+    console.error(
+      `[chain] gate-29 submodule-domain-guard: ${gate29Result.passed ? 'PASS' : 'FAIL'} — ` +
+      `${gate29Result.words_checked} words checked, ` +
+      `${gate29Result.hits.length} hit(s)`
+    )
+    logAction({
+      step: 'gate_29_submodule_domain_guard',
+      passed: gate29Result.passed,
+      words_checked: gate29Result.words_checked,
+      hit_count: gate29Result.hits.length,
+      hits: gate29Result.hits.slice(0, 50),
+      latency_ms: Date.now() - tGate29,
+    })
+    if (!gate29Result.passed) {
+      console.error(`\n[chain] === FATAL GATE 29 ===\n${gate29Result.error_message}`)
+      const g29State = {
+        projectId: 'chain-v2-' + Date.now(),
+        parsedBrief: parsedResult.data,
+        moduleDecomposition: design,
+        haltReason: `Gate 29 submodule-domain-guard FAIL: ${gate29Result.hits.length} dc/ac domain mismatch(es).`,
+        gate29Result,
+        savedAt: new Date().toISOString(),
+      }
+      writeFileSync(resolve(outDir, 'state.json'), JSON.stringify(g29State, null, 2))
+      process.exit(29)
     }
   }
 

@@ -1752,6 +1752,32 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL: sub-module domain coherence (2026-05-27, L47 gate 29) ──
+  //
+  // UNIVERSAL.submodule_domain_coherent — runs the gate 29 sub-module domain
+  // guard on this snapshot's moduleDecomposition.modules, asserts hits.length = 0.
+  //
+  // Closes L46 council 3/4-seat finding: `dc_power_cable_word` +
+  // `dc_power_cable_insulation_word` rendered inside power_distribution::ac_switchgear.
+  // Universal: any future regression where the sub-module composition step attaches
+  // a dc_* character_id to an ac_* sub_module (or vice-versa) is caught at
+  // build/regression time without a chain re-run.
+  {
+    try {
+      const { runSubModuleDomainGuard } = require('../src/lib/pdf-engine-v2/lib/submodule-domain-guard')
+      const sdgResult = runSubModuleDomainGuard(modules)
+      assertions.push(assertEq(
+        'UNIVERSAL.submodule_domain_coherent',
+        'No sub-module domain mismatches (gate 29): every word.content_character.character_id with a dc_/ac_ prefix lives inside a sub_module whose id has the matching domain prefix (L46 council 3/4 seats class-killer)',
+        sdgResult.hits.length,
+        (n: number) => n === 0,
+        (n: number) => `${n} sub-module domain mismatch(es): ${sdgResult.hits.slice(0, 3).map((h: { module_id: string; sub_module_id: string; word_id: string; character_id: string; expected_domain: string; actual_domain: string }) => `${h.module_id}::${h.sub_module_id}/${h.word_id} (cid=${h.character_id}, expected=${h.expected_domain.toUpperCase()}, actual=${h.actual_domain.toUpperCase()})`).join('; ')}. Fix upstream in the sub-module composition step (deterministic-emitter slot lists OR reviewer prompts OR applyReviewerPatches add_word_to_sub_module branch).`,
+      ))
+    } catch (err) {
+      assertions.push({ id: 'UNIVERSAL.submodule_domain_coherent', description: 'Gate 29 sub-module domain guard', passed: false, detail: `Failed to load submodule-domain-guard module: ${err}` })
+    }
+  }
+
   // ── UNIVERSAL: no historical brief value literals in emitter (2026-05-27, L42 gate 25 extension B) ──
   //
   // UNIVERSAL.no_historical_brief_value_literals_in_emitter — runs the extended
