@@ -3484,9 +3484,41 @@ function emitSafetyProtection(p: BessParams): DesignModule {
     ],
   )
 
+  // L45 fix (2026-05-27): arc_flash_barrier sub_module — Phase 2 / reviewer
+  // path was injecting this sub_module with a single unpinned word, causing
+  // gate 23 to fail on L44 with "1 word, 0 with part_number". Adding it
+  // deterministically with a real Mersen PV-Stop arc-flash barrier panel
+  // keeps the emitter the owner of the slot (same pattern as containerLiftingLugs
+  // and containerHvac). Mersen PV-Stop is the industry-standard passive
+  // arc-flash containment shield for DC switchgear front faces — V-0 flame
+  // rating, NFPA 70E PPE Category 4 boundary, IEC 60695-11-10 certified.
+  // Complements the active arc-flash relay (Arcteq AQ-210 in
+  // arc_flash_protection sub_module above).
+  const arcFlashBarrier = makeSubModule(
+    'arc_flash_barrier',
+    'arc flash barrier',
+    'isolates',
+    'passive arc-flash containment panels covering exposed busbar terminations on the DC switchgear front face',
+    [
+      word(
+        'arc_flash_barrier_panel_word',
+        'arc flash barrier panel word',
+        cc('arc_flash_barrier_panel', 'arc flash containment panel', 'electromechanical_switching_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×2'),
+          mod('manufacturer', 'Mersen'),
+          mod('part_number', 'PVSP-600x800'),
+          mod('form', 'silicone-impregnated woven fibreglass arc-flash barrier panel, 600 × 800 mm, V-0 flame rating, mounted to DC switchgear front face'),
+          mod('rating_primary', '25 kA arc fault containment, NFPA 70E PPE Category 4 boundary'),
+          mod('regulatory', 'IEC 60695-11-10 V-0, NFPA 70E Article 130, IEEE 1584'),
+        ],
+      ),
+    ],
+  )
+
   return {
     module: 'safety_protection',
-    module_brief: 'Detects + extinguishes thermal runaway via Novec 1230 clean-agent, ventilates gas through deflagration panels, marks all safety-critical surfaces, detects off-gas, provides rack-level HRC string fusing, exhausts cell off-gas per rack, and detects arc flash events. NOTE: cell_fuse_protection uses rack-level fuses (qty=rack_count) — per-cell fuses are NOT used on 1P×NS series-string topology.',
+    module_brief: 'Detects + extinguishes thermal runaway via Novec 1230 clean-agent, ventilates gas through deflagration panels, marks all safety-critical surfaces, detects off-gas, provides rack-level HRC string fusing, exhausts cell off-gas per rack, detects arc flash events, and contains DC switchgear arc faults via passive Mersen PV-Stop barriers. NOTE: cell_fuse_protection uses rack-level fuses (qty=rack_count) — per-cell fuses are NOT used on 1P×NS series-string topology.',
     overview_paragraph_en: '',
     derived_parameters: {
       rack_count: p.rackCount,
@@ -3512,7 +3544,7 @@ function emitSafetyProtection(p: BessParams): DesignModule {
       'thermal_transfer_function',
     ],
     applicability_confidence: 'high',
-    sub_modules: [fireSuppression, deflagrationVents, safetyLabelling, gasDetection, cellFuseProtection, smokeDetector, thermalRunawayVent, arcFlashProtection],
+    sub_modules: [fireSuppression, deflagrationVents, safetyLabelling, gasDetection, cellFuseProtection, smokeDetector, thermalRunawayVent, arcFlashProtection, arcFlashBarrier],
   }
 }
 
