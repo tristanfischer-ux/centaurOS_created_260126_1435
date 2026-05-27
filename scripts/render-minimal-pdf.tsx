@@ -3690,7 +3690,7 @@ function _formatDelta(target: number, achieved: number, kind: 'cost' | 'mass' | 
  * Returns an empty array when the brief has no constraints (graceful
  * degradation — page then renders a placeholder).
  */
-function _buildComplianceRows(state: any, bomTotals: BomTotals | null): ComplianceRow[] {
+function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack?: CostStack | null): ComplianceRow[] {
   const constraints = state?.parsedBrief?.constraints
   if (!constraints || typeof constraints !== 'object') return []
 
@@ -3710,7 +3710,18 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null): Complian
   const costCeiling = constraints.unit_cost_ceiling
   if (costCeiling && typeof costCeiling.value === 'number' && Number.isFinite(costCeiling.value) && bomTotals && bomTotals.grandTotal_gbp > 0) {
     const briefVal = costCeiling.value
-    const designVal = bomTotals.grandTotal_gbp
+    // L46 council fix (2026-05-27, 3/4 seats): brief's "ex-works" cost ceiling
+    // must compare against the OEM transfer price (= ex-works in trade), NOT
+    // the raw materials BoM. The raw BoM is just the parts cost; ex-works
+    // includes assembly labour + factory overhead + manufacturer margin per
+    // the per-class cost-stack ratios. L45 BESS BoM was £546k raw, ex-works
+    // £1.796M — comparing brief £1.7M against £546k gave a false PASS at -45%
+    // when the real comparison is £1.7M vs £1.796M = FAIL at +5.6%.
+    // Universal: if costStack is provided (always when bomTotals exist), use
+    // oem_transfer_price_gbp; fall back to raw BoM only when costStack absent.
+    const designVal = costStack && costStack.oem_transfer_price_gbp > 0
+      ? costStack.oem_transfer_price_gbp
+      : bomTotals.grandTotal_gbp
     const status: ComplianceStatus = designVal <= briefVal * 1.10 ? 'pass' : 'fail'  // 10% tolerance
     const delta = _formatDelta(briefVal, designVal, 'cost')
     const ratio = designVal / briefVal
@@ -3725,7 +3736,7 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null): Complian
         const energyMwh = targetEnergy ? targetEnergy.value : null
         const feasibleEnergyMwh = energyMwh != null ? (energyMwh / ratio) : null
         narrative =
-          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The raw-materials BoM rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
+          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The ex-works price rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
           `Three levers are available. (1) Reduce CAPEX by shrinking the system: ` +
           (feasibleEnergyMwh != null
             ? `at the same chemistry and voltage class, scaling to the ${fmtGBP_compact(briefVal)} ceiling would land at roughly ${feasibleEnergyMwh.toFixed(2)} MWh usable (a ${((1 - 1 / ratio) * 100).toFixed(0)}% reduction from the ${energyMwh} MWh target). `
@@ -3734,15 +3745,15 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null): Complian
           `(3) Relax safety/certification — dropping IEC 62619 + UL 9540A is not recommended for utility-grade deployment. The integer-feasible LFP design as shown prioritises cycle life and certification at the expense of unit cost.`
       } else if (productClass.includes('wind')) {
         narrative =
-          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The raw-materials BoM rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
+          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The ex-works price rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
           `Three levers: (1) reduce CAPEX by downrating the machine (a smaller rotor + drivetrain proportionally reduces foundation + tower + blade material); (2) accept higher OPEX with cheaper bearings + a non-permanent-magnet generator (annual maintenance roughly doubles, energy yield drops 3–5%); (3) relax IEC 61400-1 wind class (not recommended). The design as shown prioritises class-1 wind-load tolerance + permanent-magnet efficiency over unit cost.`
       } else if (productClass.includes('heat_pump') || productClass.includes('heatpump')) {
         narrative =
-          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The raw-materials BoM rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
+          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The ex-works price rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
           `Levers: (1) reduce CAPEX by downrating thermal output, switching from R290 to R32 (lower compressor cost but ~10% lower COP), or moving from variable-speed to fixed-speed inverter (cuts cost ~30% but loses part-load efficiency); (2) accept higher OPEX (cheaper compressor with shorter service interval); (3) relax F-Gas + EcoDesign tier (not recommended). The design as shown prioritises seasonal performance factor + low-GWP refrigerant over unit cost.`
       } else {
         narrative =
-          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The raw-materials BoM rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
+          `The brief specifies an ex-works unit cost ceiling of ${fmtGBP_compact(briefVal)}. The ex-works price rolls up to ${fmtGBP_compact(designVal)} — a ${ratio.toFixed(1)}× breach. ` +
           `Three levers exist: reduce CAPEX (shrink output, simplify topology, drop redundancy), accept higher OPEX (cheaper components with shorter service life mean more frequent maintenance + replacement), or relax safety/certification (not recommended). The integer-feasible design as shown prioritises output and certification at the expense of unit cost; meeting the ceiling requires a deliberate output reduction.`
       }
     }
@@ -3796,39 +3807,56 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null): Complian
   //    Iterate every brief metric against a per-class mapping table.
   const briefMetrics = constraints.target_performance?.metrics
   if (Array.isArray(briefMetrics)) {
-    const METRIC_MAP: Record<string, { qtyKey: string; label: string; unit: string; convert?: (v: number) => number; tolerancePct?: number }> = {
-      // BESS-class energy/power
-      nameplate_capacity_mwh:      { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy capacity', unit: 'MWh', convert: (v) => v / 1000, tolerancePct: 5 },
+    // L46 council fix (2026-05-27, 3/4 seats): each metric has a `kind` field
+    // declaring whether the brief value is a FLOOR (design must be ≥), a
+    // CEILING (design must be ≤), or an EXACT match (design within ± tol).
+    // Prior logic was symmetric — ANY non-zero delta failed. L45 BESS showed
+    // "Usable energy 2.5 MWh brief vs 2.69 design FAIL +7.5%" when +7.5% over
+    // a FLOOR is the brief's explicit over-deliver request. Fix: PASS when
+    // floor AND achieved ≥ brief (with under-tolerance for rounding), PASS
+    // when ceiling AND achieved ≤ brief (with over-tolerance), PASS when
+    // exact AND within tolerance band on both sides.
+    //
+    // Defaults: performance metrics (energy, power, yield, cycle life, COP,
+    // throughput, design life) are FLOORS. Voltages + frequencies are EXACT
+    // (need to match design target precisely). No metric here is a ceiling
+    // (mass + cost ceilings live in their dedicated rows above).
+    type MetricKind = 'floor' | 'ceiling' | 'exact'
+    const METRIC_MAP: Record<string, { qtyKey: string; label: string; unit: string; convert?: (v: number) => number; tolerancePct?: number; kind?: MetricKind }> = {
+      // BESS-class energy/power (all FLOORS — brief states minimum/target performance)
+      nameplate_capacity_mwh:      { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy capacity', unit: 'MWh', convert: (v) => v / 1000, tolerancePct: 5, kind: 'floor' },
       // Direct-kWh / kW brief keys (alias, BESS L23 council fix — gate 17 caught
       // L23 brief using these direct keys while the table only knew the _mwh / _mw
       // variants, so the compliance row silently dropped a 23% usable-energy shortfall)
-      usable_energy_kwh:           { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy',          unit: 'kWh', tolerancePct: 5 },
-      usable_energy_mwh:           { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy',          unit: 'MWh', convert: (v) => v / 1000, tolerancePct: 5 },
-      continuous_power_kw:         { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'kW',  tolerancePct: 5 },
-      continuous_power_mw:         { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
-      peak_power_kw:               { qtyKey: 'peak_power_kw',             label: 'Peak power',             unit: 'kW',  tolerancePct: 5 },
-      rated_power_mw:              { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
-      peak_power_mw:               { qtyKey: 'peak_power_kw',             label: 'Peak power',             unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5 },
-      cycle_life:                  { qtyKey: 'cycle_life_cycles',         label: 'Cycle life',             unit: 'cycles', tolerancePct: 5 },
+      usable_energy_kwh:           { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy',          unit: 'kWh', tolerancePct: 5, kind: 'floor' },
+      usable_energy_mwh:           { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy',          unit: 'MWh', convert: (v) => v / 1000, tolerancePct: 5, kind: 'floor' },
+      continuous_power_kw:         { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'kW',  tolerancePct: 5, kind: 'floor' },
+      continuous_power_mw:         { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5, kind: 'floor' },
+      peak_power_kw:               { qtyKey: 'peak_power_kw',             label: 'Peak power',             unit: 'kW',  tolerancePct: 5, kind: 'floor' },
+      rated_power_mw:              { qtyKey: 'continuous_power_kw',       label: 'Continuous power',       unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5, kind: 'floor' },
+      peak_power_mw:               { qtyKey: 'peak_power_kw',             label: 'Peak power',             unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5, kind: 'floor' },
+      cycle_life:                  { qtyKey: 'cycle_life_cycles',         label: 'Cycle life',             unit: 'cycles', tolerancePct: 5, kind: 'floor' },
       // BESS L26 (2026-05-25, gate-17 HIGH #3): brief emits key_metric
       // 'cycle_life_cycles' (not 'cycle_life') so the above entry was never
       // matched. Add the _cycles-suffixed alias pointing to the same quantity.
-      cycle_life_cycles:           { qtyKey: 'cycle_life_cycles',         label: 'Cycle life',             unit: 'cycles', tolerancePct: 5 },
-      dc_bus_voltage_v:            { qtyKey: 'dc_bus_voltage_v',          label: 'DC bus voltage',         unit: 'V',   tolerancePct: 2 },
-      ac_output_voltage_v:         { qtyKey: 'ac_output_voltage_v',       label: 'AC output voltage',      unit: 'V',   tolerancePct: 2 },
+      cycle_life_cycles:           { qtyKey: 'cycle_life_cycles',         label: 'Cycle life',             unit: 'cycles', tolerancePct: 5, kind: 'floor' },
+      // Voltages + frequencies — EXACT match required (a 400V grid needs 400V output;
+      // ±2% tolerance covers measurement/rounding noise on the design value).
+      dc_bus_voltage_v:            { qtyKey: 'dc_bus_voltage_v',          label: 'DC bus voltage',         unit: 'V',   tolerancePct: 2, kind: 'exact' },
+      ac_output_voltage_v:         { qtyKey: 'ac_output_voltage_v',       label: 'AC output voltage',      unit: 'V',   tolerancePct: 2, kind: 'exact' },
       // Wind-turbine + BESS alias (2026-05-25, BESS L26 council): brief key
       // 'rated_power_kw' was already here but mapped to qtyKey 'rated_power_kw'
       // which BESS contracts don't emit (they use continuous_power_kw). Both
       // BESS and wind turbine continuous/rated power live in continuous_power_kw.
       // 'rated_power' (no suffix) added for brief parsers that drop the unit suffix.
-      rated_power:                 { qtyKey: 'continuous_power_kw',       label: 'Rated power',            unit: 'kW',  tolerancePct: 5 },
-      rated_power_kw:              { qtyKey: 'continuous_power_kw',       label: 'Rated power',            unit: 'kW',  tolerancePct: 5 },
-      annual_energy_mwh:           { qtyKey: 'annual_energy_yield_mwh',   label: 'Annual energy yield',    unit: 'MWh', tolerancePct: 10 },
-      // Heat pump
-      thermal_output_kw:           { qtyKey: 'thermal_output_kw',         label: 'Thermal output',         unit: 'kW',  tolerancePct: 5 },
-      cop:                         { qtyKey: 'cop_seasonal',              label: 'COP (seasonal)',         unit: '',    tolerancePct: 5 },
-      // Vertical-farm
-      yield_kg_per_year:           { qtyKey: 'yield_kg_per_year',         label: 'Annual yield',           unit: 'kg/yr', tolerancePct: 10 },
+      rated_power:                 { qtyKey: 'continuous_power_kw',       label: 'Rated power',            unit: 'kW',  tolerancePct: 5, kind: 'floor' },
+      rated_power_kw:              { qtyKey: 'continuous_power_kw',       label: 'Rated power',            unit: 'kW',  tolerancePct: 5, kind: 'floor' },
+      annual_energy_mwh:           { qtyKey: 'annual_energy_yield_mwh',   label: 'Annual energy yield',    unit: 'MWh', tolerancePct: 10, kind: 'floor' },
+      // Heat pump (FLOORS — thermal output ≥ brief, COP ≥ brief)
+      thermal_output_kw:           { qtyKey: 'thermal_output_kw',         label: 'Thermal output',         unit: 'kW',  tolerancePct: 5, kind: 'floor' },
+      cop:                         { qtyKey: 'cop_seasonal',              label: 'COP (seasonal)',         unit: '',    tolerancePct: 5, kind: 'floor' },
+      // Vertical-farm (FLOOR — yield ≥ brief target)
+      yield_kg_per_year:           { qtyKey: 'yield_kg_per_year',         label: 'Annual yield',           unit: 'kg/yr', tolerancePct: 10, kind: 'floor' },
     }
     for (const m of briefMetrics) {
       const km = String(m?.key_metric ?? '')
@@ -3840,7 +3868,22 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null): Complian
       if (!ach) continue
       const achievedConverted = mapping.convert ? mapping.convert(ach.value) : ach.value
       const tol = (mapping.tolerancePct ?? 5) / 100
-      const within = Math.abs(achievedConverted - briefVal) <= briefVal * tol
+      // L46 council fix (2026-05-27, 3/4 seats): kind-aware PASS/FAIL.
+      // FLOOR: achieved must be >= brief (allow small under-tolerance for rounding).
+      // CEILING: achieved must be <= brief (allow small over-tolerance).
+      // EXACT: achieved must be within ±tolerance.
+      const kind: MetricKind = mapping.kind ?? 'floor'
+      let within: boolean
+      if (kind === 'floor') {
+        // PASS when achieved >= brief * (1 - tol). Over-delivery is good.
+        within = achievedConverted >= briefVal * (1 - tol)
+      } else if (kind === 'ceiling') {
+        // PASS when achieved <= brief * (1 + tol). Under-delivery is good.
+        within = achievedConverted <= briefVal * (1 + tol)
+      } else {
+        // EXACT — symmetric tolerance band on both sides.
+        within = Math.abs(achievedConverted - briefVal) <= briefVal * tol
+      }
       const status: ComplianceStatus = within ? 'pass' : 'fail'
       const delta = _formatDelta(briefVal, achievedConverted, 'plain')
       let narrative: string | null = null
@@ -4345,8 +4388,8 @@ function _generateBriefRewrites(
   return out
 }
 
-function BriefComplianceTradeOffsPage({ state, project, bomTotals }: { state: any; project: string; bomTotals: BomTotals | null }) {
-  const rows = _buildComplianceRows(state, bomTotals)
+function BriefComplianceTradeOffsPage({ state, project, bomTotals, costStack }: { state: any; project: string; bomTotals: BomTotals | null; costStack?: CostStack | null }) {
+  const rows = _buildComplianceRows(state, bomTotals, costStack)
   const briefRewrites = _generateBriefRewrites(rows, state, bomTotals)
 
   // Graceful degradation — brief has no parseable constraints. Renders a
@@ -9044,7 +9087,7 @@ function MinimalDocument({ state, subject, statePath }: { state: any; subject: s
           Sits AFTER Brief Provenance so the reader has seen what was asked
           for, BEFORE Engineering Tools Flow so the trade-off shapes how the
           tool chain is interpreted. */}
-      <BriefComplianceTradeOffsPage state={state} project={project} bomTotals={bomTotals} />
+      <BriefComplianceTradeOffsPage state={state} project={project} bomTotals={bomTotals} costStack={costStack} />
       {/* Engineering Tools Flow (universal — task #113, 2026-05-24): per-tool
           3-column block showing the INPUTS each engineering tool consumed,
           a short description of the tool, and the OUTPUTS it produced. The

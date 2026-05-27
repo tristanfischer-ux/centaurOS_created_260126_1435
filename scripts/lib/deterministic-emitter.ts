@@ -1908,6 +1908,12 @@ function emitPowerDistribution(p: BessParams): DesignModule {
     'isolates',
     `${acBreakerContinuousA} A AC main breaker + G99 protection at the PCC`,
     [
+      // L46 council fix (2026-05-27, 4/4 seats): ac_main_breaker_word had ABB
+      // Emax E2.2 named only in the form string — no manufacturer + no
+      // part_number modifiers + no list_price_gbp. BoM row rendered the
+      // Engine B class curve estimate (£6.50) which is ~1000× under real UK
+      // distributor price. Same emitter bug pattern as DC contactors pre-L45.
+      // Real ABB Emax E2.2 2500 A ACB UK trade: £4,500-6,000 (council finding).
       word(
         'ac_main_breaker_word',
         'AC main breaker word',
@@ -1918,6 +1924,9 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           // UL 489 removed from form string: US-only type-cert (gate 19 HIGH
           // for UK briefs). ABB Emax E2.2 carries IEC 60947-2 + BS EN 60947-2.
           mod('form', 'ABB Emax E2.2 2500 A 4-pole air circuit breaker (real product, thermal-magnetic trip, IEC 60947-2 + BS EN 60947-2 listed)'),
+          mod('manufacturer', 'ABB'),
+          mod('part_number', 'Emax E2.2 2500'),
+          mod('list_price_gbp', '4500'),
           mod('regulatory', 'IEC 60947-2'),
         ],
       ),
@@ -1930,6 +1939,9 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('form', 'microprocessor protection relay, CT/VT input measurement, G99 compliant'),
           mod('manufacturer', 'ComAp'),
           mod('part_number', 'InteliPro-G99/3'),
+          // L46 council fix: real ComAp InteliPro-G99/3 UK trade ~£1,800-2,200.
+          // Engine B was estimating £35 (~50× under).
+          mod('list_price_gbp', '1800'),
           // SIZING GATE NOTE: G99 protection relay is a MEASUREMENT device, not a
           // power-carrying component. Its relay output contacts are rated 5 A (trip
           // circuits to contactor coils), but the relay itself monitors and trips
@@ -1972,6 +1984,9 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('form', 'cast resin single-phase voltage transformer, 0.2 accuracy class'),
           mod('manufacturer', 'Ritz Instrument Transformers'),
           mod('part_number', 'RVT-11'),
+          // L46 council fix: real Ritz RVT-11 11kV cast-resin VT UK trade
+          // ~£600-1,000 each. Engine B was estimating £18 (~30× under).
+          mod('list_price_gbp', '700'),
           mod('regulatory', 'IEC 61869-3'),
         ],
       ),
@@ -1986,6 +2001,9 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('dimension', '400', 'V AC'),
           mod('manufacturer', 'Dehn'),
           mod('part_number', 'DEHNguard DG M TNS 275'),
+          // L46 council fix: real Dehn DG M TNS 275 Type-2 SPD UK trade
+          // ~£200 each. Engine B was estimating £6.50 (~30× under).
+          mod('list_price_gbp', '200'),
           mod('regulatory', 'IEC 61643-11 + BS EN 62305'),
         ],
       ),

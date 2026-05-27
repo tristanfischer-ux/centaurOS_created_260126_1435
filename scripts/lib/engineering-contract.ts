@@ -936,13 +936,25 @@ registerArchetype('bess', (brief: any) => {
     // industry-standard 1500 A class HVDC contactor at this voltage is
     // Schaltbau's C310 (used in Sungrow, Huawei, CATL utility BESS).
     // Bus needs ≥1.25 × 1250 A = 1562 A per UL 9540A 13.2.4; C310 satisfies.
+    // L46 council fix (2026-05-27, 3/4 seats): this macro override was emitting
+    // £2,400 with the stale L17-era spec "Schaltbau C310 1500 A continuous"
+    // (the C310 family is actually 500 A max — L17 already corrected the word
+    // to C330 2000 A but the macro override stayed on the old £2,400 with the
+    // wrong narrative). The macro override fires AHEAD of distributor_price_gbp
+    // in render-minimal-pdf.tsx, so it was overriding the L45 list_price_gbp
+    // = £3,500 I added to main_bus_contactor_word, and the BoM row rendered
+    // "Main Bus Contactor — — ×1 £2,400 >2x" — narrative said C330-A but BoM
+    // showed unpinned + wrong price.
+    //
+    // Fix: macro now matches the word's real spec (Schaltbau C330-A 2000 A
+    // continuous 1500 V DC) at £3,500 trade per Schaltbau UK distributor.
     {
       word_name: 'main_bus_contactor',
-      unit_price_gbp: 2400,
+      unit_price_gbp: 3500,
       dimension_basis: 'each',
       dimension_value: 1,
-      total_gbp: 2400,
-      source_detail: `£2,400 flat — Schaltbau C310 1500 A continuous / 1500 V DC main bus contactor (real product, IEC 60947-2 + UL 508, ≥1.25 × ${busContinuousA.toFixed(0)} A bus current per UL 9540A)`,
+      total_gbp: 3500,
+      source_detail: `£3,500 flat — Schaltbau C330-A 2000 A continuous / 1500 V DC bi-directional main bus contactor (real product, MCS Level 2/3, IEC 60947-4-1, ≥1.25 × ${busContinuousA.toFixed(0)} A bus current per UL 9540A)`,
     },
   ]
 
