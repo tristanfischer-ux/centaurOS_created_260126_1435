@@ -77,7 +77,7 @@ import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter
 import { runSharedQuantityConsistencyAudit } from '../src/lib/pdf-engine-v2/lib/shared-quantity-consistency-audit'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
 import { runManufacturerAttributionAudit } from '../src/lib/pdf-engine-v2/lib/manufacturer-attribution-audit'
-import { scanEmitterFileForBriefLiterals } from './lib/brief-value-literal-scanner'
+import { scanMultipleFilesForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { runStateParseGuard } from '../src/lib/pdf-engine-v2/lib/state-parse-guard'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords, refreshModulesRadSyntax } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
@@ -3574,8 +3574,20 @@ async function main() {
       batch_size: typeof bc.batch_size?.value === 'number' ? bc.batch_size.value : undefined,
     }
     const emitterPath = resolve(__dirname, 'lib/deterministic-emitter.ts')
-    const gate25Result = scanEmitterFileForBriefLiterals(
-      emitterPath,
+    // L43 universal extension (2026-05-27): scan ALL source files whose strings
+    // render into the PDF, not just deterministic-emitter.ts. tool-narratives.ts
+    // descriptions render on the PDF's Tools page; frozen "e.g. <number>"
+    // examples become stale literals when the brief changes.
+    const toolNarrativesPath = resolve(
+      __dirname,
+      '..',
+      'src',
+      'lib',
+      'pdf-engine-v2',
+      'tool-narratives.ts',
+    )
+    const gate25Result = scanMultipleFilesForBriefLiterals(
+      [emitterPath, toolNarrativesPath],
       briefConstraintsForScan,
       currentProductClass ?? 'unknown',
     )

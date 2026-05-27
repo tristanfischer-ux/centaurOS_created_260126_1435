@@ -40,6 +40,7 @@ import {
   selectFireSuppressionAgentMass,
   selectCurrentSensorFor,
   selectDcFuseFor,
+  selectContainerHvacFor,
   formatMassKg,
 } from './hardware-selectors'
 
@@ -2350,9 +2351,86 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
     ],
   )
 
+  // ── containerHvac (L44 fix, 2026-05-27): the chain has historically had a
+  // third sub_module `container_hvac` injected post-emit (Phase 2 / shared
+  // module densification path) carrying an UNPINNED Pfannenberg 3 kW word.
+  // Physics Critic L43 caught the 3 kW as undersized for the 4 kW design
+  // sensible-heat load at +50°C ambient. Universal fix: emit this sub_module
+  // deterministically with a real Pfannenberg DTI selected by ambient + load,
+  // so the chain stops the "Phase 2 invents a too-small AC" failure mode for
+  // containerised classes (BESS, VF, eVTOL ground charger, satellite ground
+  // station). Source: selectContainerHvacFor() in hardware-selectors.ts.
+  //
+  // Design sensible load model (auxiliary heat that stays INSIDE the container,
+  // NOT rejected through the liquid chiller):
+  //   base auxiliary (BMS + EMS + lighting + door heaters) ≈ 2.0 kW
+  //   + per-rack ancillary (rack fans, slave-BMS, sensors) ≈ 0.10 kW × rackCount
+  //   + solar gain above +35°C ambient ≈ 0.10 kW × (ambient - 35) for ambient > 35
+  // Selector then applies 1.20× safety factor + ambient derating.
+  const containerSensibleLoadKw =
+    2.0 +
+    0.10 * p.rackCount +
+    Math.max(0, p.ambientDesignTempC - 35) * 0.10
+  const selectedContainerHvac = selectContainerHvacFor({
+    design_sensible_load_kw: containerSensibleLoadKw,
+    ambient_design_temp_c: p.ambientDesignTempC,
+  })
+  // N+1 redundancy: utility BESS norm is two AC units (one running, one
+  // standby) for fault-tolerance. If the selector saturated, the second unit
+  // also helps cover the gap.
+  const containerHvacQty = selectedContainerHvac.saturation === 'saturated_recommend_split_dx' ? 2 : 2
+  const containerHvac = makeSubModule(
+    'container_hvac',
+    'container HVAC',
+    'conditions',
+    'container interior sensible-heat HVAC for auxiliary loads + solar gain on the container shell (separate from the battery liquid-cooling loop)',
+    [
+      word(
+        'container_ac_unit_word',
+        'container AC unit word',
+        cc('container_ac_unit', 'container AC unit', 'thermal_transfer_function', 'steel'),
+        [
+          mod('quantity', `×${containerHvacQty}`),
+          mod('manufacturer', 'Pfannenberg'),
+          mod('part_number', selectedContainerHvac.part_number),
+          mod('form', `Pfannenberg ${selectedContainerHvac.family} family cabinet/container air-conditioning unit, ${selectedContainerHvac.ip_rating}, ${selectedContainerHvac.supply}, wall- or roof-mount with EPDM gasket interface, N+1 redundant pair`),
+          mod('capacity', String(selectedContainerHvac.nominal_capacity_kw_at_35c), 'kW'),
+          mod('rating_primary', selectedContainerHvac.ip_rating),
+          mod('performance', `${selectedContainerHvac.nominal_capacity_kw_at_35c} kW @ 35°C nominal, derated to ${selectedContainerHvac.derated_capacity_kw} kW @ ${p.ambientDesignTempC}°C ambient (${selectedContainerHvac.derating_factor}× nominal); ${containerSensibleLoadKw.toFixed(1)} kW design sensible load × 1.20 safety = ${selectedContainerHvac.required_capacity_kw} kW required`),
+          mod('regulatory', 'EN 14511, EN 60204-1, IEC 60529 (IP rating)'),
+        ],
+      ),
+      word(
+        'hvac_duct_word',
+        'HVAC duct word',
+        cc('hvac_duct', 'HVAC duct', 'thermal_transfer_function', 'steel'),
+        [
+          mod('quantity', '×2'),
+          mod('manufacturer', 'Lindab'),
+          mod('part_number', 'Safe SR-200'),
+          mod('form', 'galvanised steel circular duct, 200 mm Ø, double-skin EN 1505 with EPDM gasket joints'),
+          mod('regulatory', 'EN 1505, EN 12237'),
+        ],
+      ),
+      word(
+        'hvac_condensate_pump_word',
+        'HVAC condensate pump word',
+        cc('hvac_condensate_pump', 'HVAC condensate pump', 'thermal_transfer_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', `×${containerHvacQty}`),
+          mod('manufacturer', 'Aspen Pumps'),
+          mod('part_number', 'Mini Lime FP2210'),
+          mod('form', 'mini condensate pump, 12 L/h max flow, 10 m head, 24 V AC, IP24, in-line with each AC unit drain'),
+          mod('capacity', '12', 'L/h'),
+          mod('regulatory', 'BS EN 60335-2-41'),
+        ],
+      ),
+    ],
+  )
+
   return {
     module: 'environmental_interface',
-    module_brief: `Rejects ${p.systemThermalDissipationKw.toFixed(1)} kW of inverter + pack losses via a Pfannenberg ${selected.part_number} (${pinnedChillerCapacityKw} kW @ 35°C / ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient) glycol/water chiller and four enclosure ventilation fans.`,
+    module_brief: `Rejects ${p.systemThermalDissipationKw.toFixed(1)} kW of inverter + pack losses via a Pfannenberg ${selected.part_number} (${pinnedChillerCapacityKw} kW @ 35°C / ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient) glycol/water chiller, plus a ${containerHvacQty}× Pfannenberg ${selectedContainerHvac.part_number} container interior HVAC pair for the ${containerSensibleLoadKw.toFixed(1)} kW auxiliary-load + solar-gain sensible heat, and four enclosure ventilation fans.`,
     overview_paragraph_en: '',
     derived_parameters: {
       // class-killer #2 (2026-05-26): cooling_power gate reads this field and
@@ -2382,7 +2460,7 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
       'polymer_thermoplastic',
     ],
     applicability_confidence: 'high',
-    sub_modules: [liquidCooling, enclosureClimate],
+    sub_modules: [liquidCooling, enclosureClimate, containerHvac],
   }
 }
 

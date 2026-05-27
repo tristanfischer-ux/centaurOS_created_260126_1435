@@ -67,12 +67,14 @@ export interface LiteralHit {
   brief_key: string
   /** Human label for this constraint (e.g. "max mass cap"). */
   brief_label: string
-  /** Line number in the emitter source (1-indexed). */
+  /** Line number in the source file (1-indexed). */
   line_number: number
   /** The line text containing the literal. */
   line_text: string
   /** The raw matched string (e.g. "28000", "28,000"). */
   raw_match: string
+  /** Source file path that contained this hit (relative or absolute). */
+  source_file?: string
 }
 
 export interface BriefValueLiteralScanResult {
@@ -307,6 +309,85 @@ export function scanEmitterFileForBriefLiterals(
 
   const source = fs.readFileSync(emitterPath, 'utf-8')
   return scanEmitterForBriefLiterals(source, constraints, className, minValue)
+}
+
+// ── Multi-file scan (2026-05-27, L43 universal extension) ────────────────────
+
+/**
+ * scanMultipleFilesForBriefLiterals — extends gate 25 to scan ADDITIONAL source
+ * files beyond deterministic-emitter.ts. The same brief-derived-literal problem
+ * appears in any source file whose strings are rendered into the PDF — most
+ * notably src/lib/pdf-engine-v2/tool-narratives.ts, which describes the
+ * engineering tools used (Mass Aggregator, Lifecycle CO2, Psychrolib, etc.)
+ * and renders on the PDF's Tools page.
+ *
+ * L43 finding: src/lib/pdf-engine-v2/tool-narratives.ts:230 had a frozen
+ *   "e.g. 28,000 kg for a road-transportable 40-foot container" in the Mass
+ *   Aggregator tool description. Brief was 35,000 kg, but the stale 28,000 kg
+ *   rendered on PDF p.80, and gate 11 (cross-page numeric consistency) caught
+ *   the contradiction. Gate 25 did NOT catch it because the L43 scan was
+ *   scoped only to deterministic-emitter.ts.
+ *
+ * UNIVERSAL CLOSURE: any source file whose strings render into the PDF MUST
+ * be in the gate 25 scan list. This function takes an array of source files
+ * and aggregates hits across all of them. Each hit's `source_file` field
+ * identifies which file the literal came from.
+ *
+ * @param sourcePaths    Array of absolute paths to scan.
+ * @param constraints    Brief constraint numerics.
+ * @param className      Product class for the error message.
+ * @param minValue       Skip values below this (default 100).
+ */
+export function scanMultipleFilesForBriefLiterals(
+  sourcePaths: string[],
+  constraints: MinimalBriefConstraints,
+  className: string,
+  minValue = 100,
+): BriefValueLiteralScanResult {
+  const allHits: LiteralHit[] = []
+  let totalLinesScanned = 0
+  let constraintsCheckedSeen = 0
+
+  for (const sourcePath of sourcePaths) {
+    if (!fs.existsSync(sourcePath)) continue
+    const source = fs.readFileSync(sourcePath, 'utf-8')
+    const result = scanEmitterForBriefLiterals(source, constraints, className, minValue)
+    constraintsCheckedSeen = Math.max(constraintsCheckedSeen, result.constraints_checked)
+    totalLinesScanned += result.lines_scanned
+    for (const hit of result.hits) {
+      allHits.push({ ...hit, source_file: path.basename(sourcePath) })
+    }
+  }
+
+  const passed = allHits.length === 0
+  let errorMessage: string | null = null
+  if (!passed) {
+    const lines: string[] = [
+      `[Gate 25 / exit 25] Brief-value literal scanner FAIL — class: ${className}`,
+      `${allHits.length} hardcoded brief literal(s) found across ${sourcePaths.length} source file(s):`,
+    ]
+    for (const h of allHits) {
+      const fileTag = h.source_file ? `[${h.source_file}]` : ''
+      lines.push(
+        `  ${fileTag} Line ${h.line_number}: literal "${h.raw_match}" matches brief.${h.brief_key} (${h.brief_label})`,
+      )
+      lines.push(`    → ${h.line_text.substring(0, 120)}`)
+    }
+    lines.push('')
+    lines.push('Fix: replace literal with a contract-driven expression OR drop the example value.')
+    lines.push('  For mass: mod(\'capacity\', String(p.briefMassCapKg), \'kg\')')
+    lines.push('  For tool-narratives.ts: drop the "e.g. <number>" example — tool descriptions render into the PDF\'s Tools page and any frozen example value becomes a stale literal when the brief changes.')
+    errorMessage = lines.join('\n')
+  }
+
+  return {
+    passed,
+    hits: allHits,
+    lines_scanned: totalLinesScanned,
+    constraints_checked: constraintsCheckedSeen,
+    error_message: errorMessage,
+    class_name: className,
+  }
 }
 
 // ── Historical brief values extension (2026-05-27, L42 universal fix B) ──────

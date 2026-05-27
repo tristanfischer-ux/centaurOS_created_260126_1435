@@ -227,7 +227,7 @@ export const TOOL_NARRATIVES: Record<string, ToolNarrative> = {
   // Cross-class / utility tools
   // ──────────────────────────────────────────────────────────────────────
   'mass-aggregator:envelope-check': {
-    description: 'Sums the mass of every priced component in the BoM and compares against the brief\'s envelope mass cap (e.g. 28,000 kg for a road-transportable 40-foot container).',
+    description: 'Sums the mass of every priced component in the BoM and compares against the brief\'s envelope mass cap (the max_mass_kg constraint).',
     origin: 'In-tree aggregator. Reads `mass_kg` from every BoM line item; rules-of-thumb fill in missing masses by component class (e.g. battery cells at 80 g/cell, transformers at 4 kg/kVA).',
     results_interpretation: 'total_system_mass_kg vs envelope cap. If total exceeds cap, the design either splits across multiple containers (`recommended_container_count = 2`) or the brief\'s envelope is wrong. A 10% overshoot is normal during early design; >25% needs a fundamental rework.',
     usage_pattern: 'Runs at the end of the chain after the BoM is finalised. Outputs flag the cover page if the mass cap is breached, so the buyer sees the constraint violation up-front.',
