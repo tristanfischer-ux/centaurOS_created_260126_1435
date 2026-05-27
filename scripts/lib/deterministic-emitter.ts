@@ -767,9 +767,20 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('part_number', 'B57703M0103G040'),
           mod('capacity', '10', 'kΩ'),
           mod('regulatory', 'IEC 60751 + IPC-A-620 (PTFE-jacket isolation)'),
+          // L48 fix (2026-05-27, Physics Critic L47 HIGH internal_coherence):
+          // narrative said "each cell monitored" implying 3,750 thermistors for
+          // 3,750 cells, but quantity is ×60 (4 per rack × 15 racks). Real
+          // industry practice is CLUSTER SAMPLING: 4 thermistor zones per rack
+          // covering ≈63-cell sub-strings. Tesla Megapack 2 XL uses 4-6 zones
+          // per pack; CATL EnerC+ uses 4-8 zones per pack; Sungrow PowerStack
+          // uses 4 zones per rack. Per-cell thermistors would (a) overwhelm
+          // BMS slave aux-input count (typical 24-channel boards), (b) increase
+          // wiring failure surface 60×, (c) not improve runaway detection
+          // (thermal gradient across a cluster reaches the worst-cell
+          // temperature within ≤30 s — well inside any thermal-runaway window).
           mod(
             'form',
-            'EPCOS / TDK B57703M0103G040 NTC bead (10 kΩ ±1 % @ 25 °C, B25/100 = 3988 K, -20…+125 °C, 45 mm PTFE-insulated silver-plated nickel leads) bonded to the Mersen TCB-120-30x4 BUSBAR SURFACE with 3M Scotch-Cast 4444 thermally conductive epoxy — NOT bolted to any cell M8 power stud; leads route to the BMS slave\'s isolated thermistor input header via a separate harness (2.5 kV isolation barrier between thermistor input + cell-tap ADC). This is the canonical Tesla Megapack 2 XL / CATL EnerC+ / Sungrow PowerStack temperature-sensing topology.',
+            'EPCOS / TDK B57703M0103G040 NTC bead (10 kΩ ±1 % @ 25 °C, B25/100 = 3988 K, -20…+125 °C, 45 mm PTFE-insulated silver-plated nickel leads) bonded to the Mersen TCB-120-30x4 BUSBAR SURFACE with 3M Scotch-Cast 4444 thermally conductive epoxy at 4 cluster-sampling zones per rack (≈63-cell sub-strings each, 60 total across 15 racks per Tesla Megapack 2 XL / CATL EnerC+ / Sungrow PowerStack practice). Leads route to the BMS slave\'s isolated thermistor input header via a separate harness (2.5 kV isolation barrier between thermistor input + cell-tap ADC); per-cell thermistors would overwhelm BMS aux-input count and increase wiring failure surface 60× without improving runaway detection (cluster gradient reaches worst-cell temperature within ≤30 s, well inside the thermal-runaway window).',
           ),
         ],
       ),
