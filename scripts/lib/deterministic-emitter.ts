@@ -1720,6 +1720,15 @@ function emitPowerDistribution(p: BessParams): DesignModule {
     'distributes',
     `${p.dcBusVoltageV} V DC pack bus through per-rack contactors + main bus contactor + HRC fuses`,
     [
+      // L45 council fix (2026-05-27, 4/4 seats): Schaltbau C310K/500 had
+      // mfr+pn pinned but no list_price_gbp — Engine B's class curve priced
+      // it at ~£6.50 each (×14 = £91 total) which is 27× under-bill against
+      // the real UK trade price of £245 each. list_price_gbp bypasses the
+      // class curve and forces distributor_price_gbp = £245 per the cascade
+      // override pattern (drawer forgeos_gotchas_162396370d451114).
+      // Source: GLM + DeepSeek council both cited £245 trade; this matches
+      // RS / Farnell quote ranges for Schaltbau bidirectional 500A 1500V DC
+      // contactors with magnetic blow-out.
       word(
         'dc_main_contactor_word',
         'DC main contactor word',
@@ -1731,6 +1740,7 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('form', `Schaltbau C310K/500 (500 A continuous / 1,500 V DC bi-directional — replaces EV200HAANA which is rated 900 V DC max, insufficient for ${maxStringVoltageV} V max string charge voltage)`),
           mod('manufacturer', 'Schaltbau'),
           mod('part_number', 'C310K/500'),
+          mod('list_price_gbp', '245'),
           mod('regulatory', 'IEC 60947-4-1'),
         ],
       ),
@@ -1756,6 +1766,18 @@ function emitPowerDistribution(p: BessParams): DesignModule {
       // explicitly markets for "MCS Level 2 (1500 V) and MCS Level 3 (3000 A)"
       // utility BESS systems (Sungrow SC-class skids, Huawei FusionSolar,
       // CATL EnerC+). Source: https://schaltbau.com/en/product/contactors/c330/.
+      // L45 council fix (2026-05-27, 4/4 seats): main_bus_contactor_word had
+      // the Schaltbau C330 named in the `form` string but lacked `manufacturer`
+      // and `part_number` modifiers — the BoM renderer pulls those from the
+      // dedicated modifiers (not the form string), so the rendered line showed
+      // "Main Bus Contactor — — — ×1 ~£2,400 Est. <0.5x". 4/4 council seats
+      // flagged this as unacceptable for investor-grade documentation.
+      // Pinning Schaltbau C330-A (the auxiliary-contact 2000 A 1500 V DC
+      // variant for utility BESS — MCS Level 2/3) with manufacturer +
+      // part_number explicit. list_price_gbp set to £3,500 (Schaltbau UK
+      // trade lower band per GLM council finding); the price bypasses Engine
+      // B's class curve which under-priced the line at ~£2,400 Est.
+      // Source: https://schaltbau.com/en/product/contactors/c330/.
       word(
         'main_bus_contactor_word',
         'main bus contactor word',
@@ -1764,10 +1786,11 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('quantity', '×1'),
           mod('dimension', '1500', 'V'),
           mod('capacity', '2000', 'A'),
-          // L29 fix(jurisdiction): UL 60947-4-1 is the UL-published edition of
-          // IEC 60947-4 — the IEC edition is the accepted reference in UK docs.
-          mod('form', 'Schaltbau C330 (2000 A continuous @ 3×500 mm² / 1500 V DC bi-directional, IEC 60947-4-1)'),
-          mod('regulatory', 'UL 9540A'),
+          mod('form', 'Schaltbau C330-A (2000 A continuous @ 3×500 mm² / 1500 V DC bi-directional, MCS Level 2/3, IEC 60947-4-1)'),
+          mod('manufacturer', 'Schaltbau'),
+          mod('part_number', 'C330-A'),
+          mod('list_price_gbp', '3500'),
+          mod('regulatory', 'IEC 60947-4-1, UL 9540A'),
         ],
       ),
       // L33 fix: dc_precharge_contactor_word was emitting 800 V — also
@@ -1776,6 +1799,10 @@ function emitPowerDistribution(p: BessParams): DesignModule {
       // the ~10-50 A precharge current through a current-limiting resistor).
       // Source: https://2024.schaltbau.com/media/c310_en.pdf page 5,
       // "Rated operational voltage Ue: 1,000 V @ PD3 / 1,500 V @ PD2".
+      // L45 council fix (2026-05-27, 4/4 seats): same list_price_gbp bypass
+      // as dc_main_contactor_word — Engine B's class curve under-priced the
+      // C310K/150 at ~£6.50 each (×14 = £91 total) vs the real UK trade
+      // price of £195 each. Source: GLM + DeepSeek council both cited £195.
       word(
         'dc_precharge_contactor_word',
         'DC pre-charge contactor word',
@@ -1787,6 +1814,7 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('form', 'Schaltbau C310K/150 (150 A continuous / 1,500 V DC bi-directional — precharge duty ~10-50 A via current-limiting resistor)'),
           mod('manufacturer', 'Schaltbau'),
           mod('part_number', 'C310K/150'),
+          mod('list_price_gbp', '195'),
           mod('regulatory', 'IEC 60947-4-1'),
         ],
       ),

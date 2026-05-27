@@ -553,7 +553,31 @@ registerArchetype('bess', (brief: any) => {
   })()
   // Default DoD 80% per BESS class convention; nameplate = usable / dod
   const dodFraction = 0.80
-  const nameplateKwhRequested = usableKwh / dodFraction
+  // L45 council fix (2026-05-27, 3/4 seats: GLM + DeepSeek + Grok): the brief
+  // for utility BESS commonly specifies BOTH a minimum usable energy floor
+  // ("≥ 2.5 MWh usable") AND an over-delivery target ("design over-delivers
+  // to ≥ 2.65 MWh usable"). The previous solver sized rack_count to clear the
+  // FLOOR (2.5 MWh), which gives ~14 racks and 2.51 MWh achieved — barely
+  // clearing the floor but missing the over-delivery target. Council found
+  // this and three seats flagged it as a brief-fidelity failure.
+  //
+  // Fix: introduce an OVER_DELIVER_FACTOR (default 1.06 for BESS — covers the
+  // 2.65/2.5 ratio in the canonical UK utility BESS brief). The solver now
+  // targets `usableKwh × overDeliverFactor` instead of `usableKwh` alone.
+  // For the L43 brief this lifts the design from 14 racks (2.51 MWh) to
+  // 15 racks (2.69 MWh usable @ 3,360 kWh nameplate), which sits within the
+  // 35,000 kg mass cap (30,875 kg total in-container, 88% utilisation).
+  //
+  // UNIVERSAL: future briefs can specify brief.constraints.target_over_deliver_factor
+  // to override; if absent, 1.06 is the BESS-default. Other classes (HAPS,
+  // VF, heat pump, EV charger) can adopt the same field with their own
+  // class-default factor.
+  const overDeliverFactor = Number(
+    brief?.constraints?.target_over_deliver_factor?.value ??
+    brief?.constraints?.over_deliver_factor?.value ??
+    1.06,
+  )
+  const nameplateKwhRequested = (usableKwh * overDeliverFactor) / dodFraction
   // CATL 280 Ah × 3.2 V LFP prismatic — class default
   const cellAh = 280
   const cellVoltageV = 3.2
