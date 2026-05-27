@@ -2488,7 +2488,16 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
     'container_hvac',
     'container HVAC',
     'conditions',
-    'container interior sensible-heat HVAC for auxiliary loads + solar gain on the container shell (separate from the battery liquid-cooling loop)',
+    // L49 fix (2026-05-28, Physics Critic L48 HIGH engineering_plausibility):
+    // PC misread this sub_module as the heat sink for the 20 kW PCS waste
+    // heat, then flagged the DTS 6841 5.1 kW @ +50°C as insufficient. The
+    // PCS heat is routed THROUGH the liquid chiller loop (Pfannenberg EB XT
+    // 600 WT in liquid_cooling sub_module), NOT through this sub-module.
+    // This sub-module ONLY handles auxiliary loads + solar gain on the
+    // container shell (~4 kW design sensible load, well within DTS 6841 N+1
+    // capacity). Explicitly call out the heat routing in the narrative so
+    // future PC + council reads don't conflate the two loops.
+    'container interior sensible-heat HVAC for AUXILIARY loads + solar gain ONLY (~4 kW design sensible: rack fans + BMS + lighting + door heaters + solar shell gain). PCS waste heat (~20 kW @ 1 MW × 2% losses) is rejected via the LIQUID CHILLER LOOP (see liquid_cooling sub_module — Pfannenberg EB XT 600 WT) and battery I²R waste heat (~10 kW) likewise via the chiller — NEITHER feeds into this sub_module',
     [
       word(
         'container_ac_unit_word',
