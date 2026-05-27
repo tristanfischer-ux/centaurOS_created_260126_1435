@@ -35,6 +35,10 @@ export PA_PIPELINE=true
 export RADICAL_MULTI_EMITTER=true
 # WS-B (commit f94af1b1): drive BoM from Tier 4 emission, bypass character-hierarchy WORDS[] filter
 export RADICAL_TIER4_TREE=true
+# L43 fix (2026-05-27): explicit ORCHESTRATOR=1. The chain reads
+# process.env.ORCHESTRATOR; if unset, falls back to LLM Generator path
+# silently (audit caught this on L42). Belt-and-braces here.
+export ORCHESTRATOR=1
 
 DISTRIBUTOR_ENV="$HOME/.claude/secrets/distributor-apis.env"
 if [ -f "$DISTRIBUTOR_ENV" ]; then

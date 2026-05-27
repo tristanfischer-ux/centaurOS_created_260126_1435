@@ -3509,6 +3509,60 @@ function emitStructureContainment(p: BessParams): DesignModule {
     ],
   )
 
+  // L43 fix (2026-05-27): container_lifting_lugs sub_module — gate 23 was
+  // catching this as 1 word, 0 MPN. ISO containers have integral corner
+  // castings per ISO 1161 (the canonical lift point); for site-handling
+  // of containerised BESS (yard-crane lift, low-loader unload) we also
+  // pin aftermarket weldable lifting points for any non-corner lift +
+  // tested certification documentation.
+  // Source: ISO 1161:2016 (corner fittings spec); RUD VLBG-PLUS catalogue
+  // (rud.com) — VLBG-PLUS 4.0 is the 4-tonne weldable lifting point,
+  // EN 1677-1 certified, 360° rotatable.
+  const containerLiftingLugs = makeSubModule(
+    'container_lifting_lugs',
+    'container lifting lugs',
+    'lifts',
+    'ISO 1161 corner castings + aftermarket weldable lifting points for yard-crane handling and recovery lifts',
+    [
+      word(
+        'iso_corner_casting_word',
+        'ISO corner casting word',
+        cc('iso_corner_casting', 'ISO 1161 corner casting', 'mechanical_structural_function', 'steel'),
+        [
+          mod('quantity', '×8'),
+          mod('manufacturer', 'CIMC'),
+          mod('part_number', 'ISO-1161-CC-A'),
+          mod('form', 'cast steel ISO 1161 top + bottom corner fittings, BIC-coded'),
+          mod('rating_primary', '30,480 kg vertical lift per fitting'),
+          mod('regulatory', 'ISO 1161:2016, ISO 668'),
+        ],
+      ),
+      word(
+        'weldable_lifting_point_word',
+        'weldable lifting point word',
+        cc('weldable_lifting_point', 'weldable lifting eye', 'mechanical_structural_function', 'steel'),
+        [
+          mod('quantity', '×4'),
+          mod('manufacturer', 'RUD'),
+          mod('part_number', 'VLBG-PLUS-4.0'),
+          mod('form', '360° rotatable weld-on lifting point, alloy steel, electroplated yellow'),
+          mod('rating_primary', '4,000 kg WLL each (asymmetric lift) / 16,000 kg WLL for 4-leg sling at 60°'),
+          mod('regulatory', 'EN 1677-1, factor 4× breaking strength'),
+        ],
+      ),
+      word(
+        'lifting_certification_record_word',
+        'lifting certification record word',
+        cc('lifting_certification_record', 'lifting certification + proof-load test record', null, 'paper'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'EC Declaration of Conformity + proof-load test certificate at 1.5× WLL per LOLER 1998 reg 9'),
+          mod('regulatory', 'LOLER 1998, Machinery Directive 2006/42/EC, EN 1677-1'),
+        ],
+      ),
+    ],
+  )
+
   return {
     module: 'structure_containment',
     module_brief: 'Houses the BESS in a 40-foot HC ISO container with reinforced floor, mineral-wool fire-rated insulation and IP54 double-leaf doors with positive-opening door position safety switches.',
@@ -3534,7 +3588,7 @@ function emitStructureContainment(p: BessParams): DesignModule {
       'electromechanical_switching_function',
     ],
     applicability_confidence: 'high',
-    sub_modules: [isoContainerShell],
+    sub_modules: [isoContainerShell, containerLiftingLugs],
   }
 }
 
