@@ -1850,6 +1850,10 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('form', 'Arcol HS100 100R F wirewound, 100 Ω ±1%, 100 W continuous, PN16, -55°C to +275°C; limits precharge inrush to ≤10 A at 912 V nominal bus'),
           mod('manufacturer', 'Arcol'),
           mod('part_number', 'HS100-100RF'),
+          // L48 council fix (2026-05-27, GLM + GPT-5.5): pre-charge resistor
+          // Engine B class curve was at £9.67 each — flagged "<0.5x" by gate
+          // 21. Real Arcol HS100 series wirewound resistor UK trade ~£28-35.
+          mod('list_price_gbp', '28'),
           mod('regulatory', 'IEC 60115-1'),
         ],
       ),
@@ -1885,6 +1889,11 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('part_number', 'PV-200ANH1'),
           mod('form', 'Eaton Bussmann PV-200ANH1 photovoltaic / battery-storage fuse (200 A / 1000 V DC / NH1 size / Class gPV per IEC 60269-6, 50 kAIC interrupt, UL Listed + CSA + CE/RoHS — the EXPLICIT DC-PV variant; NOT a 170M AC-rated variant)'),
           mod('dimension', '1000', 'V'),
+          // L48 council fix (2026-05-27, L43+L45+L46 carry-forward + L46 GPT-5.5):
+          // Engine B class curve emitted £613 each — flagged ">2x" by gate 21
+          // and council 1-of-4 seats. Real Eaton Bussmann PV-200ANH1 UK trade
+          // ~£200-350 (RS Components shows ~£245; Farnell ~£285). Pin £285.
+          mod('list_price_gbp', '285'),
           mod('regulatory', 'IEC 60269-6 (gPV)'),
         ],
       ),
@@ -1981,6 +1990,10 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('dimension', '400', 'V 3-phase'),
           mod('manufacturer', 'Schneider Electric'),
           mod('part_number', 'ION7550'),
+          // L48 council fix (2026-05-27, Grok L46): real Schneider PowerLogic
+          // ION7550 UK trade ~£1,400-1,800. Engine B class curve was at ~£10k
+          // (5x over). Pin £1,500.
+          mod('list_price_gbp', '1500'),
           mod('regulatory', 'BS EN 62052-11 + MID Annex B'),
         ],
       ),
