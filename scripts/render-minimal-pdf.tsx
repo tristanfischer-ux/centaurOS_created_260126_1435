@@ -1034,8 +1034,19 @@ function computeBomTotals(state: any): BomTotals | null {
           // bearing). Macro override = contract authoritative; the
           // mfg/part chosen by corpus loses out. Leave nullable for
           // downstream procurement to fill class-correct alternative.
-          manufacturer: macro_override_strip_corpus_partnum ? null : (v?.manufacturer ?? (mfgMod ? String(mfgMod.value) : null)),
-          part_number: macro_override_strip_corpus_partnum ? null : (v?.part_number ?? (pnMod ? String(pnMod.value) : null)),
+          // L47 council fix (2026-05-27, 3/4 seats): the L26 strip behaviour
+          // was intended for the corpus-picked case (small IGBT mis-picked
+          // for 5kV converter). When the WORD itself has explicit emitter-
+          // pinned manufacturer + part_number modifiers (mfgMod / pnMod from
+          // deterministic-emitter.ts), those should ALWAYS win — they're the
+          // engineering-grade pin, not a corpus guess. Only strip when the
+          // mfr/pn comes from corpus (no explicit modifier on the word).
+          // L45 main_bus_contactor_word added manufacturer='Schaltbau' +
+          // part_number='C330-A' modifiers; the macro override stripped them
+          // anyway because the strip ignored the word's explicit modifiers.
+          // Council rendered "Main Bus Contactor — — ×1 £3,500" — wrong.
+          manufacturer: (mfgMod ? String(mfgMod.value) : (macro_override_strip_corpus_partnum ? null : (v?.manufacturer ?? null))),
+          part_number: (pnMod ? String(pnMod.value) : (macro_override_strip_corpus_partnum ? null : (v?.part_number ?? null))),
           source_url: v?.source_url ?? null,
           source_method: v?.source_method ?? null,
           distributor_price_gbp: hasActual ? unit_price_gbp : null,
@@ -1408,12 +1419,20 @@ function computePriceReality(
   if (!bomTotals || bomTotals.grandTotal_gbp <= 0) return null
   const band = resolvePriceBand(state, slugHint)
   if (!band) return null
-  // Engine D: prefer installed_asp_gbp as the target economic layer the
-  // market band is calibrated against. Per PLAN-2026-05-18 the band's
-  // band_low/band_high values are now installed-ASP figures (the value a
-  // founder compares against in market reports). Falls back to raw BoM
-  // grand total if no cost stack is available (graceful degradation).
-  const comparisonNumerator = costStack && costStack.installed_asp_gbp > 0
+  // L47 council fix (2026-05-27, 2-3/4 seats DeepSeek + Grok + GPT-5.5):
+  // Industry £/kWh / £/m² / £/kW reference bands (BNEF, IRENA, Wood Mackenzie
+  // for BESS; comparable indices for other classes) are quoted EX-WORKS (OEM
+  // transfer price), NOT installed ASP. The L26 PLAN that calibrated the
+  // bands to installed ASP was wrong against the industry-quote convention —
+  // the brief itself quotes "£600-760/kWh usable" ex-works (see BESS brief
+  // line 8). L46 showed cover banner "! Cost outside band" while compliance
+  // row showed PASS at +5.2% over the £1.7M cap — the inconsistency was
+  // because banner used installed ASP £2.11M / 2.69 MWh = £785 (outside band)
+  // while compliance used ex-works £1.79M (in band). Unify on ex-works.
+  // Falls back to installed ASP if no ex-works available, then raw BoM.
+  const comparisonNumerator = costStack && costStack.oem_transfer_price_gbp > 0
+    ? costStack.oem_transfer_price_gbp
+    : costStack && costStack.installed_asp_gbp > 0
     ? costStack.installed_asp_gbp
     : bomTotals.grandTotal_gbp
 
@@ -2120,7 +2139,19 @@ function IndustryBandBlock({
   if (!band) return null
   if (!costStack || costStack.installed_asp_gbp <= 0) return null
 
-  const result = computeDesignBandPosition(costStack.installed_asp_gbp, state, band)
+  // L47 council fix (2026-05-27, 1.5/4 seats DeepSeek + GPT-5.5): the
+  // £/kWh card was dividing installed ASP by usable energy, but the
+  // industry band (BNEF / IRENA / Wood Mackenzie) is quoted EX-WORKS.
+  // L46 showed £785/kWh (= £2.11M installed / 2.69 MWh) compared against
+  // the £550-800 ex-works band — apples to oranges. The correct numerator
+  // is the OEM transfer price (ex-works). L46 ex-works = £1.79M → real
+  // £/kWh = 665, well inside the band. Use oem_transfer_price_gbp when
+  // available; fall back to installed_asp_gbp only for legacy classes
+  // whose cost-stack doesn't wire ex-works yet.
+  const bandNumerator = costStack.oem_transfer_price_gbp > 0
+    ? costStack.oem_transfer_price_gbp
+    : costStack.installed_asp_gbp
+  const result = computeDesignBandPosition(bandNumerator, state, band)
   if (!result) return null
 
   const { computed_per_unit, position } = result

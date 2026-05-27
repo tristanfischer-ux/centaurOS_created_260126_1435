@@ -141,7 +141,7 @@ export const SHARED_QUANTITY_ANCHORS: SharedQuantityAnchor[] = [
   // not a contradiction. Flagging them as inconsistent would be a false positive.
   // If a future gate is needed for "main string bus voltage consistent across
   // main-bus-only components", add a targeted anchor with class_scope restricted
-  // to dc_main_contactor_word + dc_power_cable_word + pcs_inverter_word only.
+  // to dc_string_contactor_word + dc_power_cable_word + pcs_inverter_word only.
 
 ]
 

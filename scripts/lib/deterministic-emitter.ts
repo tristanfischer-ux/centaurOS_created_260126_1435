@@ -1729,10 +1729,20 @@ function emitPowerDistribution(p: BessParams): DesignModule {
       // Source: GLM + DeepSeek council both cited £245 trade; this matches
       // RS / Farnell quote ranges for Schaltbau bidirectional 500A 1500V DC
       // contactors with magnetic blow-out.
+      // L47 council fix (2026-05-27, GLM + partial GPT-5.5 council): the 15×
+      // Schaltbau C310K/500 contactors are per-rack string isolators (each
+      // rack carries ~83 A continuous), NOT main bus contactors. Naming them
+      // "DC main contactor" contradicts the narrative claim ">=1625 A DC
+      // contactors + 2000 A main bus" — council read this as topology
+      // incoherence (15× 500 A in parallel doesn't reconcile with a "main"
+      // single-line label). Rename to dc_string_contactor / "DC string
+      // contactor" to match the actual rack-string-bus architecture: 15
+      // string contactors (one per rack) feed one main_bus_contactor_word
+      // (the Schaltbau C330-A 2000 A pin, already correctly named).
       word(
-        'dc_main_contactor_word',
-        'DC main contactor word',
-        cc('dc_main_contactor', 'DC main contactor', 'electromechanical_switching_function', 'copper'),
+        'dc_string_contactor_word',
+        'DC string contactor word',
+        cc('dc_string_contactor', 'DC string contactor', 'electromechanical_switching_function', 'copper'),
         [
           mod('quantity', fmtQty(p.rackCount)),
           mod('dimension', '1500', 'V'),
