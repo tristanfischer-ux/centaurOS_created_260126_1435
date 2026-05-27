@@ -1149,8 +1149,13 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         cc('rack_dc_cable_gland', 'cable gland for DC isolator feed', 'electrical_conducting_function', 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount * 2)),  // supply + return per rack
-          mod('form', 'M25 cable gland, IP68, nylon, single-compression, for 13–18 mm cable OD'),
-          mod('manufacturer', 'Roxtec'),
+          // L40 fix (2026-05-27): ICG/501-M25 is a Hawke International product line
+          // (individual cable transit gland, brass M25 thread). Roxtec makes
+          // rectangular multi-cable transit FRAMES (CF/CM series), NOT individual
+          // threaded glands. Wrong manufacturer attribution corrected here.
+          mod('form', 'individual cable transit gland, nickel-plated brass, M25 thread, IP68, single-compression, for 13–18 mm cable OD'),
+          mod('manufacturer', 'Hawke International'),
+          mod('part_number', 'ICG/501-M25'),
           mod('regulatory', 'IEC 62135-1'),
         ],
       ),

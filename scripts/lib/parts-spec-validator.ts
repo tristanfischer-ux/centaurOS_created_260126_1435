@@ -1018,6 +1018,24 @@ export const KNOWN_PART_AUTHORITATIVE: AuthSpec[] = [
     notes: 'Hawke 501/421/Universal: dual-cert (Exd + Exe) compression-style HV cable gland, nickel-plated brass, M16-M75 entry threads, IEC 60079-0 + IEC 60079-1 + IEC 60079-7, BASEEFA + IECEx + ATEX certified, suitable for HV power cables (11 kV typical) in Zone 1/21 + Zone 2/22 hazardous areas. The correct part type for a round threaded HV gland — distinct from Roxtec CF 16 (which is a RECTANGULAR cable transit FRAME, not a round gland).',
   },
 
+  // ── Hawke ICG/501-M25 LV cable gland (L40 attribution fix 2026-05-27) ──────
+  // ICG series = Hawke International (NOT Roxtec). Roxtec makes rectangular
+  // multi-cable transit frames (CF/CM series); the ICG/501 is an individual
+  // threaded compression cable gland with M-thread entries (M20–M63).
+  // NOTE: datasheet URL from ehawke.com + hubbell.com/hawke was unreachable
+  // from sub-agent network during L41-Q fix session (hawke.com TLS cert
+  // altname invalid; hubbell.com ICG product pages return 404). Sub-agent P's
+  // manufacturer-attribution-audit gate 27 will catch remaining Roxtec
+  // attributions at runtime. Manual entry left without rated_voltage_ac_v
+  // because the LV ICG/501-M25 is used on ≤1 kV DC circuits (no AC voltage
+  // claim needed for gate 13 spec-claim correctness).
+  {
+    manufacturer: 'Hawke International',
+    part_number_pattern: /^ICG\/501(?:-M\d+)?$/i,
+    category: 'lv_cable_gland',
+    notes: 'Hawke International ICG/501 series: individual cable transit gland, nickel-plated brass, M-thread entry (M20–M63 variants), IP68, single-compression, for 13–18 mm cable OD. Used for DC isolator feed cables in BESS rack enclosures. NOT Roxtec (Roxtec = rectangular multi-cable transit frames CF/CM series). Datasheet: https://www.ehawke.com/ (canonical domain; redirects to hubbell.com/hawke/en — product-level URL unreachable as of 2026-05-27 from sub-agent environment).',
+  },
+
   // ── BESS OEM subsystems (manual seed 2026-05-25) ────────────────────────
   // Added to enable gate 13 spec-claim validation for the 5 most engineering-
   // critical BESS subsystems seeded into pretraining_extracted_parts by

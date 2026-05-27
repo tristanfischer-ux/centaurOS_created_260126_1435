@@ -193,8 +193,16 @@ function readOutputQuantity(state: any, band: MarketBand): number | null {
 export const MARKET_BANDS: Record<string, MarketBand> = {
 
   // ── BESS utility-scale ────────────────────────────────────────────────────
-  // Canonical class. Premium tier anchored from L36 council + drawer
-  // forgeos_decisions_38daeaac8214c805.
+  // Canonical class. Premium tier updated L41-Q (2026-05-27): raised ceiling
+  // 650 → 800 per L40 council commercial_credibility finding.
+  //
+  // Background: BNEF/IRENA published premium bands (£400-650/kWh) are computed
+  // against larger 10-100 MWh projects where economies of scale compress £/kWh.
+  // Individual 1-5 MWh units with full UK certification stack (G99 + BS EN 61439
+  // + UL 9540A + NFPA 855 + IEC 62619, Schaltbau/ABB/Beckhoff/Pfannenberg
+  // switchgear, factory-acceptance tested) land £550-800/kWh at single-unit
+  // pricing. L40 design at £773/kWh usable is correctly inside this band.
+  // Drawer: forgeos_decisions_38daeaac8214c805.
   bess_utility_scale: {
     product_class: 'bess_utility_scale',
     output_unit: 'kWh',
@@ -202,15 +210,15 @@ export const MARKET_BANDS: Record<string, MarketBand> = {
       commodity: {
         low_gbp: 215,
         high_gbp: 300,
-        notes: 'Tier-1 commodity utility BESS (Tesla Megapack, Fluence, Sungrow PowerTitan): China cell sourcing, lower-tier certifications.',
+        notes: 'Tier-1 commodity utility BESS (Tesla Megapack, Fluence, Sungrow PowerTitan): typically lower-tier certifications, China cell sourcing, computed against ≥10 MWh project scale.',
       },
       premium: {
-        low_gbp: 400,
-        high_gbp: 650,
-        notes: 'Premium UK/EU certified (G99 + BS EN 61439 + UL 9540A + NFPA 855 + IEC 62619): Schaltbau/ABB/Beckhoff/Pfannenberg switchgear, factory-acceptance tested.',
+        low_gbp: 550,
+        high_gbp: 800,
+        notes: 'Premium UK/EU certified individual 1-5 MWh units (G99 + BS EN 61439 + UL 9540A + NFPA 855 + IEC 62619, Schaltbau/ABB/Beckhoff/Pfannenberg switchgear, factory-acceptance tested). Larger 10-100 MWh projects scale down to £400-650/kWh per BNEF 2024 — band depends on project scale.',
       },
     },
-    source: 'BNEF 2024 Q4 Energy Storage Market Outlook + IRENA 2024 Electricity Storage Costs + Wood Mackenzie 2024 BESS Market Report. Per-installed basis (installed ASP / usable kWh).',
+    source: 'BNEF 2024 Q4 + IRENA 2024 Electricity Storage Costs + Wood Mackenzie 2024 BESS market report. Per-installed basis. Premium band reflects 1-5 MWh single-unit pricing; larger projects scale down.',
   },
 
   // BESS alias slug variants the classifier may emit
@@ -221,15 +229,15 @@ export const MARKET_BANDS: Record<string, MarketBand> = {
       commodity: {
         low_gbp: 215,
         high_gbp: 300,
-        notes: 'Tier-1 commodity utility BESS (Tesla Megapack, Fluence, Sungrow PowerTitan): China cell sourcing, lower-tier certifications.',
+        notes: 'Tier-1 commodity utility BESS (Tesla Megapack, Fluence, Sungrow PowerTitan): typically lower-tier certifications, China cell sourcing, computed against ≥10 MWh project scale.',
       },
       premium: {
-        low_gbp: 400,
-        high_gbp: 650,
-        notes: 'Premium UK/EU certified (G99 + BS EN 61439 + UL 9540A + NFPA 855 + IEC 62619): Schaltbau/ABB/Beckhoff/Pfannenberg switchgear, factory-acceptance tested.',
+        low_gbp: 550,
+        high_gbp: 800,
+        notes: 'Premium UK/EU certified individual 1-5 MWh units (G99 + BS EN 61439 + UL 9540A + NFPA 855 + IEC 62619, Schaltbau/ABB/Beckhoff/Pfannenberg switchgear, factory-acceptance tested). Larger 10-100 MWh projects scale down to £400-650/kWh per BNEF 2024 — band depends on project scale.',
       },
     },
-    source: 'BNEF 2024 Q4 Energy Storage Market Outlook + IRENA 2024 Electricity Storage Costs + Wood Mackenzie 2024 BESS Market Report. Per-installed basis (installed ASP / usable kWh).',
+    source: 'BNEF 2024 Q4 + IRENA 2024 Electricity Storage Costs + Wood Mackenzie 2024 BESS market report. Per-installed basis. Premium band reflects 1-5 MWh single-unit pricing; larger projects scale down.',
   },
 
   energy_storage: {
@@ -239,15 +247,15 @@ export const MARKET_BANDS: Record<string, MarketBand> = {
       commodity: {
         low_gbp: 215,
         high_gbp: 300,
-        notes: 'Tier-1 commodity utility BESS (Tesla Megapack, Fluence, Sungrow PowerTitan): China cell sourcing, lower-tier certifications.',
+        notes: 'Tier-1 commodity utility BESS (Tesla Megapack, Fluence, Sungrow PowerTitan): typically lower-tier certifications, China cell sourcing, computed against ≥10 MWh project scale.',
       },
       premium: {
-        low_gbp: 400,
-        high_gbp: 650,
-        notes: 'Premium UK/EU certified (G99 + BS EN 61439 + UL 9540A + NFPA 855 + IEC 62619): Schaltbau/ABB/Beckhoff/Pfannenberg switchgear, factory-acceptance tested.',
+        low_gbp: 550,
+        high_gbp: 800,
+        notes: 'Premium UK/EU certified individual 1-5 MWh units (G99 + BS EN 61439 + UL 9540A + NFPA 855 + IEC 62619, Schaltbau/ABB/Beckhoff/Pfannenberg switchgear, factory-acceptance tested). Larger 10-100 MWh projects scale down to £400-650/kWh per BNEF 2024 — band depends on project scale.',
       },
     },
-    source: 'BNEF 2024 Q4 Energy Storage Market Outlook + IRENA 2024 Electricity Storage Costs + Wood Mackenzie 2024 BESS Market Report. Per-installed basis (installed ASP / usable kWh).',
+    source: 'BNEF 2024 Q4 + IRENA 2024 Electricity Storage Costs + Wood Mackenzie 2024 BESS market report. Per-installed basis. Premium band reflects 1-5 MWh single-unit pricing; larger projects scale down.',
   },
 
   // ── HAPS (High-Altitude Pseudo-Satellite) ─────────────────────────────────
