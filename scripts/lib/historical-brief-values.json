@@ -1,0 +1,24 @@
+{
+  "_comment": "Per-class manifest of ALL NUMERIC VALUES that have ever appeared in a brief for this class. Used by gate 25 (brief-value-literal-scanner) to flag stale literals that match HISTORICAL values (even if the current brief has a different value). Seeded from git log on brief files 2026-05-27 (L42). Write-back: when a brief is rewritten and new values are introduced, append them here.",
+  "_write_back_rule": "On each chain run, any new brief value not already in the manifest for its class should be appended. This is checked by the extended gate 25 scanner (historical-brief-values extension).",
+  "bess_container": {
+    "_source": "git log on src/lib/pdf-engine-v2/briefs/baseline-10/09-bess-container.md — commits ce8fde2af, f8efb3f4d, 2e367e15b, 9301f9619",
+    "max_mass_kg": [28000, 35000],
+    "unit_cost_ceiling_gbp": [180000, 450000, 1300000, 1700000],
+    "usable_energy_mwh": [3.5, 2.5],
+    "nameplate_capacity_mwh": [3.5, 2.5],
+    "continuous_power_kw": [1000],
+    "peak_power_kw": [1100, 1250],
+    "dc_bus_voltage_v": [800],
+    "design_life_years": [15],
+    "cycle_life_cycles": [6000],
+    "batch_size": [25],
+    "operating_temp_min_c": [-20],
+    "operating_temp_max_c": [50]
+  },
+  "_notes": {
+    "historical_only_means_stale": "A value in historical_values that is NOT the current brief value is STALE. Gate 25 should flag HIGH if it appears as a literal in deterministic-emitter.ts.",
+    "ambiguous_means_current_or_historical": "A value that IS the current brief value could be either current-use OR a coincidental stale literal from a prior brief. Gate 25 flags these as MED (ambiguous).",
+    "how_to_extend": "When adding a new product class: run `git log --oneline -- <brief-file>` and `git show <sha>:<brief-file>` for each commit to extract all historical numeric values. Add the class key matching the class_name field in moduleDecomposition.product_class."
+  }
+}

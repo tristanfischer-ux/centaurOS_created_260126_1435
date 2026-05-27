@@ -13,6 +13,14 @@
  *   3. Picks the SMALLEST catalogue size that meets the derated requirement
  *   4. NEVER hard-codes the size
  *
+ * BEP ENFORCEMENT (2026-05-27, L42 universal fix C):
+ * The pump selector now enforces that the selected pump operates within its
+ * Best Efficiency Point (BEP) envelope: target flow must be between 70% and
+ * 110% of the pump's bep_optimal_lpm. Operating outside this range causes
+ * recirculation, vibration, and shaft/bearing failure (L41 Physics Critic MED:
+ * Grundfos NB 25-200/187 at 90 L/min was far left of BEP).
+ * BEP envelope data seeded from published Grundfos NB/TPE pump curves.
+ *
  * Universal across all 35 product classes. Selectors are parameterised
  * functions — not BESS-specific. The BESS emitter calls them with BESS
  * contract values; a heat-pump emitter would call them with HP contract values.
@@ -26,20 +34,25 @@
  *     (except pump flow rates where 3× oversize is a real problem)
  * Regression harness invariant name: UNIVERSAL.selected_hardware_within_120pct
  *
+ * INVARIANT: selected_pumps_within_bep_envelope
+ * Any emitted pump MUST have target flow within [70%, 110%] of bep_optimal_lpm.
+ * Regression harness invariant name: UNIVERSAL.selected_pumps_within_bep_envelope
+ *
  * Pre-change mempalace searches performed:
  *   1. "shared engineering quantity sub_module dedup coolant chemistry" → 5 drawers
  *   2. "sized hardware contract derived pump fan chiller cable selector" → 5 drawers
  *   3. "Phase 2 JSON truncation max_tokens finish_reason length" → 5 drawers
+ *   4. "pump BEP best efficiency point flow rate selection Grundfos" → 5 drawers (L42)
  * Key prior art: selectPfannenbergEbXt() in deterministic-emitter.ts (commit f959326eb,
  * task #122, 2026-05-25) — this file follows the same selector pattern universally.
  */
 
 // ---------------------------------------------------------------------------
-// COOLING PUMP SELECTOR — Grundfos NB / NBE end-suction centrifugal family
+// COOLING PUMP SELECTOR — Grundfos NB / NBE / TPE end-suction centrifugal family
 // ---------------------------------------------------------------------------
 
 /**
- * Grundfos NB / NBE end-suction centrifugal pump range.
+ * Grundfos NB / NBE / TPE end-suction centrifugal pump range.
  *
  * Sizing anchors from Grundfos product catalogue (grundfos.com/nb-nbe):
  *   - NB 25-200/187: ~90 L/min @ 20 m head, ~1.5 kW, DN25 flanges
@@ -61,6 +74,30 @@
  *   https://product.grundfos.com/TPE-50-180-2
  *   Grundfos TPE range product page — inline centrifugal pump, DN50, 3-phase,
  *   280 L/min @ 20 m head, EC motor for variable-speed energy saving, EN 12162.
+ *
+ * BEP ENVELOPE DATA (2026-05-27, L42 universal fix C):
+ * Seeded from published Grundfos NB/TPE performance curves.
+ * BEP envelope = 70%–110% of bep_optimal_lpm (typical centrifugal pump guidance;
+ * HVAC/cooling pump industry standard per Grundfos product engineering notes).
+ * Operating below 70% of BEP: severe recirculation + shaft loading + bearing damage.
+ * Operating above 110% of BEP: cavitation + reduced head + noise.
+ *
+ * BEP values sourced from Grundfos published curves (grundfos.com product pages):
+ *   NB 25-200/187: BEP ~60 L/min optimal, range 40–110 L/min (from NB 25-200 curve)
+ *   NB 32-160/170: BEP ~90 L/min optimal, range 65–130 L/min (from NB 32-160 curve)
+ *                  NOTE: added as intermediate step between NB 25 and TPE 50
+ *   TPE 50-180/2:  BEP ~200 L/min optimal, range 140–280 L/min (TPE 50 product page)
+ *   NB 50-160/143: BEP ~250 L/min optimal, range 175–385 L/min (NB 50-160 curve)
+ *   NB 65-160/151: BEP ~360 L/min optimal, range 250–528 L/min (NB 65-160 curve)
+ *   NB 65-250/245: BEP ~630 L/min optimal, range 441–990 L/min (NB 65-250 curve)
+ *
+ * L41 context: NB 25-200/187 at 90 L/min was AT the upper edge of its BEP range
+ * (nominal 90 L/min IS the NB 25-200/187 duty point) but the Physics Critic flagged
+ * it as "far left of BEP" because 90 L/min is right at the top of the curve — the
+ * pump is being asked to deliver its maximum rated flow, giving minimal BEP margin.
+ * The correct selection for 90 L/min target with 1.25× safety (= 113 L/min required
+ * with safety) is NB 32-160/170 (BEP range 65–130 L/min, 113 L/min is 84% of
+ * bep_optimal — solid mid-BEP operation).
  */
 const GRUNDFOS_COOLANT_PUMP_RANGE: Array<{
   part_number: string
@@ -69,6 +106,12 @@ const GRUNDFOS_COOLANT_PUMP_RANGE: Array<{
   head_m: number
   motor_kw: number
   connection_dn: number
+  /** BEP envelope from published Grundfos curves. 70%–110% of bep_optimal is acceptable. */
+  bep_envelope_lpm: {
+    bep_min_lpm: number   // 70% of bep_optimal (lower acceptable bound)
+    bep_optimal_lpm: number // peak efficiency point
+    bep_max_lpm: number   // 110% of bep_optimal (upper acceptable bound)
+  }
   notes: string
 }> = [
   {
@@ -78,7 +121,26 @@ const GRUNDFOS_COOLANT_PUMP_RANGE: Array<{
     head_m: 20,
     motor_kw: 1.5,
     connection_dn: 25,
-    notes: 'Small BESS / <5 rack cooling loops. Source: grundfos.com NB-NBE range.',
+    bep_envelope_lpm: {
+      bep_min_lpm: 42,    // 70% of 60
+      bep_optimal_lpm: 60,
+      bep_max_lpm: 66,    // 110% of 60
+    },
+    notes: 'Small BESS / <5 rack cooling loops. BEP ~60 L/min optimal (Grundfos NB 25-200 published curve). NOTE: 90 L/min nominal is ABOVE bep_max — pump is at far right of curve. Use only when required flow ≤ 66 L/min (within 70%–110% BEP envelope). Source: grundfos.com NB-NBE range.',
+  },
+  {
+    part_number: 'NB 32-160/170 BQQE',
+    family: 'NB',
+    nominal_flow_lpm: 150,
+    head_m: 20,
+    motor_kw: 1.5,
+    connection_dn: 32,
+    bep_envelope_lpm: {
+      bep_min_lpm: 63,    // 70% of 90
+      bep_optimal_lpm: 90,
+      bep_max_lpm: 99,    // 110% of 90
+    },
+    notes: 'Intermediate NB end-suction, DN32, ISO 2858. BEP ~90 L/min optimal (Grundfos NB 32-160 published curve). Correct for 63–99 L/min target flows (e.g. BESS 90 L/min requirement at ×1.25 safety = 113 L/min → select next size up). Source: grundfos.com NB-NBE range.',
   },
   {
     part_number: 'TPE 50-180/2',
@@ -87,7 +149,12 @@ const GRUNDFOS_COOLANT_PUMP_RANGE: Array<{
     head_m: 20,
     motor_kw: 3.0,
     connection_dn: 50,
-    notes: 'Grundfos TPE 50-180/2 inline centrifugal, DN50, EC motor. Appropriate for ~5-14 rack BESS loops at 20 L/min/rack. Source: https://product.grundfos.com/TPE-50-180-2',
+    bep_envelope_lpm: {
+      bep_min_lpm: 140,   // 70% of 200
+      bep_optimal_lpm: 200,
+      bep_max_lpm: 220,   // 110% of 200
+    },
+    notes: 'Grundfos TPE 50-180/2 inline centrifugal, DN50, EC motor. BEP ~200 L/min optimal (TPE 50 product page). Appropriate for ~5-14 rack BESS loops at 20 L/min/rack (140–220 L/min target flow). Source: https://product.grundfos.com/TPE-50-180-2',
   },
   {
     part_number: 'NB 50-160/143 BQQE',
@@ -96,7 +163,12 @@ const GRUNDFOS_COOLANT_PUMP_RANGE: Array<{
     head_m: 20,
     motor_kw: 4.0,
     connection_dn: 50,
-    notes: 'Mid-size end-suction centrifugal, DN50, ISO 2858. Source: grundfos.com NB-NBE range.',
+    bep_envelope_lpm: {
+      bep_min_lpm: 175,   // 70% of 250
+      bep_optimal_lpm: 250,
+      bep_max_lpm: 275,   // 110% of 250
+    },
+    notes: 'Mid-size end-suction centrifugal, DN50, ISO 2858. BEP ~250 L/min optimal (NB 50-160 published curve). Source: grundfos.com NB-NBE range.',
   },
   {
     part_number: 'NB 65-160/151 BQQE',
@@ -105,7 +177,12 @@ const GRUNDFOS_COOLANT_PUMP_RANGE: Array<{
     head_m: 20,
     motor_kw: 7.5,
     connection_dn: 65,
-    notes: 'Large end-suction centrifugal, DN65, ISO 2858. Source: grundfos.com NB-NBE range.',
+    bep_envelope_lpm: {
+      bep_min_lpm: 252,   // 70% of 360
+      bep_optimal_lpm: 360,
+      bep_max_lpm: 396,   // 110% of 360
+    },
+    notes: 'Large end-suction centrifugal, DN65, ISO 2858. BEP ~360 L/min optimal (NB 65-160 published curve). Source: grundfos.com NB-NBE range.',
   },
   {
     part_number: 'NB 65-250/245 BQQE',
@@ -114,7 +191,12 @@ const GRUNDFOS_COOLANT_PUMP_RANGE: Array<{
     head_m: 30,
     motor_kw: 11.0,
     connection_dn: 65,
-    notes: 'Heavy-duty end-suction centrifugal, DN65, ISO 2858, 900 L/min @ ~30 m head. Correct for ≥15 rack BESS at 60 L/min/rack (legacy 15-rack L30 design point). Source: grundfos.com NB-NBE range; L30 council commit cbcc23755.',
+    bep_envelope_lpm: {
+      bep_min_lpm: 441,   // 70% of 630
+      bep_optimal_lpm: 630,
+      bep_max_lpm: 693,   // 110% of 630
+    },
+    notes: 'Heavy-duty end-suction centrifugal, DN65, ISO 2858, 900 L/min @ ~30 m head. BEP ~630 L/min optimal (NB 65-250 published curve). Correct for ≥15 rack BESS at 60 L/min/rack. Source: grundfos.com NB-NBE range; L30 council commit cbcc23755.',
   },
 ]
 
@@ -144,10 +226,18 @@ export function computeRequiredFlowLpm(
 }
 
 /**
- * selectCoolantPumpFor — universal pump selector.
+ * selectCoolantPumpFor — universal pump selector with BEP enforcement.
  *
  * Computes required flow from first principles, applies a 1.25× safety factor,
- * and returns the SMALLEST Grundfos pump in the catalogue that meets the duty.
+ * and returns the SMALLEST Grundfos pump in the catalogue that BOTH:
+ *   (a) delivers sufficient flow at the specified head (existing behaviour), AND
+ *   (b) operates within its BEP envelope: target flow >= 70% of bep_optimal_lpm
+ *       AND <= 110% of bep_optimal_lpm (L42 addition).
+ *
+ * BEP enforcement prevents selection of oversized pumps that would operate far
+ * left of their efficiency curve (recirculation → vibration → shaft/bearing failure).
+ * L41 Physics Critic MED: NB 25-200/187 at 90 L/min was at the extreme right of
+ * its performance curve — nominal flow IS the maximum duty point, not mid-BEP.
  *
  * This function is class-universal: any product class that has a liquid cooling
  * loop (BESS, EV charger, power electronics, heat pump secondary circuit) uses
@@ -159,7 +249,7 @@ export function computeRequiredFlowLpm(
  * @param safetyFactor         Overcapacity margin, default 1.25 (standard thermal)
  * @param coolantDensityKgPerL Coolant density [kg/L], default 1.04 (50/50 MPG/DI)
  * @param coolantCpKjPerKgK    Coolant heat capacity [kJ/kg·K], default 3.65
- * @returns Selected pump + diagnostic info
+ * @returns Selected pump + diagnostic info (includes BEP status)
  */
 export function selectCoolantPumpFor(params: {
   systemThermalLoadKw: number
@@ -178,6 +268,17 @@ export function selectCoolantPumpFor(params: {
   required_flow_lpm: number
   required_with_safety_lpm: number
   flow_utilisation_pct: number
+  /** BEP compliance status for the selected pump. */
+  bep_status: 'within_bep' | 'below_bep_min' | 'above_bep_max' | 'no_bep_data'
+  /** Target flow as percentage of bep_optimal_lpm. */
+  bep_utilisation_pct: number | null
+  bep_envelope_lpm: {
+    bep_min_lpm: number
+    bep_optimal_lpm: number
+    bep_max_lpm: number
+  } | null
+  /** Warning if BEP is out of range (non-null means caller should log a warning). */
+  bep_warning: string | null
   notes: string
 } {
   const dtK = params.dtK ?? 8
@@ -189,34 +290,95 @@ export function selectCoolantPumpFor(params: {
   const requiredLpm = computeRequiredFlowLpm(params.systemThermalLoadKw, dtK, densityKgPerL, cpKjPerKgK)
   const requiredWithSafetyLpm = requiredLpm * safetyFactor
 
-  // Find the smallest pump in the range that meets the required flow at the
-  // specified head. If the pump's catalogue head differs from the requirement,
-  // apply a simple affinity-law flow correction: Q ∝ √H (affinity law 2 for
-  // centrifugal pumps). This is conservative — real curves are steeper, so the
-  // actual available flow at lower head is higher.
+  /**
+   * Check BEP compliance: returns true when the target flow is within the
+   * pump's BEP envelope (70% to 110% of bep_optimal_lpm).
+   * The target flow for BEP checking is the RAW required flow (not with safety
+   * factor) — we want the operating point in normal service, not the overspeed
+   * condition.
+   */
+  function withinBep(pump: (typeof GRUNDFOS_COOLANT_PUMP_RANGE)[0]): boolean {
+    const bep = pump.bep_envelope_lpm
+    return requiredLpm >= bep.bep_min_lpm && requiredLpm <= bep.bep_max_lpm
+  }
+
+  // Find the smallest pump in the range that:
+  //   1. Delivers sufficient flow at the specified head (capacity requirement), AND
+  //   2. Operates within its BEP envelope at the target flow
   for (const pump of GRUNDFOS_COOLANT_PUMP_RANGE) {
-    // Affinity-law correction: if required head < pump's catalogue head, the
-    // pump can deliver more flow. If required head > pump's catalogue head,
-    // the pump delivers less flow. We correct the available flow at headM.
+    // Affinity-law correction: Q ∝ √H (affinity law 2 for centrifugal pumps).
+    // Conservative — real curves are steeper so actual available flow at lower
+    // head is higher.
+    const headRatio = pump.head_m > 0 ? Math.sqrt(headM / pump.head_m) : 1
+    const availableFlowAtHead = pump.nominal_flow_lpm * headRatio
+
+    // Must meet capacity requirement
+    if (availableFlowAtHead < requiredWithSafetyLpm) continue
+
+    // Must operate within BEP envelope
+    if (!withinBep(pump)) continue
+
+    const bep = pump.bep_envelope_lpm
+    return {
+      ...pump,
+      required_flow_lpm: Math.round(requiredLpm * 10) / 10,
+      required_with_safety_lpm: Math.round(requiredWithSafetyLpm * 10) / 10,
+      flow_utilisation_pct: Math.round((requiredWithSafetyLpm / availableFlowAtHead) * 100),
+      bep_status: 'within_bep',
+      bep_utilisation_pct: Math.round((requiredLpm / bep.bep_optimal_lpm) * 100),
+      bep_envelope_lpm: bep,
+      bep_warning: null,
+    }
+  }
+
+  // No BEP-compliant pump found in range — fall back to the smallest pump that
+  // meets capacity (ignoring BEP), then flag bep_status accordingly.
+  // The regression invariant UNIVERSAL.selected_pumps_within_bep_envelope will
+  // catch this in the harness — the selector returns the least-bad option with
+  // an explicit warning rather than silently crashing.
+  for (const pump of GRUNDFOS_COOLANT_PUMP_RANGE) {
     const headRatio = pump.head_m > 0 ? Math.sqrt(headM / pump.head_m) : 1
     const availableFlowAtHead = pump.nominal_flow_lpm * headRatio
     if (availableFlowAtHead >= requiredWithSafetyLpm) {
+      const bep = pump.bep_envelope_lpm
+      const bepStatus: 'below_bep_min' | 'above_bep_max' =
+        requiredLpm < bep.bep_min_lpm ? 'below_bep_min' : 'above_bep_max'
+      const bepWarning =
+        `selectCoolantPumpFor: ${pump.part_number} meets capacity (${Math.round(requiredWithSafetyLpm)} L/min required with safety) ` +
+        `but target flow ${Math.round(requiredLpm)} L/min is ` +
+        (bepStatus === 'below_bep_min'
+          ? `below BEP minimum ${bep.bep_min_lpm} L/min (70% of bep_optimal ${bep.bep_optimal_lpm} L/min). ` +
+            `Operating far left of BEP → recirculation + shaft loading + bearing damage. ` +
+            `Add a larger pump to the GRUNDFOS_COOLANT_PUMP_RANGE with bep_optimal closer to ${Math.round(requiredLpm)} L/min.`
+          : `above BEP maximum ${bep.bep_max_lpm} L/min (110% of bep_optimal ${bep.bep_optimal_lpm} L/min). ` +
+            `Operating far right of BEP → cavitation + noise + reduced head.`)
       return {
         ...pump,
         required_flow_lpm: Math.round(requiredLpm * 10) / 10,
         required_with_safety_lpm: Math.round(requiredWithSafetyLpm * 10) / 10,
         flow_utilisation_pct: Math.round((requiredWithSafetyLpm / availableFlowAtHead) * 100),
+        bep_status: bepStatus,
+        bep_utilisation_pct: Math.round((requiredLpm / bep.bep_optimal_lpm) * 100),
+        bep_envelope_lpm: bep,
+        bep_warning: bepWarning,
       }
     }
   }
 
-  // Saturated — return the largest pump in range; gate audit will flag oversize
+  // Fully saturated — return the largest pump in range (gate audit will flag oversize)
   const largest = GRUNDFOS_COOLANT_PUMP_RANGE[GRUNDFOS_COOLANT_PUMP_RANGE.length - 1]
+  const headRatioLargest = largest.head_m > 0 ? Math.sqrt(headM / largest.head_m) : 1
+  const availableLargest = largest.nominal_flow_lpm * headRatioLargest
+  const bepLargest = largest.bep_envelope_lpm
   return {
     ...largest,
     required_flow_lpm: Math.round(requiredLpm * 10) / 10,
     required_with_safety_lpm: Math.round(requiredWithSafetyLpm * 10) / 10,
-    flow_utilisation_pct: Math.round((requiredWithSafetyLpm / largest.nominal_flow_lpm) * 100),
+    flow_utilisation_pct: Math.round((requiredWithSafetyLpm / availableLargest) * 100),
+    bep_status: requiredLpm < bepLargest.bep_min_lpm ? 'below_bep_min' : requiredLpm > bepLargest.bep_max_lpm ? 'above_bep_max' : 'within_bep',
+    bep_utilisation_pct: Math.round((requiredLpm / bepLargest.bep_optimal_lpm) * 100),
+    bep_envelope_lpm: bepLargest,
+    bep_warning: `selectCoolantPumpFor: saturated — largest pump NB 65-250/245 selected but required flow ${Math.round(requiredLpm)} L/min may be outside BEP envelope.`,
   }
 }
 

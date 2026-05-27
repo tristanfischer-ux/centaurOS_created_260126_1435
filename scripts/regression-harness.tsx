@@ -1718,6 +1718,127 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL: state JSON parses after Phase 2 (2026-05-27, L42 gate 28 backstop A) ──
+  //
+  // UNIVERSAL.state_json_parses_after_phase2 — re-runs the gate 28 state-parse
+  // guard (runStateParseGuard) on the current snapshot, asserts that:
+  //   (a) JSON is parseable
+  //   (b) moduleDecomposition exists
+  //   (c) modules.length > 0
+  //   (d) no structural damage (every module's sub_modules is an Array)
+  //
+  // Root cause of L41 HIGH F-4 truncation finding: multimodal scorer artefact —
+  // Gemini Flash read a PDF page-break mid-sentence as data truncation. The
+  // underlying 4-generator.json, 8-5-specialist.json, and state.json all had all
+  // 10 modules intact. Phase 2 is a deterministic patch loop with no LLM call,
+  // so finish_reason='length' was never applicable. Gate 28 is added as a
+  // structural backstop. This invariant mirrors gate 28 in the regression harness
+  // so that future snapshots are automatically validated.
+  {
+    try {
+      const { runStateParseGuard } = require('../src/lib/pdf-engine-v2/lib/state-parse-guard')
+      const spgResult = runStateParseGuard(snapshotPath)
+      assertions.push(assertEq(
+        'UNIVERSAL.state_json_parses_after_phase2',
+        'Gate 28: state.json parses cleanly — moduleDecomposition present, modules.length > 0, sub_modules all Arrays (L42 backstop against multimodal scorer artefact truncation)',
+        spgResult.passed,
+        (p: boolean) => p === true,
+        (_: boolean) => `Gate 28 state-parse guard FAILED on ${snapshotPath}: ${spgResult.errors.join('; ')}. Fix: ensure Phase 2 does not corrupt moduleDecomposition. Root cause: ${spgResult.root_cause ?? 'unknown'}.`,
+      ))
+    } catch (err) {
+      assertions.push({ id: 'UNIVERSAL.state_json_parses_after_phase2', description: 'Gate 28 state-parse guard', passed: false, detail: `Failed to load state-parse-guard module: ${err}` })
+    }
+  }
+
+  // ── UNIVERSAL: no historical brief value literals in emitter (2026-05-27, L42 gate 25 extension B) ──
+  //
+  // UNIVERSAL.no_historical_brief_value_literals_in_emitter — runs the extended
+  // gate 25 scanner (scanEmitterFileWithHistoricalValues) on deterministic-emitter.ts,
+  // seeding constraints from the current snapshot's orchestratorContract and the
+  // historical-brief-values.json manifest. Asserts HIGH count = 0.
+  //
+  // Motivation: brief values change across iterations (bess_container max_mass_kg
+  // was 28000 in ce8fde2af, then 35000 in f8efb3f4d). A stale literal from a prior
+  // brief that appears as a template literal in deterministic-emitter.ts will produce
+  // wrong output for any project whose brief differs from the stale value, even though
+  // the gate 25 base scan (which only checks CURRENT brief values) would not catch it.
+  // HIGH = value is ONLY in historical list (stale). MED = also matches current brief (ambiguous).
+  {
+    try {
+      const { scanEmitterFileWithHistoricalValues } = require('./lib/brief-value-literal-scanner')
+      const emitterPath = resolve(__dirname, 'lib/deterministic-emitter.ts')
+      // Extract current constraints from orchestratorContract (same structure as gate 25 base scan)
+      const contractQtys5 = (
+        (state?.orchestratorContract as Record<string, unknown> | undefined)?.quantities ?? {}
+      ) as Record<string, number>
+      const historicalManifest = resolve(__dirname, 'lib/historical-brief-values.json')
+      const result = scanEmitterFileWithHistoricalValues(
+        emitterPath,
+        contractQtys5,
+        productClass ?? 'unknown',
+        historicalManifest,
+        10, // minValue: ignore values < 10 (too many false positives for small integers)
+      )
+      assertions.push(assertEq(
+        'UNIVERSAL.no_historical_brief_value_literals_in_emitter',
+        'Gate 25 (historical extension): no stale brief-value literals (HIGH) in deterministic-emitter.ts — historical-brief-values.json manifest lists all prior brief numeric values; stale literals cause wrong output when brief changes (L42 Deliverable B)',
+        result.combined_high_count,
+        (n: number) => n === 0,
+        (n: number) => `${n} stale brief-value literal(s) found in emitter: ${result.historical_hits.filter((h: { historical_status: string }) => h.historical_status === 'stale').slice(0, 3).map((h: { line: number; value: number; field: string }) => `line ${h.line}: ${h.value} (${h.field})`).join('; ')}. Fix: replace literal with a dynamic lookup from the current brief/orchestratorContract. See historical-brief-values.json for the stale manifest.`,
+      ))
+    } catch (err) {
+      assertions.push({ id: 'UNIVERSAL.no_historical_brief_value_literals_in_emitter', description: 'Gate 25 historical brief-value literals scan', passed: false, detail: `Failed to load brief-value-literal-scanner module: ${err}` })
+    }
+  }
+
+  // ── UNIVERSAL: selected pumps within BEP envelope (2026-05-27, L42 gate BEP C) ──
+  //
+  // UNIVERSAL.selected_pumps_within_bep_envelope — walks every coolant_pump /
+  // circulation_pump word in the design, reads the capacity modifier (L/min),
+  // calls selectCoolantPumpFor() from hardware-selectors.ts with that flow rate,
+  // and asserts bep_status === 'within_bep' for the returned selection.
+  //
+  // Motivation: L41 BESS MED finding — Grundfos NB 25-200/187 selected for
+  // 90 L/min target (NB 25 bep_max = 66 L/min; 90 L/min is far left of BEP).
+  // Hardware-selectors now enforces BEP-first selection and seeds the NB 32-160/170
+  // (bep range 63–99 L/min) as the correct intermediate choice for this flow range.
+  // This invariant catches any future snapshot where a selected pump falls outside
+  // its published BEP envelope.
+  {
+    try {
+      const { selectCoolantPumpFor } = require('./lib/hardware-selectors')
+      for (const m of modules) {
+        for (const sm of (m.sub_modules ?? [])) {
+          for (const w of (sm.words ?? [])) {
+            const wid = String(w?.id ?? '')
+            if (!/coolant_pump|circulation_pump/.test(wid)) continue
+            const mods5: Array<{ kind: string; value: string; unit?: string }> =
+              Array.isArray(w?.modifier_characters) ? w.modifier_characters : []
+            // Look for a flow-rate capacity modifier (unit lpm or L/min)
+            const flowMod = mods5.find((mc) =>
+              mc.kind === 'capacity' && /^(?:lpm|L\/min|l\/min)$/i.test(mc.unit ?? '')
+            )
+            if (!flowMod) continue
+            const flowLpm = parseFloat(String(flowMod.value ?? ''))
+            if (!Number.isFinite(flowLpm) || flowLpm <= 0) continue
+
+            const selection = selectCoolantPumpFor({ required_flow_lpm: flowLpm, required_head_m: 0 })
+            const bepStatus = selection?.bep_status ?? 'no_bep_data'
+            assertions.push(assertEq(
+              'UNIVERSAL.selected_pumps_within_bep_envelope',
+              `${wid} (${flowLpm} L/min target): selectCoolantPumpFor returns a pump within published Grundfos BEP envelope (70%–110% of BEP optimal; L42 Deliverable C — closes L41 MED Grundfos oversized)`,
+              bepStatus,
+              (s: string) => s === 'within_bep',
+              (s: string) => `${wid}: pump selected with bep_status='${s}' for ${flowLpm} L/min target. Selected: ${selection?.pump_model ?? 'none'}. BEP envelope: ${selection?.bep_envelope_lpm ? JSON.stringify(selection.bep_envelope_lpm) : 'n/a'}. Warning: ${selection?.bep_warning ?? 'none'}. Fix: add a Grundfos catalogue entry in hardware-selectors.ts whose BEP envelope covers ${flowLpm} L/min.`,
+            ))
+          }
+        }
+      }
+    } catch (err) {
+      assertions.push({ id: 'UNIVERSAL.selected_pumps_within_bep_envelope', description: 'Pump BEP envelope check (L42 Deliverable C)', passed: false, detail: `Failed to load hardware-selectors module: ${err}` })
+    }
+  }
+
   return { snapshot_path: snapshotPath, product_class: productClass, assertions }
 }
 

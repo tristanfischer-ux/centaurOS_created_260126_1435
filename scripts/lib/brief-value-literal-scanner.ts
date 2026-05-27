@@ -31,6 +31,16 @@
  * COVERAGE: universal — walks the emitter source text against ANY brief's
  *   constraint numerics. New briefs get full coverage without code changes.
  *
+ * HISTORICAL VALUES EXTENSION (2026-05-27, L42 universal fix B):
+ *   The gate also scans for HISTORICAL brief values — values that appeared in
+ *   prior briefs for the same class but no longer match the current brief.
+ *   Source: scripts/lib/historical-brief-values.json (per-class manifest).
+ *   Severity: HIGH for historical-only matches (definitively stale);
+ *             MED for values matching BOTH current AND historical (ambiguous).
+ *   L41 context: L38 raised max_mass_kg 28000→35000. Gate 25 scanned for 35000
+ *   (current) but NOT 28000 (stale historical). The stale "28,000 kg" slipped
+ *   past gate 25 because it only checked current-brief values.
+ *
  * SCOPE OF SCAN:
  *   Only literals inside string templates (backtick, single-quote, double-quote
  *   contexts) and mod() calls are flagged. TypeScript type annotations,
@@ -40,6 +50,9 @@
  *
  * Pre-change mempalace search: "brief-value literal hardcoded emitter stale
  *   mass_cap 28000" → 2 drawers loaded.
+ * Pre-change mempalace search (L42): "historical brief value scanner stale
+ *   literal emitter" → 5 drawers loaded. Drawer confirmed stale-literal
+ *   class is UNIVERSAL and the 28000→35000 example IS the canonical instance.
  */
 
 import * as fs from 'fs'
@@ -294,4 +307,203 @@ export function scanEmitterFileForBriefLiterals(
 
   const source = fs.readFileSync(emitterPath, 'utf-8')
   return scanEmitterForBriefLiterals(source, constraints, className, minValue)
+}
+
+// ── Historical brief values extension (2026-05-27, L42 universal fix B) ──────
+
+/**
+ * HistoricalBriefValueHit — a literal match against a HISTORICAL brief value
+ * (one that appeared in a prior brief version for this class).
+ */
+export interface HistoricalBriefValueHit extends LiteralHit {
+  /** 'stale' = matches historical ONLY (not current brief) — HIGH severity.
+   *  'ambiguous' = matches BOTH current and historical — MED severity. */
+  historical_status: 'stale' | 'ambiguous'
+  /** All historical values for this brief_key. */
+  historical_values: number[]
+  /** Whether this value also matches the current brief (true = 'ambiguous'). */
+  also_matches_current: boolean
+}
+
+/**
+ * Load historical brief values for a product class from the manifest JSON.
+ *
+ * @param manifestPath   Absolute path to historical-brief-values.json.
+ * @param className      Product class slug (must match a top-level key in the manifest).
+ * @returns              Map of constraint_key → array of all historical numeric values.
+ */
+export function loadHistoricalBriefValues(
+  manifestPath: string,
+  className: string,
+): Map<string, number[]> {
+  const result = new Map<string, number[]>()
+  if (!fs.existsSync(manifestPath)) return result
+
+  let manifest: Record<string, any>
+  try {
+    manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'))
+  } catch {
+    return result
+  }
+
+  // Try className directly, then with underscores → dashes and vice-versa
+  const classData =
+    manifest[className] ??
+    manifest[className.replace(/_/g, '-')] ??
+    manifest[className.replace(/-/g, '_')] ??
+    null
+
+  if (!classData || typeof classData !== 'object') return result
+
+  for (const [key, val] of Object.entries(classData)) {
+    if (key.startsWith('_')) continue  // skip comment keys
+    if (Array.isArray(val)) {
+      const nums = val.filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+      if (nums.length > 0) result.set(key, nums)
+    }
+  }
+  return result
+}
+
+/**
+ * scanEmitterForHistoricalBriefLiterals — extends the base gate 25 scan to
+ * check for HISTORICAL brief values (stale values from prior brief versions).
+ *
+ * This function runs AFTER scanEmitterForBriefLiterals. It scans for values
+ * that appear in the historical manifest but NOT in the current brief — those
+ * are definitively stale. It also flags values that appear in BOTH current
+ * and historical manifests as MED (ambiguous).
+ *
+ * @param emitterSource      Full text of deterministic-emitter.ts.
+ * @param currentConstraints Current brief constraint numerics.
+ * @param historicalValues   Map from loadHistoricalBriefValues().
+ * @param className          Product class.
+ * @param minValue           Skip values below this threshold (default 100).
+ */
+export function scanEmitterForHistoricalBriefLiterals(
+  emitterSource: string,
+  currentConstraints: MinimalBriefConstraints,
+  historicalValues: Map<string, number[]>,
+  className: string,
+  minValue = 100,
+): HistoricalBriefValueHit[] {
+  const lines = emitterSource.split('\n')
+  const hits: HistoricalBriefValueHit[] = []
+
+  // Build a set of current-brief values for O(1) lookup
+  const currentValues = new Set<number>()
+  for (const [, rawValue] of Object.entries(currentConstraints)) {
+    if (rawValue !== undefined && rawValue !== null) {
+      const v = Number(rawValue)
+      if (Number.isFinite(v) && v >= minValue) currentValues.add(v)
+    }
+  }
+
+  for (const [key, histNums] of historicalValues.entries()) {
+    const label = BRIEF_KEY_LABELS[key] ?? key
+
+    for (const histValue of histNums) {
+      if (!Number.isFinite(histValue) || histValue < minValue) continue
+
+      const alsoMatchesCurrent = currentValues.has(histValue)
+      // If the historical value is ALSO the current value: ambiguous (MED)
+      // If the historical value is NOT the current value: stale (HIGH)
+      const historicalStatus: 'stale' | 'ambiguous' = alsoMatchesCurrent ? 'ambiguous' : 'stale'
+
+      const pattern = buildLiteralPattern(histValue)
+
+      for (let i = 0; i < lines.length; i++) {
+        const lineText = lines[i]
+
+        // Skip excluded line types
+        if (EXCLUDED_LINE_PATTERNS.some((p) => p.test(lineText))) continue
+
+        // Only scan string-context lines
+        const isStringContext =
+          lineText.includes("mod('") ||
+          lineText.includes('mod("') ||
+          lineText.includes('`') ||
+          lineText.includes("'") ||
+          lineText.includes('"')
+
+        if (!isStringContext) continue
+
+        const match = lineText.match(pattern)
+        if (!match) continue
+
+        // Don't double-report: if this was already caught by the base scanner
+        // (because histValue === currentValue) skip here — the base scanner
+        // already reported it as a current-value hit. We only add the
+        // historical status for STALE values not in the current constraints.
+        if (historicalStatus === 'ambiguous') continue  // base scan already caught these
+
+        hits.push({
+          value: histValue,
+          brief_key: key,
+          brief_label: label,
+          line_number: i + 1,
+          line_text: lineText.trim(),
+          raw_match: match[1],
+          historical_status: historicalStatus,
+          historical_values: histNums,
+          also_matches_current: alsoMatchesCurrent,
+        })
+      }
+    }
+  }
+
+  return hits
+}
+
+/**
+ * scanEmitterFileForHistoricalBriefLiterals — file-backed wrapper.
+ *
+ * Combines the current-brief scan (gate 25 base) with the historical-values
+ * scan. Returns both current hits (always HIGH) and historical-stale hits
+ * (HIGH for stale, MED for ambiguous).
+ *
+ * @param emitterPath        Absolute path to deterministic-emitter.ts.
+ * @param constraints        Current brief constraint numerics.
+ * @param className          Product class slug.
+ * @param historicalManifest Absolute path to historical-brief-values.json.
+ * @param minValue           Skip values below this (default 100).
+ */
+export function scanEmitterFileWithHistoricalValues(
+  emitterPath: string,
+  constraints: MinimalBriefConstraints,
+  className: string,
+  historicalManifest: string,
+  minValue = 100,
+): {
+  base_result: BriefValueLiteralScanResult
+  historical_hits: HistoricalBriefValueHit[]
+  combined_passed: boolean
+  combined_high_count: number
+} {
+  const baseResult = scanEmitterFileForBriefLiterals(emitterPath, constraints, className, minValue)
+
+  // Load historical values
+  const historicalValues = loadHistoricalBriefValues(historicalManifest, className)
+
+  let historicalHits: HistoricalBriefValueHit[] = []
+  if (historicalValues.size > 0 && fs.existsSync(emitterPath)) {
+    const source = fs.readFileSync(emitterPath, 'utf-8')
+    historicalHits = scanEmitterForHistoricalBriefLiterals(
+      source,
+      constraints,
+      historicalValues,
+      className,
+      minValue,
+    )
+  }
+
+  // HIGH: base result hits (current-brief value literals) + historical-stale hits
+  const highCount = baseResult.hits.length + historicalHits.filter((h) => h.historical_status === 'stale').length
+
+  return {
+    base_result: baseResult,
+    historical_hits: historicalHits,
+    combined_passed: highCount === 0,
+    combined_high_count: highCount,
+  }
 }
