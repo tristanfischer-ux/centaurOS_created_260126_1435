@@ -602,6 +602,14 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
     // integer-clean voltage (e.g. 250S × 3.2 V = 800 V exactly per IEC 61140).
     `wired in ${p.rackCount} racks of ${p.parallelStringsPerRack}P × ${p.seriesCellsPerString}S = ${p.stringVoltageNominalV.toFixed(0)} V per rack`,
     [
+      // L48 council fix (2026-05-27, 4/4 seats): cell_string was the highest-
+      // value BoM line emitting £0 (no list_price_gbp + Engine B class curve
+      // returned 0 for the LFP prismatic cell radical). With L47's macro
+      // mfr/pn preservation, the cell line rendered without a price at all
+      // — collapsing part_realism from 6.25 → 3.75. Real CATL 280 Ah LFP
+      // prismatic cell UK trade ~£90-110 each (CATL bulk orders £70-85; UK
+      // distributor mark-up + import to ~£100). Pin £100 to match the trade
+      // band; 3,750 × £100 = £375k matching the cells line on the cover.
       word(
         'lfp_prismatic_cell_word',
         'LFP prismatic cell word',
@@ -609,6 +617,9 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         [
           mod('quantity', fmtQty(p.cellCount)),
           mod('capacity', String(p.cellCapacityAh), 'Ah'),
+          mod('manufacturer', 'CATL'),
+          mod('part_number', 'LF280K'),
+          mod('list_price_gbp', '100'),
           mod('form', 'prismatic'),
           mod('dimension', String(p.cellVoltageV), 'V'),
           mod('regulatory', 'IEC 62619'),
@@ -1253,6 +1264,10 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
     'converts',
     'DC pack bus ↔ AC grid via bidirectional inverter',
     [
+      // L48 council fix (2026-05-27, 4/4 seats): PCS inverter line was emitting
+      // £0 because mfr+pn not in dedicated modifiers (form-only) + no
+      // list_price_gbp. Sungrow SC1000UD-MV 1 MW utility BESS PCS UK trade
+      // ~£60-90k (Sungrow direct ~£60-70k; UK distributor ~£75-90k). Pin £75k.
       word(
         'pcs_inverter_1mw_bidirectional_word',
         'PCS inverter 1 MW bidirectional word',
@@ -1260,6 +1275,9 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('capacity', String(Math.round(p.continuousPowerKw / 1000)), 'MW'),
+          mod('manufacturer', 'Sungrow'),
+          mod('part_number', 'SC1000UD-MV'),
+          mod('list_price_gbp', '75000'),
           mod('form', 'Sungrow SC1000UD-MV'),
           // L29 council fix: authoritative spec is 1500 V DC max (per Sungrow
           // datasheet + KNOWN_PART_AUTHORITATIVE entry). 1700 V was the IGBT
@@ -1375,6 +1393,10 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
     // reference for external-pad-mount MV switchgear on stationary BESS.
     '400 V AC inverter output to 11 kV grid — EXTERNAL pad-mounted unit outside the container envelope (IEC 62933-5-2 §6.4)',
     [
+      // L48 council fix (2026-05-27, 4/4 seats): step_up_transformer was emitting
+      // £38 (Engine B class curve for "transformer" radical, no MV qualifier).
+      // 1 MVA 400V/11kV cast-resin dry-type UK trade ~£20-30k (Schneider Trihal,
+      // ABB EcoDry, Siemens GEAFOL). Pin Schneider Trihal at £25k.
       word(
         'step_up_transformer_word',
         'step-up transformer word',
@@ -1382,7 +1404,10 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('capacity', '1', 'MVA'),
-          mod('form', '400V/11kV dry-type, external pad-mounted (excluded from container mass budget per IEC 62933-5-2 §6.4)'),
+          mod('manufacturer', 'Schneider Electric'),
+          mod('part_number', 'Trihal 1000kVA 400V/11kV'),
+          mod('list_price_gbp', '25000'),
+          mod('form', '400V/11kV cast-resin dry-type, external pad-mounted (excluded from container mass budget per IEC 62933-5-2 §6.4)'),
           mod('regulatory', 'IEC 60076'),
           mod('installation', 'external pad-mount'),
         ],
@@ -3956,6 +3981,8 @@ function emitInterconnect(p: BessParams): DesignModule {
           // Using an 11 kV gland on a 400 V circuit is a safety-critical
           // labelling error: the gland's voltage rating must match the circuit.
           mod('part_number', 'ICG/501'),
+          // L48 council fix: Hawke ICG/501 LV Ex cable gland UK trade ~£50.
+          mod('list_price_gbp', '50'),
           mod(
             'form',
             `compression-style LV AC cable gland, nickel-plated brass, M63 entry (round, NOT a Roxtec rectangular cable transit frame); count CALCULATED: 3 phases × ceil(${continuousAcA.toFixed(0)} A / ${AMPS_PER_CABLE} A per ${240} mm² Cu cable) = 3 × ${cablesPerPhase} = ${PHASES * cablesPerPhase} phase glands + 1 neutral + 1 PE bond = ${totalGlands} total`,
@@ -3964,12 +3991,19 @@ function emitInterconnect(p: BessParams): DesignModule {
           mod('regulatory', 'IEC 60079-0 + IEC 60079-1 + IEC 60079-7 (Exd + Exe)'),
         ],
       ),
+      // L48 council fix (2026-05-27, 4/4 seats): grid_pcc_metering_ct had
+      // no manufacturer/part_number/list_price_gbp — rendered as part of
+      // the ac_grid_interconnect £7 phantom line. Real ABB CT-05S-2000
+      // 2000A 0.5S accuracy class UK trade ~£300 each.
       word(
         'grid_pcc_metering_ct_word',
         'grid PCC metering CT word',
         cc('grid_pcc_metering_ct', 'grid PCC metering CT', 'magnetic_coupling_function', 'copper'),
         [
           mod('quantity', '×3'),
+          mod('manufacturer', 'ABB'),
+          mod('part_number', 'CT-05S-2000'),
+          mod('list_price_gbp', '300'),
           // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): "0.5S accuracy"
           // is a performance class (IEC 61869 metering CT), not the standard
           // itself. Use `performance` for the class spec; cite the standard
