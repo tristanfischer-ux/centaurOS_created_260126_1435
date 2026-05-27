@@ -1521,6 +1521,25 @@ function fmtGBP_shared(n: number): string {
   return `£${n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 }
 
+// L49 council fix (2026-05-28, 3/4 seats): sub-total column wrap.
+// fmtGBP_shared with decimals (£391,554.00 = 11 chars) overflows the BoM
+// table's price column at flex:1.2 — react-pdf hyphenates the break point,
+// producing `£-` on line 1 and `391,554.00` on line 2 which reads visually
+// as £-391,554 (NEGATIVE) and destroys cost traceability. Council L48
+// 3/4 seats flagged as the dominant blocker; mean dropped from projected
+// 7.6-7.8 to 7.07 entirely on this defect. For aggregated sub-totals the
+// pence precision conveys no engineering information (always rolls up to
+// whole pounds from pence-rounded line items), so dropping decimals at
+// the sub-total layer is lossless. Threshold £1,000: anything ≥£1k uses
+// integer pounds; smaller sub-totals (rare, e.g. supplementary fittings)
+// keep pence for completeness.
+function fmtGBP_subtotal(n: number): string {
+  if (!Number.isFinite(n) || n === 0) return '—'
+  if (n >= 10_000_000) return `£${(n / 1_000_000).toLocaleString('en-GB', { maximumFractionDigits: 1 })}M`
+  if (n >= 1_000) return `£${Math.round(n).toLocaleString('en-GB')}`
+  return `£${n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 // Compact GBP formatter for price-reality badge — drops the pence so the
 // inline "£269/kWh" stays short. Uses M / k abbreviations for big numbers.
 function fmtGBP_compact(n: number): string {
@@ -7191,9 +7210,15 @@ function BillOfMaterialsPage({
     }
     if (row.kind === 'sub-total') {
       return (
+        // L49 council fix (2026-05-28): widen price column flex 1.2 → 1.6
+        // (label flex 6.6 → 6.2) AND swap fmtGBP → fmtGBP_subtotal (drops
+        // pence on ≥£1k aggregates) to prevent the £391,554.00 wrap that
+        // L48 rendered as £-391,554. Two independent guards — column
+        // widening fits up to ~£10M; subtotal-formatter drops the .00
+        // pence that conveys no info on aggregated lines.
         <View key={`subt-${idx}`} wrap={false} style={{ flexDirection: 'row', paddingTop: 3, paddingBottom: 5, marginBottom: 4, borderTopWidth: 0.5, borderTopColor: '#cbd5e1' }}>
-          <View style={{ flex: 6.6 }}><Text style={{ fontSize: 9, color: MUTED, fontStyle: 'italic' }}>Sub-total — {title_case(row.label)}</Text></View>
-          <View style={{ flex: 1.2, alignItems: 'flex-end' }}><Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>{fmtGBP(row.subtotal)}</Text></View>
+          <View style={{ flex: 6.2 }}><Text style={{ fontSize: 9, color: MUTED, fontStyle: 'italic' }}>Sub-total — {title_case(row.label)}</Text></View>
+          <View style={{ flex: 1.6, alignItems: 'flex-end' }}><Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>{fmtGBP_subtotal(row.subtotal)}</Text></View>
           <View style={{ flex: 0.9 }} />
         </View>
       )
@@ -7201,8 +7226,8 @@ function BillOfMaterialsPage({
     if (row.kind === 'module-total') {
       return (
         <View key={`modt-${idx}`} wrap={false} style={{ flexDirection: 'row', paddingTop: 5, paddingBottom: 6, marginBottom: 8, borderTopWidth: 1.2, borderTopColor: ACCENT, backgroundColor: '#f7f8fa', paddingHorizontal: 6 }}>
-          <View style={{ flex: 6.6 }}><Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT }}>Module total — {title_case(row.label)}</Text></View>
-          <View style={{ flex: 1.2, alignItems: 'flex-end' }}><Text style={{ fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: ACCENT }}>{fmtGBP(row.subtotal)}</Text></View>
+          <View style={{ flex: 6.2 }}><Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: ACCENT }}>Module total — {title_case(row.label)}</Text></View>
+          <View style={{ flex: 1.6, alignItems: 'flex-end' }}><Text style={{ fontSize: 10.5, fontFamily: 'Helvetica-Bold', color: ACCENT }}>{fmtGBP_subtotal(row.subtotal)}</Text></View>
           <View style={{ flex: 0.9 }} />
         </View>
       )
