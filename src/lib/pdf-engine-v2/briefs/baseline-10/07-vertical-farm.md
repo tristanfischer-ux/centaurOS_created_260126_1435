@@ -14,7 +14,7 @@ Key constraints (CONTAINER):
 - Crop types: lettuce, basil, rocket, pak choi, kale, microgreens (no fruiting crops v1)
 - Energy use: ≤ 22 kWh per kg produce at steady state (container + skid total, electrical input — industry reference: AeroFarms 32 kWh/kg, Plenty 25-30 kWh/kg, premium UK efficient builds 20-25 kWh/kg)
 - Water use: ≤ 18 L per kg produce (closed-loop recirculating with skid-side reverse-osmosis polish, includes substrate retention + condensate recovery — industry reference: open-field 200-500 L/kg, commercial CEA closed-loop 10-30 L/kg, Plenty reports ~5 L/kg for premium build)
-- Lighting: tunable-spectrum horticultural LED 200-350 µmol·m⁻²·s⁻¹ PPFD per tier, 16-hour photoperiod
+- Lighting: tunable-spectrum horticultural LED 200-350 µmol·m⁻²·s⁻¹ PPFD per tier, 16-hour photoperiod, installed_lighting_kw ≈ 85 kW (100 m² × 350 µmol/m²/s × 2.4 µmol/J LED efficacy)
 - Climate: 20-24 °C, 60-75% RH, 800-1,200 ppm CO₂ (dosed from external CO₂ cylinder via skid)
 - Annual batch size: 25 units per year
 
