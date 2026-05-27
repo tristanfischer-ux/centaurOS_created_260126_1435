@@ -1143,6 +1143,70 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
     }
   }
 
+  // ── UNIVERSAL: reviewer-merge never changes word.id (2026-05-27, L47 Fix B) ──
+  //
+  // UNIVERSAL.reviewer_merge_never_changes_word_id — reads actions.jsonl and
+  // asserts that no Phase 2 repair patch APPLIED a write to a word-identity
+  // field (word.id, content_character, content_character.character_id,
+  // content_character.function_radical_primary, content_character.material_radical_primary).
+  //
+  // The L47 Fix B guard in universal-repair.ts applyPatches() REJECTS such
+  // patches at the top of the per-patch loop, logging a reason with the
+  // prefix "[id-preservation] REJECT". This invariant verifies that no such
+  // patch slipped past the guard and made it into the applied set.
+  //
+  // Detection logic: walk every phase2_repair_N record's reasons[] array.
+  // An APPLIED identity-targeting patch would surface as a reason like
+  // "+<module>.<...>.words[N].id (..)" or "~<module>.<...>.words[N].content_character.character_id (..)" —
+  // i.e. starts with "+" or "~" or "=" (applied marker) AND its path content
+  // matches the WORD_IDENTITY_PROTECTED_REGEXES family. The reject marker is
+  // the literal "[id-preservation] REJECT" substring; we count reasons
+  // matching protected-path patterns that do NOT carry the reject prefix.
+  //
+  // L46 context: ABB Emax E2.2 modifiers loaded onto ac_main_breaker_word by
+  // the emitter were OVERWRITTEN at Phase 2 — the word was renamed to
+  // dc_power_cable_word with manufacturer=Prysmian + part_number=Afumex 1000V.
+  // This invariant catches any future regression of that bug class.
+  {
+    const actionsPath = snapshotPath.replace(/state\.json$/, 'actions.jsonl')
+    if (existsSync(actionsPath)) {
+      const identityRenamesByPhase2: string[] = []
+      // Same regex family as universal-repair.ts WORD_IDENTITY_PROTECTED_REGEXES
+      // but flattened into a single multi-alternation regex for the reasons-string scan.
+      const identityPathRe = /\.words\[\d+\]\.(?:id\b|content_character(?:$|\b|\.(?:character_id|function_radical_primary|material_radical_primary)))/
+      try {
+        const lines = readFileSync(actionsPath, 'utf-8').split('\n').filter(Boolean)
+        for (const line of lines) {
+          try {
+            const rec = JSON.parse(line)
+            if (!/^phase2_repair_/.test(String(rec?.step ?? ''))) continue
+            const reasons: string[] = Array.isArray(rec?.patch_reasons) ? rec.patch_reasons
+              : Array.isArray(rec?.reasons) ? rec.reasons : []
+            for (const r of reasons) {
+              // Skip rejection-success reasons — those mean the guard worked.
+              if (r.includes('[id-preservation] REJECT')) continue
+              // Look for an applied/merged/replaced marker against a protected path.
+              // Applied markers: "+" (append), "~" (merge), "=" (set).
+              if (!/^[+~=]/.test(r)) continue
+              if (identityPathRe.test(r)) {
+                identityRenamesByPhase2.push(`step=${rec.step}: ${r.slice(0, 220)}`)
+              }
+            }
+          } catch { /* skip malformed JSON lines */ }
+        }
+      } catch { /* actions.jsonl unreadable — skip invariant */ }
+      if (identityRenamesByPhase2.length > 0) {
+        assertions.push(assertEq(
+          'UNIVERSAL.reviewer_merge_never_changes_word_id',
+          'Phase 2 repair actions.jsonl has zero applied patches targeting word-identity fields (word.id / content_character / character_id / function_radical_primary / material_radical_primary) — L47 Fix B architectural invariant',
+          identityRenamesByPhase2.length,
+          (n) => n === 0,
+          (n) => `${n} suspect Phase 2 identity-rename action(s) detected in actions.jsonl — the id-preservation guard in universal-repair.ts applyPatches may have been bypassed: ${identityRenamesByPhase2.slice(0, 3).join('; ')}. Fix: re-apply WORD_IDENTITY_PROTECTED_REGEXES guard (search for "[id-preservation] REJECT" in universal-repair.ts).`,
+        ))
+      }
+    }
+  }
+
   // ── UNIVERSAL: shared-quantities consistent across sub_modules (2026-05-26, L38 class-killer A) ──
   //
   // UNIVERSAL.shared_quantities_consistent_across_sub_modules — walks every

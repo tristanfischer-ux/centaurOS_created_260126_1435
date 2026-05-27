@@ -429,6 +429,55 @@ function validateNoDanglingLink(modules: ModuleSpec[], patch: RepairPatch): stri
 }
 
 /**
+ * isWordIdentityProtectedPath — returns true when the patch path targets a
+ * field that defines a word's IDENTITY or STRUCTURAL radicals; such fields
+ * are owned by the deterministic-emitter and must not be mutated by Phase 2.
+ *
+ * Protected (rejected when matched against `patch.path`):
+ *   - <...>.words[N].id                                         (word rename)
+ *   - <...>.words[N].content_character                          (whole-object swap)
+ *   - <...>.words[N].content_character.character_id             (character rename)
+ *   - <...>.words[N].content_character.function_radical_primary (structural)
+ *   - <...>.words[N].content_character.material_radical_primary (structural)
+ *
+ * NOT protected (Phase 2 may freely write these):
+ *   - <...>.words[N].name_human                       (display label)
+ *   - <...>.words[N].content_character.name_human     (display label)
+ *   - <...>.words[N].modifier_characters[+]           (enrichment merge branch)
+ *   - <...>.words[N].content_character.function_radical_secondary
+ *   - <...>.words[N].content_character.material_radical_secondary
+ *
+ * Matches operate on the raw patch.path string (e.g. "sub_modules[2].words[5].id"
+ * or "modules[0].sub_modules[2].words[5].content_character.character_id"). The
+ * helper does NOT walk the runtime tokens — that walk happens later in
+ * applyPatches, and we want to fail fast (before the walk) on identity-protected
+ * paths. Patches whose paths look like a `words[+]` append are NOT identity
+ * patches (they go through the dedicated merge branch which handles existing-id
+ * matching), so the regex specifically requires a numeric index `[N]`.
+ *
+ * Codified 2026-05-27 L47 fix B (reviewer-merge ID-preservation guard).
+ */
+const WORD_IDENTITY_PROTECTED_REGEXES = [
+  // word.id rename — must end EXACTLY with `.id` at the leaf (not `.<thing>.id`)
+  /\.words\[\d+\]\.id$/,
+  // whole content_character swap (no further path tokens)
+  /\.words\[\d+\]\.content_character$/,
+  // identity fields nested under content_character
+  /\.words\[\d+\]\.content_character\.character_id($|\.)/,
+  /\.words\[\d+\]\.content_character\.function_radical_primary($|\.)/,
+  /\.words\[\d+\]\.content_character\.material_radical_primary($|\.)/,
+]
+
+export function isWordIdentityProtectedPath(path: string | null | undefined): boolean {
+  if (!path) return false
+  const s = String(path)
+  for (const re of WORD_IDENTITY_PROTECTED_REGEXES) {
+    if (re.test(s)) return true
+  }
+  return false
+}
+
+/**
  * Options for applyPatches.
  *
  * verifiedPartsAllowlist: when provided, every patch that introduces or
@@ -543,6 +592,47 @@ export function applyPatches(
       }
     }
     // ── END ALLOWLIST CHECK ──────────────────────────────────────────────
+
+    // ── WORD-IDENTITY PRESERVATION GUARD (2026-05-27 L47 architectural fix) ──
+    // L46 council found that ABB Emax E2.2 modifiers loaded onto
+    // ac_main_breaker_word by deterministic-emitter.ts had been OVERWRITTEN at
+    // Phase 2 — the word's id was renamed to dc_power_cable_word with
+    // manufacturer=Prysmian + part_number=Afumex 1000V. The L33 X fix
+    // (preserve-modifiers-when-LLM-renames-words) closed the modifier-loss
+    // hole; this Fix B closes the ORTHOGONAL id-rename hole.
+    //
+    // Phase 2 LLM (repair LLM) MAY NEVER:
+    //   - Change a word's `id` field via a path like `<...>.words[N].id`.
+    //   - Change a word's `content_character.character_id` via
+    //     `<...>.words[N].content_character.character_id`.
+    //   - Change a word's `content_character.function_radical_primary` or
+    //     `material_radical_primary` (structural radicals).
+    //   - Replace the entire `content_character` object via
+    //     `<...>.words[N].content_character`.
+    //
+    // Phase 2 LLM MAY:
+    //   - Change `word.name_human` (display label only).
+    //   - Change `word.content_character.name_human` (display label only).
+    //   - ADD `modifier_characters` via the words[+] merge branch (which has
+    //     its own SAFETY_PROTECTED_KINDS guard) or via a direct append.
+    //
+    // Rejected patches are logged via reasons[] (persisted to actions.jsonl
+    // by the chain's phase2_repair_N log step). A regression invariant
+    // UNIVERSAL.reviewer_merge_never_changes_word_id walks the final state.json
+    // and asserts no Phase-2-introduced id renames slipped past the guard.
+    if (isWordIdentityProtectedPath(p.path)) {
+      skipped++
+      reasons.push(
+        `[id-preservation] REJECT ${p.module}.${p.path}: patch targets a word-identity field ` +
+        `(word.id / content_character.character_id / function_radical_primary / ` +
+        `material_radical_primary). Phase 2 may not rename words or alter their ` +
+        `structural radicals; the deterministic-emitter owns these. ` +
+        `If the word's name needs an update for display, edit word.name_human instead. ` +
+        `(${p.reason})`
+      )
+      continue
+    }
+    // ── END WORD-IDENTITY PRESERVATION GUARD ─────────────────────────────
 
     // Validate against dangling links BEFORE applying — iter-22 bug: repair
     // LLM kept "fixing" dangling refs by adding more links to non-existent
