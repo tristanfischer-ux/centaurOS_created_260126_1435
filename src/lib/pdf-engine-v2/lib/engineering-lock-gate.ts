@@ -46,7 +46,7 @@ import type { EngineeringContract } from '../../../../scripts/lib/engineering-co
 // These slots MUST be filled after lock-gate runs. Exit code 22 if any remain
 // zero/missing. Only include slots whose absence would make Phase 2 arithmetic
 // gates nonsensical (not just "nice-to-have" quantities).
-const HARD_REQUIRED_SLOTS: Record<string, string[]> = {
+export const HARD_REQUIRED_SLOTS: Record<string, string[]> = {
   bess: ['nameplate_capacity_kwh', 'continuous_power_kw', 'cell_count', 'dc_bus_voltage_v'],
   energy_storage: ['nameplate_capacity_kwh', 'continuous_power_kw'],
   heat_pump: ['rated_thermal_kw', 'cop'],

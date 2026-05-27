@@ -41,6 +41,8 @@ import { execFileSync } from 'child_process'
 import { resolve, dirname } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
+import { buildContract } from './lib/engineering-contract'
+import { HARD_REQUIRED_SLOTS } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 
 interface Assertion {
   id: string
@@ -1836,6 +1838,63 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
       }
     } catch (err) {
       assertions.push({ id: 'UNIVERSAL.selected_pumps_within_bep_envelope', description: 'Pump BEP envelope check (L42 Deliverable C)', passed: false, detail: `Failed to load hardware-selectors module: ${err}` })
+    }
+  }
+
+  // ── UNIVERSAL: all classes lock-gate HARD slots derivable from minimal brief (2026-05-27, L43 Deliverable C) ──
+  //
+  // UNIVERSAL.all_classes_lock_gate_hard_slots_derivable — for every class in
+  // HARD_REQUIRED_SLOTS, runs buildContract() on a synthetic minimal brief and
+  // asserts that ALL HARD slots are present and non-zero in the resulting
+  // Contract.quantities. Fails build if any class's HARD slots aren't derivable.
+  //
+  // Root cause: VF chain failed 4× at Engineering Lock Gate exit 22 because the
+  // VF builder emitted 'led_installed_power_kw' while the gate checked
+  // 'installed_lighting_kw'. Same "mechanism universal, per-class schema partial"
+  // pattern from drawer e9be6d1fd3f95149. Pre-change mempalace search:
+  // "engineering contract derived parameters per-class HARD slot completion" →
+  // 5 drawers loaded. See drawer a9d3a83646b33d8c (watchdog stall pattern) —
+  // NO smoke chain needed; this invariant provides the mechanical guard instead.
+  //
+  // The synthetic minimal brief is intentionally sparse — each class must derive
+  // HARD slots from defaults alone (i.e., the builder's fallback paths must work).
+  // Briefs with explicit brief inputs would also pass; this is the minimum bar.
+  {
+    const MINIMAL_BRIEF: Record<string, unknown> = {
+      product_description: '',
+      constraints: { target_performance: { value: 100, unit: 'kW' }, max_mass_kg: { value: 10000 } },
+    }
+    for (const [cls, hardSlots] of Object.entries(HARD_REQUIRED_SLOTS)) {
+      if (hardSlots.length === 0) continue
+      let contract: ReturnType<typeof buildContract>
+      try {
+        contract = buildContract(cls, MINIMAL_BRIEF)
+      } catch (err) {
+        assertions.push({ id: `UNIVERSAL.all_classes_lock_gate_hard_slots_derivable.${cls}`, description: `Class '${cls}': buildContract runs without throwing on minimal brief`, passed: false, detail: `buildContract('${cls}', minimalBrief) threw: ${err}` })
+        continue
+      }
+      if (!contract) {
+        assertions.push({ id: `UNIVERSAL.all_classes_lock_gate_hard_slots_derivable.${cls}`, description: `Class '${cls}': archetype registered for all HARD_REQUIRED_SLOTS classes`, passed: false, detail: `buildContract('${cls}', ...) returned null — no archetype registered. Register one in scripts/lib/engineering-contract.ts with derivations for: ${hardSlots.join(', ')}` })
+        continue
+      }
+      const missingSlots: string[] = []
+      for (const slot of hardSlots) {
+        const qty = contract.quantities[slot]
+        // qty is always a Quantity object (or undefined if missing). Extract .value safely.
+        const val: number | undefined = qty != null && typeof qty === 'object'
+          ? (qty as unknown as { value?: number }).value
+          : undefined
+        if (val === undefined || val === null || val === 0) {
+          missingSlots.push(slot)
+        }
+      }
+      assertions.push(assertEq(
+        `UNIVERSAL.all_classes_lock_gate_hard_slots_derivable.${cls}`,
+        `Class '${cls}': all ${hardSlots.length} HARD lock-gate slot(s) derivable from minimal brief — ${hardSlots.join(', ')} (L43 universal contract completeness, drawer e9be6d1fd3f95149)`,
+        missingSlots.length,
+        (n: number) => n === 0,
+        (n: number) => `${n} HARD slot(s) not derivable for '${cls}': ${missingSlots.join(', ')}. Fix: add derivation for each missing slot in the '${cls}' archetype builder in scripts/lib/engineering-contract.ts. The lock gate (engineering-lock-gate.ts) will fire exit 22 until all HARD slots are filled.`,
+      ))
     }
   }
 

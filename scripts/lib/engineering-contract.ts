@@ -311,6 +311,7 @@ const ARCHETYPE_ALIASES: Record<string, string> = {
   on_prem_inference: 'edge_ai',
   ai_inference_appliance: 'edge_ai',
   ev_charger: 'ev_charger',
+  aev_charger: 'ev_charger',  // lock-gate HARD_REQUIRED_SLOTS uses 'aev_charger' as a separate key; resolves to ev_charger archetype
   ev_charging_station: 'ev_charger',
   dc_fast_charger: 'ev_charger',
   ccs_fast_charger: 'ev_charger',
@@ -1288,6 +1289,10 @@ registerArchetype('vertical_farm', (brief: any) => {
     ppfd_target_umol_m2_s: q(ppfdTarget, 'µmol/m²/s', 'photon_flux_density', 'rated', 'rack', 'brief'),
     led_efficacy_umol_per_j: q(ledEfficacyUmolPerJ, 'µmol/J', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'Modern horticultural LED full-spectrum typical' }),
     led_installed_power_kw: q(ledPowerKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'canopy × PPFD / efficacy / 1000' }),
+    // Lock-gate HARD slot alias (engineering-lock-gate.ts::HARD_REQUIRED_SLOTS['vertical_farm']).
+    // The gate checks 'installed_lighting_kw'; the primary slot above is 'led_installed_power_kw'.
+    // Both point to the same computed value. If the gate slot name ever changes, update BOTH.
+    installed_lighting_kw: q(ledPowerKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'alias of led_installed_power_kw — lock-gate HARD slot (exit 22)' }),
     aux_load_kw: q(auxLoadKw, 'kW', 'power', 'continuous', 'system', 'physics_constant', { source_detail: 'fertigation pumps + sensors + PLC + CO2 valve' }),
     hvac_cooling_kw: q(hvacCoolingKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: '(LED × 0.95 heat + aux) × 1.20 margin' }),
     co2_target_ppm: q(co2TargetPpm, 'ppm', 'dimensionless', 'rated', 'system', 'brief'),
@@ -1531,6 +1536,9 @@ registerArchetype('heat_pump_residential', (brief: any) => {
     rated_thermal_kw: q(thermalKw, 'kW', 'power', 'rated', 'system', 'brief', { source_detail: 'brief.constraints.target_performance', condition: 'A2/W35 (EN 14511)' }),
     rated_electrical_kw: q(electricalKw, 'kW', 'power', 'rated', 'system', 'calculator', { source_detail: 'thermal_kw / cop_rated' }),
     cop_rated: q(copRated, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'EN 14511 A2/W35; air-source residential typical 3.6-4.0', condition: 'A2/W35' }),
+    // Lock-gate HARD slot alias (engineering-lock-gate.ts::HARD_REQUIRED_SLOTS['heat_pump']).
+    // Gate checks 'cop'; primary slot is 'cop_rated'. Both identical value.
+    cop: q(copRated, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'alias of cop_rated — lock-gate HARD slot (exit 22)', condition: 'A2/W35 EN 14511' }),
     scop: q(scop, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'EN 14825 seasonal; air-source residential typical 4.2-5.0', condition: 'Average climate, W35' }),
     refrigerant: q(0, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: `refrigerant=${refrigerantId} (${refrigerantId === 'r290' ? 'propane, GWP=3, A3 flammable' : refrigerantId === 'r32' ? 'difluoromethane, GWP=675, A2L mildly flammable' : 'unknown'})` }),
     refrigerant_charge_kg: q(refrigerantChargeKg, 'kg', 'mass', 'rated', 'system', 'calculator', { source_detail: '0.15 kg/kW thermal × rated_thermal_kw' }),
@@ -2984,6 +2992,9 @@ registerArchetype('ev_charger', (brief: any) => {
     rated_power_kw: q(ratedPowerKw, 'kW', 'power', 'continuous', 'system', 'brief', { source_detail: 'brief.constraints.target_performance', condition: 'continuous DC output' }),
     peak_power_kw: q(peakPowerKw, 'kW', 'power', 'peak', 'system', 'calculator', { source_detail: 'continuous × 1.05 transient' }),
     output_voltage_max_v: q(outputVoltageMaxV, 'V', 'dimensionless', 'max', 'system', 'physics_constant', { source_detail: 'CCS2 IEC 62196-3 800 V architecture support (DC output)' }),
+    // Lock-gate HARD slot alias (engineering-lock-gate.ts::HARD_REQUIRED_SLOTS['ev_charger'] and 'aev_charger']).
+    // Gate checks 'dc_output_voltage_v'; primary slot is 'output_voltage_max_v'. Same value.
+    dc_output_voltage_v: q(outputVoltageMaxV, 'V', 'voltage', 'DC', 'system', 'physics_constant', { source_detail: 'alias of output_voltage_max_v — lock-gate HARD slot (exit 22); CCS2 max DC output voltage' }),
     output_voltage_nominal_v: q(outputVoltageNominalV, 'V', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'rating-midpoint for current sizing' }),
     output_current_max_a: q(outputCurrentMaxA, 'A', 'dimensionless', 'max', 'system', 'calculator', { source_detail: 'rated_power × 1000 / nominal_voltage' }),
     ac_input_voltage_v: q(acInputVoltageV, 'V', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: '3-phase 400 V mains 50/60 Hz' }),
@@ -3293,6 +3304,11 @@ registerArchetype('solar_inverter', (brief: any) => {
 
   const quantities: Record<string, Quantity> = {
     rated_power_kw: q(ratedKw, 'kW', 'power', 'rated', 'system', 'brief', { source_detail: 'brief.constraints.target_performance', condition: 'AC output, 25°C ambient' }),
+    // Lock-gate HARD slot aliases (engineering-lock-gate.ts::HARD_REQUIRED_SLOTS['solar_inverter']).
+    // Gate checks 'rated_ac_power_kw' and 'max_dc_voltage_v'; primary slots are
+    // 'rated_power_kw' and 'dc_input_voltage_v'. Both pairs point to the same values.
+    rated_ac_power_kw: q(ratedKw, 'kW', 'power', 'rated', 'system', 'brief', { source_detail: 'alias of rated_power_kw — lock-gate HARD slot (exit 22)', condition: 'AC output, 25°C ambient' }),
+    max_dc_voltage_v: q(dcInputV, 'V', 'voltage', 'DC', 'system', 'brief', { source_detail: 'alias of dc_input_voltage_v — lock-gate HARD slot (exit 22); maximum DC input voltage at rated MPPT' }),
     topology_class: q(topologyClass === 'residential' ? 1 : topologyClass === 'commercial' ? 2 : 3, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=residential<10kW, 2=commercial 10-250kW, 3=utility ≥250kW' }),
     semiconductor_technology: q(semiconductorTech === 'Si_IGBT' ? 1 : semiconductorTech === 'SiC_hybrid' ? 2 : 3, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'enum: 1=Si IGBT, 2=SiC hybrid, 3=SiC full; SiC chosen above 100 kW for efficiency premium' }),
     dc_input_voltage_v: q(dcInputV, 'V', 'voltage', 'DC', 'system', 'brief'),
