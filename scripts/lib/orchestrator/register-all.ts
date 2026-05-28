@@ -27,7 +27,7 @@ import './tools/cantera-real'        // Build #18j  Cantera 3.2.0
 // downstream consumers do not need migration. Per mempalace tier-1 policy,
 // distributor APIs are the authoritative source for parts catalogue data.
 import './tools/distributor-cascade-real'
-import './tools/iec-standards-stub'  // stub (needs scrape or local DB)
+import './tools/iec-standards-stub'  // DB-backed: forge-truth.db pretraining_extracted_standards + curated region/mandatory overlay
 import './tools/mass-aggregator'     // Build #18q  pure-TS internal aggregator
 
 // ---------------------------------------------------------------------------

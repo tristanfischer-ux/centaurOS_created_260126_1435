@@ -10,6 +10,10 @@
 
 import { registerTool } from '../registry'
 import type { Tool, ToolResult } from '../types'
+import Database from 'better-sqlite3'
+import { resolve } from 'node:path'
+import { homedir } from 'node:os'
+import { existsSync } from 'node:fs'
 
 export interface IecStandardsInput {
   product_class: string
@@ -61,29 +65,109 @@ const STANDARDS_BY_CLASS: Record<string, IecStandardsOutput> = {
   },
 }
 
+// 2026-05-28 DE-STUB: query the real corpus instead of returning only the
+// hardcoded subset. ~/.forge-truth/forge-truth.db `pretraining_extracted_standards`
+// holds 4,098 standards extracted from real spec documents, linked to a
+// product_class via pretraining_spec_documents (140 join to BESS docs alone).
+// We READ that DB (DB-first, per the chain-as-DB-consumer principle) and keep
+// the curated STANDARDS_BY_CLASS as an authoritative region+mandatory overlay
+// the raw extraction lacks. Read-only; graceful no-op if the DB is absent.
+function lookupStandardsFromDb(productClass: string): Array<{ standard_name: string; scope: string | null; excerpt: string | null }> {
+  try {
+    const dbPath = resolve(homedir(), '.forge-truth', 'forge-truth.db')
+    if (!existsSync(dbPath)) return []
+    const db = new Database(dbPath, { readonly: true })
+    try {
+      const cls = String(productClass || '').toLowerCase().trim()
+      if (!cls) return []
+      return db.prepare(
+        `SELECT DISTINCT s.standard_name AS standard_name, s.scope AS scope, s.raw_excerpt AS excerpt
+           FROM pretraining_extracted_standards s
+           JOIN pretraining_spec_documents d ON s.document_id = d.id
+          WHERE s.standard_name IS NOT NULL AND TRIM(s.standard_name) != ''
+            AND ( lower(d.product_class) = @cls
+                  OR lower(d.product_class) LIKE @cls || '%'
+                  OR @cls LIKE lower(d.product_class) || '%' )
+          ORDER BY s.standard_name`,
+      ).all({ cls }) as Array<{ standard_name: string; scope: string | null; excerpt: string | null }>
+    } finally {
+      db.close()
+    }
+  } catch {
+    return []
+  }
+}
+
 export const iecStandardsLookupStub: Tool<IecStandardsInput, IecStandardsOutput> = {
   id: 'iec-standards:lookup',
   name: 'IEC/UL/NFPA/ENA Standards Lookup',
-  version: '2026-05-stub',
+  version: '2026-05-db',
   license: 'CC-BY-4.0',
-  source_url: 'webstore.iec.ch + ulstandards.ul.com + nfpa.org',
+  source_url: '~/.forge-truth/forge-truth.db pretraining_extracted_standards + curated overlay',
   domain: 'standards',
-  pinned_environment: { catalog_version: '2026-05-stub' },
+  pinned_environment: { source: 'forge-truth.db:pretraining_extracted_standards' },
   applicable_to() {
     return true
   },
   async invoke(input): Promise<ToolResult<IecStandardsOutput>> {
     const t0 = Date.now()
-    const data = STANDARDS_BY_CLASS[input.product_class]
-    if (!data) {
-      return { ok: false, output: null, provenance: { source: 'tool:iec-standards:lookup', tool_id: 'iec-standards:lookup', tool_version: '2026-05-stub' }, warnings: [], error: `no standards data for class: ${input.product_class}` }
+    const curated = STANDARDS_BY_CLASS[input.product_class] ?? null
+    const dbRows = lookupStandardsFromDb(input.product_class)
+
+    // Curated mandatory list stays authoritative — it carries the region +
+    // mandatory classification the raw DB extraction does not. Region-filter it.
+    const mandatory = curated
+      ? curated.mandatory_standards.filter(s => s.mandatory_for_region.includes(input.region))
+      : []
+    // Family keys from the curated mandatory codes, so we don't double-list a
+    // standard the overlay already covers (e.g. DB "IEC 62619" vs curated "IEC 62619:2022").
+    const mandatoryFamilies = mandatory.map(s => s.code.replace(/[:\s].*$/, '').toLowerCase()).filter(Boolean)
+
+    const seen = new Set<string>()
+    const dbRecommended = dbRows
+      .filter(r => {
+        const key = String(r.standard_name).trim().toLowerCase()
+        if (!key || seen.has(key)) return false
+        seen.add(key)
+        for (const fam of mandatoryFamilies) if (fam && (key.includes(fam) || fam.includes(key))) return false
+        return true
+      })
+      .map(r => ({
+        code: r.standard_name.trim(),
+        title: String(r.scope || r.excerpt || '').trim().slice(0, 200),
+        summary: String(r.excerpt || r.scope || '').trim().slice(0, 300),
+      }))
+
+    const output: IecStandardsOutput = {
+      mandatory_standards: mandatory,
+      recommended_standards: [...(curated?.recommended_standards ?? []), ...dbRecommended],
     }
-    // Filter mandatory by region
-    const filtered: IecStandardsOutput = {
-      mandatory_standards: data.mandatory_standards.filter(s => s.mandatory_for_region.includes(input.region)),
-      recommended_standards: data.recommended_standards,
+
+    const warnings: string[] = []
+    if (dbRows.length === 0 && !curated) {
+      warnings.push(`No standards in forge-truth.db for class "${input.product_class}" and no curated overlay.`)
+    } else {
+      warnings.push(`Standards: ${mandatory.length} curated-mandatory (region ${input.region}) + ${dbRecommended.length} from forge-truth.db (class "${input.product_class}", ${dbRows.length} rows scanned).`)
     }
-    return { ok: true, output: filtered, provenance: { source: 'tool:iec-standards:lookup', tool_id: 'iec-standards:lookup', tool_version: '2026-05-stub', tool_license: 'CC-BY-4.0', tool_source_url: 'webstore.iec.ch', invocation_input: input, pinned_versions: { catalog_version: '2026-05-stub' }, timestamp: new Date(0).toISOString(), duration_ms: Date.now() - t0 }, warnings: ['STUB: curated standards subset; real IEC catalog scrape not wired'] }
+
+    const hasAny = output.mandatory_standards.length > 0 || output.recommended_standards.length > 0
+    return {
+      ok: hasAny,
+      output: hasAny ? output : null,
+      provenance: {
+        source: 'tool:iec-standards:lookup',
+        tool_id: 'iec-standards:lookup',
+        tool_version: '2026-05-db',
+        tool_license: 'CC-BY-4.0',
+        tool_source_url: '~/.forge-truth/forge-truth.db pretraining_extracted_standards',
+        invocation_input: input,
+        pinned_versions: { source: 'forge-truth.db:pretraining_extracted_standards' },
+        timestamp: new Date().toISOString(),
+        duration_ms: Date.now() - t0,
+      },
+      warnings,
+      ...(hasAny ? {} : { error: `no standards data for class: ${input.product_class}` }),
+    }
   },
 }
 registerTool(iecStandardsLookupStub)
