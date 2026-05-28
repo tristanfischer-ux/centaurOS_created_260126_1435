@@ -3939,6 +3939,14 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack
     const METRIC_MAP: Record<string, { qtyKey: string; label: string; unit: string; convert?: (v: number) => number; tolerancePct?: number; kind?: MetricKind }> = {
       // BESS-class energy/power (all FLOORS — brief states minimum/target performance)
       nameplate_capacity_mwh:      { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy capacity', unit: 'MWh', convert: (v) => v / 1000, tolerancePct: 5, kind: 'floor' },
+      // 2026-05-28 (gate 17, BESS L57): brief parser emits energy/power metric
+      // keys in either kWh/kW or MWh/MW per run; cover both unit variants so the
+      // compliance row always renders. nameplate_capacity_kwh mirrors the _mwh
+      // convention (brief target compared against achieved usable). transient_power
+      // is the brief's overload spec → achieved peak_power_kw.
+      nameplate_capacity_kwh:      { qtyKey: 'usable_capacity_kwh',       label: 'Usable energy capacity', unit: 'kWh', tolerancePct: 5, kind: 'floor' },
+      transient_power_kw:          { qtyKey: 'peak_power_kw',             label: 'Transient (peak) power', unit: 'kW',  tolerancePct: 5, kind: 'floor' },
+      transient_power_mw:          { qtyKey: 'peak_power_kw',             label: 'Transient (peak) power', unit: 'MW',  convert: (v) => v / 1000, tolerancePct: 5, kind: 'floor' },
       // Direct-kWh / kW brief keys (alias, BESS L23 council fix — gate 17 caught
       // L23 brief using these direct keys while the table only knew the _mwh / _mw
       // variants, so the compliance row silently dropped a 23% usable-energy shortfall)

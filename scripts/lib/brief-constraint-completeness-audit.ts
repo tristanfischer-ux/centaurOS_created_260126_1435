@@ -82,6 +82,11 @@ import { readFileSync } from 'node:fs'
 // IMPORTANT: keep in sync with METRIC_MAP at render-minimal-pdf.tsx:3626.
 const KNOWN_METRIC_MAP: Record<string, { qtyKey: string; label: string }> = {
   nameplate_capacity_mwh: { qtyKey: 'usable_capacity_kwh', label: 'Usable energy capacity' },
+  // 2026-05-28 (gate 17, BESS L57): mirror the renderer METRIC_MAP additions —
+  // nameplate_capacity_kwh (kWh variant) + transient_power kW/MW (overload spec).
+  nameplate_capacity_kwh: { qtyKey: 'usable_capacity_kwh', label: 'Usable energy capacity' },
+  transient_power_kw: { qtyKey: 'peak_power_kw', label: 'Transient (peak) power' },
+  transient_power_mw: { qtyKey: 'peak_power_kw', label: 'Transient (peak) power' },
   // BESS L24 (2026-05-25): direct-kWh / kW brief keys added to renderer
   // METRIC_MAP by commit 2dbca713e. Mirror them here so the audit doesn't
   // re-flag these as renderer-blindness misses.
@@ -128,6 +133,8 @@ const HARD_PERFORMANCE_KEYS = new Set([
   'rated_power_kw',
   'peak_power_mw',
   'peak_power_kw',
+  'transient_power_kw',   // BESS L57: brief overload spec — system-identity metric
+  'transient_power_mw',
   'continuous_power_kw',
   'continuous_power_mw',  // BESS L24: MW alias added to renderer METRIC_MAP
   'dc_bus_voltage_v',
