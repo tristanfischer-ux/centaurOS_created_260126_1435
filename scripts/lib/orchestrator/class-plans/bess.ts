@@ -362,7 +362,10 @@ const stepIecStandards: ToolStep = {
   input_from_contract: () => ({ product_class: 'bess', region: 'EU' as const, voltage_class_v: 11000 }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { mandatory_standards: any[] }
-    const prov = (f: string) => ({ source: 'tool:iec-standards:lookup' as const, tool_id: 'iec-standards:lookup', tool_version: '2026-05-stub', tool_license: 'CC-BY-4.0' as const, tool_source_url: 'webstore.iec.ch', invocation_output_field: f, duration_ms: 0 })
+    // 2026-05-28: iec-standards de-stubbed to read forge-truth.db
+    // pretraining_extracted_standards (4,098 rows) + curated overlay; provenance
+    // must match so the tools-flow node stops showing a dead "…v2026-05-stub".
+    const prov = (f: string) => ({ source: 'tool:iec-standards:lookup' as const, tool_id: 'iec-standards:lookup', tool_version: '2026-05-db', tool_license: 'CC-BY-4.0' as const, tool_source_url: '~/.forge-truth/forge-truth.db pretraining_extracted_standards', invocation_output_field: f, duration_ms: 0 })
     return {
       ...c,
       quantities: {
