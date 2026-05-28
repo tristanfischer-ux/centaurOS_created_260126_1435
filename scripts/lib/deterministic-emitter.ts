@@ -1001,6 +1001,11 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('form', 'Wago 221-2401 carrier rail for Wago 221 series inline splicing connectors, snap-in DIN-rail mount'),
           mod('manufacturer', 'Wago'),
           mod('part_number', '221-2401'),
+          // L50 gate-21 fix (2026-05-28): Engine B class curve emitted £3.80;
+          // cached Farnell price for the Wago 221-2401 carrier is £0.64 →
+          // gate 21 flagged 5.98× (>5× over-bill, exit 21). Pin £0.70
+          // (≈ Farnell qty-1 + small UK margin) so the line stays in-band.
+          mod('list_price_gbp', '0.70'),
         ],
       ),
     ],

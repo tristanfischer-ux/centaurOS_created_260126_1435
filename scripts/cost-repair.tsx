@@ -266,6 +266,25 @@ async function main() {
   for (const r of allResponses) {
     const idx = pv.findIndex((v: any) => v.word_id === r.word_id)
     if (idx < 0) continue
+    // L50 fix (2026-05-28): NEVER override an emitter-pinned list_price_gbp.
+    // When the deterministic emitter sets mod('list_price_gbp', N), the
+    // estimate-missing-prices pre-step records distributor_price_source =
+    // 'emitter_list_price' and distributor_price_gbp = N as the AUTHORITATIVE
+    // catalogue price. Cost-repair is an LLM-driven corpus reconciliation
+    // step — it must not second-guess a human-pinned MPN price. L50 council
+    // root cause: Siemens SIMATIC HMI TP1500 pinned at £1,958.87 (real Mouser)
+    // was "corrected" down to £420 by cost-repair (4× the Engine B ~£105 class
+    // curve), and the renderer reads cost_repair_corrected_price_gbp ?? ...
+    // so the pin was silently overridden — gate 21 then flagged 0.21× MEDIUM.
+    // This is universal: any list_price_gbp pin (cells, PCS, transformer,
+    // contactors, HMI) must be immune to cost-repair drift.
+    if (pv[idx].distributor_price_source === 'emitter_list_price') {
+      pv[idx].cost_repair_action = 'left_as_is'
+      pv[idx].cost_repair_reasoning =
+        `[EMITTER-PIN] distributor_price_gbp=£${Number(pv[idx].distributor_price_gbp).toFixed(2)} is an authoritative emitter list_price_gbp pin; cost-repair skipped (LLM proposed: ${r.action}${typeof r.corrected_unit_price_gbp === 'number' ? ` £${r.corrected_unit_price_gbp}` : ''}).`
+      leaveAsIs++
+      continue
+    }
     pv[idx].cost_repair_action = r.action
     pv[idx].cost_repair_reasoning = r.reasoning
     pv[idx].cost_repair_confidence = r.confidence
