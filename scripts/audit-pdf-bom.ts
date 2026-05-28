@@ -398,7 +398,15 @@ async function audit(outDir: string): Promise<{ findings: Finding[]; bom: BomExt
     const bomSum = Array.from(moduleHeaders.values()).reduce((a, v) => a + v, 0)
     const cover = bom.cover_raw_materials_bom_gbp
     const ratio = bomSum / Math.max(cover, 1)
-    if (Math.abs(1 - ratio) > 0.10) {
+    // 2026-05-28: tightened from a 10% band — which let BESS L55's £6,012
+    // (0.67%) orphaned-macro gap pass while 4 council seats flagged it as a
+    // self-contradiction — to £50 + 0.2% near-exact. computeBomTotals now gives
+    // every unmatched macro a visible module home (render-minimal-pdf.tsx) so
+    // cover == Σ(module headers) BY CONSTRUCTION; only pence-rounding + batch-
+    // economics drift remain. Absolute floor (£50) tolerates pennies on small
+    // BoMs; 0.2% scales for large ones. Universal across all 35 classes.
+    const absGap = Math.abs(cover - bomSum)
+    if (absGap > Math.max(50, cover * 0.002)) {
       findings.push({
         severity: 'HIGH',
         check_id: 'B-3',

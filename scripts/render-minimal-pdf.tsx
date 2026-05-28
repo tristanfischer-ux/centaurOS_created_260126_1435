@@ -1256,10 +1256,72 @@ function computeBomTotals(state: any): BomTotals | null {
     // £3.18M of cost. Strict match only via exact ID; the BESS pattern of
     // emitting word_id = `${macro_name}_word` is the supported mapping.
     const matched = wordNames.has(lowerName) || wordNames.has(`${lowerName}_word`)
-    if (!matched) {
-      unmatchedMacroTotal_gbp = roundToPence(unmatchedMacroTotal_gbp + total)
-      unmatchedMacros.push({ name: lowerName, total })
+    if (!matched) unmatchedMacros.push({ name: lowerName, total: roundToPence(total) })
+  }
+  // 2026-05-28 (BESS L55 regression root-cause — DETERMINISM): an unmatched
+  // macro-assembly price (e.g. liquid_cooling_loop £6,012 on a run where the
+  // generator did NOT emit a `liquid_cooling_loop_word`) was previously added
+  // to grandTotal_gbp ONLY — never to any module sub-total. The cover "Raw
+  // materials BoM" then exceeded Σ(module headers) by the unmatched total: a
+  // RUN-TO-RUN gap (£0 the runs every macro matched a word → L54 reconciled at
+  // 8.49; £6,012 the runs one didn't → L55 council 5.87) that 4 LLM seats flag
+  // as a self-contradiction while B-3's old 10% tolerance let it pass. Fix:
+  // give every unmatched macro a VISIBLE module home (best token-overlap match,
+  // deterministic largest-module fallback) so cover == Σ(headers) BY
+  // CONSTRUCTION every run. Universal across all 35 product classes; the macro
+  // also still flows into grandTotal via the same per-macro rounded total, so
+  // the two paths can no longer diverge.
+  for (const um of unmatchedMacros) {
+    const macroTokens = new Set(um.name.split(/[_\s]+/).filter((t) => t.length >= 3))
+    let best: { mod: BomMod; sub: BomSub; score: number } | null = null
+    for (const mod of allMods) {
+      const modTokenStr = `${mod.module} ${mod.label}`.toLowerCase()
+      for (const sub of mod.subs) {
+        const subTokenStr = `${sub.id} ${sub.name} ${modTokenStr}`.toLowerCase()
+        let score = 0
+        for (const t of macroTokens) if (subTokenStr.includes(t)) score += 1
+        if (!best || score > best.score) best = { mod, sub, score }
+      }
     }
+    let homeMod: BomMod
+    let homeSub: BomSub
+    if (best && best.score > 0) {
+      homeMod = best.mod
+      homeSub = best.sub
+    } else {
+      // No token overlap — deterministic fallback to the largest module, in a
+      // dedicated, clearly-labelled aggregated-assemblies sub so the line is
+      // still visible rather than silently bumping a subtotal.
+      homeMod = allMods.reduce((a, b) => (b.subtotal_gbp > a.subtotal_gbp ? b : a), allMods[0])
+      homeSub = homeMod.subs.find((s) => s.id === 'aggregated_assemblies')
+        ?? (() => {
+          const s: BomSub = { id: 'aggregated_assemblies', name: 'Aggregated Assemblies', parts: [], subtotal_gbp: 0 }
+          homeMod.subs.push(s)
+          return s
+        })()
+    }
+    const syntheticRow: BomPartRow = {
+      word_name: `${humanise(um.name)} (assembly)`,
+      word_id: `${um.name}_macro_assembly`,
+      manufacturer: null,
+      part_number: null,
+      source_url: null,
+      source_method: null,
+      distributor_price_gbp: null,
+      price_estimate_gbp: um.total,
+      quantity: 1,
+      status: 'unverified',
+      unit_price_gbp: um.total,
+      line_total_gbp: um.total,
+      price_tier: 'estimate',
+      contract_override_reason: 'Engineering-contract macro-assembly aggregate — no discrete design word was emitted for it this run; shown here so the cost has a visible module home and the cover total reconciles with the module sub-totals.',
+    }
+    homeSub.parts.push(syntheticRow)
+    homeSub.subtotal_gbp = roundToPence(homeSub.subtotal_gbp + um.total)
+    homeMod.subtotal_gbp = roundToPence(homeMod.subtotal_gbp + um.total)
+    totalRows += 1
+    estimatePriced += 1
+    unmatchedMacroTotal_gbp = roundToPence(unmatchedMacroTotal_gbp + um.total)
   }
   if (unmatchedMacroTotal_gbp > 0) {
     grandTotal_gbp = roundToPence(grandTotal_gbp + unmatchedMacroTotal_gbp)
