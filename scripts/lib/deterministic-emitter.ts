@@ -3843,6 +3843,11 @@ function emitOperatorInterface(_p: BessParams): DesignModule {
           mod('form', 'Siemens SIMATIC HMI TP1500 Comfort, 15.4" widescreen TFT, 1280×800, PROFINET/MPI/DP'),
           mod('manufacturer', 'Siemens'),
           mod('part_number', '6AV2124-0GC01-0AX0'),
+          // L49 gate-21 fix (2026-05-28): Engine B class curve emitted £380
+          // for this HMI panel; cached Mouser price for the SIMATIC TP1500
+          // Comfort is £1,958.87 — gate 21 flagged 0.19× (>5× under-bill,
+          // exit 21). Pin the real Mouser price so the line stays in-band.
+          mod('list_price_gbp', '1958.87'),
           mod('dimension', '15.4', '"'),
           mod('ip_rating', 'IP65'),
         ],

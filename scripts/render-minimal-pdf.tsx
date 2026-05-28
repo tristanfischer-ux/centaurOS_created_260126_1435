@@ -5765,8 +5765,8 @@ function SubModuleBomBlock({
           Sub-total — {subModuleName}
           {excludedCount > 0 ? ` (excl. ${excludedCount} item${excludedCount === 1 ? '' : 's'} pending price verification)` : ''}
         </Text>
-        <Text style={{ width: 49, fontSize: 9.5, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>
-          £{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <Text style={{ width: 78, fontSize: 9.5, color: INK, textAlign: 'right', fontFamily: 'Helvetica-Bold' }}>
+          {fmtGBP_subtotal(subtotal)}
         </Text>
         <View style={{ width: 60 }} />
       </View>
