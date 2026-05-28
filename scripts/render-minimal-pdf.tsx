@@ -5405,25 +5405,23 @@ function translatePhysicsToPlainEnglish(issue: any): { issue: string; why_it_mat
 function gatherEngineeringReviewNotes(state: any): EngineeringReviewNote[] {
   const notes: EngineeringReviewNote[] = []
   let counter = 0
-  // Physics-critic high + medium severity findings
-  const issues: any[] = Array.isArray(state?.physicsCritique?.issues) ? state.physicsCritique.issues : []
-  for (const i of issues) {
-    const sev = String(i.severity ?? '').toLowerCase()
-    if (sev !== 'high' && sev !== 'med' && sev !== 'critical') continue
-    const moduleId = moduleIdFromWherePath(i.where)
-    if (!moduleId) continue
-    counter++
-    const t = translatePhysicsToPlainEnglish(i)
-    notes.push({
-      id: `ERP-${moduleId.split('_').map(p => p[0]).join('').toUpperCase()}-${counter}`,
-      role: inferRoleFromContent(`${i.issue ?? ''} ${i.suggested_check ?? ''}`, i.dimension),
-      module_id: moduleId,
-      issue: t.issue,
-      why_it_matters: t.why_it_matters,
-      action: t.action,
-      source: 'physics_critic',
-    })
-  }
+  // 2026-05-28 (council L59 — #1 credibility hit): the in-chain Physics Critic
+  // is an INTERNAL QA signal — non-deterministic and sometimes WRONG. L59 it
+  // applied a 7.3% ROUND-TRIP efficiency to INSTANTANEOUS 1 MW power → a phantom
+  // "73 kW heat / 27 kW cooling deficit / cannot run at 1 MW / Recalculate" note
+  // that directly contradicted the design's own correct 26.72 kW steady-state
+  // load + adequate (35.4 kW derated) cooling. Rendering its raw `issues` as
+  // customer-facing Engineering Review Notes shipped the dossier's own QA
+  // critique as if it were a design conclusion — a self-contradiction 3/4
+  // council seats flagged as the dominant plausibility/coherence drag.
+  //
+  // The critique STILL scores the run (physicsCritique.scores, used elsewhere)
+  // and can gate the chain — but it MUST NOT bleed into the rendered narrative.
+  // Engineering Review Notes now come ONLY from VETTED/deterministic sources
+  // (design decisions, compliance gate, K10 topology) below.
+  void moduleIdFromWherePath
+  void translatePhysicsToPlainEnglish
+  void inferRoleFromContent
   // K10 missing edges → one note per affected module endpoint
   const k10 = state?.moduleDecomposition?.k10ShadowResult ?? state?.k10ShadowResult
   if (k10 && Array.isArray(k10.missing_required)) {
