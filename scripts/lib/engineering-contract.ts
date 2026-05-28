@@ -888,12 +888,24 @@ registerArchetype('bess', (brief: any) => {
       source_detail: `£100/cell × ${cellCount} cells (CATL 280 Ah LFP prismatic, programme-rate)`,
     },
     {
+      // L52 council fix (2026-05-28, 4/4 seats #1 finding): this macro priced
+      // the PCS at £150/kW = £150,000, which OVERRODE the pcs_inverter_1mw_
+      // bidirectional_word's £75,000 emitter list_price pin in the BoM line —
+      // while the narrative prose used the £75k pin. Council saw "£75k in prose
+      // vs £150k in the BoM" as a 2× contradiction (internal_coherence killer,
+      // dimension dropped to 5.80). £150/kW is a dated figure; modern 2024-25
+      // utility 1 MW string PCS UK trade is £60-90/kW, so £75/kW = £75,000
+      // matches the word pin AND is the more accurate current price. It also
+      // avoids double-counting the separate Schneider Trihal step-up
+      // transformer (£25k, step_up_transformer_word) — the bare PCS price
+      // excludes MV transformation, which the external pad-mount transformer
+      // provides. Aligned to £75/kW so macro + word + prose all agree.
       word_name: 'pcs_inverter',
-      unit_price_gbp: 150,
+      unit_price_gbp: 75,
       dimension_basis: 'kw_power',
       dimension_value: continuousKw,
-      total_gbp: 150 * continuousKw,
-      source_detail: `£150/kW × ${continuousKw} kW (IGBT-based bidirectional PCS; SiC path via ngspice replaces at £80-90/kW)`,
+      total_gbp: 75 * continuousKw,
+      source_detail: `£75/kW × ${continuousKw} kW (Sungrow SC1000UD bidirectional PCS, bare unit; MV transformation provided by the separate external pad-mount step-up transformer)`,
     },
     {
       word_name: 'iso_container_enclosure',
