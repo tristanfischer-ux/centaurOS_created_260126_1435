@@ -279,8 +279,22 @@ export const PRICE_BANDS: Record<string, PriceBand> = {
     // ≥500 units/yr the band should tighten to £190-265 — class-price
     // -bands metric_compute could read parsedBrief.constraints.batch_size
     // for this, but for now widening covers the realistic range.
-    market_band_low: 190,
-    market_band_high: 550,
+    // L53 fix (2026-05-28, Tristan + L52 council theme #2): the cover-page
+    // cost-stack banner ("Cost outside the typical band") is driven by THIS
+    // band, while the INDUSTRY £/kWh REFERENCE BAND card on the same page is
+    // driven by market-bands.ts (commodity £215-300, premium £550-800). The
+    // two disagreed: a premium UK-certified design at £632/kWh ex-works read
+    // "mid premium / in band" on the reference card but "outside band" on the
+    // banner because this band capped at £550. The brief explicitly targets
+    // the premium UK-certified band (£600-760/kWh ex-works, G99 + BS EN 61439
+    // + UL 9540A + NFPA 855 + IEC 62619). Widened to span the full realistic
+    // BESS commodity-to-premium range (£215 commodity floor → £800 premium
+    // ceiling) so the banner only trips for genuinely out-of-range prices and
+    // AGREES with the reference-band card. Both cards now read from an
+    // ex-works numerator (computePriceReality + ComputedBandPositionView both
+    // use costStack.oem_transfer_price_gbp since L47).
+    market_band_low: 215,
+    market_band_high: 800,
     sources: [
       'BloombergNEF 2H 2024 Energy Storage System Costs Survey (LFP turnkey USD 240-320/kWh DC-coupled 2025-26)',
       'Aurora Energy Research / Modo Energy UK BESS market update Sep 2024 (EPC quotes £195-260/kWh for 2025 FID projects)',
