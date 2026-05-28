@@ -238,6 +238,62 @@ const WEAK_QUALIFIERS = new Set<string>([
 
 const ROLE_QUALIFIERS = new Set<string>([...STRONG_QUALIFIERS, ...WEAK_QUALIFIERS])
 
+// L54 fix (2026-05-28): REQUIREMENT-vs-ACHIEVED role split. A brief-stated
+// requirement (e.g. "2.5 MWh minimum / brief target") and the design's
+// achieved value (e.g. "Mission: deliver 2.69 MWh") are DIFFERENT quantities
+// — the spec vs the result. gate 11 must only flag two values of the SAME
+// role. Before this fix, "2.5 MWh (BRIEF TARGET)" and "2.69 MWh (deliver)"
+// clustered together (both anchor=energy, qual=usable, since minimum/target/
+// brief are WEAK and don't split) and produced a 7.32% "contradiction" HIGH
+// on every over-delivering BESS — the single most common false exit-18.
+// Adding the role to the cluster key splits them. The L22-class REAL bug
+// (a wrong "3.5 MWh BRIEF TARGET" vs the true 2.5 MWh brief) is preserved:
+// two requirement-role values still cluster and still flag.
+//
+// Detection is per-occurrence on the local pre/post window. REQUIREMENT
+// tokens live in the qualifier stream (brief/target/minimum are WEAK_QUALIFIERS)
+// + extra head lexemes; ACHIEVED tokens are head lexemes (stemmed).
+const REQUIREMENT_ROLE_TOKENS = new Set<string>([
+  'brief', 'target', 'minimum', 'requir', 'required', 'requirement',
+  'specifi', 'specified', 'floor', 'mandate', 'mandated', 'stipulat',
+])
+const ACHIEVED_ROLE_TOKENS = new Set<string>([
+  'deliver', 'achiev', 'mission', 'asbuilt', 'as-built', 'close',
+  'provid', 'yield', 'produc', 'attain', 'realis', 'realiz', 'actual',
+  'design',
+])
+
+/** Classify an occurrence's role from its local window tokens.
+ *   achieved   = the design's delivered value ("Mission: deliver 2.69 MWh")
+ *   req-floor  = a brief minimum / floor ("2.5 MWh minimum")
+ *   req-target = a brief over-deliver target ("over-delivers to ≥2.65 MWh")
+ *   requirement= a brief spec with no floor/target discriminator
+ *   neutral    = none of the above (clusters as before).
+ *
+ * ACHIEVED wins over requirement when both signals are in one window (the
+ * annotated NUMBER is the delivered one). Within requirement, floor vs target
+ * split so a brief's own "2.5 minimum / 2.65 over-deliver target" pair — both
+ * requirement-role — does not itself become a false contradiction.
+ *
+ * Why this preserves the L22-class REAL bug: L22 had a WRONG "3.5 MWh BRIEF
+ * TARGET" on the cover vs the true 2.5 MWh brief reproduction. Both are
+ * requirement-role (req-target / req-floor) — a 3.5 mislabelled as the target
+ * still clusters with other req-target values and still flags. Only the
+ * legitimate requirement-vs-achieved pair (2.5 spec / 2.69 delivered) stops
+ * being a false positive. */
+function roleOf(feat: { head: string[]; qualifiers: string[] }): string {
+  const toks = [...feat.head, ...feat.qualifiers]
+  if (toks.some((t) => ACHIEVED_ROLE_TOKENS.has(t))) return 'achieved'
+  if (toks.some((t) => REQUIREMENT_ROLE_TOKENS.has(t))) {
+    const hasFloor = toks.some((t) => t === 'minimum' || t === 'floor')
+    const hasTarget = toks.some((t) => t === 'target' || t === 'overdeliver' || t === 'over-deliver')
+    if (hasFloor && !hasTarget) return 'req-floor'
+    if (hasTarget && !hasFloor) return 'req-target'
+    return 'requirement'
+  }
+  return 'neutral'
+}
+
 /** Light stemming — drop common verb/noun suffixes. */
 function stem(token: string): string {
   let t = token
@@ -675,11 +731,15 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
     // maximum / target / brief) describe constraints on the SAME quantity,
     // not different quantities, so they should not split clusters.
     const strongQuals = feat.qualifiers.filter((q) => STRONG_QUALIFIERS.has(q))
+    // L54: role dimension (requirement-floor / requirement-target / achieved /
+    // neutral) splits the brief-spec value from the design-delivered value so
+    // "2.5 MWh minimum" and "deliver 2.69 MWh" are not a false contradiction.
+    const role = roleOf(feat)
     let key: string
     if (feat.anchor) {
-      // Anchor-based clustering: family + anchor + strong-qualifier-set
+      // Anchor-based clustering: family + anchor + strong-qualifier-set + role
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}`
+      key = `${feat.family}|anchor=${feat.anchor}|qual=${qualSorted}|role=${role}`
     } else if (PART_SPECIFIC_FAMILIES.has(feat.family)) {
       // No fallback clustering for part-specific families. The audit would
       // be too noisy — every BoM line has a length/mass/voltage on a
@@ -693,7 +753,7 @@ function cluster(occurrences: NumericOccurrence[]): Cluster[] {
       // (e.g. table rows that quote the same spec twice).
       const headSorted = [...feat.head].sort().join('+')
       const qualSorted = [...strongQuals].sort().join('+')
-      key = `${feat.family}|head=${headSorted}|qual=${qualSorted}`
+      key = `${feat.family}|head=${headSorted}|qual=${qualSorted}|role=${role}`
     }
     let c = clusters.get(key)
     if (!c) {
