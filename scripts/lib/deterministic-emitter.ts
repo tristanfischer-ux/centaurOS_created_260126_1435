@@ -978,6 +978,34 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('regulatory', 'IEC 60068-2-1 / IEC 60068-2-14'),
         ],
       ),
+      // L52 fix (2026-05-28, gate-11 + Physics Critic recurring): the pack DC
+      // bus voltage sensor was LLM-introduced (pack_voltage_sensor_word) with
+      // LEM LV 25-P @ 500 V — BELOW the 912.5 V max string voltage. The
+      // narrative LLM correctly flagged "voltage class mismatch" (gate 11 then
+      // clustered 500 V vs 912.5 V as a contradiction; the L31 fix-T relabel
+      // regressed because the part itself was under-rated). Root fix: emitter
+      // now OWNS this slot with the LEM LV 25-1000 — the 1000 V-range member of
+      // the LV 25 closed-loop Hall voltage-transducer family (10 mA nominal
+      // primary via integral precision resistor, 0.8% accuracy, ±15 V supply,
+      // galvanic isolation). 1000 V range covers the 912.5 V bus with 9.6%
+      // margin → no mismatch, no contradiction. The LV 25-1000 is the
+      // canonical BESS DC-bus voltage transducer (CATL EnerC+, Sungrow
+      // PowerStack pack-monitor reference). Datasheet: LEM LV 25 family
+      // (1000 V variant). One per rack for per-string pack-voltage telemetry.
+      word(
+        'pack_voltage_sensor_word',
+        'pack voltage sensor word',
+        cc('pack_voltage_sensor', 'pack DC-bus voltage transducer', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', fmtQty(p.rackCount)),
+          mod('manufacturer', 'LEM'),
+          mod('part_number', 'LV 25-1000'),
+          mod('capacity', '1000', 'V'),
+          mod('form', `LEM LV 25-1000 closed-loop Hall-effect DC-bus voltage transducer (1000 V measuring range — covers the ${p.dcBusVoltageV} V nominal / 912.5 V max string with margin; 10 mA nominal primary via integral precision resistor, 0.8% accuracy, galvanic isolation, ±15 V supply)`),
+          mod('rating_primary', '1000 V measuring range'),
+          mod('regulatory', 'IEC 60688'),
+        ],
+      ),
       // class-killer #2 (2026-05-26): pack_instrumentation had 4 words, below
       // the 5-word density floor. Adding one rack-level part (NOT per-cell —
       // avoids Stage 1.7 × cell_count multiplier trap per drawer 3dbfe2f5f00ff0a3).
