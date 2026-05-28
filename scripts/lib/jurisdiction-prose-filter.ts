@@ -59,6 +59,16 @@ export const UK_CODE_SUBSTITUTIONS: Array<[RegExp, string]> = [
   [/\bUL 2075\b/g, 'BS EN 50194-1'],
   // Fuses
   [/\bUL 248\b/g, 'IEC 60269'],
+  // Cable management / cable ties (L51 gate-19 HIGH 2026-05-28): the Phase 2
+  // LLM emitted "UL 62275" on the cable_tie_word regulatory modifier; it
+  // propagated to 5 prose surfaces. 62275 is an IEC-harmonised number, so the
+  // UK/EU equivalent is the identical number under the EN prefix.
+  [/\bUL 62275\b/g, 'EN 62275'],
+  // Cable trunking / trays + conduit (same IEC-harmonised family, dual-published)
+  [/\bUL 61537\b/g, 'EN 61537'],
+  [/\bUL 651\b/g, 'IEC 61386'],
+  // Enclosure ingress protection (NEMA → IP equivalent family)
+  [/\bUL 50E\b/g, 'IEC 60529'],
   // Stainless steel pipe / tube
   [/\bASTM A312\b/g, 'BS EN 10216-5'],
   // Digital isolators (UL 1577 is the primary but cover the broader form too)
