@@ -990,6 +990,287 @@ export function componentClassFloorGbp(componentClass: ComponentClass): number {
 }
 
 // ---------------------------------------------------------------------------
+// PER-CATEGORY KEYWORD FLOORS — the systemic fix for cascade-miss parts that
+// belong to a high-value *category* trapped inside a low-median ComponentClass.
+// Codified 2026-05-28 after council L59 (part_realism 3.00).
+//
+// THE PROBLEM the per-CLASS floor above cannot solve
+// --------------------------------------------------
+// Several ComponentClasses have IRREDUCIBLE intra-class magnitude variance.
+// `sensor` (canonical ref £12, floor £4) legitimately spans an NTC thermistor
+// (~£0.40) to a VESDA aspirating-smoke detector (~£1,850) to a Crowcon gas
+// detector (~£380). A single per-class reference + floor cannot serve both
+// ends: anchoring the median at £12 leaves a cascade-MISS detector pricing at
+// ~£4-£8 (the curve drives ref × multiplier toward the floor), while raising
+// the `sensor` floor to £350 to catch the detector would over-price the 896
+// NTC thermistors in a BESS BoM by ~900×. The same trap hits `safety_consumable`
+// (a £2 fuse vs a £400 fire detector), `electronic_pcb` (a £15 break-out board
+// vs a £400 Siemens PLC CPU), `oem_subsystem` (whose per-PRODUCT-CLASS overrides
+// push it to £10k for BESS / £80k for HAPS, so a misclassified industrial PC
+// renders £10,000), `structural_metal` (a £40 bracket vs a £250 IP66 cabinet),
+// and `mechanical_assembly` (a £15 hinge vs a £1,500 Grundfos pump).
+//
+// THE FIX
+// -------
+// A keyword→floor table that fires ONLY when the part NAME (or manufacturer +
+// part-number text) matches a known high-value category. Matched parts get a
+// category-appropriate floor (gas detector £350, aspirating smoke detector head
+// £1,500, PLC CPU £250, fieldbus gateway £300, UPS £180, IP66 steel enclosure
+// £150, industrial pump £1,200, DIN contactor £40). Unmatched parts (thermistor,
+// fuse, bracket, hinge) are untouched and keep their normal low ComponentClass
+// floor — so genuinely-cheap commodities stay cheap.
+//
+// This is the per-PART `CURATED_INDUSTRIAL_PRICES` table in
+// estimate-missing-prices.tsx generalised to per-CATEGORY keyword matching:
+// it covers ANY VESDA / Crowcon / Beckhoff / Rittal, not named SKUs. It is
+// independent of the LLM classifier (no new ComponentClass to learn — the
+// "you cannot price items that do not exist" routing trap is avoided) and it
+// leaves every curve SHAPE untouched — it only raises the magnitude FLOOR.
+//
+// SEED DATA: ingesting real catalogue prices for these categories into
+// forge-truth.db `distributor_cascade_cache` lets the cascade serve them
+// DB-first (miss=0, priceGBP populated) and this keyword table can shrink.
+//
+// ORDER MATTERS: entries are evaluated top-to-bottom; first match wins. Put
+// the MOST SPECIFIC / HIGHEST-VALUE patterns first (aspirating smoke detector
+// before generic detector; industrial pump before generic pump).
+// ---------------------------------------------------------------------------
+
+export type CategoryKeywordFloor = {
+  // Matched case-insensitively against the part name (and a manufacturer +
+  // part-number fallback string). Word-boundary anchored where sensible to
+  // avoid sub-string false positives (e.g. "fuse" must not match "refuse").
+  pattern: RegExp
+  floor_gbp: number
+  note: string
+}
+
+export const CATEGORY_KEYWORD_FLOORS_GBP: CategoryKeywordFloor[] = [
+  // ── Fire / gas / smoke detection (council L59 primary offenders) ─────────
+  // Aspirating smoke detection (ASD) head — VESDA VLF/VLP, Wagner TITANUS,
+  // Securiton. A detector head is £1,500-£2,200; the full bore + pipework
+  // network is more, but the BoM line is usually the head. Anchor £1,500.
+  { pattern: /\b(aspirating|aspiration|asd)\b.*\b(smoke|detector|detection)\b|\b(vesda|titanus)\b/i,
+    floor_gbp: 1500, note: 'aspirating smoke detection head (VESDA / TITANUS class), real £1,500-£2,200' },
+  // Conventional / addressable smoke / heat detector point — £40-£120. These
+  // are NOT the absurd £1 case; keep their floor modest so we do not over-price
+  // a £45 Apollo point detector. Listed AFTER aspirating so VESDA wins.
+  { pattern: /\b(smoke|heat|flame|optical)\b.*\bdetector\b|\bdetector\b.*\b(smoke|heat|flame)\b/i,
+    floor_gbp: 45, note: 'conventional point smoke/heat/flame detector, real £40-£120' },
+  // Fixed gas detector — Crowcon, Dräger, Honeywell, MSA, Sensit. A
+  // transmitter + sensor head for CH4 / H2 / CO / O2 is £300-£500. Anchor £350.
+  { pattern: /\b(gas|methane|ch4|hydrogen|h2|propane|co2?|oxygen|o2|toxic|combustible|lel)\b.*\b(detector|detection|monitor|transmitter)\b|\b(crowcon|draeger|dräger|gasalert|sensepoint)\b/i,
+    floor_gbp: 350, note: 'fixed gas detector / transmitter (Crowcon / Dräger class), real £300-£500' },
+  // Generic detector that did not match a more specific pattern — a real
+  // detector of any kind is rarely under £40. Modest catch-all.
+  { pattern: /\bdetector\b/i,
+    floor_gbp: 40, note: 'generic detector (catch-all), real ≥ £40' },
+
+  // ── Process transducers + water-chemistry / environmental sensors ────────
+  // Industrial pressure / flow / level transducer — Gems, WIKA, Endress+Hauser,
+  // Danfoss. 4-20 mA loop transducers are £80-£300. Anchor £90.
+  { pattern: /\b(pressure|flow|level|differential|loop)\b.*\b(transducer|transmitter)\b|\btransducer\b/i,
+    floor_gbp: 90, note: 'industrial process transducer/transmitter, real £80-£300' },
+  // Water-chemistry probe — pH, EC/conductivity, dissolved-O2, ORP, turbidity.
+  // Industrial inline probes (Hamilton, Endress+Hauser, Atlas Scientific
+  // industrial) are £80-£600; sterile bioreactor probes higher (handled by the
+  // bioreactor product-class sensor override at £200). Anchor £80.
+  { pattern: /\b(ph|conductivity|ec|dissolved.?oxygen|do|orp|turbidity|chlorine|salinity|water.?chem)\b.*\b(probe|sensor|electrode|cell)\b/i,
+    floor_gbp: 80, note: 'water-chemistry probe (pH/EC/DO/ORP), real £80-£600' },
+  // Environmental sensor — CO2 / VOC / particulate / humidity+temp duct or
+  // room sensor (Sensirion, E+E Elektronik, Vaisala). £40-£120. Anchor £40.
+  { pattern: /\b(co2|voc|particulate|pm2|humidity|rh|ambient|air.?quality|environmental)\b.*\b(sensor|probe|transmitter)\b/i,
+    floor_gbp: 40, note: 'environmental sensor (CO2/VOC/RH), real £40-£120' },
+
+  // ── Industrial control gear + computers + comms ──────────────────────────
+  // Industrial / panel PC, embedded controller — Beckhoff CX, Advantech UNO/ARK,
+  // Siemens IPC, Kontron. £400-£1,500. Anchor £450. (The curated per-PART table
+  // already pins specific Beckhoff/Advantech SKUs; this floors the category for
+  // un-pinned cascade-miss variants and prevents the £10k oem_subsystem-override
+  // mis-price when an IPC is classified as oem_subsystem in a BESS BoM.)
+  { pattern: /\b(industrial|panel|embedded|edge|box)\b.*\b(pc|computer|controller|ipc)\b|\b(ipc)\b|\b(beckhoff|advantech|kontron)\b/i,
+    floor_gbp: 450, note: 'industrial / panel PC (Beckhoff / Advantech class), real £400-£1,500' },
+  // PLC CPU / I-O module / safety controller — Siemens S7, Allen-Bradley
+  // CompactLogix, Schneider M340, Pilz PNOZ, WAGO PFC. £250-£800. Anchor £250.
+  { pattern: /\b(plc|s7-?\d|compactlogix|controllogix|pnoz|safety.?(plc|controller|relay))\b|\bplc\b.*\b(cpu|module|rack)\b|\b(cpu|i\/?o)\b.*\bmodule\b/i,
+    floor_gbp: 250, note: 'PLC CPU / I-O / safety controller (Siemens / AB / Pilz class), real £250-£800' },
+  // Fieldbus / protocol gateway, managed industrial switch — HMS Anybus, Moxa,
+  // Hirschmann, ProSoft. £300-£700. Anchor £300.
+  { pattern: /\b(fieldbus|protocol|modbus|profinet|ethercat|ethernet\/?ip|bacnet)\b.*\b(gateway|converter|coupler)\b|\b(anybus|hirschmann|prosoft)\b|\bmanaged\b.*\bswitch\b/i,
+    floor_gbp: 300, note: 'fieldbus / protocol gateway or managed switch (Anybus / Moxa class), real £300-£700' },
+  // HMI touchscreen panel — Siemens SIMATIC, Pro-face, Weintek. £400-£1,200.
+  // Anchor £400.
+  { pattern: /\b(hmi|simatic\s*hmi)\b|\b(operator|touch.?screen)\b.*\b(panel|terminal|hmi)\b|\b(pro-?face|weintek)\b/i,
+    floor_gbp: 400, note: 'HMI touchscreen panel (SIMATIC / Pro-face class), real £400-£1,200' },
+
+  // ── Power conditioning ───────────────────────────────────────────────────
+  // DIN-rail / industrial UPS — Phoenix QUINT-UPS, Siemens SITOP, Eaton 9SX.
+  // £180-£800. Anchor £180.
+  { pattern: /\b(ups|uninterruptible|quint-?ups|sitop)\b|\buninterruptible power\b/i,
+    floor_gbp: 180, note: 'industrial / DIN-rail UPS (Phoenix QUINT / Eaton class), real £180-£800' },
+
+  // ── Enclosures ───────────────────────────────────────────────────────────
+  // IP-rated steel / stainless / polycarbonate enclosure or cabinet — Rittal AE/
+  // VX, Schneider Spacial, Fibox, Eldon. A wall-box is £120-£300; a floor-
+  // standing bay is £400+. Anchor £150 (covers the common wall-box; bigger bays
+  // come from the curve / overrides which already exceed the floor).
+  { pattern: /\b(ip\s?\d{2}|nema\s?\d)\b.*\b(enclosure|cabinet|box|housing)\b|\b(enclosure|cabinet)\b.*\b(steel|stainless|316l|304|polycarbonate|glass.?fibre|grp)\b|\b(rittal|fibox|eldon|spacial)\b/i,
+    floor_gbp: 150, note: 'IP-rated steel / polycarbonate enclosure (Rittal / Spacial class), real £120-£600' },
+
+  // ── Rotating / fluid equipment ───────────────────────────────────────────
+  // Industrial pump — Grundfos NB/CR/CM, KSB, Wilo, Lowara end-suction or
+  // multistage. £1,200-£2,000. Anchor £1,200. (Listed before any generic
+  // "pump" so a real industrial pump beats the circulator-pump floor.)
+  { pattern: /\b(end.?suction|multistage|centrifugal|positive.?displacement|peristaltic|process|booster)\b.*\bpump\b|\b(grundfos|ksb|wilo|lowara)\b/i,
+    floor_gbp: 1200, note: 'industrial pump (Grundfos NB/CR / KSB class), real £1,200-£2,000' },
+  // Small circulator / dosing pump — keep modest so we do not over-price a
+  // £80 circulator. Listed AFTER the industrial pump pattern.
+  { pattern: /\b(circulator|dosing|metering)\b.*\bpump\b/i,
+    floor_gbp: 80, note: 'small circulator / dosing pump, real £80-£300' },
+
+  // ── Switchgear ───────────────────────────────────────────────────────────
+  // DIN / IEC contactor (NOT the HV/DC bus contactor — those are pinned parts
+  // with their own datasheet entries). A standard 3-pole AC contactor is £40-£60.
+  { pattern: /\bcontactor\b/i,
+    floor_gbp: 40, note: 'DIN / IEC contactor, real £40-£60' },
+]
+
+/**
+ * Resolve a per-category keyword floor for a cascade-MISS part. Returns the
+ * floor GBP + a note when the part name (or the manufacturer + part-number
+ * fallback) matches a known high-value category, else null. Consulted by the
+ * estimator AFTER the per-class floor: the effective floor is
+ * max(componentClassFloorGbp(cls), keywordFloorGbp(name)?.floor_gbp ?? 0).
+ *
+ * Matching is intentionally name-first because the BoM word name ("aspirating
+ * smoke detector", "Grundfos NB 32-125 process pump") is the most reliable
+ * category signal; manufacturer + part-number is a secondary fallback for
+ * cases where the name is terse ("detector head, VESDA VLF-500").
+ */
+export function keywordFloorGbp(
+  partName: string | null | undefined,
+  manufacturer?: string | null,
+  partNumber?: string | null,
+): { floor_gbp: number; note: string } | null {
+  const hay = [
+    String(partName ?? ''),
+    String(manufacturer ?? ''),
+    String(partNumber ?? ''),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+  if (!hay) return null
+  for (const e of CATEGORY_KEYWORD_FLOORS_GBP) {
+    if (e.pattern.test(hay)) return { floor_gbp: e.floor_gbp, note: e.note }
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
+// PER-CATEGORY KEYWORD CEILINGS — the DOWN-direction complement of the floor
+// table. Same council L59 finding, opposite failure mode: a cascade-MISS part
+// that is MISCLASSIFIED into a high-anchor class renders absurdly EXPENSIVE.
+//
+// The worst case: a £450 Beckhoff industrial PC or a £520 Phoenix QUINT-UPS
+// classified as `oem_subsystem` in a BESS BoM inherits the BESS per-product-
+// class override `oem_subsystem: 10000` (calibrated for BMS master + EMS PC +
+// LV switch-panel, which genuinely cost £2k-£20k) and renders £9,161. The floor
+// table cannot fix this — it only raises values UP. Lowering the BESS
+// `oem_subsystem` override is also wrong: it would under-price the real £2k-£20k
+// subsystems it was built for. The correct systemic fix is a per-CATEGORY
+// CEILING that caps the small-but-misclassified part regardless of which class
+// it landed in.
+//
+// Ceilings apply ONLY to categories that have a hard upper bound in reality: an
+// industrial PC is never £10k, a DIN-rail UPS is never £10k, a fieldbus gateway
+// is never £10k, a DIN contactor is never £10k. Categories with a genuine high
+// tail (industrial pump up to ~£5k for big bare-shaft units; IP-rated bay
+// enclosures up to ~£2k) get a generous ceiling or NONE so we never clip a
+// legitimately-expensive part. Where a category has both a floor and a ceiling,
+// floor < ceiling by construction.
+//
+// Effective price = clamp(curve, floor=max(classFloor, keywordFloor),
+//                                ceiling=keywordCeiling ?? +inf).
+// Floor is applied first, then ceiling — so a part can never be pushed below
+// its floor by the ceiling (the ranges never cross for a single category).
+// ---------------------------------------------------------------------------
+
+export type CategoryKeywordCeiling = {
+  pattern: RegExp
+  ceiling_gbp: number
+  note: string
+}
+
+export const CATEGORY_KEYWORD_CEILINGS_GBP: CategoryKeywordCeiling[] = [
+  // Industrial / panel PC — top of the catalogue range for a fanless box PC
+  // with a couple of expansion slots is ~£2,000 (a high-end multi-slot IPC).
+  // £10k = misclassification. Ceiling £2,500 (headroom over the £400-£1,500
+  // typical band so we never clip a loaded server-grade IPC).
+  { pattern: /\b(industrial|panel|embedded|edge|box)\b.*\b(pc|computer|controller|ipc)\b|\b(ipc)\b|\b(beckhoff|advantech|kontron)\b/i,
+    ceiling_gbp: 2500, note: 'industrial / panel PC — ceiling £2,500 (never the £10k oem_subsystem override)' },
+  // PLC / safety controller — a fully-populated rack is ~£2,000; a single CPU
+  // far less. Ceiling £2,500.
+  { pattern: /\b(plc|s7-?\d|compactlogix|controllogix|pnoz|safety.?(plc|controller|relay))\b|\bplc\b.*\b(cpu|module|rack)\b/i,
+    ceiling_gbp: 2500, note: 'PLC / safety controller — ceiling £2,500' },
+  // Fieldbus gateway / managed switch — top of range ~£1,500. Ceiling £1,800.
+  { pattern: /\b(fieldbus|protocol|modbus|profinet|ethercat|ethernet\/?ip|bacnet)\b.*\b(gateway|converter|coupler)\b|\b(anybus|hirschmann|prosoft)\b|\bmanaged\b.*\bswitch\b/i,
+    ceiling_gbp: 1800, note: 'fieldbus gateway / managed switch — ceiling £1,800' },
+  // HMI panel — large multi-touch panels reach ~£3,000. Ceiling £3,500.
+  { pattern: /\b(hmi|simatic\s*hmi)\b|\b(operator|touch.?screen)\b.*\b(panel|terminal|hmi)\b|\b(pro-?face|weintek)\b/i,
+    ceiling_gbp: 3500, note: 'HMI touchscreen panel — ceiling £3,500' },
+  // DIN-rail / rack industrial UPS — large 3 kVA rack units reach ~£3,000.
+  // Ceiling £3,500 (covers genuine large UPS; clips the £10k override case).
+  { pattern: /\b(ups|uninterruptible|quint-?ups|sitop)\b|\buninterruptible power\b/i,
+    ceiling_gbp: 3500, note: 'industrial UPS — ceiling £3,500' },
+  // DIN / IEC contactor — even a large 800 A AC contactor is ~£600 at the
+  // extreme; a standard one £40-£60. Ceiling £800. (HV/DC bus contactors are
+  // PINNED parts that bypass the curve entirely, so they are never clipped.)
+  { pattern: /\bcontactor\b/i,
+    ceiling_gbp: 800, note: 'DIN / IEC contactor — ceiling £800 (HV/DC bus contactors are pinned, bypass curve)' },
+  // Conventional point smoke / heat / flame detector — never above ~£250.
+  // Aspirating detection heads (VESDA / TITANUS) are EXPLICITLY excluded via
+  // the negative look-ahead — they legitimately reach £2,200 and the aspirating
+  // floor already anchors them at £1,500. (Belt-and-braces: even without the
+  // look-ahead, the estimator applies the £1,500 floor before this ceiling and
+  // never pushes below the floor, so an aspirating head stays at £1,500.)
+  { pattern: /^(?!.*\b(aspirating|aspiration|asd|vesda|titanus)\b)(.*\b(smoke|heat|flame|optical)\b.*\bdetector\b|.*\bdetector\b.*\b(smoke|heat|flame)\b)/i,
+    ceiling_gbp: 250, note: 'conventional point detector — ceiling £250 (aspirating ASD heads excluded)' },
+]
+
+/**
+ * Resolve a per-category keyword ceiling for a cascade-MISS part. Returns the
+ * ceiling GBP + a note when the part name matches a category with a hard upper
+ * bound, else null. Consulted by the estimator AFTER the floor: the effective
+ * price is min(flooredCentral, keywordCeilingGbp(name)?.ceiling_gbp ?? +inf).
+ *
+ * IMPORTANT: a ceiling is the LAST resort and only applies to the curve path.
+ * It must NOT clip a real catalogue price (the curated table + cascade DB +
+ * emitter list_price_gbp all run before the curve), nor a PINNED part. It
+ * exists solely to stop the curve/override path rendering a misclassified small
+ * part at an impossible figure (the £10k IPC case).
+ */
+export function keywordCeilingGbp(
+  partName: string | null | undefined,
+  manufacturer?: string | null,
+  partNumber?: string | null,
+): { ceiling_gbp: number; note: string } | null {
+  const hay = [
+    String(partName ?? ''),
+    String(manufacturer ?? ''),
+    String(partNumber ?? ''),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+  if (!hay) return null
+  for (const e of CATEGORY_KEYWORD_CEILINGS_GBP) {
+    if (e.pattern.test(hay)) return { ceiling_gbp: e.ceiling_gbp, note: e.note }
+  }
+  return null
+}
+
+// ---------------------------------------------------------------------------
 // Convenience — compute the volume-anchored unit cost for a class.
 // Optional productClassSlug consults PRODUCT_CLASS_REFERENCE_OVERRIDES so
 // industrial-heavy product classes (BESS, etc.) pick up the corrected ref.

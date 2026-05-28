@@ -52,6 +52,8 @@ import {
   defaultVolumeFor,
   referenceUnitCostFor,
   componentClassFloorGbp,
+  keywordFloorGbp,
+  keywordCeilingGbp,
   type ComponentClass,
 } from '../src/lib/pdf-engine-v2/component-classes'
 
@@ -136,7 +138,7 @@ interface PriceEstimate {
   curve_multiplier: number
   reference_unit_cost_gbp: number
   annual_volume: number
-  classification_source: 'corpus' | 'flash_lite' | 'fallback'
+  classification_source: 'corpus' | 'flash_lite' | 'fallback' | 'curated'
   estimate_source: 'curve' | 'flash_lite_unknown_class'
 }
 
@@ -586,7 +588,8 @@ function curveEstimateFor(
   cls: ComponentClass,
   annualVolume: number,
   productClassSlug?: string | null,
-): { central: number; low: number; high: number; multiplier: number; reference: number; floored?: boolean } {
+  keywordCtx?: { name?: string | null; manufacturer?: string | null; part_number?: string | null },
+): { central: number; low: number; high: number; multiplier: number; reference: number; floored?: boolean; keyword_floor_note?: string; keyword_ceiling_note?: string } {
   const c = COMPONENT_CURVES[cls]
   // Engine B (2026-05-18 BESS investigation): the reference unit cost can be
   // overridden per (product_class, component_class) so industrial-heavy hosts
@@ -607,9 +610,40 @@ function curveEstimateFor(
   // misclassification rather than real economy. Curve can still go ABOVE the
   // floor for low-volume / high-margin cases. See COMPONENT_CLASS_FLOORS_GBP
   // in component-classes.ts for the table.
-  const floor = componentClassFloorGbp(cls)
+  //
+  // 2026-05-28 council L59 (part_realism 3.00): a per-class floor is not enough
+  // for ComponentClasses with irreducible intra-class magnitude variance — a
+  // fire/gas/smoke detector or industrial PC that MISSES the distributor cascade
+  // lands in `sensor` (median £12 → ~£4-8) or `oem_subsystem` (BESS override
+  // £10k), both wrong by 10-100×. The PER-CATEGORY keyword floor below fires
+  // ONLY when the part NAME matches a known high-value category (gas detector
+  // £350, aspirating smoke detector £1,500, PLC £250, UPS £180, IP-rated
+  // enclosure £150, industrial pump £1,200, …) and leaves commodities (NTC
+  // thermistor, fuse, bracket) untouched. The effective floor is the MAX of the
+  // per-class floor and the keyword floor. See CATEGORY_KEYWORD_FLOORS_GBP +
+  // keywordFloorGbp() in component-classes.ts.
+  const classFloor = componentClassFloorGbp(cls)
+  const kw = keywordCtx
+    ? keywordFloorGbp(keywordCtx.name, keywordCtx.manufacturer, keywordCtx.part_number)
+    : null
+  const floor = Math.max(classFloor, kw?.floor_gbp ?? 0)
   const floored = floor > 0 && raw < floor
-  const central = floored ? floor : raw
+  let central = floored ? floor : raw
+  // 2026-05-28 council L59 (down-direction): cap the curve/override path at a
+  // per-category ceiling so a small part misclassified into a high-anchor class
+  // (e.g. a £450 Beckhoff IPC inheriting the BESS oem_subsystem £10k override)
+  // cannot render at an impossible figure. The ceiling never clips a real
+  // catalogue price (curated table / cascade DB / emitter list_price all run
+  // before the curve) nor a pinned part. See keywordCeilingGbp().
+  const kwCeil = keywordCtx
+    ? keywordCeilingGbp(keywordCtx.name, keywordCtx.manufacturer, keywordCtx.part_number)
+    : null
+  let ceiled = false
+  if (kwCeil && central > kwCeil.ceiling_gbp) {
+    // Never push below the effective floor (ranges never cross per category).
+    central = Math.max(floor, kwCeil.ceiling_gbp)
+    ceiled = true
+  }
   return {
     central: round2(central),
     low: round2(central * 0.7),
@@ -617,6 +651,8 @@ function curveEstimateFor(
     multiplier: m,
     reference: ref,
     floored,
+    keyword_floor_note: kw && floored && (kw.floor_gbp >= classFloor) ? kw.note : undefined,
+    keyword_ceiling_note: ceiled ? kwCeil!.note : undefined,
   }
 }
 
@@ -871,7 +907,11 @@ async function main() {
       unknowns.push(ctx)
       continue
     }
-    const c = curveEstimateFor(cls, annualVolume, productClass)
+    const c = curveEstimateFor(cls, annualVolume, productClass, {
+      name: ctx.word_name,
+      manufacturer: ctx.manufacturer,
+      part_number: ctx.part_number,
+    })
     // ITER-10.5 Sprint 1A (Tristan 2026-05-20): finished commodities
     // (catalogue items bought from a real manufacturer — CIMC container,
     // Copeland compressor, Bosch Rexroth rail) skip the production-scale
@@ -891,7 +931,11 @@ async function main() {
         estimate_high_gbp: finalHigh,
         reasoning: finished
           ? `Engine B finished-commodity: class=${cls}, manufacturer=${ctx.manufacturer}, SKU=${ctx.part_number}, reference £${c.reference} (no production-scale discount applied — catalogue item)`
-          : `Engine B curve: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference}, multiplier ${c.multiplier.toFixed(3)} → £${c.central}`,
+          : c.keyword_ceiling_note
+            ? `Engine B curve + category keyword ceiling: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} × ${c.multiplier.toFixed(3)} capped DOWN to £${c.central} (${c.keyword_ceiling_note})`
+            : c.keyword_floor_note
+              ? `Engine B curve + category keyword floor: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} × ${c.multiplier.toFixed(3)} clamped UP to £${c.central} (${c.keyword_floor_note})`
+              : `Engine B curve: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference}, multiplier ${c.multiplier.toFixed(3)} → £${c.central}`,
         component_class: cls,
         curve_multiplier: finalMultiplier,
         reference_unit_cost_gbp: c.reference,
@@ -985,8 +1029,8 @@ async function main() {
   // -------------------------------------------------------------------------
   let updated = 0
   let synthesised = 0
-  let bySource = { corpus: 0, flash_lite: 0, fallback: 0 }
-  let byEstimate = { curve: 0, flash_lite_unknown_class: 0 }
+  const bySource = { corpus: 0, flash_lite: 0, fallback: 0, curated: 0 }
+  const byEstimate = { curve: 0, flash_lite_unknown_class: 0 }
   const classCounts: Record<string, number> = {}
 
   for (const { ctx, estimate } of results) {
@@ -1044,7 +1088,7 @@ async function main() {
   console.log(
     `[estimate] updated ${updated} existing, synthesised ${synthesised} new, ${noEstimate} failed`,
   )
-  console.log(`[estimate] classification source: corpus=${bySource.corpus} flash_lite=${bySource.flash_lite} fallback=${bySource.fallback}`)
+  console.log(`[estimate] classification source: corpus=${bySource.corpus} flash_lite=${bySource.flash_lite} fallback=${bySource.fallback} curated=${bySource.curated}`)
   console.log(`[estimate] estimate source: curve=${byEstimate.curve} flash_lite_unknown=${byEstimate.flash_lite_unknown_class}`)
   const top = Object.entries(classCounts).sort((a, b) => b[1] - a[1]).slice(0, 8)
   console.log('[estimate] top classes in BoM:')
