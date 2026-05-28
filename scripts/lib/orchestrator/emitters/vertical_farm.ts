@@ -352,6 +352,8 @@ function emitGrowingCanopy(p: VfParams) {
         cc('mobile_growing_trolley', 'mobile growing trolley', 'mechanical_load_function', 'steel'),
         [
           mod('quantity', fmtQty(p.trolleyCount)),
+          mod('manufacturer', 'Montel'),
+          mod('part_number', 'GREENROLL mobile grow rack'),
           mod('dimension', '1200×2000×2400', 'mm'),
           mod('form', 'powder-coated steel chassis with castors + guide rails'),
           mod('regulatory', 'BS EN 60204-1'),
@@ -423,6 +425,8 @@ function emitGrowingCanopy(p: VfParams) {
         cc('rockwool_cube', 'rockwool propagation cube', null, 'mineral_fibre_material'),
         [
           mod('quantity', fmtQty(Math.round(p.canopyAreaM2 * 25))),  // ~25 plugs/m² canopy
+          mod('manufacturer', 'Grodan'),
+          mod('part_number', 'A-OK 36/40'),
           mod('form', 'Grodan A-OK 36/40 wrapped'),
           mod('regulatory', 'BRCGS-approved'),
         ],
@@ -484,6 +488,8 @@ function emitLightingArray(p: VfParams) {
         cc('horticultural_led_fixture', 'horticultural LED bar', 'optical_emission_function', 'aluminium'),
         [
           mod('quantity', fmtQty(ledFixtureCount)),
+          mod('manufacturer', 'Heliospectra'),
+          mod('part_number', 'MITRA X'),
           mod('capacity', String(ledFixtureWatts.toFixed(0)), 'W'),
           mod('form', 'Heliospectra MITRA X / Fluence SPYDR class, tunable RB+W'),
           mod('regulatory', 'CE EN 60598-2-22'),
@@ -533,6 +539,8 @@ function emitLightingArray(p: VfParams) {
         cc('lighting_dali_controller', 'lighting DALI controller', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Tridonic'),
+          mod('part_number', 'basicDIM Wireless'),
           mod('form', 'Tridonic basicDIM Wireless'),
           mod('regulatory', 'IEC 62386'),
         ],
@@ -604,6 +612,8 @@ function emitClimateControl(p: VfParams) {
         cc('dx_indoor_unit', 'DX indoor unit', 'thermal_transfer_function', 'aluminium'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Daikin'),
+          mod('part_number', 'FXFSQ125ARV16 (VRV-S round-flow cassette)'),
           mod('capacity', String(p.hvacCoolingKw.toFixed(1)), 'kW'),
           mod('form', 'Daikin VRV-S Mini / Mitsubishi PUMY-class ceiling cassette'),
           mod('regulatory', 'EN 14511, R290 / R32 refrigerant'),
@@ -665,6 +675,8 @@ function emitClimateControl(p: VfParams) {
         cc('refrigeration_dehumidifier', 'refrigeration dehumidifier', 'fluid_flow_state', 'aluminium'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Munters'),
+          mod('part_number', 'MLT800'),
           mod('capacity', String(p.dehumidifierLDay.toFixed(0)), 'L/day'),
           mod('form', 'Aerial AD-580 / Munters MX2-class commercial'),
           mod('regulatory', 'EN 60335-2-40'),
@@ -706,6 +718,8 @@ function emitClimateControl(p: VfParams) {
         cc('co2_pressure_regulator', 'CO2 pressure regulator', 'pressure_vessel_function', 'steel'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Harris'),
+          mod('part_number', 'Model 825'),
           mod('form', 'Harris 825 two-stage 0-10 bar'),
           mod('regulatory', 'WRAS-approved'),
         ],
@@ -744,6 +758,8 @@ function emitClimateControl(p: VfParams) {
         cc('ahu_centrifugal_fan', 'AHU centrifugal fan', 'thermal_transfer_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'ebm-papst'),
+          mod('part_number', 'RadiCal R3G250 EC'),
           mod('capacity', String(p.ahuFanKw.toFixed(2)), 'kW'),
           mod('form', 'ebm-papst RadiCal EC centrifugal'),
           mod('regulatory', 'CE Erp 2018'),
@@ -818,6 +834,8 @@ function emitIrrigationNutrient(p: VfParams) {
         cc('fertigation_reservoir', 'fertigation reservoir', 'fluid_flow_state', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Enduramaxx'),
+          mod('part_number', '172810 1000 L vertical tank'),
           mod('capacity', String(p.fertigationReservoirL.toFixed(0)), 'L'),
           mod('form', 'food-grade HDPE tank with light-tight lid'),
           mod('regulatory', 'EN 1186 / EU 10/2011'),
@@ -858,6 +876,8 @@ function emitIrrigationNutrient(p: VfParams) {
         cc('peristaltic_dosing_pump', 'peristaltic dosing pump', 'fluid_flow_state', 'polymer_thermoplastic'),
         [
           mod('quantity', '×4'),
+          mod('manufacturer', 'Stenner'),
+          mod('part_number', '45MPHP10'),
           mod('capacity', '8', 'L/h'),
           mod('form', 'Hawkin GreenGuard / Stenner Classic peristaltic'),
           mod('regulatory', 'EN 60335-2-76'),
@@ -898,6 +918,8 @@ function emitIrrigationNutrient(p: VfParams) {
         cc('fertigation_pump', 'fertigation pump', 'fluid_flow_state', 'steel'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Grundfos'),
+          mod('part_number', 'CRE 3'),
           mod('capacity', String(p.irrigationPumpKw.toFixed(2)), 'kW'),
           mod('form', 'Grundfos CR-class vertical multistage centrifugal'),
           mod('regulatory', 'EN 60335-2-41, WRAS'),
@@ -987,6 +1009,8 @@ function emitAutomationSensing(p: VfParams) {
         cc('sht41_temp_rh_sensor', 'SHT41 temperature + RH sensor', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.trolleyCount * 2)),
+          mod('manufacturer', 'Sensirion'),
+          mod('part_number', 'SHT41-AD1B-R3'),
           mod('form', 'Sensirion SHT41 ±0.2 °C / ±1.8% RH, I2C'),
         ],
       ),
@@ -1024,6 +1048,8 @@ function emitAutomationSensing(p: VfParams) {
         cc('ec_conductivity_probe', 'EC conductivity probe', 'electrical_conducting_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×2'),
+          mod('manufacturer', 'Atlas Scientific'),
+          mod('part_number', 'ENV-40-EC-K1.0'),
           mod('form', 'Atlas Scientific K1.0 platinum EC probe'),
           mod('regulatory', 'EN 27888'),
         ],
@@ -1070,6 +1096,8 @@ function emitAutomationSensing(p: VfParams) {
         cc('plc_controller', 'PLC controller', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Siemens'),
+          mod('part_number', '6ES7214-1AG40-0XB0 (S7-1200 CPU 1214C DC/DC/DC)'),
           mod('form', 'Siemens S7-1200 CPU 1214C DC/DC/DC'),
           mod('regulatory', 'IEC 61131-3'),
         ],
@@ -1165,6 +1193,8 @@ function emitElectricalDistribution(p: VfParams) {
         cc('tp_n_main_breaker', 'TP&N main breaker', 'electromechanical_switching_function', 'copper'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'ABB'),
+          mod('part_number', 'Tmax XT1H 160 4p'),
           mod('capacity', String(mainBreakerA), 'A'),
           mod('form', 'ABB Tmax XT1H 4-pole 36 kA'),
           mod('regulatory', 'BS EN 60947-2'),
@@ -1206,6 +1236,8 @@ function emitElectricalDistribution(p: VfParams) {
         cc('lighting_branch_breaker', 'lighting branch breaker', 'electromechanical_switching_function', 'copper'),
         [
           mod('quantity', '×2'),
+          mod('manufacturer', 'ABB'),
+          mod('part_number', 'S203-C (3-pole C-curve MCB)'),
           mod('capacity', String(Math.max(16, Math.round(p.ledInstalledKw * 1.5))), 'A'),
           mod('form', 'ABB S203 C-curve 3-pole MCB'),
         ],
@@ -1265,6 +1297,8 @@ function emitElectricalDistribution(p: VfParams) {
         cc('insulation_monitor', 'insulation monitor', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Bender'),
+          mod('part_number', 'IRDH275B-435'),
           mod('form', 'Bender IRDH275 IMD'),
           mod('regulatory', 'BS EN 61557-8'),
         ],
@@ -1321,6 +1355,8 @@ function emitDataComputeComms(_p: VfParams) {
         cc('edge_industrial_pc', 'edge industrial PC', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Advantech'),
+          mod('part_number', 'UNO-148'),
           mod('form', 'Advantech UNO-148 Atom x6413E DIN-rail'),
           mod('regulatory', 'IEC 60068 vibration'),
         ],
@@ -1350,6 +1386,8 @@ function emitDataComputeComms(_p: VfParams) {
         cc('industrial_managed_switch', 'industrial managed switch', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Hirschmann'),
+          mod('part_number', 'GREYHOUND GRS1052-AAAA'),
           mod('form', 'Hirschmann GREYHOUND GRS105 5-port'),
           mod('regulatory', 'IEC 61850-3 substation'),
         ],
@@ -1413,6 +1451,8 @@ function emitStructureContainment(p: VfParams) {
         cc('iso_container_40hc', 'ISO container 40 HC', null, 'steel'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'CIMC'),
+          mod('part_number', '40HC dry container (ISO 6346 42G1)'),
           mod('dimension', '12190×2440×2900', 'mm'),
           mod('form', 'CIMC / Maersk-grade 40HC, modified panels'),
           mod('regulatory', 'BS EN ISO 1496-1 / ISO 6346'),
@@ -1475,6 +1515,8 @@ function emitStructureContainment(p: VfParams) {
         cc('personnel_door_assembly', 'personnel door assembly', 'mechanical_load_function', 'steel'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Dortek'),
+          mod('part_number', 'Hygienic Hinged Door (insulated single-leaf)'),
           mod('dimension', '900×2000', 'mm'),
           mod('form', 'insulated steel door + tri-point latch + thermal break'),
           mod('regulatory', 'IP54 + EN 1627 RC2'),
@@ -1562,6 +1604,8 @@ function emitWorkerAccessSafety(p: VfParams) {
         cc('emergency_egress_release', 'emergency egress release', 'electromechanical_switching_function', 'steel'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Exidor'),
+          mod('part_number', '294 push-bar panic device'),
           mod('form', 'panic-bar release on inside of personnel door'),
           mod('regulatory', 'EN 1125'),
         ],
@@ -1581,6 +1625,8 @@ function emitWorkerAccessSafety(p: VfParams) {
         cc('emergency_stop_pushbutton', 'emergency stop pushbutton', 'electromechanical_switching_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×2'),
+          mod('manufacturer', 'Eaton'),
+          mod('part_number', 'M22-PV'),
           mod('form', 'Eaton M22-PV mushroom head, twist-release'),
           mod('regulatory', 'EN ISO 13850'),
         ],
@@ -1627,6 +1673,8 @@ function emitWorkerAccessSafety(p: VfParams) {
         cc('uvc_low_pressure_lamp', 'UV-C low-pressure lamp', 'optical_emission_function', 'ceramic'),
         [
           mod('quantity', fmtQty(p.uvcLamps)),
+          mod('manufacturer', 'Signify (Philips)'),
+          mod('part_number', 'TUV PL-L 4P (germicidal 254 nm)'),
           mod('capacity', '30', 'W'),
           mod('form', 'Philips TUV PL-L 254 nm + electronic ballast'),
           mod('regulatory', 'ANSI/IES RP-27.3'),
@@ -1695,6 +1743,8 @@ function emitHarvestHandling(p: VfParams) {
         cc('bench_scale', 'bench scale', 'electromechanical_switching_function', 'steel'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Adam Equipment'),
+          mod('part_number', 'GBK 30aM (OIML-approved)'),
           mod('capacity', '30', 'kg'),
           mod('form', 'OIML-approved trade-use bench scale'),
           mod('regulatory', 'EU 2014/31 NAWI'),
@@ -1725,6 +1775,8 @@ function emitHarvestHandling(p: VfParams) {
         cc('knee_operated_sink', 'knee-operated sink', 'fluid_flow_state', 'steel'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Mechline'),
+          mod('part_number', 'BaSiX BSX-HWS-KO'),
           mod('form', '304 stainless knee-operated mixer, food-grade'),
           mod('regulatory', 'WRAS-approved'),
         ],
@@ -1788,6 +1840,8 @@ function emitRegulatoryCompliance(_p: VfParams) {
         cc('ukca_marking_label', 'UKCA marking label', null, 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Brady'),
+          mod('part_number', 'B-7541 polyester rating-plate label'),
           mod('regulatory', 'UKCA Conformity Assessment 2022'),
         ],
       ),
