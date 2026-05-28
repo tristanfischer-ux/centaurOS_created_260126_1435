@@ -1834,6 +1834,8 @@ function emitRegulatoryCompliance(_p: VfParams) {
         cc('water_quality_sampling_port', 'water-quality sampling port', 'fluid_flow_state', 'steel'),
         [
           mod('quantity', '×2'),
+          mod('manufacturer', 'Georg Fischer'),
+          mod('part_number', 'Type 546 Pro'),
           mod('form', 'stainless quick-connect on supply + return manifolds'),
           mod('regulatory', 'BS EN ISO 19458'),
         ],
@@ -1877,8 +1879,10 @@ function emitEffluentTreatment(p: VfParams) {
         cc('screen_filter_50_micron', '50 µm screen filter', 'fluid_flow_state', 'steel'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'Amiad'),
+          mod('part_number', 'Mini Sigma'),
           mod('capacity', '40', 'L/min'),
-          mod('form', 'Amiad 2" T-line self-cleaning screen filter'),
+          mod('form', 'Amiad Mini Sigma 2" self-cleaning screen filter'),
           mod('regulatory', 'BS EN 13443-1'),
         ],
       ),
@@ -1907,6 +1911,8 @@ function emitEffluentTreatment(p: VfParams) {
         cc('recirc_uv_steriliser', 'recirculation UV steriliser', 'optical_emission_function', 'steel'),
         [
           mod('quantity', '×1'),
+          mod('manufacturer', 'TMC'),
+          mod('part_number', 'Pro-Clear UV-40'),
           mod('capacity', '40', 'W'),
           mod('form', 'TMC Pro-Clear UV 40W inline 254 nm'),
           mod('regulatory', 'CE EN 60335-2-109'),
