@@ -655,6 +655,150 @@ def per_module_camera_pair(bbox, distance_factor=2.8, elevation_factor=0.6):
     ]
 
 
+def module_bbox(module_objects, module_id):
+    """Union the world-space bounding boxes of every object tagged with
+    module_id → ((cx, cy, cz), (dx, dy, dz)).
+
+    Returns None if the module has no tagged MESH objects OR the union bbox
+    is degenerate (max dim < MODULE_BBOX_MIN_DIM_M, i.e. a single flat panel
+    with no real extent) — callers MUST treat None as "fall back to the
+    scene-level framing" rather than crashing.
+
+    Skips fl_ground* shadow-catcher planes (same as compute_scene_bbox) so a
+    module that happens to include a helper plane doesn't get its bbox blown
+    out. 2026-05-28: per-module best-view cameras (Tristan).
+    """
+    objs = module_objects.get(module_id, []) if module_objects else []
+    xs, ys, zs = [], [], []
+    for obj in objs:
+        if obj is None or getattr(obj, "type", None) != "MESH":
+            continue
+        if obj.name.startswith("fl_ground"):
+            continue
+        for v in obj.bound_box:
+            wv = obj.matrix_world @ mathutils.Vector(v)
+            xs.append(wv.x); ys.append(wv.y); zs.append(wv.z)
+    if not xs:
+        return None
+    cx, cy, cz = (min(xs)+max(xs))/2, (min(ys)+max(ys))/2, (min(zs)+max(zs))/2
+    dx, dy, dz = max(xs)-min(xs), max(ys)-min(ys), max(zs)-min(zs)
+    if max(dx, dy, dz) < MODULE_BBOX_MIN_DIM_M:
+        return None
+    return ((cx, cy, cz), (dx, dy, dz))
+
+
+# Minimum module extent (metres) below which module_bbox() returns None and
+# the caller falls back to scene framing. 5 cm guards against a module made
+# of a single zero-thickness panel (e.g. an earth tape 5mm thick) producing a
+# camera glued to the panel surface.
+MODULE_BBOX_MIN_DIM_M = 0.05
+
+
+def camera_for_module(mod_centre, mod_dims, scene_bbox, camera_hint="three_quarter",
+                      context_margin=1.6):
+    """Compute ONE camera spec that frames a SINGLE module from its best-view
+    angle, aimed at the MODULE centroid (not the scene centre).
+
+    Args:
+      mod_centre: (cx, cy, cz) module centroid, world space
+      mod_dims:   (dx, dy, dz) module bounding-box dimensions
+      scene_bbox: ((xmin,xmax),(ymin,ymax),(zmin,zmax)) whole-scene bbox —
+                  used ONLY to infer which face of the module points outward
+                  (the face nearest the container exterior).
+      camera_hint: "front" | "three_quarter" | "top_down". Unknown / None →
+                  "three_quarter".
+      context_margin: ortho_scale = module max_dim × this factor. 1.6 keeps
+                  the module filling most of the frame while still showing
+                  where it sits in the container (Tristan 2026-05-28 spec).
+
+    Returns a dict {name, loc, target, ortho_scale} consumable by
+    setup_camera(**spec minus name). The camera is positioned on a sphere
+    around the module centroid; only the angle (azimuth + elevation) changes
+    with camera_hint. Distance is generous (module diag × 3) — framing is
+    governed by ortho_scale, not distance, for an ORTHO camera, so distance
+    only needs to clear the geometry and keep the module in front of the
+    container bulk.
+
+    OUTWARD-NORMAL INFERENCE: the module's dominant outward-facing axis is
+    the horizontal axis (X or Y) on which the module centroid is furthest
+    (as a fraction of the scene half-extent) from the scene centre. The
+    camera is placed on the OUTWARD side of that axis so it looks at the
+    module from outside the container toward the centre — i.e. it sees the
+    module's exterior-facing face, not the wall behind it. For a module
+    sitting dead-centre, defaults to looking along -Y (the conventional
+    "front" of these container scenes; back wall is at -Y per the templates,
+    front access is +Y, but camera looks toward -Z-ish from +Y/-Y based on
+    sign — see below).
+    """
+    if camera_hint not in ("front", "three_quarter", "top_down"):
+        camera_hint = "three_quarter"
+
+    cx, cy, cz = mod_centre
+    dx, dy, dz = mod_dims
+    (xmin, xmax), (ymin, ymax), (zmin, zmax) = scene_bbox
+    scx = (xmin + xmax) / 2
+    scy = (ymin + ymax) / 2
+    sx_half = max((xmax - xmin) / 2, 1e-6)
+    sy_half = max((ymax - ymin) / 2, 1e-6)
+
+    max_dim = max(dx, dy, dz, 1e-6)
+    diag = math.sqrt(dx * dx + dy * dy + dz * dz)
+    # Distance only needs to clear geometry — ortho framing is ortho_scale.
+    dist = max(diag * 3.0, max_dim * 3.0)
+    ortho_scale = max_dim * context_margin
+
+    # Outward normal: pick the horizontal axis on which the module is most
+    # off-centre (normalised by that axis's scene half-extent). Sign = which
+    # way is "outward" from the scene centre.
+    off_x = (cx - scx) / sx_half
+    off_y = (cy - scy) / sy_half
+    if abs(off_x) >= abs(off_y):
+        # X is the dominant outward axis
+        out = (1.0 if off_x >= 0 else -1.0, 0.0)
+        # secondary (for 3/4 swing) is Y, biased toward the front (+Y access)
+        side = (0.0, 1.0)
+    else:
+        out = (0.0, 1.0 if off_y >= 0 else -1.0)
+        side = (1.0 if off_x >= 0 else -1.0, 0.0)
+    # If the module is essentially centred on both axes, default outward = +Y
+    # (front access face of a container) so we don't look through the back wall.
+    if abs(off_x) < 0.08 and abs(off_y) < 0.08:
+        out = (0.0, 1.0)
+        side = (1.0, 0.0)
+
+    def _on_sphere(az_unit, elev_deg):
+        """az_unit = (ux, uy) horizontal unit-ish direction the camera sits
+        in (FROM the module, looking back at it). elev_deg = elevation above
+        horizontal. Returns world camera loc."""
+        ux, uy = az_unit
+        n = math.hypot(ux, uy) or 1.0
+        ux, uy = ux / n, uy / n
+        elev = math.radians(elev_deg)
+        horiz = math.cos(elev) * dist
+        vert = math.sin(elev) * dist
+        return (cx + ux * horiz, cy + uy * horiz, cz + vert)
+
+    if camera_hint == "front":
+        # Low elevation, camera on the module's outward face → the face fills
+        # the frame. ~20° elevation.
+        loc = _on_sphere(out, 20.0)
+        name = "front"
+    elif camera_hint == "top_down":
+        # High elevation looking down — roof / array / tray modules. Keep a
+        # slight outward azimuth so it's not a pure plan view (reads better).
+        loc = _on_sphere(out, 74.0)
+        name = "top-down"
+    else:  # three_quarter
+        # Classic hero 3/4: ~40° azimuth swung off the outward normal toward
+        # the side axis, + ~30° elevation.
+        az = (out[0] * math.cos(math.radians(40)) + side[0] * math.sin(math.radians(40)),
+              out[1] * math.cos(math.radians(40)) + side[1] * math.sin(math.radians(40)))
+        loc = _on_sphere(az, 30.0)
+        name = "three-quarter"
+
+    return {"name": name, "loc": loc, "target": (cx, cy, cz), "ortho_scale": ortho_scale}
+
+
 def setup_camera(loc, target, ortho_scale, focal=50):
     bpy.ops.object.camera_add(location=loc)
     cam = bpy.context.active_object
@@ -926,16 +1070,49 @@ def run_render_pipeline(out_dir, module_objects, structure_module_id="structure_
             if orig is not None:
                 obj.scale = orig
 
+    # Scene bbox is fixed for the whole per-module pass (geometry doesn't move,
+    # only materials/scale toggle) — compute once for outward-normal inference
+    # + the scene-level fallback framing.
+    scene_bbox = compute_scene_bbox()
+    (sx0, sx1), (sy0, sy1), (sz0, sz1) = scene_bbox
+    print("[forge] ── per-module best-view camera table ──────────────────")
+    print(f"[forge] scene bbox X[{sx0:.2f},{sx1:.2f}] Y[{sy0:.2f},{sy1:.2f}] Z[{sz0:.2f},{sz1:.2f}]")
+
     for module_id, mod_objs in module_objects.items():
         if not mod_objs:
             continue
         apply_focal_palette(module_id)
         apply_focal_scale(module_id, scale_factor=1.05)
-        bbox_mod = compute_scene_bbox()
-        # Phase A item 4 (2026-05-24): 2-angle per module — corner-FR (primary)
-        # + top-front (alternate view to reveal vertical layout). Each is
-        # written as module-<id>.png (primary) and module-<id>-top-front.png.
-        cam_pair = per_module_camera_pair(bbox_mod)
+
+        # 2026-05-28 (Tristan): per-module BEST-VIEW camera. Frame each module
+        # from its own camera_hint angle, aimed at the MODULE centroid — not
+        # the shared scene-level corner/top-front pair that made every module
+        # render look identical (just recoloured).
+        profile = get_module_profile(module_id)
+        cam_hint = profile["camera_hint"] if profile else "three_quarter"
+        mbbox = module_bbox(module_objects, module_id)
+        if mbbox is not None:
+            mod_centre, mod_dims = mbbox
+            primary = camera_for_module(mod_centre, mod_dims, scene_bbox, cam_hint)
+            tx, ty, tz = primary["target"]
+            lx, ly, lz = primary["loc"]
+            print(f"[forge] module {module_id:<32} hint={cam_hint:<13} "
+                  f"target=({tx:.2f},{ty:.2f},{tz:.2f}) "
+                  f"loc=({lx:.2f},{ly:.2f},{lz:.2f}) "
+                  f"ortho={primary['ortho_scale']:.2f}  [MODULE-FRAMED]")
+            # Alternate second angle: a complementary top-down-ish view of the
+            # SAME module (still module-centred) so downstream keeps its
+            # 2-angle-per-module contract (module-<id>-top-front.png).
+            alt = camera_for_module(mod_centre, mod_dims, scene_bbox, "top_down")
+            alt["name"] = "top-front"
+            cam_pair = [primary, alt]
+        else:
+            # Guard rail: module has no usable tagged geometry → fall back to
+            # the scene-level pair (old behaviour) instead of crashing.
+            print(f"[forge] module {module_id:<32} hint={cam_hint:<13} "
+                  f"[FALLBACK: scene-level framing — no usable module bbox]")
+            cam_pair = per_module_camera_pair(scene_bbox)
+
         for cam_idx, cam_spec in enumerate(cam_pair):
             clear_cameras()
             setup_camera(loc=cam_spec["loc"], target=cam_spec["target"], ortho_scale=cam_spec["ortho_scale"])
