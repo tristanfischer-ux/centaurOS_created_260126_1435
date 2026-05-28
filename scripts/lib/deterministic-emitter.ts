@@ -1004,6 +1004,7 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('form', `LEM LV 25-1000 closed-loop Hall-effect DC-bus voltage transducer (1000 V measuring range — covers the ${p.dcBusVoltageV} V nominal / 912.5 V max string with margin; 10 mA nominal primary via integral precision resistor, 0.8% accuracy, galvanic isolation, ±15 V supply)`),
           mod('rating_primary', '1000 V measuring range'),
           mod('regulatory', 'IEC 60688'),
+          mod('list_price_gbp', '112.92'), // 2026-05-28 gate 21: was £1 curve estimate; real Mouser LV 25-1000 ≈ £112.92
         ],
       ),
       // class-killer #2 (2026-05-26): pack_instrumentation had 4 words, below
@@ -1088,6 +1089,7 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('manufacturer', 'Schneider Electric'),
           mod('part_number', 'LC1K0910M7'),
           mod('regulatory', 'IEC 60947-4-1'),
+          mod('list_price_gbp', '45.24'), // 2026-05-28 gate 21: was £18.50 curve; real Mouser ≈ £45.24
         ],
       ),
       word(
@@ -1585,6 +1587,7 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
           mod('part_number', 'TJA1051T/3'),
           mod('capacity', '500', 'kbit/s'),
           mod('regulatory', 'ISO 11898-2'),
+          mod('list_price_gbp', '1.22'), // 2026-05-28 gate 21: was £5 curve; real Farnell ≈ £1.22
         ],
       ),
       word(
