@@ -339,7 +339,12 @@ const stepOctopart: ToolStep = {
   }),
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { total_in_stock_count: number; parts: any[] }
-    const prov = (f: string) => ({ source: 'tool:octopart:parts-lookup' as const, tool_id: 'octopart:parts-lookup', tool_version: '2026-05-stub', tool_license: 'proprietary' as const, tool_source_url: 'octopart.com', invocation_output_field: f, duration_ms: 0 })
+    // 2026-05-28: octopart-stub was replaced by distributor-cascade-real (live
+    // Farnell/Digi-Key/Mouser cascade written back to forge-truth.db). The
+    // tool_id stays 'octopart:parts-lookup' for compat, but the provenance must
+    // tell the truth about the real source so the tools-flow diagram stops
+    // showing a dead "Octopart …v2026-05-stub" node.
+    const prov = (f: string) => ({ source: 'tool:octopart:parts-lookup' as const, tool_id: 'octopart:parts-lookup', tool_version: '2026-05-25-db-only', tool_license: 'free-proprietary' as const, tool_source_url: 'forge-truth.db distributor_cascade_cache + pretraining_extracted_parts (Farnell/Digi-Key/Mouser)', invocation_output_field: f, duration_ms: 0 })
     return {
       ...c,
       quantities: {

@@ -57,7 +57,7 @@ export interface DistributorCascadeOutput {
 
 export const distributorCascadeRealTool: Tool<DistributorCascadeInput, DistributorCascadeOutput> = {
   id: 'octopart:parts-lookup', // kept stable so TOOL_INPUT_HINTS + mermaid still match
-  name: 'Distributor Cascade — DB Enrichment (forge-truth.db, no live API)',
+  name: 'Parts Cascade — Farnell / Digi-Key / Mouser (forge-truth.db)',
   version: '2026-05-25-db-only',
   license: 'free-proprietary',  // DB read, no live API calls
   source_url: 'forge-truth.db distributor_cascade_cache + pretraining_extracted_parts',

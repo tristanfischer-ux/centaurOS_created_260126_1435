@@ -181,8 +181,19 @@ export function buildToolsUsedPage(contract: ContractInProgress): ToolsUsedPage 
 
   // Lookup display names from the tool registry (lazy import to avoid
   // module cycle if attribution is imported before any tools register).
+  // 2026-05-28: prefer the REGISTERED tool's real name over humanising the
+  // tool_id. Class plans emit provenance without a tool_name, so the old
+  // fallback humanised the id — e.g. 'octopart:parts-lookup' rendered as
+  // "Octopart Parts Lookup" in the tools-flow diagram even though that id is
+  // now the DB-backed distributor cascade. Pulling the registry name fixes the
+  // misleading node label universally (every tool, not just this one).
+  const registryNames = new Map<string, string>()
+  try {
+    const { listTools } = require('./registry') as typeof import('./registry')
+    for (const [tid, tool] of listTools()) registryNames.set(tid, tool.name)
+  } catch { /* registry not available — fall back to humanised ids below */ }
   for (const entry of byTool.values()) {
-    if (!entry.tool_name) entry.tool_name = humaniseToolId(entry.tool_id)
+    if (!entry.tool_name) entry.tool_name = registryNames.get(entry.tool_id) || humaniseToolId(entry.tool_id)
   }
 
   // Build #18m: list tools that are AVAILABLE in the registry but did
