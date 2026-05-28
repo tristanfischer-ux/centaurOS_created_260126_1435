@@ -545,6 +545,43 @@ Guidance:
 // unit cost in GBP. Quantity uncertainty handled by ±25% low/high bracket.
 // ---------------------------------------------------------------------------
 
+// 2026-05-28 INTERIM (council L56 part_realism 4.75): industrial OEM parts that
+// MISS the distributor cascade (not on Digi-Key/Mouser/Farnell) fell to the
+// Engine-B curve, whose per-(product_class, component_class) reference
+// over-prices control/comms to ~£10k (Beckhoff CX7000, Anybus AB7634, Phoenix
+// QUINT-UPS all rendered £10,000 in BESS L56; real ≈ £300-520) and under-prices
+// industrial pumps to ~£35 (Grundfos NB; real ≈ £1.2-2k). This curated table
+// gives real catalogue prices for the common offenders, consulted BEFORE the
+// curve. Match = manufacturer-regex AND part_number-regex; first hit wins.
+// These are FINISHED CATALOGUE prices → not re-scaled by batch economics
+// (tagged estimate_source 'curve', which applyBatchEconomics already skips).
+// SEED DATA for the full fix: ingest these (+ a real industrial-OEM catalogue
+// sweep) into forge-truth.db pretraining_extracted_parts so the cascade reads
+// them DB-first and this hardcoded table can be deleted.
+export const CURATED_INDUSTRIAL_PRICES: Array<{ mfr: RegExp; pn: RegExp; price_gbp: number; note: string }> = [
+  { mfr: /beckhoff/i, pn: /^CX7\d/i, price_gbp: 420, note: 'Beckhoff CX7000-series embedded PC' },
+  { mfr: /beckhoff/i, pn: /^CX[59]\d/i, price_gbp: 980, note: 'Beckhoff CX5/9-series embedded PC' },
+  { mfr: /\b(hms|anybus)\b/i, pn: /^AB7\d/i, price_gbp: 330, note: 'HMS Anybus Modbus/fieldbus gateway' },
+  { mfr: /phoenix/i, pn: /QUINT-?UPS/i, price_gbp: 520, note: 'Phoenix Contact QUINT-UPS DC/DC module' },
+  { mfr: /grundfos/i, pn: /\bNB ?\d{2}-\d{2,3}/i, price_gbp: 1650, note: 'Grundfos NB end-suction centrifugal pump' },
+  { mfr: /grundfos/i, pn: /\b(CRE?\d|CM\d|MAGNA)/i, price_gbp: 1200, note: 'Grundfos CR/CM/MAGNA circulation pump' },
+  { mfr: /siemens/i, pn: /6ES7 ?21[0-9]/i, price_gbp: 280, note: 'Siemens S7-1200 CPU' },
+  { mfr: /siemens/i, pn: /6AV2/i, price_gbp: 950, note: 'Siemens SIMATIC HMI panel' },
+  { mfr: /moxa/i, pn: /^(EDS|IKS|EDR|MGate)/i, price_gbp: 380, note: 'Moxa industrial ethernet switch/gateway' },
+  { mfr: /hirschmann/i, pn: /(GRS|RSP|SPIDER)/i, price_gbp: 650, note: 'Hirschmann industrial switch' },
+  { mfr: /advantech/i, pn: /^(UNO|ARK)/i, price_gbp: 600, note: 'Advantech fanless industrial PC' },
+]
+
+export function curatedIndustrialPrice(manufacturer: string | null | undefined, partNumber: string | null | undefined): { price_gbp: number; note: string } | null {
+  const mfr = String(manufacturer ?? '').trim()
+  const pn = String(partNumber ?? '').trim()
+  if (!mfr || !pn) return null
+  for (const e of CURATED_INDUSTRIAL_PRICES) {
+    if (e.mfr.test(mfr) && e.pn.test(pn)) return { price_gbp: e.price_gbp, note: e.note }
+  }
+  return null
+}
+
 function curveEstimateFor(
   cls: ComponentClass,
   annualVolume: number,
@@ -805,6 +842,30 @@ async function main() {
 
   let finishedCommodityCount = 0
   for (const ctx of targets) {
+    // 2026-05-28 INTERIM: curated real catalogue price for cascade-miss
+    // industrial OEM parts (Beckhoff/Anybus/Phoenix/Grundfos/…), consulted
+    // BEFORE the Engine-B curve so they stop rendering at the ~£10k / ~£35
+    // curve-reference errors the L56 council flagged. Tagged 'curve' so batch
+    // economics treats it as already-anchored (no W3 re-scale).
+    const curated = curatedIndustrialPrice(ctx.manufacturer, ctx.part_number)
+    if (curated) {
+      results.push({
+        ctx,
+        estimate: {
+          price_estimate_gbp: curated.price_gbp,
+          estimate_low_gbp: round2(curated.price_gbp * 0.8),
+          estimate_high_gbp: round2(curated.price_gbp * 1.25),
+          reasoning: `Curated industrial catalogue price (interim, pre-DB-ingest): ${curated.note} = £${curated.price_gbp}. Part missed the distributor cascade; this real price replaces the Engine-B curve estimate.`,
+          component_class: classByWordId.get(ctx.word_id) ?? 'unknown',
+          curve_multiplier: 1.0,
+          reference_unit_cost_gbp: curated.price_gbp,
+          annual_volume: annualVolume,
+          classification_source: classSource.get(ctx.word_id) ?? 'curated',
+          estimate_source: 'curve',
+        },
+      })
+      continue
+    }
     const cls = classByWordId.get(ctx.word_id)!
     if (cls === 'unknown') {
       unknowns.push(ctx)
