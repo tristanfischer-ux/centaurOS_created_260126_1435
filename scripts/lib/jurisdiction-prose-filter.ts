@@ -35,6 +35,12 @@ export const UK_CODE_SUBSTITUTIONS: Array<[RegExp, string]> = [
   [/\bUL 60947-4\b/g, 'IEC 60947-4-1'],
   // MCCBs
   [/\bUL 489\b/g, 'IEC 60947-2'],
+  // Industrial control panels / arc-flash containment (L59 gate-19 HIGH ×10:
+  // Phase 2 emitted "UL 508A" on control + arc-flash containment panels in a UK
+  // BESS doc). UK/EU equivalent for LV control/switchgear assemblies is BS EN
+  // 61439. UL 508A listed before UL 508 (longest-match-first per the ordering note).
+  [/\bUL 508A\b/g, 'BS EN 61439-1'],
+  [/\bUL 508\b/g, 'BS EN 61439-1'],
   // Grounding / bonding
   [/\bUL 467\b/g, 'BS 7430'],
   // Cell / stationary-battery
