@@ -2527,16 +2527,18 @@ function CoverPage({
           return null
         })()}
         <Text style={{ fontSize: 9, color: MUTED, letterSpacing: 2, marginBottom: 12 }}>
-          FORGE ENGINEERING REPORT
+          FORGE ENGINEERING DESIGN DOSSIER · CONCEPT STAGE
         </Text>
         <View style={{ height: 1, backgroundColor: ACCENT, marginBottom: 18 }} />
         <Text style={{ fontSize: 26, fontFamily: 'Helvetica-Bold', color: INK, lineHeight: 1.15, marginBottom: 14 }}>
           {subject}
         </Text>
         <Text style={{ fontSize: 11, color: INK_SOFT, lineHeight: 1.5 }}>
-          Brief and module decomposition. First-cut engineering report covering
-          the product brief, modules and sub-modules, compliance, risks, bill
-          of materials, and recommended suppliers.
+          A concept-stage engineering design dossier: from the product brief to a
+          buildable, costed design — modules and sub-modules, a full bill of
+          materials with real manufacturer part numbers and live pricing,
+          compliance and risk review, and recommended suppliers. Study-grade for
+          early decision-making — not a for-construction or certified design.
         </Text>
         {/* Task #87 (2026-05-18) — provisional class-registry note.
             Amber, not red — informational only, not blocking. Fires when
@@ -2793,7 +2795,7 @@ function PageFooter() {
     <View style={{ position: 'absolute', bottom: 30, left: 64, right: 64 }} fixed>
       <View style={{ height: 0.6, backgroundColor: RULE_SOFT, marginBottom: 6 }} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ fontSize: 8, color: MUTED }}>Forge Engineering Report</Text>
+        <Text style={{ fontSize: 8, color: MUTED }}>Forge Engineering Design Dossier · Concept Stage</Text>
         <Text
           style={{ fontSize: 8, color: MUTED }}
           render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`}
