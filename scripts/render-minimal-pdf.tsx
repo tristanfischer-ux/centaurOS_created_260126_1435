@@ -1314,17 +1314,36 @@ function computeBomTotals(state: any): BomTotals | null {
       unit_price_gbp: um.total,
       line_total_gbp: um.total,
       price_tier: 'estimate',
+      engine_b_component_class: 'system_assemblies',
       contract_override_reason: 'Engineering-contract macro-assembly aggregate — no discrete design word was emitted for it this run; shown here so the cost has a visible module home and the cover total reconciles with the module sub-totals.',
     }
     homeSub.parts.push(syntheticRow)
     homeSub.subtotal_gbp = roundToPence(homeSub.subtotal_gbp + um.total)
     homeMod.subtotal_gbp = roundToPence(homeMod.subtotal_gbp + um.total)
+    // 2026-05-28 (council L59): attribute the injected macro to the component-
+    // class breakdown too, else engine_b_by_class is short by this amount.
+    engine_b_by_class['system_assemblies'] = roundToPence((engine_b_by_class['system_assemblies'] || 0) + um.total)
     totalRows += 1
     estimatePriced += 1
     unmatchedMacroTotal_gbp = roundToPence(unmatchedMacroTotal_gbp + um.total)
   }
   if (unmatchedMacroTotal_gbp > 0) {
     grandTotal_gbp = roundToPence(grandTotal_gbp + unmatchedMacroTotal_gbp)
+  }
+  // 2026-05-28 (council L59 — second rollup determinism): guarantee the
+  // component-class breakdown sums to the grand total BY CONSTRUCTION. Council
+  // found the breakdown £5,867.50 short of the BoM total because the injected
+  // macro lines (and any rounding/excluded-row residual) weren't in
+  // engine_b_by_class. Plug any residual into 'system_assemblies' so the
+  // breakdown table can never silently disagree with the BoM total again.
+  // (When applyBatchEconomics later rebuilds engine_b_by_class from sub.parts,
+  // the synthetic rows now carry engine_b_component_class so they bucket there too.)
+  {
+    const ebSum = Object.values(engine_b_by_class).reduce((a, v) => a + v, 0)
+    const ebResidual = roundToPence(grandTotal_gbp - ebSum)
+    if (Math.abs(ebResidual) >= 0.01) {
+      engine_b_by_class['system_assemblies'] = roundToPence((engine_b_by_class['system_assemblies'] || 0) + ebResidual)
+    }
   }
 
   return {
