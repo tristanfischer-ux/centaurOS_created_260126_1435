@@ -93,7 +93,7 @@ PDF_DIR = Path("~/.forge-truth/spec-pdfs").expanduser()
 COST_LOG = Path(os.environ.get("REEXTRACT_PRICE_LOG", "/tmp/reextract-prices.log"))
 
 CHARS_PER_CHUNK = 40_000
-EXTRACT_MODEL = "google/gemini-3.1-flash-lite-preview"
+EXTRACT_MODEL = "google/gemini-3.1-flash-lite"
 # Per-1M-token pricing (USD).
 PRICE_IN_PER_M_USD = 0.10
 PRICE_OUT_PER_M_USD = 0.40

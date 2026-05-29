@@ -64,7 +64,7 @@ function insightToAgentInsight(insight: PageInsight, index: number): AgentInsigh
 // server action twice with fast=true and fast=false.
 //
 // COST CUT 2026-04-24: Fast tier swapped from claude-haiku-4-5 ($1.00 / $5.00
-// per 1M) to gemini-3.1-flash-lite-preview ($0.075 / $0.30 per 1M) — ~13x
+// per 1M) to gemini-3.1-flash-lite ($0.075 / $0.30 per 1M) — ~13x
 // cheaper input, ~17x cheaper output. Page-insight workload is small JSON
 // emission with simple persona — Flash Lite handles it fine and the deep
 // Sonnet pass still upgrades shortly after for analytical quality.
@@ -74,7 +74,7 @@ function insightToAgentInsight(insight: PageInsight, index: number): AgentInsigh
 // Deep tier now uses OpenAI gpt-4.1-mini (Anthropic eliminated 2026-04-30).
 const MODEL_CONFIG = {
   fast: {
-    model: "gemini-3.1-flash-lite-preview",
+    model: "gemini-3.1-flash-lite",
     provider: "google" as const,
     maxTokens: 512,
     timeout: 8_000,

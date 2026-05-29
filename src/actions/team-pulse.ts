@@ -245,7 +245,7 @@ export async function generateDailyStandup(): Promise<{ data?: DailyStandup; err
       const { text } = await callGemini(
         'Write a 2-3 sentence standup summary highlighting key focus areas and any blockers. Be concise and direct. No markdown, just plain text.',
         standupText,
-        'google/gemini-flash-1.5-8b',
+        'google/gemini-3.1-flash-lite',
         200,
         30_000,
       )

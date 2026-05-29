@@ -16,7 +16,7 @@
  *   1. SELECTs all `source = 'web_fallback_pdf_engine'` rows.
  *   2. For each, applies a known-domain mapping (sigmaaldrich.com → MilliporeSigma,
  *      merckmillipore.com → MilliporeSigma, biorad.com → Bio-Rad Laboratories).
- *   3. For the rest, runs Flash-Lite (google/gemini-3.1-flash-lite-preview, the
+ *   3. For the rest, runs Flash-Lite (google/gemini-3.1-flash-lite, the
  *      same model used by cleanCompanyName in enrich-state-with-suppliers.tsx)
  *      to decide whether the name is a product line or already canonical.
  *   4. UPDATEs offenders: name = parent_company, attributes_json gets
@@ -127,7 +127,7 @@ Output ONLY a JSON object: {"canonical_company_name": "...", "is_product_line": 
         'X-Title': 'ForgeOS supplier name cleanup mop-up',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3.1-flash-lite-preview',
+        model: 'google/gemini-3.1-flash-lite',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 250,
         temperature: 0.1,

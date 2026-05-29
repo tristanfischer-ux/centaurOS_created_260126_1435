@@ -125,7 +125,7 @@ export async function reviewPromptDiffWithCouncil(
 
   const COUNCIL_SEATS = [
     'google/gemini-3.1-pro-preview',
-    'openai/gpt-5.4',
+    'openai/gpt-5.5',
     'x-ai/grok-4.3',
     'z-ai/glm-5.1',
     'moonshotai/kimi-k2.6',

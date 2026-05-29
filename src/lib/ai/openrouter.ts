@@ -93,7 +93,7 @@ interface RawResponse {
  */
 const REASONING_MODEL_PATTERNS = [
     "deepseek-v4",       // deepseek/deepseek-v4-pro, deepseek/deepseek-v4-flash
-    "deepseek-r1",       // deepseek/deepseek-r1 variants
+    "deepseek-r1",       // deepseek/deepseek-r1 variants (superseded by deepseek-v4-pro, kept for safety)
     "kimi-k2",           // moonshotai/kimi-k2.6
     "gpt-5",             // openai/gpt-5.5 (reasoning model — no temperature)
     "o1",                // openai/o1, openai/o1-mini, openai/o1-preview
@@ -294,7 +294,7 @@ export const CHEAP_STRUCTURED_MODEL = "deepseek/deepseek-v4-flash" as const
 /** Mid-tier for cases where V4-Flash quality regresses; still cheaper than Haiku. */
 export const MID_STRUCTURED_MODEL = "deepseek/deepseek-v4-pro" as const
 /** Cheap option with strong English prose — good for description synthesis. */
-export const CHEAP_PROSE_MODEL = "google/gemini-2.5-flash" as const
+export const CHEAP_PROSE_MODEL = "google/gemini-3.5-flash" as const
 
 /**
  * Normalise a raw OpenRouter (OpenAI-compatible) response JSON to a plain

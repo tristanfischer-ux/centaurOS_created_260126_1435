@@ -58,7 +58,7 @@ async function main() {
   }
 
   const searchResp = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${GOOGLE_KEY}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${GOOGLE_KEY}`,
     {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

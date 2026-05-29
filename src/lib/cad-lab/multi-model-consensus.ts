@@ -38,13 +38,13 @@ function normalizeMaterial(raw: string): string {
 
 async function callOpenAIConsensus(systemPrompt: string, userPrompt: string): Promise<string> {
   const result = await callOpenRouter({
-    model: "openai/gpt-5.4",
+    model: "openai/gpt-5.5",
     system: systemPrompt,
     prompt: userPrompt,
     maxTokens: 256,
     timeoutMs: 30_000,
   })
-  if (!result.ok) throw new Error(result.error ?? "OpenRouter GPT-5.4 call failed")
+  if (!result.ok) throw new Error(result.error ?? "OpenRouter GPT-5.5 call failed")
   return (result.text ?? "").trim()
 }
 

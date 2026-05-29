@@ -325,7 +325,7 @@ Overall health trend: ${overallHealthTrend}`
       const { text: content } = await callGemini(
         systemPrompt,
         userPrompt,
-        'google/gemini-flash-1.5-8b',
+        'google/gemini-3.1-flash-lite',
         1000,
         60_000,
       )

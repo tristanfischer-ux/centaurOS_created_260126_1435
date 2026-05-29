@@ -316,7 +316,7 @@ async function analyzeSource(
         const prompt = `${companyContext}\n\n---\n\n${source.analysisPrompt}`
 
         const response = await client.chat.completions.create({
-            model: 'openai/gpt-5.4',
+            model: 'openai/gpt-5.5',
             messages: [
                 {
                     role: 'system',

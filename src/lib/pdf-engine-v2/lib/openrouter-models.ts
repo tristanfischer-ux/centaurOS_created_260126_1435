@@ -27,8 +27,8 @@ export const GROK_4_3 = 'x-ai/grok-4.3'
 /** MiMo V2.5 Pro (Xiaomi) — 25% hallucination, +4 Omniscience, consumer-electronics manufacturing prior. */
 export const MIMO_V2_5_PRO = 'xiaomi/mimo-v2.5-pro'
 
-/** Qwen 3.6 Max Preview (Alibaba) — 46% hallucination, +4 Omniscience, B2B supply chain prior. NOTE: intermittent OpenRouter HTTP 400 — drawer forgeos_gotchas_a19eb8ce377fa87d. */
-export const QWEN_3_6_MAX = 'qwen/qwen3.6-max-preview'
+/** Qwen 3.7 Max (Alibaba) — 46% hallucination, +4 Omniscience, B2B supply chain prior. NOTE: intermittent OpenRouter HTTP 400 — drawer forgeos_gotchas_a19eb8ce377fa87d. */
+export const QWEN_3_6_MAX = 'qwen/qwen3.7-max'
 
 /** Kimi K2.6 (Moonshot) — 44% hallucination, long-context lineage. NOTE: intermittent OpenRouter unavailability — drawer forgeos_gotchas_a19eb8ce377fa87d. */
 export const KIMI_K2_6 = 'moonshotai/kimi-k2.6'

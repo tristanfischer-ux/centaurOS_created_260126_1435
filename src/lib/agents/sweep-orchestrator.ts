@@ -141,13 +141,13 @@ const EXECUTION_MAX_TOKENS = 8192
  * interactive mode. This ensures output quality matches what was measured.
  */
 const EXECUTION_MODEL_MAP: Record<string, { model: string; provider: 'openai-compat'; baseURL: string; apiKeyEnv: string }> = {
-  'claude': { model: 'openai/gpt-5.4', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
+  'claude': { model: 'openai/gpt-5.5', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
   'sonnet': { model: 'deepseek-chat', provider: 'openai-compat', baseURL: 'https://api.deepseek.com/v1', apiKeyEnv: 'DEEPSEEK_API_KEY' },
   'deepseek': { model: 'deepseek-chat', provider: 'openai-compat', baseURL: 'https://api.deepseek.com/v1', apiKeyEnv: 'DEEPSEEK_API_KEY' },
   'google': { model: 'google/gemini-3.1-pro-preview', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
-  'openai': { model: 'openai/gpt-5.4', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
+  'openai': { model: 'openai/gpt-5.5', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
   'minimax': { model: 'MiniMax-M2.7', provider: 'openai-compat', baseURL: 'https://api.minimax.io/v1', apiKeyEnv: 'MINIMAX_API_KEY' },
-  'haiku': { model: 'google/gemini-2.5-flash', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
+  'haiku': { model: 'google/gemini-3.5-flash', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
   'gpt-mini': { model: 'openai/gpt-4.1-mini', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
   'qwen-235b': { model: 'qwen3-235b-a22b', provider: 'openai-compat', baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', apiKeyEnv: 'DASHSCOPE_API_KEY' },
   'deepseek-v4-pro': { model: 'deepseek-ai/DeepSeek-V4-Pro', provider: 'openai-compat', baseURL: 'https://api.together.xyz/v1', apiKeyEnv: 'TOGETHER_API_KEY' },

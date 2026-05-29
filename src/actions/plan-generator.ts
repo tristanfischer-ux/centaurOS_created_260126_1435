@@ -161,7 +161,7 @@ Rules:
       const { text: content } = await callGemini(
         systemPrompt,
         `User goal: ${sentence}`,
-        'google/gemini-flash-1.5-8b',
+        'google/gemini-3.1-flash-lite',
         3000,
         60_000,
       )

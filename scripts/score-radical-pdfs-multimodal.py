@@ -68,7 +68,7 @@ MODELS = [
         "id": "gemini",
         "label": "Gemini-2.5-Pro",
         "provider": "openrouter",
-        "model": "google/gemini-2.5-pro-preview",
+        "model": "google/gemini-3.1-pro-preview",
     },
     {
         "id": "claude",
@@ -530,7 +530,7 @@ def run(args):
     lines.append("")
     lines.append(f"**Date:** 2026-05-10  ")
     lines.append(f"**Shadow batch:** `{batch_dir.name}`  ")
-    lines.append(f"**Council models:** `google/gemini-2.5-pro-preview` · `anthropic/claude-opus-4-7` · `qwen/qwen3-vl-235b-a22b-instruct`  ")
+    lines.append(f"**Council models:** `google/gemini-3.1-pro-preview` · `anthropic/claude-opus-4-7` · `qwen/qwen3-vl-235b-a22b-instruct`")
     lines.append(f"**Methodology:** 150 DPI PNG conversion via `pdftoppm`; 3-LLM multimodal scoring per PDF; outlier calibration (drop score ≥3 below other two); mean of calibrated valid scores per cell.  ")
     lines.append(f"**Changes scored:** P1 template cross-contamination fix, P2 Feasibility Assessment section, P3 Executive Summary section, DRC rename, BOM legend fix.")
     lines.append("")

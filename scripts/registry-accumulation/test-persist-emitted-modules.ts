@@ -114,7 +114,7 @@ function buildSyntheticEmitters(): EmitterOutputLike[] {
     { ok: true, model: 'google/gemini-3.1-pro-preview',     data: canonical },
     { ok: true, model: 'x-ai/grok-4.3',                     data: canonical },
     { ok: true, model: 'anthropic/claude-opus-4-7',         data: canonical },
-    { ok: true, model: 'qwen/qwen3.6-max-preview',          data: canonical },
+    { ok: true, model: 'qwen/qwen3.7-max',                   data: canonical },
     { ok: true, model: 'xiaomi/mimo-v2.5-pro',              data: variant5 },
     { ok: true, model: 'moonshotai/kimi-k2.6',              data: variant6 },
   ]

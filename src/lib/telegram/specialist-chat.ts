@@ -201,8 +201,8 @@ export async function sendToSpecialist(
         qwen: { providerId: 'qwen', modelId: 'qwen3.5-plus' },
         'qwen-local': { providerId: 'qwen-local', modelId: 'qwen3:30b-a3b' },
         minimax: { providerId: 'minimax', modelId: 'MiniMax-M2.7' },
-        // haiku tier: was anthropic/claude-haiku-4-5, now google/gemini-2.5-flash (mirrors failover.ts)
-        haiku: { providerId: 'google', modelId: 'gemini-2.5-flash' },
+        // haiku tier: was anthropic/claude-haiku-4-5, now google/gemini-3.5-flash (mirrors failover.ts)
+        haiku: { providerId: 'google', modelId: 'gemini-3.5-flash' },
         'gpt-mini': { providerId: 'openai', modelId: 'gpt-4.1-mini' },
         'qwen-235b': { providerId: 'qwen', modelId: 'qwen3-235b-a22b' },
         'deepseek-v4-pro': { providerId: 'together', modelId: 'deepseek-ai/DeepSeek-V4-Pro' },

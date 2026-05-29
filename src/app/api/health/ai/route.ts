@@ -82,7 +82,7 @@ export async function GET(request: NextRequest) {
   const googleKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (googleKey) {
     const start = Date.now()
-    const geminiModel = "gemini-3.1-flash-lite-preview"
+    const geminiModel = "gemini-3.1-flash-lite"
     try {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${googleKey}`, {
         method: "POST",

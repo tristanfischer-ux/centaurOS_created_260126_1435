@@ -2,13 +2,19 @@
 # check-ai-models.sh — Scan codebase for stale/retired AI model references.
 # Runs on SessionStart hook and outputs JSON for Claude to act on.
 #
-# Model registry: maps retired model IDs to their replacements.
-# Update this list when providers announce retirements or new GA models.
+# Model registry: maps retired/superseded model IDs to their replacements.
+# Update this list when the weekly monitor (scripts/check-model-versions.ts)
+# flags a new provider release, or when a provider announces a retirement.
+# Canonical current ids live in src/lib/ai/models.ts.
 
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 SRC="$REPO_ROOT/src"
+# The PDF-generation engine lives in scripts/ and was UNWATCHED before 2026-05-29 —
+# the supplier enricher silently ran a two-generation-old Gemini Flash-Lite because
+# this scan only looked at src/. Scan both trees now.
+SCRIPTS="$REPO_ROOT/scripts"
 
 STALE_COUNT=0
 OUTPUT=""
@@ -21,7 +27,7 @@ check_model() {
   local matches
   # -w = word boundaries, prevents "gpt-4o" matching "gpt-4o-mini-tts"
   # and "o1" matching "icon", "color", etc.
-  matches=$(grep -rnw --include="*.ts" --include="*.tsx" "$pattern" "$SRC" 2>/dev/null \
+  matches=$(grep -rnw --include="*.ts" --include="*.tsx" --include="*.mjs" "$pattern" "$SRC" "$SCRIPTS" 2>/dev/null \
     | grep -v node_modules \
     | grep -v __tests__ \
     | grep -v "\.test\." \
@@ -52,7 +58,7 @@ check_model_filtered() {
   local reason="$4"
 
   local matches
-  matches=$(grep -rnw --include="*.ts" --include="*.tsx" "$pattern" "$SRC" 2>/dev/null \
+  matches=$(grep -rnw --include="*.ts" --include="*.tsx" --include="*.mjs" "$pattern" "$SRC" "$SCRIPTS" 2>/dev/null \
     | grep -v node_modules \
     | grep -v __tests__ \
     | grep -v "\.test\." \
@@ -79,13 +85,24 @@ $(echo "$matches" | head -10 | sed 's/^/- /' | sed 's/\$/\\$/g; s/`/\\`/g')
 check_model_filtered "gpt-4o" "gpt-4o-mini-tts" "gpt-5.3-chat-latest" "GPT-4o retired Feb 13 2026"
 check_model "gpt-4-turbo" "gpt-5.3-chat-latest" "GPT-4 Turbo retired"
 
-# VERIFIED 2026-03-23: Gemini 3.1 Pro and Flash-Lite are STILL in preview. No GA model ID exists.
-# Do NOT replace -preview suffix until Google announces GA.
-# Source: https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/3-1-pro
-# check_model "gemini-3.1-pro-preview" "gemini-3.1-pro" "GA version available"
-# check_model "gemini-3.1-flash-lite-preview" "gemini-3.1-flash-lite" "GA version available"
-# check_model "gemini-3-pro-preview" "gemini-3.1-pro" "Superseded by 3.1"
-# check_model "gemini-3-flash-preview" "gemini-3.1-flash-lite" "Superseded by 3.1"
+# ── Stale LLM model versions (engine + app) — refreshed 2026-05-29 ─
+# Canonical current ids: src/lib/ai/models.ts. When the weekly monitor
+# (scripts/check-model-versions.ts) reports a newer provider release, add the
+# SUPERSEDED id below so this SessionStart hook catches stragglers in code, then
+# bump the manifest. NOTE: the Gemini 3.1 GA ids are LIVE (the 2026-03-23
+# "still in preview, no GA id" note was wrong by May — the engine uses
+# google/gemini-3.1-flash-lite 24× in production).
+check_model "gemini-2.5-pro" "gemini-3.1-pro-preview" "Gemini 3.1 Pro is current"
+check_model "gemini-2.5-flash-lite" "gemini-3.1-flash-lite" "Gemini 3.1 Flash-Lite is GA"
+check_model "gemini-2.0-flash-lite" "gemini-3.1-flash-lite" "Two generations stale — the supplier enricher silently ran this"
+check_model "gemini-flash-1.5-8b" "gemini-3.1-flash-lite" "Gemini 1.5 — ancient"
+check_model "gemini-1.5-flash" "gemini-3.1-flash-lite" "Gemini 1.5 — ancient"
+check_model "gemini-3.1-flash-lite-preview" "gemini-3.1-flash-lite" "GA id is live — drop the -preview suffix"
+check_model "claude-opus-4-5" "claude-opus-4-7" "Opus 4.7 is current"
+check_model "claude-sonnet-4-7" "claude-sonnet-4-6" "No Sonnet 4-7 exists; latest Sonnet is 4.6"
+check_model "deepseek-r1" "deepseek-v4-pro" "DeepSeek V4 era; R1 superseded"
+check_model "qwen3.6-max-preview" "qwen3.7-max" "Qwen3.7 Max replaced 3.6 Max on 2026-05-24"
+check_model "qwen3.5-405b" "qwen3.7-max" "Qwen3.7 Max is current"
 
 # ── Retired audio/TTS models ──────────────────────────────────────
 check_model "\"tts-1\"" "gpt-4o-mini-tts" "Legacy TTS, 35% higher error rate"

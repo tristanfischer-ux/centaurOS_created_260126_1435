@@ -385,9 +385,9 @@ Return ONLY valid JSON:
   //
   // B2 (2026-05-08): replaced xiaomi/mimo-v2.5-pro — it generates Stage 0
   // training data and Stage 1 research content, making it a self-judge.
-  // Replaced with openai/gpt-5.4 (OpenAI lineage, zero overlap with content
+  // Replaced with openai/gpt-5.5 (OpenAI lineage, zero overlap with content
   // generators Gemini/MiMo/DeepSeek, strong engineering non-hallucination).
-  // Verified available on OpenRouter 2026-05-08. Alternates if gpt-5.4 is
+  // Verified available on OpenRouter 2026-05-08. Alternates if gpt-5.5 is
   // unavailable: moonshotai/kimi-k2.6 or meta-llama/llama-4-maverick.
   //
   // B5 (2026-05-10): removed z-ai/glm-5.1 — frequent attempt-1 failures
@@ -404,7 +404,7 @@ Return ONLY valid JSON:
   // lineage (Google) from the content generators (Anthropic + xAI + Asian).
   const judges = [
     'x-ai/grok-4.3',                // honest adversary, 98% tool-use, 75% non-hallucination
-    'openai/gpt-5.4',               // B2: replaced MiMo — OpenAI lineage, no overlap with content generators
+    'openai/gpt-5.5',               // B2: replaced MiMo — OpenAI lineage, no overlap with content generators
     'google/gemini-3.1-flash-lite', // Iter-09: replaced Mistral Large — Google lineage, 8.2% hallucination, fast + reliable JSON
   ]
 

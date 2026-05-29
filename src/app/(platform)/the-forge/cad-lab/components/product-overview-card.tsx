@@ -92,7 +92,7 @@ function getModelDisplayName(modelId: string): string {
     // New model IDs
     "gpt-5.5": "GPT-5.5",
     "gpt-4.1-mini": "GPT-4.1-mini",
-    "gemini-2.5-flash": "Gemini 2.5 Flash",
+    "gemini-3.5-flash": "Gemini 2.5 Flash",
     // Short labels from the decomposition race
     "Opus": "GPT-5.5",
     "Sonnet": "GPT-4.1-mini",

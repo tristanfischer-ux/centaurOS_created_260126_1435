@@ -23,7 +23,7 @@
  *
  * Provider: Google AI Gemini TTS.
  *   Primary model:  gemini-2.5-pro-preview-tts
- *   Fallback model: gemini-2.5-flash-preview-tts  (on 429 / 500 / 503)
+ *   Fallback model: gemini-3.5-flash-preview-tts  (on 429 / 500 / 503)
  *   Auth: x-goog-api-key from GOOGLE_AI_API_KEY or GEMINI_API_KEY
  *
  * NOTE: OpenRouter does NOT proxy Gemini TTS (audio modality is excluded from
@@ -57,7 +57,7 @@ const AUDIO_BUCKET = 'brainstorm-assets'
 // Pro first; on 429 / 500 / 503 it falls back to Flash.
 const TTS_MODELS = [
     'gemini-2.5-pro-preview-tts',
-    'gemini-2.5-flash-preview-tts',
+    'gemini-3.5-flash-preview-tts',
 ] as const
 
 // British voices for multi-speaker TTS.

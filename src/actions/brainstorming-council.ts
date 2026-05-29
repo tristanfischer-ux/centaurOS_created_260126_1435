@@ -27,7 +27,7 @@
  *   Finn  (finance-lead)    → moonshotai/kimi-k2.6
  *   Fang  (vp-manufacturing)→ deepseek/deepseek-v4-flash
  *   Max   (cto)             → deepseek/deepseek-v4-pro
- *   Priya (product-lead)    → qwen/qwen3.6-max-preview
+ *   Priya (product-lead)    → qwen/qwen3.7-max
  *   Mia   (growth-marketer) → deepseek/deepseek-v4-flash
  *   Sal   (sales-lead)      → deepseek/deepseek-v4-flash
  *   Jian  (vp-engineering)  → deepseek/deepseek-v4-flash
@@ -59,7 +59,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 //   US Anthropic → anthropic/claude-opus-4.7  (Fiona: +0.21 composite benchmark win)
 //   China Moonshot → moonshotai/kimi-k2.6     (Intelligence 54, different RLHF lineage)
 //   China DeepSeek → deepseek/deepseek-v4-pro (structured reasoning, Intelligence 52)
-//   China Alibaba  → qwen/qwen3.6-max-preview (IFBench 77%, Intelligence 52)
+//   China Alibaba  → qwen/qwen3.7-max (IFBench ~79%, Intelligence 57)
 //   China Zhipu    → z-ai/glm-5.1            (tool-use 98%, non-hallucination 74%)
 //
 // NOTE 2026-05-02: xiaomi/mimo-v2.5-pro was blocked on OpenRouter provider
@@ -106,9 +106,9 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
     // reasoning. NOTE: returns reasoning in `reasoning_content` not `content`.
     "cto":                 "deepseek/deepseek-v4-pro",
 
-    // China Alibaba — Qwen 3.6 Max Preview: Intelligence 52, IFBench 77%.
+    // China Alibaba — Qwen 3.7 Max: Intelligence 57, IFBench ~79%.
     // Different Alibaba lineage adds genuine diversity vs Moonshot/DeepSeek/Xiaomi.
-    "product-lead":        "qwen/qwen3.6-max-preview",
+    "product-lead":        "qwen/qwen3.7-max",
 
     // China DeepSeek — V4-Flash: proven reliable on this OpenRouter account, clean prose output.
     // Used when Cal isn't in the session. Cheap generalist prose.
@@ -155,13 +155,13 @@ const COUNCIL_FALLBACK_CHAINS: Record<string, string[]> = {
     "strategist":          ["deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"],
 
     // DeepSeek V4-Pro → Kimi K2.6 (reasoning, diff lineage) → Qwen 3.6 Max
-    "fundraising-advisor": ["moonshotai/kimi-k2.6", "qwen/qwen3.6-max-preview"],
+    "fundraising-advisor": ["moonshotai/kimi-k2.6", "qwen/qwen3.7-max"],
 
     // Kimi K2.6 → DeepSeek V4-Pro (reasoning) → DeepSeek V4-Flash
     "finance-lead":        ["deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"],
 
     // DeepSeek V4-Flash → Qwen 3.6 Max → Grok 4.3
-    "vp-manufacturing":    ["qwen/qwen3.6-max-preview", "x-ai/grok-4.3"],
+    "vp-manufacturing":    ["qwen/qwen3.7-max", "x-ai/grok-4.3"],
 
     // DeepSeek V4-Pro → DeepSeek V4-Flash → Gemini 3.1 Pro
     "cto":                 ["deepseek/deepseek-v4-flash", "google/gemini-3.1-pro-preview"],
@@ -170,15 +170,15 @@ const COUNCIL_FALLBACK_CHAINS: Record<string, string[]> = {
     "product-lead":        ["deepseek/deepseek-v4-flash", "x-ai/grok-4.3"],
 
     // DeepSeek V4-Flash → Qwen 3.6 Max → Grok 4.3
-    "growth-marketer":     ["qwen/qwen3.6-max-preview", "x-ai/grok-4.3"],
-    "sales-lead":          ["qwen/qwen3.6-max-preview", "x-ai/grok-4.3"],
-    "vp-engineering":      ["qwen/qwen3.6-max-preview", "x-ai/grok-4.3"],
+    "growth-marketer":     ["qwen/qwen3.7-max", "x-ai/grok-4.3"],
+    "sales-lead":          ["qwen/qwen3.7-max", "x-ai/grok-4.3"],
+    "vp-engineering":      ["qwen/qwen3.7-max", "x-ai/grok-4.3"],
 
     // Kimi K2.6 → DeepSeek V4-Flash → Qwen 3.6 Max
-    "hiring-team":         ["deepseek/deepseek-v4-flash", "qwen/qwen3.6-max-preview"],
+    "hiring-team":         ["deepseek/deepseek-v4-flash", "qwen/qwen3.7-max"],
 
     // GLM-5.1 → DeepSeek V4-Flash → Qwen 3.6 Max
-    "legal-counsel":       ["deepseek/deepseek-v4-flash", "qwen/qwen3.6-max-preview"],
+    "legal-counsel":       ["deepseek/deepseek-v4-flash", "qwen/qwen3.7-max"],
 
     // Gemini 3.1 Pro → DeepSeek V4-Pro → DeepSeek V4-Flash
     "vp-supply-chain":     ["deepseek/deepseek-v4-pro", "deepseek/deepseek-v4-flash"],

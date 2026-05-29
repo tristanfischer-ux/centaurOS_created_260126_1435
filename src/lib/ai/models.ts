@@ -46,7 +46,11 @@ export type AnthropicModelId = (typeof ANTHROPIC_MODELS)[keyof typeof ANTHROPIC_
  *  and for image generation (nanobanana / gemini-pro-preview). */
 export const GOOGLE_MODELS = {
   gemini_pro: "gemini-3.1-pro-preview",
-  gemini_flash: "gemini-2.5-flash",
+  /** Cheap, fast flash tier. Bumped 2026-05-29 from gemini-2.5-flash — Gemini 3.5 Flash is GA. */
+  gemini_flash: "gemini-3.5-flash",
+  /** Cheapest tier — classification, extraction, supplier enrichment. The flash-lite family
+   *  tops out at 3.1 (no 3.5-lite exists). Used by scripts/ingest/enrich-new-suppliers.ts. */
+  gemini_flash_lite: "gemini-3.1-flash-lite",
 } as const
 
 export type GoogleModelId = (typeof GOOGLE_MODELS)[keyof typeof GOOGLE_MODELS]
@@ -78,6 +82,38 @@ export const QWEN_MODELS = {
 
 export type QwenModelId = (typeof QWEN_MODELS)[keyof typeof QWEN_MODELS]
 
+/** OpenRouter model IDs — the PDF-generation ENGINE (`scripts/`) routes every LLM
+ *  call through OpenRouter and is deliberately Anthropic-free. These are the
+ *  canonical current ids (verified against openrouter.ai/api/v1/models 2026-05-29).
+ *
+ *  This block is the single place to bump the engine's models. It is enforced by
+ *  `scripts/check-ai-models.sh` (the SessionStart hook now scans `scripts/` too, so a
+ *  stale hardcoded id surfaces immediately). It is intentionally NOT wired into the
+ *  weekly `/models` drift monitor: OpenRouter version labels are non-semantic
+ *  (`x-ai/grok-4.20` sorts above `x-ai/grok-4.3` under tuple comparison) and would
+ *  produce false "newer version" alerts. Bump these by hand when the routing docs
+ *  (`~/.claude/docs/model-routing.md`) record a benchmark-backed promotion. */
+export const OPENROUTER_MODELS = {
+  // Frontier reasoning / second opinion
+  gemini_pro:        "google/gemini-3.1-pro-preview",
+  gpt5:              "openai/gpt-5.5",        // best coder/reasoner; high hallucination — cross-check facts
+  // Honest review / adversarial / schema enforcement (low hallucination)
+  grok:              "x-ai/grok-4.3",
+  mimo:              "xiaomi/mimo-v2.5-pro",
+  glm:               "z-ai/glm-5.1",
+  // Structured reasoning + prose
+  deepseek_pro:      "deepseek/deepseek-v4-pro",
+  deepseek_flash:    "deepseek/deepseek-v4-flash",
+  kimi:              "moonshotai/kimi-k2.6",
+  qwen_max:          "qwen/qwen3.7-max",      // long-context (1M); replaced 3.6 Max 2026-05-24
+  // Cheap bulk: classification / extraction / enrichment
+  gemini_flash:      "google/gemini-3.5-flash",
+  gemini_flash_lite: "google/gemini-3.1-flash-lite",
+  gpt_mini:          "openai/gpt-4.1-mini",
+} as const
+
+export type OpenRouterModelId = (typeof OPENROUTER_MODELS)[keyof typeof OPENROUTER_MODELS]
+
 /** Combined manifest — convenience for the monitor workflow and for code that
  *  wants one object to introspect. Keep this as the SINGLE shape the GitHub
  *  Action reads. Changing the shape requires updating the workflow too. */
@@ -99,7 +135,8 @@ export const MODEL_METADATA = {
   "claude-sonnet-4-6":         { provider: "anthropic", family: "claude-sonnet", version: [4, 6] },
   "claude-haiku-4-5-20251001": { provider: "anthropic", family: "claude-haiku", version: [4, 5] },
   "gemini-3.1-pro-preview":    { provider: "google",    family: "gemini-pro", version: [3, 1] },
-  "gemini-2.5-flash":          { provider: "google",    family: "gemini-flash", version: [2, 5] },
+  "gemini-3.5-flash":          { provider: "google",    family: "gemini-flash", version: [3, 5] },
+  "gemini-3.1-flash-lite":     { provider: "google",    family: "gemini-flash-lite", version: [3, 1] },
   "gpt-5.5":                   { provider: "openai",    family: "gpt-5", version: [5, 5] },
   "gpt-5.4":                   { provider: "openai",    family: "gpt-5", version: [5, 4] },
   "gpt-4.1-mini":              { provider: "openai",    family: "gpt-4.1-mini", version: [4, 1] },
