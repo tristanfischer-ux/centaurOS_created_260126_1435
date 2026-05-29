@@ -117,7 +117,7 @@ if _missing_keys:
 # enormous and blowing the multimodal request budget. Per-judge image limits
 # (Anthropic Opus 4.7 = 100 images/msg, OpenRouter ≈10 MB body) are still the
 # physical ceiling — this is a softer safety net.
-MAX_PAGES_PER_CALL = 40
+MAX_PAGES_PER_CALL = 120
 
 MODELS = [
     {
@@ -234,6 +234,41 @@ def pdf_to_pngs(pdf_path: Path, dpi: int = 150) -> list[Path]:
         print(f"  [WARN] pdftoppm error: {result.stderr[:200]}", file=sys.stderr)
     pngs = sorted(out_dir.glob("page-*.png"))
     return pngs
+
+
+def pdf_to_pngs_fit(
+    pdf_path: Path,
+    target_raw_kb: int = 6800,
+    max_dpi: int = 150,
+    min_dpi: int = 60,
+) -> tuple[list[Path], int]:
+    """Convert a PDF to PNGs at the HIGHEST DPI whose total raw byte size fits
+    `target_raw_kb`, so the WHOLE document can be sent in one multimodal call
+    without blowing the request-body limit.
+
+    Why: the OpenRouter seats cap the request body at roughly 10 MB; base64
+    inflates bytes by 4/3, so ~6.8 MB of raw PNG → ~9 MB body, just under the
+    limit. A short 17-22pp dossier stays at the full 150 DPI; a long one (e.g.
+    the 85pp VF dossier) steps down until it fits, so EVERY page is scored
+    rather than silently truncating to the first 40 (which would penalise the
+    unseen BoM / cost / appendix sections). PNG size does NOT scale as DPI^2 for
+    text/vector pages, so we MEASURE and back off proportionally rather than
+    compute a single DPI analytically. Returns (pngs, dpi_used).
+    """
+    import math
+    dpi = max_dpi
+    pngs = pdf_to_pngs(pdf_path, dpi=dpi)
+    for _ in range(4):
+        raw_kb = sum(p.stat().st_size for p in pngs) // 1024
+        if raw_kb <= target_raw_kb or dpi <= min_dpi:
+            return pngs, dpi
+        scale = math.sqrt(target_raw_kb / max(raw_kb, 1))
+        new_dpi = max(min_dpi, int(dpi * scale))
+        if new_dpi >= dpi:  # no further reduction possible
+            return pngs, dpi
+        dpi = new_dpi
+        pngs = pdf_to_pngs(pdf_path, dpi=dpi)
+    return pngs, dpi
 
 
 def encode_image(path: Path) -> str:
@@ -824,10 +859,13 @@ def run_single_pdf(args) -> None:
     print(f"[single-PDF] Scoring: {pdf_path}")
     print(f"  product_class={product_class}  run_tag={run_tag}")
 
-    # Convert to PNGs
-    print("  Converting to PNGs...")
-    pngs = pdf_to_pngs(pdf_path)
-    print(f"  {len(pngs)} pages")
+    # Convert to PNGs at the highest DPI whose total body fits the multimodal
+    # request limit, so the WHOLE doc is scored rather than truncating to the
+    # first MAX_PAGES_PER_CALL pages (which would penalise unseen BoM / cost /
+    # appendix sections).
+    print("  Converting to PNGs (auto-fit DPI)...")
+    pngs, dpi_used = pdf_to_pngs_fit(pdf_path)
+    print(f"  {len(pngs)} pages @ {dpi_used} DPI")
     if not pngs:
         print("ERROR: No pages extracted.", file=sys.stderr)
         sys.exit(1)
