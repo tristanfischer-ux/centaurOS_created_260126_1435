@@ -59,6 +59,11 @@ interface SubModule {
   role_verb: string
   topology_clause: string
   words: Word[]
+  /** U8 (2026-05-29): 'external' means this sub-module's hardware lives
+   *  outside the primary product envelope. Its BoM lines are excluded from
+   *  the headline installed price and shown in a separate "Supplied separately"
+   *  segment. Absence / 'internal' = inside the unit. */
+  location?: 'internal' | 'external'
 }
 
 // ---------------------------------------------------------------------------
@@ -869,7 +874,11 @@ function emitClimateControl(p: VfParams) {
 
 function emitIrrigationNutrient(p: VfParams) {
   // ── EXTERNAL SKID (sits outside the container, customer or supplier skid) ──
-  const externalIrrigationSkid = makeSubModule(
+  // U8 (2026-05-29): mark as 'external' so the cost renderer excludes its
+  // BoM lines from the headline installed price and shows them in a
+  // "Supplied separately (external)" segment instead.
+  const externalIrrigationSkid: SubModule = {
+    ...makeSubModule(
     'external_irrigation_skid',
     'external irrigation skid',
     'supplies',
@@ -942,7 +951,9 @@ function emitIrrigationNutrient(p: VfParams) {
         ],
       ),
     ],
-  )
+    ),
+    location: 'external' as const,
+  }
 
   // ── INTERNAL DISTRIBUTION LOOP (inside container envelope) ──
   const recirculationLoop = makeSubModule(

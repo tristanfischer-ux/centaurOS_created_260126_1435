@@ -489,6 +489,18 @@ export interface MacroAssemblyPrice {
 }
 
 // ---------------------------------------------------------------------------
+// SUB-MODULE LOCATION — whether the sub-module's hardware lives inside or
+// outside the primary product envelope (container / enclosure / unit).
+// 'external' means the sub-module is "supplied separately" — its BoM lines
+// and cost are shown in a dedicated segment and EXCLUDED from the headline
+// installed price.  Absence of the field (or 'internal') = part of the unit.
+// ---------------------------------------------------------------------------
+
+/** Set on a SubModule (in DesignJSON / moduleDecomposition) to indicate that
+ *  the sub-module's hardware sits outside the primary product envelope. */
+export type SubModuleLocation = 'internal' | 'external'
+
+// ---------------------------------------------------------------------------
 // EXECUTION OUTCOME — what the orchestrator returns to the chain.
 // ---------------------------------------------------------------------------
 

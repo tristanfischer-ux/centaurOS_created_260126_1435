@@ -105,6 +105,7 @@ import { runPhysicsLedger } from '../src/lib/pdf-engine-v2/stages/0.1-physics-le
 import { runComplianceGate, type ComplianceGateResult } from '../src/lib/pdf-engine-v2/stages/3.5-compliance-gate'
 import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/lib/pdf-engine-v2/stages/1.8-brief-target-reconciliation'
 import { resolvePriceBand, targetPerformanceValueAs } from '../src/lib/pdf-engine-v2/class-price-bands'
+import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { resolveCostStack, computeCostStack } from '../src/lib/pdf-engine-v2/class-cost-structure'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
@@ -5042,89 +5043,158 @@ async function main() {
       let cost_reality_rejection: any = null
       let cost_reality_verdict: 'pass' | 'warn' | 'reject' = 'pass'
 
-      // Cost-overrun forensic (Tristan 2026-05-20): the order-of-magnitude
-      // check above passes anything between £100 and £10M, so a £215k VF
-      // BoM (real band £100k-£200k for 100 m²) sailed through silently.
-      // Add a per-class band check using the SAME resolvePriceBand the
-      // cover uses — if installed-ASP per metric is >2× the band ceiling
-      // or <0.3× the band floor, reject the gate so the worker doesn't
-      // ship a wildly mispriced report without a visible flag. Universal
-      // across product classes — every class has a price band.
+      // U4 (2026-05-29): SINGLE-SOURCE-OF-TRUTH band check. Use the SAME
+      // MARKET_BANDS table + oem_transfer_price_gbp numerator as the cover
+      // IndustryBandBlock so the chain gate and the PDF verdict are always
+      // identical (no more "gate passes, cover says outside band").
+      // Falls back to the legacy resolvePriceBand path for classes not yet
+      // in MARKET_BANDS (preserves existing behaviour for BESS, AUV, etc.).
       let band_reality: any = null
       try {
-        const band = resolvePriceBand(liveState)
-        if (band && bomTotalGbp > 0) {
+        const productClassForBand = String(
+          liveState?.moduleDecomposition?.product_class
+          ?? liveState?.parsedBrief?.product_class
+          ?? ''
+        )
+        const marketBand = productClassForBand ? (MARKET_BANDS[productClassForBand] ?? null) : null
+        if (bomTotalGbp > 0) {
           const { ratios, class_key } = resolveCostStack(liveState)
           const stack = computeCostStack(bomTotalGbp, ratios, class_key)
-          const installedAsp = stack.installed_asp_gbp > 0 ? stack.installed_asp_gbp : bomTotalGbp
-          const metricInput = band.metric_compute(liveState)
-          if (metricInput !== null && Number.isFinite(metricInput) && metricInput > 0) {
-            const metricValue = installedAsp / metricInput
-            const lo = band.market_band_low
-            const hi = band.market_band_high
-            let bandVerdict: 'in_band' | 'high' | 'low' = 'in_band'
-            let pct = 0
-            if (metricValue >= lo && metricValue <= hi) {
-              bandVerdict = 'in_band'
-            } else if (metricValue < lo) {
-              bandVerdict = 'low'
-              pct = ((metricValue - lo) / lo) * 100
-            } else {
-              bandVerdict = 'high'
-              pct = ((metricValue - hi) / hi) * 100
-            }
-            band_reality = {
-              band_metric: band.natural_metric,
-              metric_value: Math.round(metricValue * 100) / 100,
-              metric_input: metricInput,
-              band_low: lo,
-              band_high: hi,
-              installed_asp_gbp: Math.round(installedAsp),
-              verdict: bandVerdict,
-              pct_deviation: Math.round(pct * 10) / 10,
-            }
-            // Hard reject when off the band by >100% (i.e. >2× high or
-            // <0.5× low). That's the renderer's "Critical" tier already
-            // — we just hoist the verdict up to the gate so the chain
-            // stops or flags BEFORE rendering instead of silently shipping.
-            if (Math.abs(pct) > 100) {
-              cost_reality_verdict = 'reject'
-              cost_reality_status = 'manual_review_required'
-              cost_reality_rejection = {
-                reason: bandVerdict === 'high'
-                  ? `Installed-ASP ${band.natural_metric} = £${metricValue.toFixed(0)} is ${Math.round(Math.abs(pct))}% ABOVE typical band £${lo}-£${hi}. Likely cause: Cost Repair over-corrected, quantity multiplied wrong, or Engine B class-floor too aggressive. Inspect partVerifications for £5k+ line items.`
-                  : `Installed-ASP ${band.natural_metric} = £${metricValue.toFixed(0)} is ${Math.round(Math.abs(pct))}% BELOW typical band £${lo}-£${hi}. Likely cause: missing major subsystems, Engine B fell short, or distributor cascade timed out on big-ticket items.`,
-                bom_total_gbp: Math.round(bomTotalGbp),
-                installed_asp_gbp: Math.round(installedAsp),
-                metric_value: Math.round(metricValue * 100) / 100,
-                metric_label: band.natural_metric,
+          // U4: numerator is always oem_transfer_price_gbp (ex-works) to match
+          // the industry-band convention and the IndustryBandBlock numerator.
+          const exWorksPrice = stack.oem_transfer_price_gbp > 0
+            ? stack.oem_transfer_price_gbp
+            : stack.installed_asp_gbp > 0
+            ? stack.installed_asp_gbp
+            : bomTotalGbp
+
+          if (marketBand) {
+            // ── Path 1: MARKET_BANDS (canonical ex-works) ──────────────────
+            const mbResult = computeDesignBandPosition(exWorksPrice, liveState, marketBand)
+            if (mbResult) {
+              const { computed_per_unit, position } = mbResult
+              const lo = marketBand.tiers.commodity.low_gbp
+              const hi = marketBand.tiers.premium.high_gbp
+              let bandVerdict: 'in_band' | 'high' | 'low' = 'in_band'
+              let pct = 0
+              if (position === 'below commodity band') {
+                bandVerdict = 'low'
+                pct = ((computed_per_unit - lo) / lo) * 100
+              } else if (position === 'above premium band') {
+                bandVerdict = 'high'
+                pct = ((computed_per_unit - hi) / hi) * 100
+              }
+              band_reality = {
+                band_metric: `£/${marketBand.output_unit} ex-works`,
+                metric_value: Math.round(computed_per_unit * 100) / 100,
                 band_low: lo,
                 band_high: hi,
+                ex_works_price_gbp: Math.round(exWorksPrice),
+                verdict: bandVerdict,
                 pct_deviation: Math.round(pct * 10) / 10,
-                priced_lines: bomPricedLines,
-                unpriced_lines: bomUnpricedLines,
               }
-            } else if (Math.abs(pct) > 30 && cost_reality_verdict === 'pass') {
-              // Soft warn at >30% off — minor variance, still emit but flag
-              cost_reality_verdict = 'warn'
-              cost_reality_rejection = {
-                reason: `Installed-ASP ${band.natural_metric} = £${metricValue.toFixed(0)} is ${Math.round(Math.abs(pct))}% off typical band £${lo}-£${hi}. Within engineering noise but worth a manual review of the largest BoM lines.`,
-                bom_total_gbp: Math.round(bomTotalGbp),
-                installed_asp_gbp: Math.round(installedAsp),
-                metric_value: Math.round(metricValue * 100) / 100,
-                metric_label: band.natural_metric,
-                band_low: lo,
-                band_high: hi,
-                pct_deviation: Math.round(pct * 10) / 10,
-                priced_lines: bomPricedLines,
-                unpriced_lines: bomUnpricedLines,
+              if (Math.abs(pct) > 100) {
+                cost_reality_verdict = 'reject'
+                cost_reality_status = 'manual_review_required'
+                cost_reality_rejection = {
+                  reason: bandVerdict === 'high'
+                    ? `Ex-works £/${marketBand.output_unit} = £${computed_per_unit.toFixed(0)} is ${Math.round(Math.abs(pct))}% ABOVE typical band £${lo}–£${hi}. Likely cause: Cost Repair over-corrected, quantity multiplied wrong, or Engine B class-floor too aggressive. Inspect partVerifications for £5k+ line items.`
+                    : `Ex-works £/${marketBand.output_unit} = £${computed_per_unit.toFixed(0)} is ${Math.round(Math.abs(pct))}% BELOW typical band £${lo}–£${hi}. May reflect a genuine cost advantage or an incomplete BoM — inspect per-line items.`,
+                  bom_total_gbp: Math.round(bomTotalGbp),
+                  ex_works_price_gbp: Math.round(exWorksPrice),
+                  metric_value: Math.round(computed_per_unit * 100) / 100,
+                  metric_label: `£/${marketBand.output_unit} ex-works`,
+                  band_low: lo,
+                  band_high: hi,
+                  pct_deviation: Math.round(pct * 10) / 10,
+                  priced_lines: bomPricedLines,
+                  unpriced_lines: bomUnpricedLines,
+                }
+              } else if (Math.abs(pct) > 30 && cost_reality_verdict === 'pass') {
+                cost_reality_verdict = 'warn'
+                cost_reality_rejection = {
+                  reason: `Ex-works £/${marketBand.output_unit} = £${computed_per_unit.toFixed(0)} is ${Math.round(Math.abs(pct))}% off typical band £${lo}–£${hi}. Within engineering noise but worth a manual review of the largest BoM lines.`,
+                  bom_total_gbp: Math.round(bomTotalGbp),
+                  ex_works_price_gbp: Math.round(exWorksPrice),
+                  metric_value: Math.round(computed_per_unit * 100) / 100,
+                  metric_label: `£/${marketBand.output_unit} ex-works`,
+                  band_low: lo,
+                  band_high: hi,
+                  pct_deviation: Math.round(pct * 10) / 10,
+                  priced_lines: bomPricedLines,
+                  unpriced_lines: bomUnpricedLines,
+                }
               }
             }
-            // 2026-05-23 prune #2: removed liveState.cost_reality_band — no
-            // reader. The same data lives inside cost_reality_rejection
-            // (which IS read by renderer G2 badge), so we lose nothing.
+          } else {
+            // ── Path 2: legacy PRICE_BANDS fallback ────────────────────────
+            const band = resolvePriceBand(liveState)
+            if (band) {
+              const metricInput = band.metric_compute(liveState)
+              if (metricInput !== null && Number.isFinite(metricInput) && metricInput > 0) {
+                const metricValue = exWorksPrice / metricInput
+                const lo = band.market_band_low
+                const hi = band.market_band_high
+                let bandVerdict: 'in_band' | 'high' | 'low' = 'in_band'
+                let pct = 0
+                if (metricValue >= lo && metricValue <= hi) {
+                  bandVerdict = 'in_band'
+                } else if (metricValue < lo) {
+                  bandVerdict = 'low'
+                  pct = ((metricValue - lo) / lo) * 100
+                } else {
+                  bandVerdict = 'high'
+                  pct = ((metricValue - hi) / hi) * 100
+                }
+                band_reality = {
+                  band_metric: band.natural_metric,
+                  metric_value: Math.round(metricValue * 100) / 100,
+                  metric_input: metricInput,
+                  band_low: lo,
+                  band_high: hi,
+                  ex_works_price_gbp: Math.round(exWorksPrice),
+                  verdict: bandVerdict,
+                  pct_deviation: Math.round(pct * 10) / 10,
+                }
+                if (Math.abs(pct) > 100) {
+                  cost_reality_verdict = 'reject'
+                  cost_reality_status = 'manual_review_required'
+                  cost_reality_rejection = {
+                    reason: bandVerdict === 'high'
+                      ? `Ex-works ${band.natural_metric} = £${metricValue.toFixed(0)} is ${Math.round(Math.abs(pct))}% ABOVE typical band £${lo}-£${hi}. Likely cause: Cost Repair over-corrected, quantity multiplied wrong, or Engine B class-floor too aggressive.`
+                      : `Ex-works ${band.natural_metric} = £${metricValue.toFixed(0)} is ${Math.round(Math.abs(pct))}% BELOW typical band £${lo}-£${hi}. May reflect a genuine cost advantage or an incomplete BoM.`,
+                    bom_total_gbp: Math.round(bomTotalGbp),
+                    ex_works_price_gbp: Math.round(exWorksPrice),
+                    metric_value: Math.round(metricValue * 100) / 100,
+                    metric_label: band.natural_metric,
+                    band_low: lo,
+                    band_high: hi,
+                    pct_deviation: Math.round(pct * 10) / 10,
+                    priced_lines: bomPricedLines,
+                    unpriced_lines: bomUnpricedLines,
+                  }
+                } else if (Math.abs(pct) > 30 && cost_reality_verdict === 'pass') {
+                  cost_reality_verdict = 'warn'
+                  cost_reality_rejection = {
+                    reason: `Ex-works ${band.natural_metric} = £${metricValue.toFixed(0)} is ${Math.round(Math.abs(pct))}% off typical band £${lo}-£${hi}. Within engineering noise but worth a manual review.`,
+                    bom_total_gbp: Math.round(bomTotalGbp),
+                    ex_works_price_gbp: Math.round(exWorksPrice),
+                    metric_value: Math.round(metricValue * 100) / 100,
+                    metric_label: band.natural_metric,
+                    band_low: lo,
+                    band_high: hi,
+                    pct_deviation: Math.round(pct * 10) / 10,
+                    priced_lines: bomPricedLines,
+                    unpriced_lines: bomUnpricedLines,
+                  }
+                }
+              }
+            }
           }
         }
+        // 2026-05-23 prune #2: removed liveState.cost_reality_band — no
+        // reader. The same data lives inside cost_reality_rejection
+        // (which IS read by renderer G2 badge), so we lose nothing.
       } catch (err) {
         // Band check is best-effort — never block the gate if it fails;
         // fall through to the existing order-of-magnitude check.

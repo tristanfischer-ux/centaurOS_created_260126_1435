@@ -35,6 +35,7 @@ import {
   type MarketBand,
   type BandPosition,
 } from '../src/lib/pdf-engine-v2/lib/market-bands'
+import { isConsumable } from '../src/lib/pdf-engine-v2/component-classes'
 
 // ─── Design tokens ──────────────────────────────────────────────────────────
 
@@ -699,6 +700,17 @@ type BomTotals = {
   // total. Maps component_class → GBP contributed. Empty when state has no
   // Engine B attribution (legacy iter runs).
   engine_b_by_class?: Record<string, number>
+  // U2-finish (2026-05-29): consumable lines (rockwool/growing media etc.)
+  // are excluded from grandTotal_gbp and tracked separately for the
+  // "Consumables (per cycle)" segment shown below the capital cost stack.
+  consumablesTotal_gbp?: number
+  consumablesRows?: Array<{ word_name: string; quantity: number; unit_price_gbp: number; line_total_gbp: number }>
+  // U8 (2026-05-29): BoM lines from sub-modules with location='external'
+  // are excluded from grandTotal_gbp and shown in a "Supplied separately"
+  // segment. The cost stack (and therefore the band comparison) is computed
+  // from grandTotal_gbp alone (capital items only).
+  externalTotal_gbp?: number
+  externalRows?: Array<{ sub_module_id: string; sub_module_name: string; word_name: string; quantity: number; unit_price_gbp: number; line_total_gbp: number }>
 }
 
 function roundToPence(n: number): number {
@@ -831,12 +843,29 @@ function computeBomTotals(state: any): BomTotals | null {
   const orderedModules = order_modules(rawModules as Array<{ module: string; display_name?: string }>)
   if (orderedModules.length === 0) return null
 
+  // U8 (2026-05-29): build a map of sub_module_id → location ('external' |
+  // undefined/internal) so the word-level loop can route lines correctly.
+  const subModuleLocation = new Map<string, string>()
+  for (const m of rawModules as any[]) {
+    for (const sm of (m.sub_modules ?? [])) {
+      if (sm.id && sm.location === 'external') {
+        subModuleLocation.set(String(sm.id), 'external')
+      }
+    }
+  }
+
   const allMods: BomMod[] = []
   let grandTotal_gbp = 0
   let totalRows = 0
   let actualPriced = 0
   let estimatePriced = 0
   let tbdRows = 0
+  // U2-finish (2026-05-29): consumables excluded from capital total
+  let consumablesTotal_gbp = 0
+  const consumablesRows: BomTotals['consumablesRows'] = []
+  // U8 (2026-05-29): external sub-module lines excluded from capital total
+  let externalTotal_gbp = 0
+  const externalRows: BomTotals['externalRows'] = []
 
   for (const m of orderedModules as any[]) {
     const mod: BomMod = {
@@ -1141,8 +1170,42 @@ function computeBomTotals(state: any): BomTotals | null {
         // keeping the row in the BoM table for visibility — the row
         // renders with MANUAL SOURCING tagged + £0 contribution.
         // Universal across product classes.
+        //
+        // U2-finish + U8 (2026-05-29): before accumulating, route consumables
+        // and external-sub-module lines OUT of the capital subtotal.
+        // Consumables (rockwool, growing media, reagents): per-cycle cost,
+        // not capital — excluded from costStack numerator + band comparison.
+        // External sub-modules (e.g. irrigation skid): shown separately,
+        // also excluded from headline installed price.
         if (row.cost_repair_excluded_from_subtotal !== true) {
-          sub.subtotal_gbp = roundToPence(sub.subtotal_gbp + line_total_gbp)
+          const isExternalSm = subModuleLocation.get(String(sm.id ?? '')) === 'external'
+          const componentCls = row.engine_b_component_class ?? ''
+          const isConsumableRow = componentCls ? isConsumable(componentCls as any) : false
+
+          if (isConsumableRow) {
+            // Route to the consumables segment — not capital
+            consumablesTotal_gbp = roundToPence(consumablesTotal_gbp + line_total_gbp)
+            consumablesRows!.push({
+              word_name: row.word_name,
+              quantity: row.quantity,
+              unit_price_gbp: row.unit_price_gbp,
+              line_total_gbp: row.line_total_gbp,
+            })
+          } else if (isExternalSm) {
+            // Route to the "supplied separately" external segment
+            externalTotal_gbp = roundToPence(externalTotal_gbp + line_total_gbp)
+            externalRows!.push({
+              sub_module_id: String(sm.id ?? ''),
+              sub_module_name: sm.name_human || humanise(String(sm.id ?? '')),
+              word_name: row.word_name,
+              quantity: row.quantity,
+              unit_price_gbp: row.unit_price_gbp,
+              line_total_gbp: row.line_total_gbp,
+            })
+          } else {
+            // Normal capital line
+            sub.subtotal_gbp = roundToPence(sub.subtotal_gbp + line_total_gbp)
+          }
         }
         totalRows += 1
         if (tier === 'actual') actualPriced += 1
@@ -1356,6 +1419,12 @@ function computeBomTotals(state: any): BomTotals | null {
     engine_b_by_class,
     unmatchedMacroTotal_gbp,
     unmatchedMacros,
+    // U2-finish (2026-05-29): consumables excluded from capital total
+    consumablesTotal_gbp: consumablesTotal_gbp > 0 ? consumablesTotal_gbp : undefined,
+    consumablesRows: consumablesRows && consumablesRows.length > 0 ? consumablesRows : undefined,
+    // U8 (2026-05-29): external sub-module lines excluded from capital total
+    externalTotal_gbp: externalTotal_gbp > 0 ? externalTotal_gbp : undefined,
+    externalRows: externalRows && externalRows.length > 0 ? externalRows : undefined,
   }
 }
 
@@ -1498,25 +1567,118 @@ function computePriceReality(
   costStack?: CostStack | null,
 ): PriceReality | null {
   if (!bomTotals || bomTotals.grandTotal_gbp <= 0) return null
-  const band = resolvePriceBand(state, slugHint)
-  if (!band) return null
-  // L47 council fix (2026-05-27, 2-3/4 seats DeepSeek + Grok + GPT-5.5):
-  // Industry £/kWh / £/m² / £/kW reference bands (BNEF, IRENA, Wood Mackenzie
-  // for BESS; comparable indices for other classes) are quoted EX-WORKS (OEM
-  // transfer price), NOT installed ASP. The L26 PLAN that calibrated the
-  // bands to installed ASP was wrong against the industry-quote convention —
-  // the brief itself quotes "£600-760/kWh usable" ex-works (see BESS brief
-  // line 8). L46 showed cover banner "! Cost outside band" while compliance
-  // row showed PASS at +5.2% over the £1.7M cap — the inconsistency was
-  // because banner used installed ASP £2.11M / 2.69 MWh = £785 (outside band)
-  // while compliance used ex-works £1.79M (in band). Unify on ex-works.
-  // Falls back to installed ASP if no ex-works available, then raw BoM.
+
+  // U4 (2026-05-29): SINGLE-SOURCE-OF-TRUTH for band comparison.
+  // Both the cover banner ("! Cost outside the typical band") and the
+  // IndustryBandBlock reference section MUST read from the SAME band table
+  // and the SAME numerator so they can never contradict.
+  //
+  // Precedence:
+  //   1. MARKET_BANDS (market-bands.ts) — canonical ex-works industry bands,
+  //      citable BNEF/IRENA/WoodMac sources, updated 2026-05-29. Used by
+  //      IndustryBandBlock. When a MARKET_BANDS entry exists for this class,
+  //      use it here so banner + reference section are identical.
+  //   2. PRICE_BANDS (class-price-bands.ts) — legacy installed-ASP bands,
+  //      kept as fallback for classes not yet in MARKET_BANDS.
+  //
+  // Numerator (both paths): oem_transfer_price_gbp (ex-works), falling back
+  // to installed_asp_gbp then raw BoM only when the cost stack is absent.
   const comparisonNumerator = costStack && costStack.oem_transfer_price_gbp > 0
     ? costStack.oem_transfer_price_gbp
     : costStack && costStack.installed_asp_gbp > 0
     ? costStack.installed_asp_gbp
     : bomTotals.grandTotal_gbp
 
+  // Resolve the product class slug for MARKET_BANDS lookup.
+  const productClass = String(
+    state?.moduleDecomposition?.product_class
+    ?? state?.parsedBrief?.product_class
+    ?? slugHint
+    ?? ''
+  )
+  const marketBand = productClass ? (MARKET_BANDS[productClass] ?? null) : null
+
+  if (marketBand) {
+    // ── Path 1: MARKET_BANDS (authoritative ex-works bands) ──────────────────
+    // Use the same computeDesignBandPosition logic as IndustryBandBlock so
+    // the two sections are guaranteed to agree.
+    const mbResult = computeDesignBandPosition(comparisonNumerator, state, marketBand)
+    if (!mbResult) {
+      // Can't compute output quantity — mark unavailable.
+      const legacyBand = resolvePriceBand(state, slugHint)
+      return legacyBand ? {
+        band: legacyBand,
+        metric_value: null,
+        metric_input: null,
+        metric_label: legacyBand.natural_metric,
+        band_low: legacyBand.market_band_low,
+        band_high: legacyBand.market_band_high,
+        verdict: 'unavailable',
+        pct_deviation: null,
+        diagnostic: `Cannot compute ${marketBand.output_unit} quantity from pipeline state.`,
+      } : null
+    }
+    const { computed_per_unit, position } = mbResult
+    const lo = marketBand.tiers.commodity.low_gbp
+    const hi = marketBand.tiers.premium.high_gbp
+    // Map BandPosition → PriceBandVerdict (high/low/in_band)
+    let verdict: PriceBandVerdict
+    if (position === 'below commodity band') verdict = 'low'
+    else if (position === 'above premium band') verdict = 'high'
+    else verdict = 'in_band'
+    const pct_deviation = verdict === 'low'
+      ? ((computed_per_unit - lo) / lo) * 100
+      : verdict === 'high'
+      ? ((computed_per_unit - hi) / hi) * 100
+      : 0
+    const absPct = Math.abs(pct_deviation)
+    let diagnostic: string
+    if (verdict === 'in_band') {
+      diagnostic = 'Within typical market range — pipeline output looks priced sensibly.'
+    } else if (absPct < 30) {
+      diagnostic = 'Within engineering noise of typical market range — minor sourcing variance only.'
+    } else if (absPct < 70) {
+      diagnostic = verdict === 'low'
+        ? 'Modest deviation — verify BoM completeness and distributor pricing on the largest assemblies.'
+        : 'Modest deviation — verify no double-counted assemblies or premium-tier component substitution.'
+    } else if (absPct < 150) {
+      diagnostic = verdict === 'low'
+        ? 'Significant deviation — may reflect a cost advantage or incomplete BoM; inspect per-line items.'
+        : 'Significant deviation — likely double-counted assemblies or wrong unit-of-measure on a key line.'
+    } else {
+      diagnostic = verdict === 'low'
+        ? 'Critical under-pricing — pipeline output not procurement-ready without manual correction.'
+        : 'Critical over-pricing — pipeline output not procurement-ready without manual correction. Expect quantity or unit-of-measure error.'
+    }
+    // Synthesise a PriceBand-shaped object (for callers that read band.notes etc.)
+    // using the MARKET_BANDS data so the CandidCostAnalysisSection can cite it.
+    const legacyBandFallback = resolvePriceBand(state, slugHint)
+    const syntheticBand: PriceBand = legacyBandFallback ?? {
+      natural_metric: `£/${marketBand.output_unit} (ex-works)`,
+      metric_compute: () => null,
+      market_band_low: lo,
+      market_band_high: hi,
+      sources: [marketBand.source],
+      notes: marketBand.tiers.premium.notes,
+      bom_scale_factor: 1,
+    }
+    return {
+      band: syntheticBand,
+      metric_value: computed_per_unit,
+      metric_input: comparisonNumerator / computed_per_unit,  // reverse: numerator/ratio = output qty
+      metric_label: `£/${marketBand.output_unit} ex-works`,
+      band_low: lo,
+      band_high: hi,
+      verdict,
+      pct_deviation,
+      diagnostic,
+    }
+  }
+
+  // ── Path 2: PRICE_BANDS fallback (classes not yet in MARKET_BANDS) ─────────
+  const band = resolvePriceBand(state, slugHint)
+  if (!band) return null
+  // Falls back to installed ASP if no ex-works available, then raw BoM.
   // The metric_compute callback returns:
   // - a divisor (kWh, kg, L, kW...) when the band is per-metric
   // - 1 when the band is per-unit and we should compare the grand total directly
@@ -1557,10 +1719,7 @@ function computePriceReality(
     pct_deviation = ((metric_value - hi) / hi) * 100
   }
 
-  // Build the diagnostic based on the deviation magnitude. Tristan's brief
-  // defined four tiers; this matches them exactly. Direction (low vs high)
-  // tunes the wording — "missing major subsystems" vs "double-counted
-  // assemblies".
+  // Build the diagnostic based on the deviation magnitude.
   const absPct = Math.abs(pct_deviation)
   let diagnostic: string
   if (verdict === 'in_band') {
@@ -2212,7 +2371,10 @@ function buildBandNarrative(position: BandPosition, band: MarketBand, computedPe
   const premiumExcerpt = band.tiers.premium.notes.split(':').slice(-1)[0]?.trim().split(',')[0] ?? ''
 
   if (position === 'below commodity band') {
-    return `At ${computedFmt} this design is BELOW the commodity band floor of ${fmt(band.tiers.commodity.low_gbp)}/${unitLabel}. Verify BoM completeness — major subsystems may be missing or Engine B pricing is under-estimating a key assembly.`
+    // U4 (2026-05-29): neutral framing — both explanations are equally valid;
+    // do not assert "subsystems missing" as the only reading. Let the reader
+    // inspect the per-line BoM to determine which applies.
+    return `At ${computedFmt} this design is BELOW the commodity band floor of ${fmt(band.tiers.commodity.low_gbp)}/${unitLabel}. This may reflect a genuine cost advantage (lean spec, direct sourcing) OR an incomplete BoM — see the per-line BoM to determine which.`
   }
   if (position === 'mid commodity' || position === 'lower edge of commodity') {
     return `At ${computedFmt} this design sits within the commodity tier (${fmt(band.tiers.commodity.low_gbp)}–${fmt(band.tiers.commodity.high_gbp)}/${unitLabel}). The component selection may include lower-certification parts; verify against the premium tier's regulatory requirements if UK/EU certification is required.`
@@ -9011,7 +9173,7 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
         // minPresenceAhead with the claim count (12pt per claim row + 200pt for
         // narrative + heading).
         const visibleClaims = claims
-        const extraClaims = 0
+        const extraClaims: number = 0
         const reserveHeight = 200 + claims.length * 12
         return (
           <View
