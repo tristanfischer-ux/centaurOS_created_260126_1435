@@ -9375,7 +9375,7 @@ function PhysicsNarrativePage({ state, project }: { state: any; project: string 
             <Text style={{ fontFamily: 'Helvetica-Bold', color: INK_SOFT }}>
               {'Tools cited in this section: '}
             </Text>
-            {narrative.tools_cited.join('   ·   ')}
+            {normalise_unicode(narrative.tools_cited.join('   ·   '))}
           </Text>
           <Text style={{ fontSize: 8, color: MUTED, marginTop: 4, fontStyle: 'italic', lineHeight: 1.4 }}>
             Full tool provenance — version, license, physics basis, and every
@@ -9478,7 +9478,7 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
           >
             <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
               <Text style={{ flex: 1, fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK }}>
-                {tool.tool_name || tool.tool_id}
+                {normalise_unicode(tool.tool_name || tool.tool_id)}
                 <Text style={{ fontFamily: 'Helvetica', color: MUTED }}>
                   {tool.tool_version ? `  v${tool.tool_version}` : ''}
                 </Text>
@@ -9680,7 +9680,7 @@ function ModuleToolsCallout({ moduleSpec, state }: { moduleSpec: any; state: any
   for (const tid of ids) {
     const tool = (page.tools as any[]).find(t => t?.tool_id === tid)
     if (tool) {
-      const name = tool.tool_name || tid
+      const name = normalise_unicode(tool.tool_name || tid)
       const version = tool.tool_version ? ` v${tool.tool_version}` : ''
       displays.push(`${name}${version}`)
     } else {
