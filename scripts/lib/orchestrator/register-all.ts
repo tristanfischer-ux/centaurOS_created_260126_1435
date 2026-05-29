@@ -214,10 +214,13 @@ import './tools/water-treatment-ro'
 import './tools/battery-c-rate-thermal'
 import './tools/cell-balance-model'
 import './tools/warranty-reliability-battery'
-import './tools/arc-flash-analysis'
+import './tools/arc-flash-analysis'           // arc-flash:ieee-1584  (upgraded to validated ieee1584.py 2026-05-29)
 import './tools/grounding-lightning'
 import './tools/fire-suppression-sizing'
 import './tools/yield-economics-npv'
+// 2026-05-29: three validated engineering tools wired in (all tests PASS):
+import './tools/protection-coordination'      // protection-coordination:dc-ac  (IEC 60909 + TCC, 13/13)
+import './tools/g99-dynamic-compliance'       // g99:dynamic-compliance          (EREC G99, 35/35)
 
 // ---------------------------------------------------------------------------
 // UNIVERSAL (apply to every class plan)

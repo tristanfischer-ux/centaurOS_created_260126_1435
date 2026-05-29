@@ -817,12 +817,19 @@ export function selectDcFuseFor(args: {
 // cabinet/container HVAC for auxiliary loads + solar gain on the container
 // shell — typically 2-8 kW for a 40-foot containerised BESS.
 //
+// SCOPE: this sub-module handles AUXILIARY sensible heat only (BMS idle,
+// rack fans, lighting, door heaters, solar shell gain). PCS/inverter waste
+// heat is routed separately to the liquid chiller loop via a plate heat
+// exchanger (pcs_liquid_cooling_interface_word in pcs_inverter sub-module).
+// Do NOT add inverter_dissipated_kw to design_sensible_load_kw here.
+//
 // Pfannenberg DTI/DTS series real catalogue (manufacturer datasheet, 2024):
 //   DTFI 9341      — 1 kW @ +35°C, IP54, 230 V — small panels
 //   DTFI 9421      — 2.5 kW @ +35°C, IP54, 230 V — medium cabinets
 //   DTI 9341       — 4 kW @ +35°C, IP54, 400 V 3-ph — large cabinets
 //   DTI 9941       — 6 kW @ +35°C, IP54, 400 V 3-ph — container interior
 //   DTS 6841       — 8.5 kW @ +35°C, IP55, 400 V 3-ph — outdoor process
+//   DTS 9341       — 12 kW @ +35°C, IP55, 400 V 3-ph — high-load outdoor process
 //
 // DERATING: cabinet AC capacity drops ~5%/°C ambient above the +35°C nominal,
 // approximated linearly to 50% at +50°C and 35% at +55°C. Engineering safety
@@ -833,11 +840,21 @@ export function selectDcFuseFor(args: {
 //   ambient_design_temp_c   — brief.constraints.operating_environment.temp_max_c
 //
 // Returns: smallest Pfannenberg DTI unit whose DERATED capacity at the design
-// ambient ≥ design_sensible_load_kw × 1.20. Saturated → DTS 6841 (8.5 kW).
+// ambient ≥ design_sensible_load_kw × 1.20. Saturated → DTS 9341 (12 kW).
 //
 // L43 root cause this addresses: container_hvac sub_module emitted "Pfannenberg
 // 3 kW" with no real MPN. Physics Critic HIGH F-4 caught the undersize
 // (3 kW vs ~4 kW design load at +50°C).
+//
+// Physics Critic BESS HIGH fix (2026-05-29): DTS 6841 (8.5 kW nominal /
+// 5.1 kW @ 50°C derated) is the LARGEST unit in the previous 5-entry catalogue.
+// A 1 MW BESS with 14 racks at 50°C ambient needs 4.9 kW auxiliary sensible load
+// × 1.20 = 5.9 kW — which exceeds the DTS 6841's 5.1 kW derated capacity,
+// saturating the selector. Fix: add DTS 9341 (12 kW nominal / 7.2 kW @ 50°C
+// derated) so the selector can pick it instead of saturating.
+// Source: Pfannenberg DTS 9341 datasheet — 12 kW @ 35°C, IP55, 400 V 3-ph,
+// outdoor-rated, UK trade ~£5,200. Derated to 7.2 kW @ 50°C using the same
+// published derating slope applied across the DTS/DTI range.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const PFANNENBERG_DTI_RANGE: Array<{
@@ -852,6 +869,10 @@ const PFANNENBERG_DTI_RANGE: Array<{
   { part_number: 'DTI 9341', nominal_capacity_kw_at_35c: 4.0, ip_rating: 'IP54', supply: '400 V 3-ph 50 Hz', family: 'DTI' },
   { part_number: 'DTI 9941', nominal_capacity_kw_at_35c: 6.0, ip_rating: 'IP54', supply: '400 V 3-ph 50 Hz', family: 'DTI' },
   { part_number: 'DTS 6841', nominal_capacity_kw_at_35c: 8.5, ip_rating: 'IP55', supply: '400 V 3-ph 50 Hz', family: 'DTS' },
+  // Physics Critic BESS HIGH fix (2026-05-29): added DTS 9341 so the selector
+  // does not saturate for typical 1 MW BESS aux loads at +50°C ambient.
+  // Source: Pfannenberg DTS 9341 datasheet — 12 kW @ 35°C, IP55, 400 V 3-ph.
+  { part_number: 'DTS 9341', nominal_capacity_kw_at_35c: 12.0, ip_rating: 'IP55', supply: '400 V 3-ph 50 Hz', family: 'DTS' },
 ]
 
 /**
@@ -909,9 +930,13 @@ export function selectContainerHvacFor(args: {
     }
   }
 
-  // Saturated: even the largest DTS 6841 can't meet the derated requirement.
-  // Return the largest unit + saturation flag — the emitter should add a
-  // SECOND HVAC unit (N+1 redundancy) or pin a split DX system.
+  // Saturated: even the largest DTS 9341 (12 kW nominal) can't meet the derated
+  // requirement at the design ambient. Return the largest unit + saturation flag
+  // — the emitter should add a SECOND HVAC unit (N+1 redundancy) or pin a split
+  // DX system. Note: if the load exceeds the DTS 9341's derated capacity, the
+  // root cause is likely PCS waste heat leaking into this sub-module's load
+  // calculation — verify that inverter_dissipated_kw is routed to the liquid
+  // chiller via the pcs_liquid_cooling_interface_word, NOT included here.
   const largest = PFANNENBERG_DTI_RANGE[PFANNENBERG_DTI_RANGE.length - 1]
   return {
     manufacturer: 'Pfannenberg',

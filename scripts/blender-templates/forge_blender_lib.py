@@ -52,7 +52,24 @@ def init_scene():
     scene.render.resolution_percentage = 100
     scene.render.image_settings.file_format = "PNG"
     scene.view_settings.exposure = 0.0
-    scene.view_settings.view_transform = "Standard"
+    # AgX tone-mapping (was "Standard"): Standard applies no highlight roll-off,
+    # so light/white surfaces bloomed to near-white and every render read as a
+    # pale wash (iter-66 mean luminance ~250/255). AgX compresses highlights and
+    # restores contrast + silhouette. Defensive: older Blender lacks AgX, so
+    # fall back Filmic -> Standard to keep the render working.
+    _chosen_vt = None
+    for _vt in ("AgX", "Filmic", "Standard"):
+        try:
+            scene.view_settings.view_transform = _vt
+            _chosen_vt = _vt
+            break
+        except (TypeError, ValueError):
+            continue
+    if _chosen_vt == "AgX":
+        try:
+            scene.view_settings.look = "AgX - Medium High Contrast"
+        except (TypeError, ValueError):
+            pass
     # Eevee quality boosts — names vary between Blender 4.x EEVEE and 5.x EEVEE_NEXT.
     # Set attributes defensively; ignore AttributeError when an engine version
     # doesn't expose a given prop.
@@ -108,12 +125,19 @@ def init_scene_back_to_eevee():
 
 
 def make_world_white():
-    """Pure white world background."""
+    """Studio mid-grey world background.
+
+    (Name kept for compatibility with 26 template call sites.) A pure-white
+    world flooded every render to a near-white wash (iter-66, mean luminance
+    ~250/255); a mid-grey backdrop gives light shapes a clear silhouette and
+    cuts the ambient wash. Tristan 2026-05-29."""
     world = bpy.data.worlds.new("world")
     bpy.context.scene.world = world
     world.use_nodes = True
     bg = world.node_tree.nodes["Background"]
-    bg.inputs["Color"].default_value = (1.0, 1.0, 1.0, 1.0)
+    # _to_linear targets a DISPLAY sRGB grey (~0.55) so it reads as mid-grey,
+    # not the much lighter value a raw-linear 0.55 would display.
+    bg.inputs["Color"].default_value = (*_to_linear((0.55, 0.55, 0.58)), 1.0)
     bg.inputs["Strength"].default_value = 1.0
 
 
@@ -232,12 +256,26 @@ def make_mat(name, rgb, metallic=0.0, roughness=0.55, alpha=1.0, kind=None,
     return mat
 
 
+class _Palette(dict):
+    """Engineering palette that never KeyErrors. An undefined material key —
+    e.g. an LLM-generated scene that references MAT["concrete"] without ever
+    defining it — lazily resolves to a neutral mid-grey material instead of
+    raising KeyError and crashing the whole render. Undefined keys were
+    silently sinking the real design to a washed-out fallback render every
+    run (iter-66/68 KeyError 'concrete'). 2026-05-29."""
+
+    def __missing__(self, key):
+        mat = make_mat(f"m_auto_{str(key)[:16]}", (0.52, 0.54, 0.58), metallic=0.2, roughness=0.6)
+        self[key] = mat
+        return mat
+
+
 def make_default_palette():
     """Standard Forge engineering palette — pure pigments, amber-not-yellow for
     legibility on white background. Used by all form factors as the base. Each
     form factor can extend with form-factor-specific colours.
     """
-    return {
+    return _Palette({
         "enclosure":   make_mat("m_enclosure",   (0.55, 0.56, 0.58), metallic=0.4, roughness=0.55),
         "battery":     make_mat("m_battery",     (0.02, 0.18, 0.95), metallic=0.0, roughness=0.45),
         "motor":       make_mat("m_motor",       (0.15, 0.50, 1.00), metallic=0.2, roughness=0.4),
@@ -262,7 +300,7 @@ def make_default_palette():
         "fluid_water": make_mat("m_water",       (0.10, 0.40, 0.85), metallic=0.5, roughness=0.3),
         "stainless":   make_mat("m_stainless",   (0.85, 0.86, 0.88), metallic=0.7, roughness=0.3),
         "ctrl_black":  make_mat("m_ctrl",        (0.05, 0.08, 0.12), metallic=0.3, roughness=0.4),
-    }
+    })
 
 
 # ─── Module visual profiles (BESS L22 fix #6 — visual differentiation) ──
@@ -854,17 +892,23 @@ def make_ghost_materials():
     GHOST_LIGHT = bpy.data.materials.new("ghost_light")
     GHOST_LIGHT.use_nodes = True
     gl = GHOST_LIGHT.node_tree.nodes["Principled BSDF"]
-    gl.inputs["Base Color"].default_value = (0.60, 0.62, 0.65, 1.0)
+    # Dark slate (2026-05-29): was (0.60,0.62,0.65) — LIGHTER than the grey
+    # studio world, so non-focal context bloomed to a pale wash under AgX.
+    # Darker-than-world makes the saturated focal module read against muted
+    # (but clearly visible) context. Linear-space value.
+    gl.inputs["Base Color"].default_value = (0.13, 0.15, 0.20, 1.0)
     gl.inputs["Metallic"].default_value = 0.0
     gl.inputs["Roughness"].default_value = 0.75
 
     ENCLOSURE_GHOST = bpy.data.materials.new("enclosure_ghost")
     ENCLOSURE_GHOST.use_nodes = True
     eg = ENCLOSURE_GHOST.node_tree.nodes["Principled BSDF"]
-    eg.inputs["Base Color"].default_value = (0.85, 0.86, 0.88, 1.0)
+    # Was (0.85) near-white + alpha 0.18 → an invisible cage. Darker + a touch
+    # more opaque reads as a real translucent enclosure (2026-05-29).
+    eg.inputs["Base Color"].default_value = (0.24, 0.26, 0.32, 1.0)
     eg.inputs["Metallic"].default_value = 0.0
     eg.inputs["Roughness"].default_value = 0.5
-    eg.inputs["Alpha"].default_value = 0.18
+    eg.inputs["Alpha"].default_value = 0.32
     ENCLOSURE_GHOST.blend_method = "BLEND"
 
     return GHOST_LIGHT, ENCLOSURE_GHOST

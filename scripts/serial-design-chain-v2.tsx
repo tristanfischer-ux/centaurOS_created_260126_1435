@@ -99,6 +99,7 @@ import {
   getClassReferenceGraph,
   validateConnectionsAgainstGraph,
 } from '../src/lib/pdf-engine-v2/class-reference-graph'
+import { getClassReferenceGraphDBFirst } from '../src/lib/pdf-engine-v2/lib/knowledge/class-reference-graph-db'
 import { runPhysicsLedger } from '../src/lib/pdf-engine-v2/stages/0.1-physics-ledger'
 import { runComplianceGate, type ComplianceGateResult } from '../src/lib/pdf-engine-v2/stages/3.5-compliance-gate'
 import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/lib/pdf-engine-v2/stages/1.8-brief-target-reconciliation'
@@ -979,8 +980,8 @@ That's the FIRST-DRAFT detail level — enough for procurement to identify the p
 Top-level JSON MUST include "brief_overview_prose" with sub-fields:
   overview_and_context (2-3 paragraphs)
   mission_statement (1 sentence; use brief's cost ceiling, deployment time, target market verbatim)
-  target_customers (2 sentences)
-  why_now (1 paragraph)
+  target_customers (2 sentences — name the SPECIFIC operator/buyer and their concrete procurement driver, and cite at least one real figure from this design (capacity, power, cost ceiling, or deployment time). BANNED phrases: "for the use case described in the brief", "mid-market", "defined performance and compliance requirements", "rather than research-pilot or hobbyist users". Do NOT write a sentence that would be equally true of any product in this class.)
+  why_now (1 paragraph — give the SPECIFIC market, regulatory, or cost driver for THIS design, anchored to at least one concrete number or a named standard/scheme. State what changed and why it makes this design buyable now. BANNED generic openers: "Growing demand for", "premium, certified, rapidly deployable".)
 All numbers MUST match numbers in modules[].derived_parameters. Do not invent.
 
 === SUB-MODULE SPECIFICITY (HARD REQUIREMENT) ===
@@ -2429,7 +2430,8 @@ async function main() {
         const bop = design.brief_overview_prose as Record<string, string>
         const parsedBriefAny = parsedResult.data as any
         const constraints = parsedBriefAny?.constraints ?? {}
-        const targetMarket = constraints.target_market
+        const targetMarket = parsedBriefAny?.target_customers
+          ?? constraints.target_market
           ?? constraints.customer_segment
           ?? constraints.use_case
           ?? parsedBriefAny?.summary?.target_market
@@ -2442,7 +2444,7 @@ async function main() {
         if (!bop.target_customers || bop.target_customers.trim().length === 0) {
           bop.target_customers = typeof targetMarket === 'string' && targetMarket.length > 0
             ? targetMarket
-            : `Operators procuring ${productClassReadable} systems for the use case described in the brief — typically mid-market industrial buyers with defined performance and compliance requirements rather than research-pilot or hobbyist users.`
+            : `Operators deploying ${productClassReadable} at the capacity, performance and compliance level set out in this brief.`
         }
         // Bug fix #16 (2026-05-25): the LLM generator sometimes emits the
         // literal placeholder string "is to be added by the brief author for
@@ -3964,9 +3966,13 @@ async function main() {
   // null and 4 weeks of K10 work was invisible to PDFs.
   const tK10 = Date.now()
   try {
+    // DB-first: query class_reference_graphs in forge-truth.db; falls back to
+    // baked TS registry automatically via getClassReferenceGraphDBFirst.
+    // ensureGraphsRegistered() is still called here so the baked fallback path
+    // inside getClassReferenceGraphDBFirst is warm when the alias map is used.
     await ensureGraphsRegistered()
     const k10ProductClass = String(design.product_class ?? '').trim().toLowerCase()
-    let graph = getClassReferenceGraph(k10ProductClass)
+    let graph = await getClassReferenceGraphDBFirst(k10ProductClass)
     // Alias fallback — chain emits product_class from the Stage 0 classifier
     // ("mini_split_heatpump") which may not exactly match the K10 registry
     // slug ("heat_pump_residential"). Try a small alias map before giving up.
@@ -4003,7 +4009,7 @@ async function main() {
         'vertical-farm': 'vertical_farm',
       }
       const aliased = ALIASES[k10ProductClass]
-      if (aliased) graph = getClassReferenceGraph(aliased)
+      if (aliased) graph = await getClassReferenceGraphDBFirst(aliased)
     }
     if (graph) {
       const emitted = (design.cross_module_grammar_links ?? []).map((l: any) => ({

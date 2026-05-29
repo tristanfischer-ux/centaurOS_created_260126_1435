@@ -446,16 +446,41 @@ async function main(): Promise<number> {
   // still ships with the (less-faithful) output.
   const md = state?.moduleDecomposition || {}
   const allMods: any[] = md.modules || []
+  // GEOMETRIC-ONLY fidelity (2026-05-29). The previous version scored the
+  // geometry script against EVERY numeric derived_parameter (3..100000) —
+  // which for most classes is dominated by electrical/thermal/energy scalars
+  // (kWh, kW, amps, volts, Ah, masses, temps). A geometry script has no reason
+  // to contain "3360" (kWh) or "1250" (A) — the prompt itself tells the model
+  // NOT to emit cell_count as cubes — so a perfectly faithful scene scored
+  // ~40%, falsely "failed", and fired an extra LLM retry that blew the geom-gen
+  // timeout (iter-66 -> SIGTERM 143 -> silent stock-template fallback). Now we
+  // score ONLY what a scene should embed: counts of drawable structural
+  // elements (racks, modules, bays…) and linear dimensions.
+  const NON_GEOMETRIC = /voltage|_v$|current|_a$|amp|_ah|kwh|_wh|_kw|kw_|power|energy|efficiency|percent|_hz|temp|_c$|ambient|mass|_kg|cycle|pressure|flow|_l$|litre|liter|volume|target/
+  const GEOMETRIC_COUNT = /(_count$|count_|(?:^|_)(?:racks?|modules?|trays?|bays?|strings?|stacks?|sections?|tiers?|panels?|columns?|rows?|cols?|phases?|glands?)(?:_|$))/
+  const GEOMETRIC_DIM = /(?:length|width|height|depth|diameter|span|thickness|clearance|pitch|spacing)(?:_mm|_cm|_m)?$|_mm$/
+  const seenVals = new Set<number>()
   const briefNumbers: Array<{ name: string; value: number }> = []
   for (const m of allMods) {
     const dp = m?.derived_parameters || {}
     for (const [k, v] of Object.entries(dp)) {
-      if (typeof v === 'number' && v >= 3 && v <= 100000 && !k.toLowerCase().includes('voltage_v') && !k.toLowerCase().includes('cell_voltage')) {
-        briefNumbers.push({ name: k, value: Math.round(Number(v)) })
-      }
+      if (typeof v !== 'number' || !isFinite(v)) continue
+      const kl = k.toLowerCase()
+      if (NON_GEOMETRIC.test(kl)) continue
+      let keep = false
+      if (GEOMETRIC_DIM.test(kl) && v >= 3) keep = true
+      else if (GEOMETRIC_COUNT.test(kl) && v >= 2 && v <= 50) keep = true // drawable counts only
+      if (!keep) continue
+      const val = Math.round(v)
+      if (seenVals.has(val)) continue
+      seenVals.add(val)
+      briefNumbers.push({ name: k, value: val })
     }
   }
-  if (briefNumbers.length > 0) {
+  // Only ACT on the fidelity signal when there are enough geometric numbers for
+  // it to be meaningful. A class with 2-4 structural numbers is too sparse to
+  // gate on, and a spurious retry there is exactly what caused the timeout.
+  if (briefNumbers.length >= 5) {
     let hits = 0
     const missing: Array<{ name: string; value: number }> = []
     for (const n of briefNumbers) {
@@ -464,7 +489,7 @@ async function main(): Promise<number> {
       else missing.push(n)
     }
     const hitRate = hits / briefNumbers.length
-    console.log(`[geom-gen] brief-number fidelity: ${hits}/${briefNumbers.length} (${(hitRate * 100).toFixed(0)}%)`)
+    console.log(`[geom-gen] geometric-number fidelity: ${hits}/${briefNumbers.length} (${(hitRate * 100).toFixed(0)}%)`)
     if (hitRate < 0.5 && missing.length > 0) {
       const missList = missing.slice(0, 10).map((n) => `  - ${n.name} = ${n.value}`).join('\n')
       console.log(`[geom-gen] fidelity below 50% — retry once with strict-numbers addendum`)

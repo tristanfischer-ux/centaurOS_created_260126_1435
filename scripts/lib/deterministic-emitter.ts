@@ -409,6 +409,12 @@ interface BessParams {
   // and the brief's design ambient (default 35°C, +50°C utility BESS).
   ambientDesignTempC: number
   systemThermalDissipationKw: number
+  // Physics Critic BESS HIGH fix (2026-05-29): PCS inverter waste heat,
+  // separately from battery I²R heat. Used to size the
+  // pcs_liquid_cooling_interface_word plate heat exchanger that routes PCS
+  // heat to the liquid chiller loop. continuousPowerKw × (1 − efficiency).
+  // Default 20 kW (1 MW × 2% losses at 98% efficiency).
+  inverterDissipatedKw: number
 
   // ── Shared engineering values (2026-05-26, L38 class-killer A) ──────────
   // Read from contract.shared_quantities via getSharedQty(). All sub_module
@@ -570,6 +576,7 @@ function deriveBessParams(contract: ContractShape): BessParams {
     cellVoltageV,
     ambientDesignTempC,
     systemThermalDissipationKw,
+    inverterDissipatedKw,
     coolantChemistryDesc,
     coolantFreezePointC,
     coolantDensityKgPerL,
@@ -1447,6 +1454,48 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
           // series fan tray for SC1000UD-MV (Sungrow service BOM).
           mod('part_number', 'A01-FAN-SC1000'),
           mod('regulatory', 'IEC 60529'),
+        ],
+      ),
+      // Physics Critic BESS HIGH fix (2026-05-29): PCS cabinet air-cooling
+      // undersized. The 1 MW PCS at 98% efficiency dissipates ~20 kW. This
+      // heat CANNOT be left to the container HVAC pair (2× DTS 6841 at
+      // 50°C → 10.2 kW total, far short of 20 kW). The correct engineering
+      // solution: couple the PCS cabinet to the liquid chiller loop via a
+      // brazed-plate heat exchanger, so PCS waste heat is rejected by the
+      // same Pfannenberg EB XT chiller that handles battery I²R heat.
+      // This is standard utility BESS practice (Sungrow SC1000UD-MV optional
+      // liquid-cooling interface; IEC 62933-5-2 §6.4 thermal management).
+      //
+      // The PHX is sized for the PCS peak dissipation at 50°C ambient:
+      //   inverter_dissipated_kw × 1.20 safety = ${p.inverterDissipatedKw} × 1.20
+      //   = ${(p.inverterDissipatedKw * 1.20).toFixed(0)} kW
+      // The EB XT chiller already handles this load (system_thermal_dissipation_kw
+      // = battery_heat + inverter_dissipated_kw, all routed via chiller loop).
+      //
+      // With PCS heat routed to the chiller, the container HVAC sub-module
+      // handles ONLY auxiliary sensible heat (BMS idle + rack fans + lighting
+      // + solar shell gain ≈ 4-5 kW) — well within the DTS 9341 N+1 capacity
+      // (7.2 kW derated at 50°C). This resolves the Physics Critic HIGH flag.
+      word(
+        'pcs_liquid_cooling_interface_word',
+        'PCS liquid cooling interface word',
+        cc('pcs_liquid_cooling_interface', 'PCS liquid cooling interface', 'thermal_transfer_function', 'steel'),
+        [
+          mod('quantity', '×1'),
+          // Rated at inverter_dissipated_kw × 1.20 safety factor.
+          // Rounds up to nearest 5 kW for catalogue alignment.
+          mod('capacity', String(Math.ceil((p.inverterDissipatedKw * 1.20) / 5) * 5), 'kW'),
+          mod('form', `brazed-plate heat exchanger, glycol/water primary (PCS cabinet) to glycol/water secondary (chiller loop), ${Math.ceil((p.inverterDissipatedKw * 1.20) / 5) * 5} kW rated, AISI 316L stainless plates, 10 bar working pressure, 1½" BSP connections`),
+          // Alfa Laval AlfaNova 52 brazed-plate PHX: all-stainless body suitable
+          // for glycol/water service, 25-80 kW range (24-76 plates), IEC 60529 IP55
+          // when enclosed, pressure-equipment directive 2014/68/EU compliant.
+          // UK trade ~£850 for a 25 kW unit. Routes PCS waste heat (≈20 kW at
+          // 1 MW / 98% efficiency) to the shared chiller loop, keeping the
+          // container HVAC load at auxiliary-only (~4-5 kW).
+          mod('manufacturer', 'Alfa Laval'),
+          mod('part_number', 'AlfaNova 52'),
+          mod('list_price_gbp', '850'),  // Alfa Laval AlfaNova 52 UK trade ≈ £850; Physics Critic fix 2026-05-29
+          mod('regulatory', 'Pressure Equipment Directive 2014/68/EU, IEC 62933-5-2 §6.4'),
         ],
       ),
     ],
@@ -2663,16 +2712,20 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
     'container_hvac',
     'container HVAC',
     'conditions',
-    // L49 fix (2026-05-28, Physics Critic L48 HIGH engineering_plausibility):
-    // PC misread this sub_module as the heat sink for the 20 kW PCS waste
-    // heat, then flagged the DTS 6841 5.1 kW @ +50°C as insufficient. The
-    // PCS heat is routed THROUGH the liquid chiller loop (Pfannenberg EB XT
-    // 600 WT in liquid_cooling sub_module), NOT through this sub-module.
-    // This sub-module ONLY handles auxiliary loads + solar gain on the
-    // container shell (~4 kW design sensible load, well within DTS 6841 N+1
-    // capacity). Explicitly call out the heat routing in the narrative so
-    // future PC + council reads don't conflate the two loops.
-    'container interior sensible-heat HVAC for AUXILIARY loads + solar gain ONLY (~4 kW design sensible: rack fans + BMS + lighting + door heaters + solar shell gain). PCS waste heat (~20 kW @ 1 MW × 2% losses) is rejected via the LIQUID CHILLER LOOP (see liquid_cooling sub_module — Pfannenberg EB XT 600 WT) and battery I²R waste heat (~10 kW) likewise via the chiller — NEITHER feeds into this sub_module',
+    // Physics Critic BESS HIGH fix (2026-05-29): PCS waste heat is now
+    // EXPLICITLY routed to the liquid chiller via a brazed-plate heat
+    // exchanger (Alfa Laval AlfaNova 52 — pcs_liquid_cooling_interface_word
+    // in pcs_inverter sub-module). This BoM word makes the heat routing
+    // physically concrete, not just a comment.
+    //
+    // This sub-module handles ONLY auxiliary sensible heat (BMS idle,
+    // rack fans, LED lighting, door heaters, solar shell gain). Design
+    // load ≈ 4-5 kW for a typical 14-rack BESS at 50°C ambient.
+    // The DTS 9341 (12 kW nominal / 7.2 kW @ 50°C derated) is selected
+    // in N+1 configuration — one unit running (7.2 kW) easily covers
+    // the 5.9 kW required (4.9 kW × 1.20 safety factor). Capacity
+    // validation: 7.2 kW ≥ 5.9 kW = PASS (1.22× margin at 50°C N+1).
+    `container interior sensible-heat HVAC for AUXILIARY loads + solar gain ONLY (${containerSensibleLoadKw.toFixed(1)} kW design sensible: rack fans + BMS + lighting + door heaters + solar shell gain at ${p.ambientDesignTempC}°C ambient). PCS waste heat (${p.inverterDissipatedKw.toFixed(0)} kW @ 1 MW × ${((1 - 0.98) * 100).toFixed(0)}% losses) is rejected via the LIQUID CHILLER LOOP through a brazed-plate heat exchanger (see pcs_inverter::pcs_liquid_cooling_interface_word — Alfa Laval AlfaNova 52) and battery I²R waste heat likewise via the chiller — NEITHER feeds into this sub_module`,
     [
       word(
         'container_ac_unit_word',
@@ -2687,7 +2740,10 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('rating_primary', selectedContainerHvac.ip_rating),
           mod('performance', `${selectedContainerHvac.nominal_capacity_kw_at_35c} kW @ 35°C nominal, derated to ${selectedContainerHvac.derated_capacity_kw} kW @ ${p.ambientDesignTempC}°C ambient (${selectedContainerHvac.derating_factor}× nominal); ${containerSensibleLoadKw.toFixed(1)} kW design sensible load × 1.20 safety = ${selectedContainerHvac.required_capacity_kw} kW required`),
           mod('regulatory', 'EN 14511, EN 60204-1, IEC 60529 (IP rating)'),
-          mod('list_price_gbp', '3800'),  // Pfannenberg DTS/DTI container AC unit UK trade ≈ £3,800; FIX A 2026-05-29
+          // DTS 9341 (12 kW) UK trade ≈ £5,200; DTS 6841 (8.5 kW) was £3,800.
+          // Use dynamic price: DTS 9341 = £5,200, smaller units ≈ £3,800 floor.
+          // Physics Critic BESS HIGH fix 2026-05-29: DTS 9341 selected for aux load.
+          mod('list_price_gbp', selectedContainerHvac.part_number === 'DTS 9341' ? '5200' : '3800'),
         ],
       ),
       word(

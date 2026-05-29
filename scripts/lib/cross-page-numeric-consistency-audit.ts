@@ -216,6 +216,13 @@ const STRONG_QUALIFIERS = new Set<string>([
   // Both "rated" (already above) and "rating" appear near component specs;
   // treating them as STRONG splits sourcing-note citations from system claims.
   'rating',
+  // Measuring-instrument range/span discriminators — a transducer's MEASURING
+  // RANGE (e.g. a Hall-effect DC-bus voltage transducer with a 1000 V range
+  // that "covers the 800 V nominal") is an instrument spec, NOT the system's
+  // operating value. Without these the audit clustered the 1000 V range with
+  // the 800 V nominal bus voltage and fired a false-positive HIGH. Added
+  // 2026-05-29 after BESS iter-68 false-positive.
+  'transducer', 'transmitter', 'measuring', 'measurement', 'span',
   // Alternative-scenario discriminators — values presented under
   // "IF prioritise CAPEX/MASS (alternative scenario):" in the design
   // decisions section are legitimately different from the canonical

@@ -58,7 +58,11 @@ function main(): number {
     execFileSync(
       'npx',
       ['tsx', resolve(__dirname, 'generate-blender-scene.tsx'), statePath, '--write'],
-      { stdio: 'inherit', timeout: 240_000 },
+      // 360s (was 240s): a single detailed gpt-5.5 geometry pass plus one
+      // legitimate retry can exceed 4 min; the old 240s budget SIGTERM'd the
+      // process (exit 143) mid-retry → silent fallback to the stock template
+      // (iter-66). Still well inside the hero stage's 15-min sentinel poll.
+      { stdio: 'inherit', timeout: 360_000 },
     )
     genOk = true
     console.log(`[bg-runner] gen OK in ${((Date.now() - t0) / 1000).toFixed(1)}s`)

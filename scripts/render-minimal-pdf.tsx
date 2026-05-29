@@ -6236,30 +6236,20 @@ function ModuleSection({
           // when absent we degrade to just the name + role_verb sentence.
           const topology = typeof sm?.topology_clause === 'string' ? sm.topology_clause.trim() : ''
           const roleVerb = typeof sm?.role_verb === 'string' ? sm.role_verb.trim() : ''
-          const next = subModulesRaw[i + 1]
-          const nextName = next ? clean_prose(next?.name_human || humanise(next?.id || '')).trim() : ''
-          // Compose one sentence per sub-module. First sub-module gets a
-          // leading "The"; the rest get connectives so the paragraph reads
-          // as a flow rather than disconnected bullet points.
-          const leader = i === 0
-            ? `The ${smName}`
-            : i === subModulesRaw.length - 1
-              ? `Finally, the ${smName}`
-              : `The ${smName}`
+          // One crisp clause per sub-module. We intentionally do NOT chain
+          // them with "…, and is followed by the X. … Finally, the Y." —
+          // that connective pile-up read as templated/mechanical and the
+          // "The X is {verb-phrase}" form produced ungrammatical "is reads…"
+          // when topology_clause is a verb phrase (2026-05-29 prose pass).
+          // Listing order already conveys sequence; an em-dash carries both
+          // noun-phrase and verb-phrase topology clauses grammatically.
           let sentence = ''
           if (topology) {
-            sentence = `${leader} is ${topology}`
+            sentence = `The ${smName} — ${topology}`
           } else if (roleVerb) {
-            sentence = `${leader} ${roleVerb} the surrounding sub-modules`
+            sentence = `The ${smName} ${roleVerb} the surrounding sub-modules`
           } else {
-            sentence = `${leader} sits inside the module`
-          }
-          // If a next sub-module exists, narrate the handover so the reader
-          // sees the chain explicitly (sub-A → sub-B). When no topology
-          // information is available, this still conveys ORDER which is
-          // strictly more information than the bare list below.
-          if (nextName) {
-            sentence += `, and is followed by the ${nextName}`
+            sentence = `The ${smName} sits inside the module`
           }
           sentence += '.'
           subBits.push(sentence)
@@ -8890,17 +8880,15 @@ function EngineeringToolsFlowPage({
   const pngExists = existsSync(pngPath)
 
   return (
-    <Page size="A4" style={PAGE_STYLE}>
+    <Page size="A4" orientation="landscape" wrap={false} style={PAGE_STYLE}>
       <PageHeader section="Section 1c · Engineering Tools Flow" project={project} />
       <Text style={{ fontSize: 22, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 6 }}>
         Engineering tools — how the design was computed
       </Text>
-      <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 14, lineHeight: 1.55 }}>
-        The diagram below shows the brief at the top, each engineering tool used
-        to compute this design in run order, and the bill of materials at the
-        bottom. Every arrow carries the field name and value flowing between
-        nodes — from a brief input into a tool, between tools when one consumes
-        another's output, and finally into the bill of materials.
+      <Text style={{ fontSize: 9.5, color: INK_SOFT, marginBottom: 10, lineHeight: 1.55 }}>
+        The brief feeds every engineering tool used to compute this design; each
+        tool's output flows into the Engineering Contract, which drives the parts
+        Library, the Reviewers, and finally the Bill of Materials.
       </Text>
 
       {pngExists ? (
@@ -8908,8 +8896,8 @@ function EngineeringToolsFlowPage({
         // page has 64pt of horizontal padding either side; usable width is
         // 595 - 128 = 467pt). We give react-pdf 460pt + auto height so the
         // image lays out fluidly without overflow.
-        <View style={{ alignItems: 'center', marginVertical: 6 }}>
-          <Image src={pngPath} style={{ width: 460, objectFit: 'contain' }} />
+        <View style={{ flexGrow: 1, alignItems: 'center', justifyContent: 'center', marginVertical: 6 }}>
+          <Image src={pngPath} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </View>
       ) : (
         <View
@@ -8935,8 +8923,8 @@ function EngineeringToolsFlowPage({
       )}
 
       <Text style={{ fontSize: 9, color: MUTED, marginTop: 6, lineHeight: 1.5, fontStyle: 'italic', textAlign: 'center' }}>
-        Every arrow shows a value flowing from one tool's output into another
-        tool's input or directly into the bill of materials.
+        Each box is an engineering tool that ran, in the order the design was
+        computed; per-tool inputs and outputs are listed in the Tools-Used appendix.
       </Text>
 
       <PageFooter />

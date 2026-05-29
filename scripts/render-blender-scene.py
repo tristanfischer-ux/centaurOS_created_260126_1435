@@ -177,6 +177,16 @@ def main() -> int:
             )
             return 5
         print(f"[render-scene] using unmodified template {template.name}", flush=True)
+        # FAIL LOUD (2026-05-29): no blender-scene.py means the LLM geometry
+        # step failed or was absent, so these renders will be a GENERIC stock
+        # model — not this design. Drop a marker the chain / a render-quality
+        # gate can detect instead of silently shipping the wrong object (iter-66).
+        try:
+            (out_dir / ".blender-template-fallback").write_text(
+                f"template={template.name}\nreason=no blender-scene.py (geom-gen failed or absent)\n"
+            )
+        except Exception:
+            pass
     if not Path(BLENDER_BIN).exists():
         print(f"[render-scene] FATAL: Blender binary missing at {BLENDER_BIN}", file=sys.stderr)
         return 1
