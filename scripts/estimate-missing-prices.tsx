@@ -55,6 +55,8 @@ import {
   keywordFloorGbp,
   keywordCeilingGbp,
   clampToSanityBand,
+  classCeilingGbp,
+  isConsumable,
   type ComponentClass,
 } from '../src/lib/pdf-engine-v2/component-classes'
 import {
@@ -144,6 +146,9 @@ interface PriceEstimate {
   annual_volume: number
   classification_source: 'corpus' | 'flash_lite' | 'fallback' | 'curated' | 'db_cache' | 'rule_based'
   estimate_source: 'curve' | 'flash_lite_unknown_class' | 'db_cache'
+  // U1 class ceiling flag — set when the final price was clamped by PRICE_CEILING_BY_COMPONENT_CLASS
+  price_class_ceiling_clamped?: boolean
+  price_class_ceiling_note?: string
   // C5 sanity clamp flag — set when the final price was clamped by CLASS_PRICE_SANITY_BOUNDS
   price_sanity_clamped?: boolean
   price_sanity_note?: string
@@ -752,7 +757,7 @@ function curveEstimateFor(
   annualVolume: number,
   productClassSlug?: string | null,
   keywordCtx?: { name?: string | null; manufacturer?: string | null; part_number?: string | null },
-): { central: number; low: number; high: number; multiplier: number; reference: number; floored?: boolean; keyword_floor_note?: string; keyword_ceiling_note?: string; sanity_clamped?: boolean; sanity_note?: string } {
+): { central: number; low: number; high: number; multiplier: number; reference: number; floored?: boolean; keyword_floor_note?: string; keyword_ceiling_note?: string; class_ceiling_clamped?: boolean; class_ceiling_note?: string; sanity_clamped?: boolean; sanity_note?: string } {
   const c = COMPONENT_CURVES[cls]
   // Engine B (2026-05-18 BESS investigation): the reference unit cost can be
   // overridden per (product_class, component_class) so industrial-heavy hosts
@@ -807,9 +812,34 @@ function curveEstimateFor(
     central = Math.max(floor, kwCeil.ceiling_gbp)
     ceiled = true
   }
+  // U1 — Universal per-class price ceiling (2026-05-29).
+  // Applied AFTER keyword ceiling (which targets named categories) and BEFORE
+  // the C5 sanity backstop. Catches class-wide over-pricing for null-MPN /
+  // median-anchored items where the Engine-B reference is a gross over-estimate
+  // for the parts a given product class actually uses in that class.
+  //
+  // Example: structural_polymer ceiling £50. VF rockwool cube at Engine B ref
+  // £22 × curve 1.0 = £22 → capped at £22 (already ≤ £50, no-op). But if a
+  // product-class override or a high-volume curve pushes it to £55, the ceiling
+  // fires. More critically: at low volume (curve multiplier 1.0) the £22 ref
+  // itself is the over-price — the VF structural_polymer override (£8) handles
+  // the anchor; the ceiling is the backstop for any class/product combo that
+  // was missed by the override table.
+  //
+  // classCeilingGbp() returns undefined for classes without a ceiling (most)
+  // so this block is nearly free for those classes.
+  let class_ceiling_clamped = false
+  let class_ceiling_note: string | undefined
+  const classCeil = classCeilingGbp(cls)
+  if (classCeil !== undefined && central > classCeil) {
+    // Never push below the effective floor (floor < ceiling by PRICE_CEILING_BY_COMPONENT_CLASS design).
+    central = Math.max(floor, classCeil)
+    class_ceiling_clamped = true
+    class_ceiling_note = `U1 class ceiling: class=${cls}, ceiling=£${classCeil}, clamped from £${round2(ceiled ? kwCeil!.ceiling_gbp : floored ? floor : raw)} to £${round2(central)}`
+  }
   // C5 — Universal per-class sanity bounds backstop (2026-05-28, BLOCKER per
-  // council GLM/Kimi). Runs AFTER keyword floor + ceiling so it catches any
-  // residual implausible price regardless of which keyword rule missed it.
+  // council GLM/Kimi). Runs AFTER keyword floor + ceiling + class ceiling so it
+  // catches any residual implausible price regardless of which rule missed it.
   // A price outside [min_gbp, max_gbp] for its class is clamped and flagged.
   const sanity = clampToSanityBand(central, cls)
   let sanity_clamped = false
@@ -817,7 +847,7 @@ function curveEstimateFor(
   if (sanity.clamped) {
     central = sanity.price_gbp
     sanity_clamped = true
-    sanity_note = `C5 sanity clamp (${sanity.breach}): class=${cls}, raw=£${round2(ceiled ? kwCeil!.ceiling_gbp : floored ? floor : raw)}, clamped=£${round2(central)}`
+    sanity_note = `C5 sanity clamp (${sanity.breach}): class=${cls}, raw=£${round2(class_ceiling_clamped ? classCeil! : ceiled ? kwCeil!.ceiling_gbp : floored ? floor : raw)}, clamped=£${round2(central)}`
   }
   return {
     central: round2(central),
@@ -828,6 +858,8 @@ function curveEstimateFor(
     floored,
     keyword_floor_note: kw && floored && (kw.floor_gbp >= classFloor) ? kw.note : undefined,
     keyword_ceiling_note: ceiled ? kwCeil!.note : undefined,
+    class_ceiling_clamped: class_ceiling_clamped || undefined,
+    class_ceiling_note,
     sanity_clamped,
     sanity_note,
   }
@@ -1194,18 +1226,22 @@ async function main() {
         reasoning: finished
           ? `Engine B finished-commodity: class=${cls}, manufacturer=${ctx.manufacturer}, SKU=${ctx.part_number}, reference £${c.reference} (no production-scale discount applied — catalogue item)${c.sanity_note ? `; ${c.sanity_note}` : ''}`
           : c.sanity_note
-            ? `Engine B curve${c.keyword_ceiling_note ? ' + keyword ceiling' : c.keyword_floor_note ? ' + keyword floor' : ''}: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} → £${c.central}; ${c.sanity_note}`
-            : c.keyword_ceiling_note
-              ? `Engine B curve + category keyword ceiling: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} × ${c.multiplier.toFixed(3)} capped DOWN to £${c.central} (${c.keyword_ceiling_note})`
-              : c.keyword_floor_note
-                ? `Engine B curve + category keyword floor: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} × ${c.multiplier.toFixed(3)} clamped UP to £${c.central} (${c.keyword_floor_note})`
-                : `Engine B curve: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference}, multiplier ${c.multiplier.toFixed(3)} → £${c.central}`,
+            ? `Engine B curve${c.class_ceiling_note ? ' + class ceiling' : c.keyword_ceiling_note ? ' + keyword ceiling' : c.keyword_floor_note ? ' + keyword floor' : ''}: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} → £${c.central}; ${c.sanity_note}`
+            : c.class_ceiling_note
+              ? `Engine B curve + U1 class ceiling: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} × ${c.multiplier.toFixed(3)} capped by class ceiling to £${c.central} (${c.class_ceiling_note})`
+              : c.keyword_ceiling_note
+                ? `Engine B curve + category keyword ceiling: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} × ${c.multiplier.toFixed(3)} capped DOWN to £${c.central} (${c.keyword_ceiling_note})`
+                : c.keyword_floor_note
+                  ? `Engine B curve + category keyword floor: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} × ${c.multiplier.toFixed(3)} clamped UP to £${c.central} (${c.keyword_floor_note})`
+                  : `Engine B curve: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference}, multiplier ${c.multiplier.toFixed(3)} → £${c.central}`,
         component_class: cls,
         curve_multiplier: finalMultiplier,
         reference_unit_cost_gbp: c.reference,
         annual_volume: annualVolume,
         classification_source: classSource.get(ctx.word_id)!,
         estimate_source: 'curve',
+        price_class_ceiling_clamped: c.class_ceiling_clamped || undefined,
+        price_class_ceiling_note: c.class_ceiling_note,
         price_sanity_clamped: c.sanity_clamped || undefined,
         price_sanity_note: c.sanity_note,
       },
@@ -1326,6 +1362,9 @@ async function main() {
       engine_b_annual_volume: estimate.annual_volume,
       engine_b_classification_source: estimate.classification_source,
       engine_b_estimate_source: estimate.estimate_source,
+      // U1 class ceiling attribution (undefined when not clamped — omitted from JSON)
+      ...(estimate.price_class_ceiling_clamped ? { price_class_ceiling_clamped: true } : {}),
+      ...(estimate.price_class_ceiling_note ? { price_class_ceiling_note: estimate.price_class_ceiling_note } : {}),
       // C5 sanity clamp attribution (undefined when not clamped — omitted from JSON)
       ...(estimate.price_sanity_clamped ? { price_sanity_clamped: true } : {}),
       ...(estimate.price_sanity_note ? { price_sanity_note: estimate.price_sanity_note } : {}),

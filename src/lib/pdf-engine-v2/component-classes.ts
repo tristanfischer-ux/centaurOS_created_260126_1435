@@ -81,6 +81,8 @@ export type ComponentClass =
   | 'oem_hvac_chiller'        // liquid chiller / air-handling unit (Pfannenberg EB XT, Stulz, Emerson): £2k-£25k
   | 'oem_fire_safety'         // fire panel, aspirating smoke detection controller, gas suppression cabinet: £800-£8k
   | 'oem_smoke_detection'     // aspirating smoke detector head / point detector panel — Hochiki, Apollo, Vesda VLF: £150-£2,500
+  // ── U2 (2026-05-29): per-cycle inputs excluded from capital BoM
+  | 'consumable'              // growing media (rockwool, perlite, coir), filters, desiccant, reagents, nutrients
 
 export type CostCurvePoint = {
   // Annual production volume of the FINAL PRODUCT (the brief value), not the
@@ -509,6 +511,38 @@ export const COMPONENT_CURVES: Record<ComponentClass, ComponentCostCurve> = {
       { annual_volume: 1000000, unit_cost_multiplier: 0.50 },
     ],
   },
+
+  // ── U2 (2026-05-29): per-cycle consumables ─────────────────────────────────
+  // Growing media (rockwool slabs/cubes, perlite, coir, clay pebbles), filters
+  // (air, water, nutrient-line), desiccant packs, reagents, nutrient solutions.
+  // These are PER-CYCLE operating inputs, NOT capital items. They are classified
+  // separately so the BoM aggregation step can exclude them from the capital/
+  // build cost total and place them in a separate consumables segment.
+  //
+  // Reference anchor: rockwool propagation cube Grodan / Cultilene (common VF
+  // entry) is ~£0.15-£0.50 each; a standard rockwool slab (1 m × 0.15 m × 0.075 m)
+  // is ~£1.50-£4.00. Anchor £1.50 — weighted toward the slab format used in
+  // hydroponic container farms. Curve is mildly elastic (bulk pallet discounts
+  // exist) but material cost dominates at scale, so the drop is modest.
+  consumable: {
+    class: 'consumable',
+    reference_unit_cost_gbp: 1.50,
+    source: 'industry_curve',
+    notes:
+      'Per-cycle growing media, filters, desiccant, reagents. NOT a capital ' +
+      'item — must be excluded from capital BoM via isConsumable(). Reference ' +
+      '£1.50 (rockwool slab / perlite bag / filter cartridge typical unit). ' +
+      'Curve modest: bulk pallet discounts ~30-40% at 10k/yr but material cost ' +
+      'floors dominate. PRICE_CEILING_BY_COMPONENT_CLASS caps this class at ' +
+      '£50/unit — individual consumable items rarely exceed £50 (a large HEPA ' +
+      'filter housing or a 5 kg nutrient bag is the practical ceiling).',
+    curve: [
+      { annual_volume: 1, unit_cost_multiplier: 1.0 },
+      { annual_volume: 1000, unit_cost_multiplier: 0.75 },
+      { annual_volume: 100000, unit_cost_multiplier: 0.55 },
+      { annual_volume: 10000000, unit_cost_multiplier: 0.40 },
+    ],
+  },
 }
 
 // ---------------------------------------------------------------------------
@@ -788,6 +822,25 @@ export const PRODUCT_CLASS_REFERENCE_OVERRIDES: Record<string, Partial<Record<Co
     //  - 40ft Hi-Cube ISO container: £4,000-£8,000 raw
     //  - Trolley steel frames custom-fab (1.2 × 2.0 × 2.4 m, 250 kg
     //    per tier): £1,200-£2,000 each
+    //
+    // U1(b) 2026-05-29: extended to cover all classes a container farm actually
+    // uses, so Engine B stops falling through to the wrong median anchor.
+    // Key VF-specific anchors added:
+    //  - structural_polymer: dominated by Kingspan / Rockwool PIR insulation
+    //    panels (£8-£30 per m², cut to panel size), flexible ducting
+    //    (£5-£20/m), and gutter trays (£3-£15 each) — NOT injection-moulded
+    //    housings. Anchor £8 (Rockwool FLEXI-slab equivalent, 1-2 m² section).
+    //  - electronic_connector: standard DIN-rail terminal blocks (£0.80-£3),
+    //    RJ45 patch leads (£1-£3), climate-sensor plugs (£0.50-£2). Anchor £2.
+    //  - mechanical_fastener: M8 bolts for container racking (£0.10-£0.40),
+    //    anchor plates (£1-£5). Anchor £0.60.
+    //  - electronic_cable: power cable for LED bars (£1-£5/m), RS485 sensor
+    //    cables (£0.80-£3/m), irrigation solenoid 24 VAC wiring (£1-£3/m).
+    //    Anchor £4.
+    //  - electronic_passive: DIN-rail 24 V power supplies (£20-£60) dominate;
+    //    smaller PCB passives for climate controllers (£0.10-£1). Anchor £0.50.
+    //  - electronic_ic: real-time clocks, 8-bit micros for dosing boards
+    //    (£1-£4 at 1000/yr). Anchor £3.
     oem_subsystem: 2500.0,          // ↑ from 2000 — LED rack module / HVAC compressor / water-treatment skid (£500-£5k mixed)
     motor_actuator: 100.0,          // ↑ from 80 — pump motors at 1000/yr volume
     fluid_path: 30.0,               // ~ — irrigation fittings + valves
@@ -800,6 +853,14 @@ export const PRODUCT_CLASS_REFERENCE_OVERRIDES: Record<string, Partial<Record<Co
     electronic_power_module: 80.0,  // ↑ from 60 — LED drivers (Mean Well CSP-class)
     magnetic: 100.0,                // ↑ from 80 — VFD chokes + transformers
     safety_consumable: 75.0,        // ↑ from 50 — Pilz SIL3 relay ~£200, E-stop buttons £30-£80
+    // U1(b) 2026-05-29: added classes VF uses that were missing overrides
+    structural_polymer: 8.0,        // Kingspan / Rockwool PIR insulation panel section, flexible ducting piece, gutter tray (£3-£30)
+    electronic_connector: 2.0,      // DIN-rail terminal block, RJ45 patch lead, sensor plug (£0.50-£5)
+    mechanical_fastener: 0.60,      // M8 anchor bolts for container racking, anchor plates (£0.10-£5)
+    electronic_cable: 4.0,          // Power/signal cable per metre run: LED bar feed, RS485, solenoid 24VAC (£0.80-£8)
+    electronic_passive: 0.50,       // PCB passives for dosing/climate boards (£0.10-£1); DIN PSUs hit oem_subsystem override instead
+    electronic_ic: 3.0,             // 8-bit / RTC / dosing-board MCU at 1000/yr volume (£1-£6)
+    electronic_discrete: 1.20,      // Small-signal MOSFETs / diodes for climate/dosing PCBs (£0.30-£3)
   },
   vertical_farm: {
     oem_subsystem: 2500.0,
@@ -814,6 +875,14 @@ export const PRODUCT_CLASS_REFERENCE_OVERRIDES: Record<string, Partial<Record<Co
     electronic_power_module: 80.0,
     magnetic: 100.0,
     safety_consumable: 75.0,
+    // U1(b) — mirrors 'vertical-farm' entry above
+    structural_polymer: 8.0,
+    electronic_connector: 2.0,
+    mechanical_fastener: 0.60,
+    electronic_cable: 4.0,
+    electronic_passive: 0.50,
+    electronic_ic: 3.0,
+    electronic_discrete: 1.20,
   },
 
   // 200 L single-use mammalian bioreactor (GMP). Industrial-heavy 100/yr.
@@ -1076,10 +1145,135 @@ export const COMPONENT_CLASS_FLOORS_GBP: Partial<Record<ComponentClass, number>>
   oem_hvac_chiller: 1500,       // Smallest viable industrial chiller unit
   oem_fire_safety: 500,         // Fire panel / suppression cabinet minimum
   oem_smoke_detection: 40,      // Cheapest addressable point detector
+  // U2 per-cycle consumable floor (2026-05-29)
+  consumable: 0.05,             // Rockwool plug / desiccant sachet minimum
 }
 
 export function componentClassFloorGbp(componentClass: ComponentClass): number {
   return COMPONENT_CLASS_FLOORS_GBP[componentClass] ?? 0
+}
+
+// ---------------------------------------------------------------------------
+// U1 — UNIVERSAL PER-CLASS PRICE CEILING (2026-05-29)
+//
+// PURPOSE
+// -------
+// Null-MPN / cascade-miss items priced via the Engine-B curve can produce
+// absurd unit prices even after the reference override and volume discount,
+// because the REFERENCE itself is a class-wide median that may be 10-100× the
+// actual commodity price for that specific part type.
+//
+// Confirmed examples before this map:
+//   • vertical_farm: rockwool propagation cube (structural_polymer, qty 2,500)
+//     → Engine B ref £22 × curve 1.0 = £22/cube → £55,000 total.
+//     Real Grodan / Cultilene cube: £0.15-£0.50. Ceiling £50 caps this.
+//   • null-MPN branch breaker (safety_consumable) → Engine B ref £6.50 ×
+//     curve high = £6,680 (curve multiplier < 1 but ref × qty still absurd
+//     because the BESS oem_subsystem override inflated the neighbour classes).
+//     Ceiling £400 caps the class-level estimate to a realistic breaker price.
+//   • electronic_connector null-MPN (e.g. a generic M12 connector in a BESS)
+//     → Engine B ref £2.50 × 0.55 curve = £1.38. Still 5-10× real commodity
+//     price for a standard M12 at that volume. Ceiling £50 provides headroom
+//     for a real high-end connector while preventing absurd outliers.
+//
+// DESIGN RULES
+// • This ceiling ONLY applies to the Engine-B curve/median path (null-MPN,
+//   cascade-miss). Pinned parts, curated-table parts, and DB-cached real prices
+//   MUST NOT be clipped. The enforcement point in curveEstimateFor() ensures this.
+// • Values are chosen to be generous enough to never clip a legitimate part in
+//   that class (e.g. a real 32-way terminal block at £45 clears the £50 ceiling;
+//   a Molex MX150 automotive connector at £12 clears it easily). They only clip
+//   the curve when the Engine-B median grossly exceeds the realistic single-unit
+//   commodity price.
+// • Benefits EVERY product class, not just VF: a BESS or HAPS BoM with a
+//   null-MPN structural_polymer part will also be capped.
+// • Not all classes need a ceiling — most are calibrated closely enough that
+//   the class floor + sanity band already bound them. Only classes with
+//   demonstrated gross-over-price failure modes are listed.
+// ---------------------------------------------------------------------------
+
+export const PRICE_CEILING_BY_COMPONENT_CLASS: Partial<Record<ComponentClass, number>> = {
+  // structural_polymer: rockwool cube (£0.15-0.50), gasket (£1-5), label (£1-3),
+  // small injection-moulded part (£0.50-£20). No legitimate single structural
+  // polymer BoM line item exceeds £50 when null-MPN (a real annotated tool /
+  // mould / housing at specific SKU bypasses the curve entirely).
+  structural_polymer: 50,
+
+  // safety_consumable: MCB/MCCB/fuse (£3-£80), E-stop button (£20-£80), fire
+  // cartridge (£50-£200), arc-flash relay (£150-£400). Circuit breakers above
+  // £400 are invariably pinned (Eaton, ABB, Schneider named SKUs) and bypass
+  // the curve. Null-MPN branch breakers capped at £400.
+  safety_consumable: 400,
+
+  // sensor: thermistor (£0.30-£2), NTC module (£1-£5), basic PT100 (£8-£25),
+  // typical process sensor (£30-£200). The class ceiling caps a null-MPN sensor
+  // at £600 — generous enough to allow a real industrial pressure transmitter
+  // (£80-£300) and a Pt100 head assembly (£150-£400) but clips the curve when
+  // the class median pulls toward a LiDAR or INS that should be a pinned part.
+  sensor: 600,
+
+  // electronic_connector: JST/Molex commodity (£0.10-£1), RJ45/M12 (£1-£8),
+  // high-density industrial connector (£8-£40). The class ceiling of £50 allows
+  // a real multi-pin military-spec connector but clips the null-MPN path when
+  // the Engine-B curve reaches the class median which may reflect a high-end
+  // subsea connector rather than a typical VF/BESS board-level connector.
+  electronic_connector: 50,
+
+  // consumable: rockwool/perlite units (£0.15-£4), filter cartridge (£5-£40),
+  // nutrient bag (£10-£50), desiccant pack (£1-£10). Per-cycle inputs rarely
+  // exceed £50 per unit in a production agriculture / industrial context.
+  consumable: 50,
+}
+
+/**
+ * Return the universal per-class price ceiling for null-MPN / median-anchored
+ * Engine-B curve estimates, or undefined when no ceiling applies to the class.
+ *
+ * Usage (in curveEstimateFor):
+ *   const ceil = classCeilingGbp(cls)
+ *   if (ceil !== undefined && central > ceil) central = Math.max(floor, ceil)
+ */
+export function classCeilingGbp(componentClass: ComponentClass): number | undefined {
+  return PRICE_CEILING_BY_COMPONENT_CLASS[componentClass]
+}
+
+// ---------------------------------------------------------------------------
+// U2 — CONSUMABLE CLASSIFICATION (2026-05-29)
+//
+// Per-cycle operating inputs (growing media, filters, desiccant, reagents)
+// are NOT capital items and must NOT appear in the capital/build BoM total.
+// They belong in a separate consumables segment so investors and procurement
+// teams can distinguish recurring OPEX-style inputs from one-time CAPEX.
+//
+// Currently the only ComponentClass that is unconditionally consumable is
+// 'consumable' itself. If the taxonomy grows (e.g. a 'reagent' or 'nutrient'
+// sub-class), add it to CONSUMABLE_COMPONENT_CLASSES — the BoM aggregation
+// logic should call isConsumable() rather than hardcoding the class name.
+//
+// WHAT THE MAIN AGENT MUST DO (wiring — NOT done here):
+//   1. Teach the classifier prompt that rockwool / perlite / growing media /
+//      filter cartridges → class = 'consumable'.
+//   2. In the BoM sum / subtotal code, filter out isConsumable(cls) rows from
+//      the capital total, and sum them separately as 'per_cycle_consumables_gbp'.
+//   3. In the renderer, show the consumables sub-table beneath the capital BoM.
+// ---------------------------------------------------------------------------
+
+export const CONSUMABLE_COMPONENT_CLASSES: ReadonlySet<ComponentClass> = new Set<ComponentClass>([
+  'consumable',
+])
+
+/**
+ * Returns true when the component class represents a per-cycle operating input
+ * (growing media, filter, desiccant, reagent, nutrient) that must be excluded
+ * from the capital/build BoM total.
+ *
+ * Use this predicate in:
+ *   • BoM aggregation (exclude from capital subtotal, sum separately)
+ *   • Renderer (separate consumables segment)
+ *   • Gate B-5 / B-7 (exclude from cost-stack ratio checks on capital BoM)
+ */
+export function isConsumable(componentClass: ComponentClass): boolean {
+  return CONSUMABLE_COMPONENT_CLASSES.has(componentClass)
 }
 
 // ---------------------------------------------------------------------------
@@ -1152,6 +1346,8 @@ export const CLASS_PRICE_SANITY_BOUNDS: Partial<Record<ComponentClass, ClassSani
   oem_hvac_chiller:        { min_gbp: 800,     max_gbp: 80_000 },
   oem_fire_safety:         { min_gbp: 300,     max_gbp: 20_000 },
   oem_smoke_detection:     { min_gbp: 20,      max_gbp: 3_000 },
+  // U2 per-cycle consumable (2026-05-29)
+  consumable:              { min_gbp: 0.01,    max_gbp: 500 },
 }
 
 /**
@@ -1527,6 +1723,8 @@ export const COMPONENT_CLASS_ORDER: ComponentClass[] = [
   'oem_hvac_chiller',
   'oem_fire_safety',
   'oem_smoke_detection',
+  // U2 per-cycle consumables (2026-05-29)
+  'consumable',
 ]
 
 // ---------------------------------------------------------------------------
