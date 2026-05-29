@@ -496,6 +496,27 @@ export function formatFlowLpm(flowLpm: number): string {
   return `${Math.round(flowLpm)} L/min`
 }
 
+/**
+ * formatPowerKw — format a power value as a human-readable kW string.
+ * Pinned to one decimal place so no two consumers produce different strings
+ * for the same value (e.g. "20 kW" vs "20.0 kW").
+ * Usage: `${formatPowerKw(p.systemThermalDissipationKw)}` in emitter templates.
+ */
+export function formatPowerKw(powerKw: number): string {
+  return `${powerKw.toFixed(1)} kW`
+}
+
+/**
+ * formatEnergyMwh — format an energy value in MWh from a kWh input.
+ * Converts kWh → MWh and pins to two decimal places so every consumer
+ * produces the same string (e.g. "2.69 MWh" not "2.688 MWh").
+ * Usage: `${formatEnergyMwh(p.usableKwh)}` in emitter templates.
+ * Pass the value in kWh; the function divides by 1000 and formats.
+ */
+export function formatEnergyMwh(energyKwh: number): string {
+  return `${(energyKwh / 1000).toFixed(2)} MWh`
+}
+
 // ---------------------------------------------------------------------------
 // FIRE SUPPRESSION AGENT MASS SELECTOR — NFPA 2001 formula
 // ---------------------------------------------------------------------------

@@ -244,15 +244,37 @@ function deriveEnergyStorageHeadline(modules: ModuleSpec[], parsedBrief: any, br
   const targetUnit = String(parsedBrief?.constraints?.target_performance?.unit ?? '').toLowerCase()
   const briefMwh = typeof targetEnergyMwh === 'number' && targetUnit.includes('mwh') ? targetEnergyMwh : null
 
-  // Nameplate energy from cells: cells × Ah × V / 1000 = kWh; / 1000 = MWh
+  // Nameplate energy — canonical source: orchestratorContract.quantities.nameplate_capacity_kwh
+  // (emitted by pybamm tool or engineering-contract archetype builder; integer-clean).
+  // Phase B fix (2026-05-28): this was recomputing cells×Ah×V/1e6 which diverges
+  // from the contract when pybamm uses a different cell count than the BoM walk.
+  // Fall back to the recomputation ONLY when the contract field is absent (pre-contract runs).
+  const contractNameplateKwh: number | null =
+    typeof orchestratorContract?.quantities?.nameplate_capacity_kwh?.value === 'number'
+      ? orchestratorContract.quantities.nameplate_capacity_kwh.value
+      : null
+  const contractUsableKwh: number | null =
+    typeof orchestratorContract?.quantities?.usable_capacity_kwh?.value === 'number'
+      ? orchestratorContract.quantities.usable_capacity_kwh.value
+      : null
+
+  // Nameplate MWh — read canonical field; fall back to cell recomputation only if absent.
   let namePlateMwh: number | null = null
-  if (totalCells > 0 && cellAh != null && cellV != null) {
+  if (contractNameplateKwh !== null) {
+    // Primary: read the canonical single source of truth
+    namePlateMwh = contractNameplateKwh / 1000
+  } else if (totalCells > 0 && cellAh != null && cellV != null) {
+    // Fallback: recompute from cells (pre-contract runs only)
     namePlateMwh = (totalCells * cellAh * cellV) / 1_000_000
   }
 
-  // Usable energy at 80% DoD (BESS-standard assumption); use brief target if it's tighter
+  // Usable energy at 80% DoD (BESS-standard assumption).
+  // Phase B fix: prefer the canonical usable_capacity_kwh from the contract
+  // (which is the integer-feasible achieved value, NOT the brief target).
   const dod = 0.80
-  const usableMwh = namePlateMwh != null ? namePlateMwh * dod : null
+  const usableMwh: number | null = contractUsableKwh !== null
+    ? contractUsableKwh / 1000
+    : namePlateMwh != null ? namePlateMwh * dod : null
 
   // Cycles per year — default 1 cycle/day = 365; brief may specify
   const cyclesPerYear = 365  // canonical BESS daily-cycling assumption
@@ -325,7 +347,16 @@ function deriveEnergyStorageHeadline(modules: ModuleSpec[], parsedBrief: any, br
   // Supporting: cell count, nameplate, cycles
   const supporting: any[] = []
   if (totalCells > 0) supporting.push(metric('cell_count', 'Cell count', totalCells, 'cells', `Total LFP prismatic cells in cell_string sub-modules.`, 'derived_deterministic'))
-  if (namePlateMwh != null) supporting.push(metric('nameplate_capacity_mwh', 'Nameplate capacity', namePlateMwh.toFixed(2), 'MWh', `${totalCells} cells × ${cellAh} Ah × ${cellV} V.`, 'derived_deterministic'))
+  if (namePlateMwh != null) supporting.push(metric(
+    'nameplate_capacity_mwh',
+    'Nameplate capacity',
+    namePlateMwh.toFixed(2),
+    'MWh',
+    contractNameplateKwh !== null
+      ? `From quantities.nameplate_capacity_kwh = ${contractNameplateKwh} kWh (canonical source, pybamm or archetype builder).`
+      : `${totalCells} cells × ${cellAh} Ah × ${cellV} V (fallback: contract absent).`,
+    contractNameplateKwh !== null ? 'derived_deterministic' : 'derived_deterministic',
+  ))
   supporting.push(metric('cycles_per_year_assumed', 'Cycles per year (assumed)', cyclesPerYear, 'cycles/yr', 'BESS-standard daily-cycling assumption.', 'derived_from_brief'))
 
   out.supporting_metrics = supporting

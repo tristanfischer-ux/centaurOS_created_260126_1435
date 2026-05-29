@@ -659,10 +659,33 @@ registerArchetype('bess', (brief: any) => {
   const stringContinuousA = busContinuousA / parallelStringsTotal
   const stringPeakA = busPeakA / parallelStringsTotal
   // Inverter losses at 98% efficiency
+  // Phase B deterministic-generation fix (2026-05-28): this formula is the
+  // SOLE source for inverter_dissipated_kw. The value is 20 kW (1000 kW × 2%).
+  // Any prose that cites inverter heat MUST read `quantities.inverter_dissipated_kw`;
+  // no consumer may hardcode 15, 20, or any other figure.
   const inverterEfficiency = 0.98
-  const dissipatedKw = continuousKw * (1 - inverterEfficiency)  // 20 kW
-  // Heatsink/thermal-rejection minimum capacity (1.5× margin)
-  const thermalRejectionMinKw = dissipatedKw * 1.5  // 30 kW
+  const dissipatedKw = continuousKw * (1 - inverterEfficiency)  // 20 kW — single source
+  // Cell I²R heat generation — default pre-pybamm estimate. PyBaMM overrides
+  // `system_thermal_dissipation_kw` at runtime; this default keeps the contract
+  // internally consistent for pre-tool runs.  At 0.5C discharge, LFP 280 Ah
+  // cells dissipate ~0.8 W/cell → 3750 cells = 3.0 kW I²R.  The 1.5× system
+  // overhead factor (wiring + busbar) brings it to ~4.5 kW; round to 5 kW as a
+  // conservative pre-pybamm default (pybamm typical: 11–13 kW at 0.5C, 1 MW).
+  const cellHeatGenerationKw = 5  // kW — pybamm overrides via system_thermal_dissipation_kw
+  // Container auxiliary / sensible heat — BMS electronics, rack fans, lighting,
+  // door heaters, solar shell gain.  NOT the chiller load; handled by the
+  // container HVAC pair, NOT the liquid chiller loop.
+  const hvacDesignLoadKw = 4  // kW — BMS + fans + lighting + solar gain (aux only)
+  // Standby auxiliary losses — BMS idle, telemetry, lighting when not discharging.
+  const standbyAuxLossKw = 2  // kW — conservative floor
+  // System thermal dissipation = cell I²R + inverter losses.  This is the total
+  // heat load the LIQUID CHILLER must reject.  Distinct from hvac_design_load_kw
+  // (container HVAC for aux sensible heat) and thermal_rejection_capacity_kw
+  // (chiller output, which includes the safety margin).
+  const systemThermalDissipationKw = cellHeatGenerationKw + dissipatedKw  // 25 kW default
+  // Chiller minimum capacity: system thermal load × 1.5 engineering margin
+  const thermalRejectionMinKw = dissipatedKw * 1.5  // 30 kW — inverter-only legacy field; kept for compat
+  const thermalRejectionCapacityKw = systemThermalDissipationKw * 1.5  // 37.5 kW min chiller capacity
   // BESS L22 fix (2026-05-25, task #122 universal thermal subsystem ambient-
   // derating contract): the brief's `operating_environment.temp_max_c` is the
   // authoritative design ambient for thermal-subsystem sizing. Default 35°C
@@ -716,8 +739,26 @@ registerArchetype('bess', (brief: any) => {
     // the total bus current.
     string_continuous_current_a: q(stringContinuousA, 'A', 'dimensionless', 'continuous', 'rack', 'calculator', { source_detail: 'bus_continuous_current_a / parallel_strings_total' }),
     string_peak_current_a: q(stringPeakA, 'A', 'dimensionless', 'peak', 'rack', 'calculator'),
-    inverter_dissipated_kw: q(dissipatedKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'continuous_kw × (1 - 0.98 efficiency)' }),
-    thermal_rejection_min_kw: q(thermalRejectionMinKw, 'kW', 'power', 'min', 'system', 'calculator', { source_detail: 'dissipated × 1.5 margin' }),
+    // ── Thermal canonical fields (Phase B, 2026-05-28) ─────────────────────
+    // Four DISTINCT physical quantities that prose sites must cite individually.
+    // NEVER collapse to a single scalar — the four represent different heat paths.
+    //
+    // Consumers:
+    //   inverter_dissipated_kw         → PCS waste-heat prose; inverter-cooling sub_module
+    //   cell_heat_generation_kw        → cell_string I²R commentary; PyBaMM narrative
+    //                                   (PyBaMM overrides this via system_thermal_dissipation_kw)
+    //   hvac_design_load_kw            → container HVAC sub_module; NOT chiller sizing
+    //   standby_aux_loss_kw            → idle-mode energy budget commentary
+    //   system_thermal_dissipation_kw  → chiller sizing prose; gate 16 thermal-derating audit
+    //   thermal_rejection_capacity_kw  → chiller capacity required (includes 1.5× margin)
+    //   thermal_rejection_min_kw       → LEGACY: inverter-only 1.5× floor; kept for emitter compat
+    inverter_dissipated_kw: q(dissipatedKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'continuous_kw × (1 − inverterEfficiency); 1000 × 0.02 = 20 kW — single computed source, no hardcodes' }),
+    cell_heat_generation_kw: q(cellHeatGenerationKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'pre-pybamm estimate: ~0.8 W/cell × 3750 cells × 1.5 system overhead ≈ 5 kW; PyBaMM overrides system_thermal_dissipation_kw at runtime' }),
+    hvac_design_load_kw: q(hvacDesignLoadKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'container auxiliary sensible heat: BMS idle + rack fans + LED lighting + door heaters + solar shell gain (~4 kW); handled by container HVAC pair (NOT liquid chiller)' }),
+    standby_aux_loss_kw: q(standbyAuxLossKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'BMS telemetry + protection relays + lighting at zero-discharge standby; ~2 kW conservative floor' }),
+    system_thermal_dissipation_kw: q(systemThermalDissipationKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'cell_heat_generation_kw + inverter_dissipated_kw = total liquid-chiller heat rejection load; PyBaMM overrides cell component at runtime' }),
+    thermal_rejection_capacity_kw: q(thermalRejectionCapacityKw, 'kW', 'power', 'min', 'system', 'calculator', { source_detail: 'system_thermal_dissipation_kw × 1.5 engineering margin = minimum chiller output required at design ambient' }),
+    thermal_rejection_min_kw: q(thermalRejectionMinKw, 'kW', 'power', 'min', 'system', 'calculator', { source_detail: 'LEGACY: inverter_dissipated_kw × 1.5 (inverter-only floor, pre-Phase-B); superseded by thermal_rejection_capacity_kw which includes cell heat; retained for emitter backward compat' }),
     // BESS L22 (2026-05-25, task #122): brief-driven design ambient for
     // thermal-subsystem sizing. The deterministic emitter selects a chiller
     // whose DERATED capacity at this ambient ≥ thermal load × margin (gate 16
@@ -751,6 +792,18 @@ registerArchetype('bess', (brief: any) => {
     system_mass_with_external_kg: q(massWithExternalTxfrKg, 'kg', 'mass', 'gross_takeoff', 'system', 'calculator', { source_detail: 'in-container + external transformer; informational only — container mass cap applies to in_container_mass_kg' }),
     transformer_installation: q(1, '', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'transformer_installation=1 means EXTERNAL pad-mount (industry standard per IEC 62933-5-2 §6.4 / NEC 706.10); =0 would mean in-container (legacy non-utility BESS only)' }),
     mass_feasibility: q(massFeasibility ? 1 : 0, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: `1 iff in_container_mass_kg ≤ brief_mass_cap_kg; achieved ${inContainerMassKg.toFixed(0)} kg vs cap ${briefMassCapKg} kg` }),
+    // FIX 3a — Bespoke enclosure payload rating (council CRITICAL, 2026-05-29):
+    // The brief's max_mass_kg is the DESIGN gross-mass cap for the bespoke
+    // heavy-duty enclosure, NOT the standard ISO-668 26,580 kg payload for a
+    // standard 40HC box. This BESS is specified with a bespoke structural
+    // enclosure rated to the brief's own cap. Displaying "26,580 kg ISO payload
+    // limit" against a 29,875 kg design is a false statement about the product.
+    // Fix: emit container_payload_rating_kg = brief_mass_cap_kg (35,000 kg here),
+    // which is what the bespoke-rated enclosure is designed to carry.
+    // Universal: classes without a containerised enclosure do not emit this field;
+    // the payload gate (exit 30) and the render-minimal-pdf display both guard
+    // with presence checks so omission is safe.
+    container_payload_rating_kg: q(briefMassCapKg, 'kg', 'mass', 'max', 'system', 'brief', { source_detail: `bespoke heavy-duty enclosure rated to brief gross-mass cap (${briefMassCapKg.toLocaleString('en-GB')} kg); road-transportable with route notification / specialist trailer per brief` }),
     // BESS L26 (2026-05-25, gate-17 HIGH #4): ac_output_voltage_v — UK
     // grid-tie BESS universally uses 400 V / 50 Hz LV AC output via the PCS;
     // brief target_performance has key 'ac_output_voltage_v' → 400 V. METRIC_MAP

@@ -1,134 +1,92 @@
-# ForgeOS Investor & Supplier Page Redesign Tracker
+# ForgeOS PDF Engine — Quality Workstream Tracker
+
+_Live single-source-of-truth for the BESS/VF quality push. Updated 2026-05-28._
+_(Previous TRACKER.md content — investor/supplier page redesign, fully shipped — is preserved in git at commit `2971a6bc5`.)_
+_View styled: `~/.claude/scripts/show-md "/Users/tristanfischer/Developer/CentaurOS created 260126 1435/TRACKER.md"`_
 
 ## Goal
-Bring ForgeOS investor and supplier pages up to the richness of the Forge Capital dashboard. Every piece of data in the database must be visible on the page.
+Recover BESS council quality toward ≥8 on a **deterministic, DB-grounded** document, and keep the engine universally sound (verified on VF). Driven by the principle: every fact comes **DB-first → search-on-miss → write-back → retrieve → grow**.
 
-## Phases
+## Council trajectory (BESS)
+| Iter | Score | Note |
+|---|---|---|
+| L54 | **8.49** | peak — partly a lucky draw; real defects not yet audited |
+| L55 | 5.87 | regression — £6,012 BoM contradiction (one bad run) |
+| L56 | 6.70 | recovered after BoM determinism fix |
+| L57 | — | not councilled — surfaced + fixed gate-17 (compliance rows) |
+| L58 | — | not councilled — surfaced + fixed gate-21 (3 mispriced pins) |
+| L59 | **4.50** | DROP — exposed 3 SYSTEMIC defects (now fixed): physics-critic prose leak, broken pricing curve, 2nd rollup gap. Score is variance-dominated, not recovering. |
+| L60 | **4.95** | systemic fixes in; still FAIL (part_realism 2.75). Confirms variance-dominated → triggered the **deterministic-generation workstream** (option 2) below. |
 
-### Phase 1: Investor Insights Panel Upgrade
-**Status:** Completed
-**Files:** src/actions/investors.ts, src/app/(platform)/investors/components/InvestorInsightsPanel.tsx
-**Checklist:**
-- [x] Update InvestorStats type to include new chart data structures
-- [x] Update getInvestorStats() to compute and return:
-  - [x] typeBreakdown: { name: string; count: number }[] — investors by firm_type
-  - [x] topSectors: { name: string; count: number }[] — top 10 sectors by count
-  - [x] stageFocusBreakdown: { name: string; count: number }[] — stage distribution
-  - [x] qualityDistribution: { range: string; count: number }[] — histogram buckets (0-2, 2-4, 4-6, 6-8, 8-10)
-  - [x] hwFit7PlusCount: number — investors with hardware_fit_score >= 7
-  - [x] portfolioCompanyCount: number — total portfolio companies across all investors
-  - [x] avgQuality: number — average data_quality_score
-- [x] Remove 2000 row limit from query to reflect full database
-- [x] Redesign InvestorInsightsPanel to show:
-  - [x] Row 1: 6 stat cards (Total Investors, Contacts, Portfolio Cos, Avg Quality, Deep Profiles, HW Fit 7+)
-  - [x] Row 2: Investors by Type (pie chart), Top Sectors (bar chart)
-  - [x] Row 3: Stage Focus (bar chart), Data Quality Distribution (bar chart)
-- [x] Use recharts for all new charts (PieChart, BarChart)
-- [x] Use semantic color tokens only (no hardcoded colors)
-- [x] Keep existing collapse/expand functionality
-- [x] Keep existing Regional Coverage chart
-- [x] Transpile check passes (TypeScript transpiles successfully)
-- [x] Visual verification: all charts render with real data shapes (will verify in browser)
+**Systemic fixes (the real levers, all committed 2026-05-28):**
+1. ✅ Thermal — dossier no longer renders the in-chain Physics Critic's raw (sometimes-wrong) notes as prose (the phantom "73 kW / can't run / Recalculate" #1 hit). `e10c4f1f5`
+2. ✅ Pricing curve — per-category keyword floors/ceilings so whole classes price sanely (detector £4→£350, IPC £9k→£2.5k). `1a75297e1`
+3. ✅ Second rollup — component-class breakdown reconciles to BoM total by construction. `7caaf6da8`
 
-### Phase 2: Investor Cards Enrichment
-**Status:** Completed
-**Files:** src/app/(platform)/investors/components/InvestorCard.tsx
-**Checklist:**
-- [x] Add thesis snippet (2-line clamp) to each card — uses investment_thesis with fallback to ideal_company_profile
-- [x] Show quality score as visual bar/indicator — horizontal progress bar with color coding (8-10: success, 5-7: warning, 0-4: destructive)
-- [x] Show cheque range when available — £X-£Y formatted badge
-- [x] Show geo focus badges — max 3 with +N overflow
-- [x] Show data freshness indicator — "Xd ago" / "Xw ago" / "Xmo ago" using last_synced or last_verified
-- [x] Keep existing functionality (shortlist heart, compare checkbox, match score badge, website/LinkedIn links, data depth indicator)
-- [x] Use semantic tokens only (no hardcoded colors)
-- [x] Transpile check passes ✓
+## DONE — committed today
+| Commit | Fix |
+|---|---|
+| `dcac146ef` | **BoM determinism** — unmatched macros get a visible module home; cover = Σ headers by construction (regression root cause) |
+| `e75345690` | Blender per-module best-view cameras (11/11 distinct) |
+| `869086e21` + `734e8903e` | VF emitter hardened — 30/30 sub_modules carry real MPNs (gate 23) |
+| `80bc68e96` | VF Blender template rebuilt — 40HC container + 8 trolleys + 12 VF module ids |
+| `7382f5f3c` | Standards lookup de-stubbed — reads the real 4,098-row `pretraining_extracted_standards` |
+| `d92667de1` + `0a9b43700` | Tools-flow diagram — real "Parts Cascade — Farnell/Digi-Key/Mouser" + "Standards Lookup — forge-truth.db" |
+| `8e6d0dd75` | Cover naming — "concept-stage engineering design dossier" |
+| `5188f0b6a` | Pricing INTERIM — curated catalogue prices for cascade-miss industrial parts |
+| `6fd4c1497` | Pricing FULL — 53 industrial-OEM SKUs seeded into forge-truth.db (cascade serves DB-first) |
+| `d015510db` | Gate-17 — map `nameplate_capacity_kwh` + `transient_power` kW/MW brief keys |
+| `990c669e1` | Gate-21 — pin real prices (LEM £1→£113, Schneider £18.50→£45, NXP £5→£1.22) |
 
-### Phase 3: Investor Detail Page Enrichment
-**Status:** Completed
-**Files:** src/app/(platform)/investors/[id]/page.tsx
-**Checklist:**
-- [x] Investment Thesis section: full thesis text in prominent card
-- [x] Key Details: fund size, cheque range, stage, sectors, geography, entity type — structured grid card
-- [x] Ideal Company Profile section: own prominent card
-- [x] Value-Add section: own card with icon
-- [x] Recent Activity section: own card with icon
-- [x] Partner grid: existing PartnerCard component (name, title, bio preview, email, LinkedIn)
-- [x] Portfolio section with company details: existing PortfolioSection
-- [x] Fund Details sidebar: existing card, optimized layout
-- [x] Data Freshness metadata: enhanced sidebar card with visual quality bar, verified date, synced date, source
-- [x] Transpile check passes ✓
-- [x] Design token check passes ✓
-- [x] Removed duplicate Stage Focus and Sectors sections (now in Key Details)
+## IN FLIGHT (background jobs)
+- `bblpsc0v4` — **BESS L59 chain** (clean full-stack) → then 4-seat council
+- `aaf8404ebab8ece39` — **DB audit** agent (truth-grounded)
+- `aa3457d561d4312de` — **Tools audit** agent (real/stub/wired/called)
 
-### Phase 4: Investor Semantic Search Hero
-**Status:** Completed
-**Files:** src/app/(platform)/investors/components/InvestorSearchHero.tsx (NEW), src/app/(platform)/investors/components/InvestorSearchHeroClient.tsx (NEW), src/app/(platform)/investors/page.tsx, src/app/(platform)/investors/components/InvestorBrowser.tsx, src/app/(platform)/investors/components/InvestorPageTabs.tsx
-**Checklist:**
-- [x] Add prominent semantic search hero above tabs
-- [x] "Describe your startup..." textarea with conversational placeholder
-- [x] Example chips (clickable to populate search)
-- [x] File upload drop zone (accepts .txt, .pdf, .docx with MVP text extraction)
-- [x] Search button with loading indicator
-- [x] Semantic search integration via searchInvestors() with embedQuery
-- [x] Results displayed in Browse tab with semantic match scores
-- [x] Filters work on top of semantic results (existing InvestorBrowser filters)
-- [x] Auto-switch to Browse All tab when search is triggered
-- [x] Transpile check passes ✓
-- [x] Design token check passes ✓
-- [x] No hardcoded colors — semantic tokens only
+## AUDIT FINDINGS (databases + tools, 2026-05-28 — code/DB-grounded)
+**Big correction:** the engine runs on REAL tools, not stubs. `register-all.ts` imports `pybamm-real`/`coolprop-real`/`pandapower-real`/`ngspice-real`; L58 fired CoolProp 7.2.0 / pandapower 3.4.0 / ngspice 46 / pybamm 26.4.3. The `*-stub.ts` files are dead/unimported. **CoolProp de-stub was MY error — dropped.**
+- **DB-first + grows (verified):** part PRICE (`distributor_cascade_cache`) + part EXISTENCE (`pretraining_extracted_parts`).
+- **Newly wired (docs stale):** specs/standards/products writeback paths exist; standards read live (de-stubbed today); specs growth unexercised (0 web rows).
+- **Real gaps:** (a) **class grounding is FROZEN baked TS** (`class-reference-graphs/*.ts`) not live-DB — the per-class "what a BESS should contain"; (b) **suppliers never DB-first** (`pretraining_extracted_suppliers` no reader; Nightshift 28k reverse-index unwired); (c) **3 validated tools stranded** (protection_coordination/arc_flash/g99 — no wrapper, not wired); (d) ~80 orphaned Python tools; (e) CLAUDE.md/DATABASES.md stale on writeback.
 
-### Phase 5: Supplier Detail Page (NEW)
-**Status:** Completed
-**Files:** src/app/(platform)/suppliers/[id]/page.tsx (new), src/app/(platform)/suppliers/search/SupplierSearchClient.tsx (updated)
-**Checklist:**
-- [x] Create supplier detail route
-- [x] Show: name, description, category, subcategory, all attributes
-- [x] Show: certifications, materials, key equipment, industries
-- [x] Show: location, website, contact info
-- [x] Show: process capabilities if available
-- [x] Transpile check passes ✓
-- [x] Design token check passes ✓
-- [x] Link supplier cards to detail pages with hover effect
-- [x] Use semantic tokens only (no hardcoded colors)
-- [x] Exclude private_synthesis (M&A intelligence) per privacy rules
-- [x] Handle sparse attributes gracefully with conditionals
+## DETERMINISTIC-GENERATION WORKSTREAM (option 2 — current focus)
+Plan: `PLAN-deterministic-generation.md` (v2, post-council). Goal reframed by council: **deterministic AND correct** (not just deterministic — else "a reproducible lie").
+Root cause of the score swing (code-verified, NOT memory): the LLM Generator was pruned 2026-05-23; variance now comes from **3 inadequately-guarded post-emission LLM mutation layers** + 7 single-source-of-truth number violations + pricing that never reads the DB (127/155 lines curve-estimated, £1/£10k outliers).
+Council (Gemini 3.1 Pro / Grok 4.3 / GLM-5.1 / Kimi K2.6): direction sound, v1 had 6 two-seat holes — all folded into v2.
 
-### Phase 6: Supplier Page Enrichment
-**Status:** Completed
-**Files:** src/app/(platform)/suppliers/search/SupplierSearchClient.tsx, src/actions/suppliers.ts, src/app/(platform)/suppliers/search/page.tsx
-**Checklist:**
-- [x] Add stats overview (total suppliers, by category, verified count) — collapsible panel with 5 stat cards
-- [x] Add pagination UI ("Load more" button at bottom) — shows remaining count
-- [x] Add advanced filters: country (text), certifications (checkboxes: ISO 9001, AS9100, NADCAP, ISO 13485) — collapsible section
-- [x] Add sorting options: relevance, name, rating — dropdown in advanced filters
-- [x] Enhance result cards: public_synthesis snippet, industries/certifications badges, employee count, verified badge
-- [x] Transpile check passes ✓
-- [x] Design token check passes ✓
-- [x] Used semantic tokens only (no hardcoded colors)
+| Phase | What | Status |
+|---|---|---|
+| **A** | Lock design state vs LLM part/spec mutation (close the 3 leaks) | **DONE + council-verified (local, uncommitted)**: physics-repair whitelist; reviewer A2/A3 + add_sub_module guards (normalised); emitter-identity-lock.ts absorption layer (snapshot→re-assert, dual-key, in-loop in Phase-2). 2 council rounds; 7 blockers fixed; type-clean. Residual: simultaneous word.id+character_id rename (low-prob, unreachable by 2/3 stages, detected by words_missing → E1 invariant). A5 numeric-claim guard deferred to after B1. |
+| **B** | Single-source + correctness of every number (thermal split, mass-reconcile gate, payload hard-gate, std merge) | pending |
+| **C** | DB-pin 100% of BoM correctly (emitter fail-closed, curated prices w/ provenance, price-sanity bounds, det. classifier) | pending |
+| **D** | Deterministic repair path | **NOT NEEDED (verify-first outcome)** — iter-61/62 physics-repair SKIPPED (plausibility 10/10, 0 HIGH findings); the emitter sizes/specs clean by construction, so neutering the LLM repair (A1) caused no regression + no repair vacuum. |
+| **E** | Prove convergence (det. test on state-hash, gate audit, invariants, end-to-end + council) | in progress — running iters |
 
-### Phase 7: Final Integration & Deploy
-**Status:** Completed
-**Checklist:**
-- [x] Full transpile check (all phases together) — 15/15 files pass
-- [x] Design token check — all hardcoded colors fixed (SupplierSearchClient, suppliers/[id]/page)
-- [x] File existence check — all 3 new critical files verified
-- [x] Git status review — 11 modified files, 2 new component files ready
-- [x] Ready for commit and Vercel deployment
+### Run progress (deterministic core)
+| Iter | Result | Lesson |
+|---|---|---|
+| 61 | exit 23 — 2 empty reviewer sub_modules (watchdog_timer, emergency_stop_chain) | Phase A guards WORKING live (REJECT [identity-locked A2/A3] all over the log); physics-repair skipped @ plausibility 10/10. |
+| 62 | exit 23 — **4 DIFFERENT** empty reviewer sub_modules (coolant_heater, coolant_return_manifold, gas_vent_interlock, cell_voltage_wire_upgrade) | Reviewer-added structure is NON-DETERMINISTIC → whack-a-mole + determinism-test killer. Decision: **block reviewer add_sub_module entirely** (structure = emitter-owned). |
+| 63 | **exit 0 — clean PDF, all 13+ gates PASS** | gate 23 cleared (structure-lock worked). Full council **7.45 mean** (Grok 7 / GLM 6 / DeepSeek 9 / GPT-5.5 7.8). **part_realism 2.75 → 8.6** (the binding axis, fixed). Stable + earned (not a lucky draw). physics-repair skipped @ 10/10. |
+| 64 | exit 0 | determinism 2nd run. **determinism-check(63,64): FAIL — identity ~99% byte-identical (1/141 word), but 40 PRICE diffs.** Variance MOVED to pricing → root cause = LLM cost-repair.tsx (Grok). |
 
-## Score Card
-| Phase | Status | Transpile | Design Tokens | Files | Ready |
-|-------|--------|-----------|---------------|-------|-------|
-| 1     | ✓ Completed | ✓ Pass      | ✓ Pass         | 2     | ✓     |
-| 2     | ✓ Completed | ✓ Pass      | ✓ Pass         | 1     | ✓     |
-| 3     | ✓ Completed | ✓ Pass      | ✓ Pass         | 1     | ✓     |
-| 4     | ✓ Completed | ✓ Pass      | ✓ Pass         | 5     | ✓     |
-| 5     | ✓ Completed | ✓ Pass      | ✓ Pass         | 2     | ✓     |
-| 6     | ✓ Completed | ✓ Pass      | ✓ Pass         | 3     | ✓     |
-| 7     | ✓ Completed | ✓ Pass (15/15) | ✓ Pass (fixed 6 tokens) | 11 M + 2 new | ✓ READY FOR DEPLOY |
+### Council 7.45 → finish-fixes for stable ≥8 (all universal, "close to brief" per Tristan)
+1. ✅ **Price determinism**: disabled LLM cost-repair by default (chain `CHAIN_ENABLE_COST_REPAIR`); deterministic cache→curve→sanity-bounds is authoritative (also lifts BoM toward the brief's premium band).
+2. ✅ **Thermal arithmetic**: PyBaMM writes cell_heat_generation_kw; system_thermal_dissipation_kw recomputed = cell + inverter (invariant). (bess.ts:150)
+3. ✅ **Mass single-source**: dropped 32,175 aggregator figure from BESS mass cascade → in_container_mass_kg (29,875).
+4. ✅ **B4 payload**: container_payload_rating_kg = brief cap 35,000 kg (bespoke heavy-duty enclosure + brief's specialist-trailer note); new gate 30 asserts mass ≤ rating. Close-to-brief (brief allows 35,000 kg gross).
+5. ✅ **Cost reconciliation**: universal cover card "ex-works vs brief target".
 
-## Notes
-- Phase 1 focuses on enriching the investor stats panel with more aggregated metrics
-- All new data must be computed server-side in getInvestorStats()
-- Design system requires semantic tokens only — no hardcoded colors
-- No Sheet/Side panels — use Dialog where needed
-- Charts use recharts (already available in project)
+**NEXT:** iter-65 (≥8 council check) + iter-66 (determinism re-test, expect prices now byte-stable). 1 residual identity nit (ems_fibre_patch_panel MPN) to confirm gone.
+
+**Key sequencing rule:** A1 neuters physics-repair's part-swap (which took L60 plausibility 5→10), so A1 must land WITH B/C/D or the score regresses. No chain run until the deterministic core (A+B+C+D) is coherent.
+**Open product fork for Tristan (non-blocking):** B4 payload breach (~30 t system vs ~26.6 t ISO-668 payload). Default = bespoke heavy-duty enclosure + on-site/split transport note, keep 2.5 MWh. Redirect before I reach B4 to instead (a) cut capacity to fit standard ISO, or (b) make multi-container the headline.
+
+## DEFERRED (post-workstream)
+- Class grounding → DB-live; wire suppliers DB-first; wire 3 stranded engineering tools; fix stale docs; thin-brief test (#219); template-mismatch guard (#221).
+
+## KNOWN STATE / GOTCHAS (verified today)
+- Per-part **price** is served by `distributor_cascade_cache`, NOT `pretraining_extracted_parts` (latter = existence only, empty price).
+- `pretraining_extracted_parts` grows live (cascade write-back). `standards` now read live (de-stubbed today). `specs` / `suppliers` / `products` still **baked TS snapshots, no write-back** = the "next major architectural move".
+- VF was the outlier on module-id mismatch; BESS/heatpump/drone use canonical ids matching their templates.
+- The chain's bash wrapper can report exit 0 while the chain failed a gate — always check the log's `Exit code:` + the gate audits.

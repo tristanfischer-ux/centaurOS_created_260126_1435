@@ -54,8 +54,12 @@ import {
   componentClassFloorGbp,
   keywordFloorGbp,
   keywordCeilingGbp,
+  clampToSanityBand,
   type ComponentClass,
 } from '../src/lib/pdf-engine-v2/component-classes'
+import {
+  lookupCached,
+} from '../src/lib/pdf-engine-v2/lib/distributors/db-only-cascade'
 
 const CONCURRENCY = 8
 const FORGE_TRUTH_DB = join(homedir(), '.forge-truth/forge-truth.db')
@@ -138,8 +142,11 @@ interface PriceEstimate {
   curve_multiplier: number
   reference_unit_cost_gbp: number
   annual_volume: number
-  classification_source: 'corpus' | 'flash_lite' | 'fallback' | 'curated'
-  estimate_source: 'curve' | 'flash_lite_unknown_class'
+  classification_source: 'corpus' | 'flash_lite' | 'fallback' | 'curated' | 'db_cache' | 'rule_based'
+  estimate_source: 'curve' | 'flash_lite_unknown_class' | 'db_cache'
+  // C5 sanity clamp flag — set when the final price was clamped by CLASS_PRICE_SANITY_BOUNDS
+  price_sanity_clamped?: boolean
+  price_sanity_note?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -231,6 +238,162 @@ class CorpusClassifier {
   close() {
     this.db?.close()
   }
+}
+
+// ---------------------------------------------------------------------------
+// C4 — DETERMINISTIC RULE-BASED CLASSIFIER (2026-05-28)
+//
+// Replaces the Flash-Lite classifier for parts that the corpus does not
+// recognise. Pure keyword + MPN-prefix matching — zero LLM calls, fully
+// deterministic across runs.
+//
+// Priority: MPN-prefix rules first (manufacturer-namespaced patterns that
+// unambiguously identify the part type), then name-keyword rules (ordered
+// most-specific → most-generic; first match wins).
+//
+// Returns null for parts that cannot be classified deterministically —
+// those STILL fall back to Flash-Lite (the existing estimatePriceForUnknown
+// path) so the Flash-Lite call is now rare (truly unrecognisable parts only).
+//
+// C4 KEY INVARIANT: smoke detectors, aspirating detection heads, chillers,
+// and HVAC units MUST NEVER be classified as `oem_subsystem`. The £10k BESS
+// oem_subsystem override makes that classification a £10k price error.
+// ---------------------------------------------------------------------------
+
+type RuleEntry = { pattern: RegExp; cls: ComponentClass }
+
+// ── MPN-prefix rules ─────────────────────────────────────────────────────────
+// These match `{manufacturer} {mpn}` concatenated, so they can use
+// manufacturer-namespaced patterns. Evaluated before name rules.
+const MPN_PREFIX_RULES: RuleEntry[] = [
+  // VESDA / aspirating smoke detectors → oem_smoke_detection
+  { pattern: /\b(vlp|vlf|vls|vls\d|vlp\d|vlt)\b/i,                          cls: 'oem_smoke_detection' },
+  // Apollo addressable point detectors → oem_smoke_detection
+  { pattern: /\bapollo\b.*\b(55000|55\d{3}|65000|65\d{3}|58000|58\d{3})\b/i, cls: 'oem_smoke_detection' },
+  // Hochiki addressable heads → oem_smoke_detection
+  { pattern: /\bhochiki\b.*\b(chq-|ce-\d|dcd-|ybo-)/i,                       cls: 'oem_smoke_detection' },
+  // Pfannenberg EB XT / CC series → oem_hvac_chiller
+  { pattern: /\bpfannenberg\b.*\b(eb.?xt|cc\b)/i,                            cls: 'oem_hvac_chiller' },
+  // Stulz precision AC → oem_hvac_chiller
+  { pattern: /\bstulz\b/i,                                                    cls: 'oem_hvac_chiller' },
+  // Schneider / Airedale / Emerson Liebert → oem_hvac_chiller
+  { pattern: /\b(airedale|liebert)\b/i,                                       cls: 'oem_hvac_chiller' },
+  // Beckhoff CX / CP series → electronic_pcb (industrial PC / panel)
+  { pattern: /\bbeckhoff\b.*\b(cx\d|cp\d|c\d{4})/i,                          cls: 'electronic_pcb' },
+  // HMS Anybus → electronic_pcb (fieldbus gateway)
+  { pattern: /\b(anybus|hms)\b.*\bab7\d/i,                                    cls: 'electronic_pcb' },
+  // Grundfos pumps → mechanical_assembly
+  { pattern: /\bgrundfos\b/i,                                                  cls: 'mechanical_assembly' },
+  // KSB / Wilo / Lowara pumps → mechanical_assembly
+  { pattern: /\b(ksb|wilo|lowara)\b/i,                                        cls: 'mechanical_assembly' },
+  // Siemens S7 PLC → electronic_pcb
+  { pattern: /\b6es7\b/i,                                                      cls: 'electronic_pcb' },
+  // Siemens SIMATIC HMI → electronic_pcb
+  { pattern: /\b6av2\b/i,                                                      cls: 'electronic_pcb' },
+  // Schaltbau contactor → safety_consumable
+  { pattern: /\bschaltbau\b.*\b(c310|c320)\b/i,                               cls: 'safety_consumable' },
+  // LEM current transducer → sensor
+  { pattern: /\b(lem)\b.*\b(hass|hat|lf)\b/i,                                 cls: 'sensor' },
+  // WAGO terminal / connector → electronic_connector
+  { pattern: /\b(221-2\d|2273-)/i,                                             cls: 'electronic_connector' },
+  // Eaton Bussmann HV fuse → safety_consumable
+  { pattern: /\b170m\d/i,                                                       cls: 'safety_consumable' },
+]
+
+// ── Name-keyword rules ────────────────────────────────────────────────────────
+// Ordered most-specific first. A match on ANY part of the part name / module
+// sub-module string wins. All patterns are case-insensitive.
+const NAME_KEYWORD_RULES: RuleEntry[] = [
+  // ── Fire / smoke / gas detection (NEVER oem_subsystem) ──────────────────
+  { pattern: /\b(aspirating|aspiration|asd)\b.*\b(smoke|detect|sensor)\b|\b(vesda|titanus)\b/i, cls: 'oem_smoke_detection' },
+  { pattern: /\b(smoke|heat|flame|optical)\b.*\bdetector\b|\bdetector\b.*\b(smoke|heat|flame)\b/i, cls: 'oem_smoke_detection' },
+  { pattern: /\b(fire|gas|methane|hydrogen|co|oxygen|lel)\b.*\b(detector|detection|panel|alarm|suppression)\b/i, cls: 'oem_fire_safety' },
+  { pattern: /\b(fire.panel|alarm.panel|suppression.system|gas.suppression|co2.suppression)\b/i, cls: 'oem_fire_safety' },
+  // ── HVAC / chiller (NEVER oem_subsystem) ────────────────────────────────
+  { pattern: /\b(liquid.chiller|chiller.unit|cooling.chiller|industrial.chiller)\b|\b(eb.xt|cc.series)\b.*\b(pfannenberg|stulz)\b/i, cls: 'oem_hvac_chiller' },
+  { pattern: /\b(air.conditioning|air.handling|hvac|rooftop.ac|container.ac|cabinet.ac|split.ac)\b/i, cls: 'oem_hvac_chiller' },
+  // ── Batteries / cells ───────────────────────────────────────────────────
+  { pattern: /\b(li.?ion|lfp|nmc|lithium|prismatic.cell|pouch.cell|cylindrical.cell|18650|21700|280ah|100ah|304ah)\b/i, cls: 'battery_cell' },
+  { pattern: /\b(lead.acid|agm|vrla|gel.battery|supercap|ultracap)\b/i, cls: 'battery_cell' },
+  // ── Power modules / converters ───────────────────────────────────────────
+  { pattern: /\b(igbt|sic.module|mosfet.module|half.bridge|full.bridge|power.module|inverter.module|pcs.module)\b/i, cls: 'electronic_power_module' },
+  // ── Sensors — specific before generic ───────────────────────────────────
+  { pattern: /\b(ntc|ptc|thermistor|temperature.sensor|temp.sensor|rtd|thermocouple|pt100|pt1000)\b/i, cls: 'sensor' },
+  { pattern: /\b(hall.effect|current.sensor|current.transducer|voltage.sensor|cell.voltage.monitor|bms.ic)\b/i, cls: 'sensor' },
+  { pattern: /\b(pressure.sensor|pressure.transducer|flow.sensor|flow.meter|level.sensor|proximity.sensor)\b/i, cls: 'sensor' },
+  { pattern: /\b(accelerometer|gyroscope|imu|encoder|resolver|tachometer|speed.sensor|position.sensor)\b/i, cls: 'sensor' },
+  { pattern: /\b(gas.sensor|oxygen.sensor|co2.sensor|humidity.sensor|moisture.sensor)\b/i, cls: 'sensor' },
+  // ── Control / compute / comms ────────────────────────────────────────────
+  { pattern: /\b(plc\b|programm\w+\slogic|safety.relay|safety.controller|pnoz)\b/i, cls: 'electronic_pcb' },
+  { pattern: /\b(industrial.pc|panel.pc|embedded.pc|edge.pc|ipc|hmi|touchscreen.panel)\b/i, cls: 'electronic_pcb' },
+  { pattern: /\b(gateway|protocol.converter|fieldbus|modbus|profinet|ethercat|bacnet)\b.*\b(module|card|adapter)\b/i, cls: 'electronic_pcb' },
+  { pattern: /\b(bms.master|bms.board|battery.management|ems.pc|scada.pc|energy.management.system)\b/i, cls: 'oem_subsystem' },
+  // ── Motors / actuators ───────────────────────────────────────────────────
+  { pattern: /\b(bldc|brushless|stepper.motor|servo.motor|servo.drive|linear.actuator|solenoid)\b/i, cls: 'motor_actuator' },
+  // ── Pumps — industrial (high-value) before generic ───────────────────────
+  { pattern: /\b(centrifugal.pump|end.suction.pump|multistage.pump|peristaltic.pump|process.pump|booster.pump)\b/i, cls: 'mechanical_assembly' },
+  { pattern: /\b(circulator.pump|dosing.pump|glycol.pump|coolant.pump|coolant.circulation|coolant.loop)\b/i, cls: 'mechanical_assembly' },
+  // ── Transformers / magnetics ──────────────────────────────────────────────
+  { pattern: /\b(step.up.transformer|step.down.transformer|isolation.transformer|distribution.transformer|dry.type.transformer|cast.resin.transformer)\b/i, cls: 'magnetic' },
+  { pattern: /\b(emi.filter|line.filter|common.mode.choke|differential.mode.choke|dc.choke|ac.choke|reactor)\b/i, cls: 'magnetic' },
+  // ── Thermal management ────────────────────────────────────────────────────
+  { pattern: /\b(cold.plate|liquid.cooling.plate|heatsink|heat.sink|heat.exchanger|plate.heat.exchanger|bphe|thermal.interface|tim.pad|tim.sheet)\b/i, cls: 'thermal' },
+  { pattern: /\b(cooling.fan|condenser.fan|evaporator.fan|axial.fan|blower)\b/i, cls: 'thermal' },
+  { pattern: /\b(pipe.insulation|armaflex|kingspan|pir.panel|insulation.panel)\b/i, cls: 'thermal' },
+  // ── Fluid path ───────────────────────────────────────────────────────────
+  { pattern: /\b(pipe\b|copper.pipe|stainless.pipe|manifold|valve\b|service.valve|expansion.valve|isolation.valve|relief.valve|check.valve|ball.valve|gate.valve)\b/i, cls: 'fluid_path' },
+  { pattern: /\b(fitting|compression.fitting|push.fit|push.connect|tee|elbow|nipple|adaptor|coupl)\b/i, cls: 'fluid_path' },
+  { pattern: /\b(hose|flexible.hose|coolant.hose|glycol.hose|expansion.vessel|accumulator)\b/i, cls: 'fluid_path' },
+  // ── Safety consumables ────────────────────────────────────────────────────
+  { pattern: /\b(fuse\b|fuse.holder|hrc.fuse|current.limiting.fuse|semiconductor.fuse)\b/i, cls: 'safety_consumable' },
+  { pattern: /\b(mcb\b|mccb|rcd\b|rcbo|circuit.breaker|miniature.circuit.breaker|residual.current)\b/i, cls: 'safety_consumable' },
+  { pattern: /\b(contactor\b|main.contactor|pre.charge.contactor|dc.contactor|hv.contactor|relay\b)\b/i, cls: 'safety_consumable' },
+  { pattern: /\b(e.stop|emergency.stop|estop|isolator|disconnect|interlock|safety.switch)\b/i, cls: 'safety_consumable' },
+  // ── Electronic connectors ─────────────────────────────────────────────────
+  { pattern: /\b(busbar.strip|cell.busbar|inter.cell|busbar\b|terminal.block|din.terminal|cable.lug|crimped.terminal)\b/i, cls: 'electronic_connector' },
+  { pattern: /\b(connector\b|plug\b|socket\b|header\b|molex|jst|rj45|m12.connector|circular.connector)\b/i, cls: 'electronic_connector' },
+  // ── Electronic passives ───────────────────────────────────────────────────
+  { pattern: /\b(capacitor|mlcc|electrolytic.cap|dc.link.cap|film.cap|varistor|mov|tvs.diode|zener)\b/i, cls: 'electronic_passive' },
+  { pattern: /\b(resistor|shunt.resistor|current.sense.resistor|inducto\w+\b)\b/i, cls: 'electronic_passive' },
+  // ── Structural metal / polymer ─────────────────────────────────────────────
+  { pattern: /\b(insulation.pad|cell.pad|thermal.pad.cell|spacer.pad)\b/i, cls: 'structural_polymer' },
+  { pattern: /\b(bracket|chassis|frame|weldment|mounting.plate|steel.enclosure|cable.tray|cable.duct)\b/i, cls: 'structural_metal' },
+  { pattern: /\b(gasket|o.ring|seal\b|grommet|polymer.housing|moulded)\b/i, cls: 'structural_polymer' },
+  // ── Cable assemblies ──────────────────────────────────────────────────────
+  { pattern: /\b(cable.assembly|harness|ribbon.cable|coax|data.cable|power.cable|ground.cable|earth.cable|earth.strap)\b/i, cls: 'electronic_cable' },
+  // ── Fasteners ─────────────────────────────────────────────────────────────
+  { pattern: /\b(bolt\b|nut\b|washer\b|screw\b|rivet|spring.washer|lock.washer|anti.vibration)\b/i, cls: 'mechanical_fastener' },
+  // ── Optical ───────────────────────────────────────────────────────────────
+  { pattern: /\b(led\b|photodiode|display|lcd|oled|lens|indicator.light|status.light)\b/i, cls: 'optical' },
+]
+
+/**
+ * C4 — deterministic rule-based classifier. Returns the component class or
+ * null when the part cannot be classified deterministically. No LLM calls.
+ *
+ * Evaluation order:
+ *   1. MPN-prefix rules (match against `{manufacturer} {mpn}` string).
+ *   2. Name-keyword rules (match against the full part name).
+ *
+ * Invariant: smoke/detector/aspirating/chiller/hvac keywords NEVER return
+ * `oem_subsystem` — they route to `oem_smoke_detection` or `oem_hvac_chiller`.
+ */
+function classifyByRules(ctx: PartContext): ComponentClass | null {
+  // 1. MPN-prefix rules — most reliable signal
+  if (ctx.manufacturer || ctx.part_number) {
+    const mpnHay = [String(ctx.manufacturer ?? ''), String(ctx.part_number ?? '')].join(' ').trim()
+    for (const r of MPN_PREFIX_RULES) {
+      if (r.pattern.test(mpnHay)) return r.cls
+    }
+  }
+  // 2. Name-keyword rules — broad but ordered specific→generic
+  const nameHay = String(ctx.word_name ?? '').trim()
+  if (nameHay) {
+    for (const r of NAME_KEYWORD_RULES) {
+      if (r.pattern.test(nameHay)) return r.cls
+    }
+  }
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -589,7 +752,7 @@ function curveEstimateFor(
   annualVolume: number,
   productClassSlug?: string | null,
   keywordCtx?: { name?: string | null; manufacturer?: string | null; part_number?: string | null },
-): { central: number; low: number; high: number; multiplier: number; reference: number; floored?: boolean; keyword_floor_note?: string; keyword_ceiling_note?: string } {
+): { central: number; low: number; high: number; multiplier: number; reference: number; floored?: boolean; keyword_floor_note?: string; keyword_ceiling_note?: string; sanity_clamped?: boolean; sanity_note?: string } {
   const c = COMPONENT_CURVES[cls]
   // Engine B (2026-05-18 BESS investigation): the reference unit cost can be
   // overridden per (product_class, component_class) so industrial-heavy hosts
@@ -644,6 +807,18 @@ function curveEstimateFor(
     central = Math.max(floor, kwCeil.ceiling_gbp)
     ceiled = true
   }
+  // C5 — Universal per-class sanity bounds backstop (2026-05-28, BLOCKER per
+  // council GLM/Kimi). Runs AFTER keyword floor + ceiling so it catches any
+  // residual implausible price regardless of which keyword rule missed it.
+  // A price outside [min_gbp, max_gbp] for its class is clamped and flagged.
+  const sanity = clampToSanityBand(central, cls)
+  let sanity_clamped = false
+  let sanity_note: string | undefined
+  if (sanity.clamped) {
+    central = sanity.price_gbp
+    sanity_clamped = true
+    sanity_note = `C5 sanity clamp (${sanity.breach}): class=${cls}, raw=£${round2(ceiled ? kwCeil!.ceiling_gbp : floored ? floor : raw)}, clamped=£${round2(central)}`
+  }
   return {
     central: round2(central),
     low: round2(central * 0.7),
@@ -653,6 +828,8 @@ function curveEstimateFor(
     floored,
     keyword_floor_note: kw && floored && (kw.floor_gbp >= classFloor) ? kw.note : undefined,
     keyword_ceiling_note: ceiled ? kwCeil!.note : undefined,
+    sanity_clamped,
+    sanity_note,
   }
 }
 
@@ -811,7 +988,7 @@ async function main() {
   // -------------------------------------------------------------------------
   const corpus = new CorpusClassifier()
   const classByWordId = new Map<string, ComponentClass | 'unknown'>()
-  const classSource = new Map<string, 'corpus' | 'flash_lite' | 'fallback'>()
+  const classSource = new Map<string, 'corpus' | 'flash_lite' | 'fallback' | 'db_cache' | 'rule_based'>()
   const needsClassify: PartContext[] = []
 
   for (const ctx of targets) {
@@ -824,16 +1001,39 @@ async function main() {
     }
   }
   console.log(
-    `[estimate] corpus-classified ${classByWordId.size}/${targets.length}; ${needsClassify.length} need Flash-Lite`,
+    `[estimate] corpus-classified ${classByWordId.size}/${targets.length}; ${needsClassify.length} need rule-based / Flash-Lite`,
+  )
+
+  // -------------------------------------------------------------------------
+  // Step 1b — C4 deterministic rule-based classifier for corpus misses.
+  // Zero LLM calls, fully deterministic. Runs before Flash-Lite so the LLM
+  // only sees the residual parts that cannot be classified by rules.
+  // Invariant: smoke/detector/chiller/hvac keywords NEVER return oem_subsystem.
+  // -------------------------------------------------------------------------
+  const stillNeedsFlashLite: PartContext[] = []
+  let ruleClassifiedCount = 0
+  for (const ctx of needsClassify) {
+    const ruled = classifyByRules(ctx)
+    if (ruled) {
+      classByWordId.set(ctx.word_id, ruled)
+      classSource.set(ctx.word_id, 'rule_based')
+      ruleClassifiedCount += 1
+    } else {
+      stillNeedsFlashLite.push(ctx)
+    }
+  }
+  console.log(
+    `[estimate] rule-based classified ${ruleClassifiedCount} parts; ${stillNeedsFlashLite.length} still need Flash-Lite`,
   )
 
   // -------------------------------------------------------------------------
   // Step 2 — on-the-fly classify remaining via Flash-Lite (batches of 20).
+  // Flash-Lite now only handles the genuinely unrecognisable residual.
   // -------------------------------------------------------------------------
   const BATCH = 20
   const batches: Array<Array<{ ctx: PartContext }>> = []
-  for (let i = 0; i < needsClassify.length; i += BATCH) {
-    batches.push(needsClassify.slice(i, i + BATCH).map((ctx) => ({ ctx })))
+  for (let i = 0; i < stillNeedsFlashLite.length; i += BATCH) {
+    batches.push(stillNeedsFlashLite.slice(i, i + BATCH).map((ctx) => ({ ctx })))
   }
   if (batches.length > 0) {
     let done = 0
@@ -876,8 +1076,70 @@ async function main() {
   const results: Array<{ ctx: PartContext; estimate: PriceEstimate | null }> = []
   const unknowns: PartContext[] = []
 
+  // C3 — DB cache lookup counter for reporting
+  let dbCacheHits = 0
   let finishedCommodityCount = 0
   for (const ctx of targets) {
+    // ── C3 PRICING GATEWAY: cache-first (2026-05-28, BLOCKER) ───────────────
+    // Before any estimate path, check the local SQLite cache in forge-truth.db
+    // (table distributor_cascade_cache). lookupCached reads ONLY the local DB —
+    // no live API calls (CHAIN-AS-DB-CONSUMER PRINCIPLE). The cache is populated
+    // by scripts/ingest/* jobs on a schedule independent of chain runs.
+    //
+    // Fallback order (canonical per PLAN-deterministic-generation.md C3):
+    //   1. emitter list_price_gbp pin  ← already handled in pre-step above
+    //   2. DB cache hit (this block)   ← C3
+    //   3. Curated industrial table    ← existing INTERIM table
+    //   4. Curve estimate (Engine B)   ← fallback
+    //
+    // Only attempt the cache lookup when the part has a real MPN (≥4 chars,
+    // not a placeholder). The manufacturer is passed as a fuzzy hint; a null
+    // manufacturer still queries on MPN alone.
+    const mpn = ctx.part_number ? String(ctx.part_number).trim() : ''
+    const hasMpn = mpn.length >= 4 && !/^(tbd|tba|n\/a|custom|generic|placeholder)/i.test(mpn)
+    if (hasMpn) {
+      const cached = lookupCached(ctx.manufacturer, mpn)
+      if (cached.found && cached.result && cached.source === 'cache_hit') {
+        // Extract a GBP price from the DistributorResult. priceGBP is an array
+        // of {quantity, unitPrice} break-points; use the lowest-quantity break
+        // (quantity = 1 or the smallest available) as the representative price.
+        const priceBreaks = cached.result.priceGBP ?? []
+        let unitPriceGbp: number | null = null
+        if (priceBreaks.length > 0) {
+          // Sort ascending by qty, pick first non-zero price.
+          const sorted = [...priceBreaks].sort((a, b) => a.qty - b.qty)
+          for (const pb of sorted) {
+            if (typeof pb.unitPriceGbp === 'number' && pb.unitPriceGbp > 0) {
+              unitPriceGbp = pb.unitPriceGbp
+              break
+            }
+          }
+        }
+        if (unitPriceGbp && unitPriceGbp > 0) {
+          dbCacheHits += 1
+          const cls = classByWordId.get(ctx.word_id) ?? 'unknown'
+          results.push({
+            ctx,
+            estimate: {
+              price_estimate_gbp: round2(unitPriceGbp),
+              estimate_low_gbp: round2(unitPriceGbp * 0.85),
+              estimate_high_gbp: round2(unitPriceGbp * 1.20),
+              reasoning: `C3 DB cache hit (distributor_cascade_cache, age ${Math.round(cached.ageHours ?? 0)}h): ${cached.result.source ?? 'unknown'} price £${unitPriceGbp} for ${ctx.manufacturer ?? '?'} ${mpn}`,
+              component_class: cls,
+              curve_multiplier: 1.0,
+              reference_unit_cost_gbp: unitPriceGbp,
+              annual_volume: annualVolume,
+              classification_source: 'db_cache',
+              estimate_source: 'db_cache',
+            },
+          })
+          continue
+        }
+      }
+      // library_only source: part is real but no pricing data — fall through
+      // to curated/curve for the price, but log the confirmed-real status.
+    }
+
     // 2026-05-28 INTERIM: curated real catalogue price for cascade-miss
     // industrial OEM parts (Beckhoff/Anybus/Phoenix/Grundfos/…), consulted
     // BEFORE the Engine-B curve so they stop rendering at the ~£10k / ~£35
@@ -930,18 +1192,22 @@ async function main() {
         estimate_low_gbp: finalLow,
         estimate_high_gbp: finalHigh,
         reasoning: finished
-          ? `Engine B finished-commodity: class=${cls}, manufacturer=${ctx.manufacturer}, SKU=${ctx.part_number}, reference £${c.reference} (no production-scale discount applied — catalogue item)`
-          : c.keyword_ceiling_note
-            ? `Engine B curve + category keyword ceiling: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} × ${c.multiplier.toFixed(3)} capped DOWN to £${c.central} (${c.keyword_ceiling_note})`
-            : c.keyword_floor_note
-              ? `Engine B curve + category keyword floor: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} × ${c.multiplier.toFixed(3)} clamped UP to £${c.central} (${c.keyword_floor_note})`
-              : `Engine B curve: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference}, multiplier ${c.multiplier.toFixed(3)} → £${c.central}`,
+          ? `Engine B finished-commodity: class=${cls}, manufacturer=${ctx.manufacturer}, SKU=${ctx.part_number}, reference £${c.reference} (no production-scale discount applied — catalogue item)${c.sanity_note ? `; ${c.sanity_note}` : ''}`
+          : c.sanity_note
+            ? `Engine B curve${c.keyword_ceiling_note ? ' + keyword ceiling' : c.keyword_floor_note ? ' + keyword floor' : ''}: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} → £${c.central}; ${c.sanity_note}`
+            : c.keyword_ceiling_note
+              ? `Engine B curve + category keyword ceiling: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} × ${c.multiplier.toFixed(3)} capped DOWN to £${c.central} (${c.keyword_ceiling_note})`
+              : c.keyword_floor_note
+                ? `Engine B curve + category keyword floor: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference} × ${c.multiplier.toFixed(3)} clamped UP to £${c.central} (${c.keyword_floor_note})`
+                : `Engine B curve: class=${cls}, annual_volume=${annualVolume.toLocaleString()}, reference £${c.reference}, multiplier ${c.multiplier.toFixed(3)} → £${c.central}`,
         component_class: cls,
         curve_multiplier: finalMultiplier,
         reference_unit_cost_gbp: c.reference,
         annual_volume: annualVolume,
         classification_source: classSource.get(ctx.word_id)!,
         estimate_source: 'curve',
+        price_sanity_clamped: c.sanity_clamped || undefined,
+        price_sanity_note: c.sanity_note,
       },
     })
   }
@@ -1029,8 +1295,8 @@ async function main() {
   // -------------------------------------------------------------------------
   let updated = 0
   let synthesised = 0
-  const bySource = { corpus: 0, flash_lite: 0, fallback: 0, curated: 0 }
-  const byEstimate = { curve: 0, flash_lite_unknown_class: 0 }
+  const bySource = { corpus: 0, flash_lite: 0, fallback: 0, curated: 0, db_cache: 0, rule_based: 0 }
+  const byEstimate = { curve: 0, flash_lite_unknown_class: 0, db_cache: 0 }
   const classCounts: Record<string, number> = {}
 
   for (const { ctx, estimate } of results) {
@@ -1048,9 +1314,11 @@ async function main() {
       price_estimate_low_gbp: estimate.estimate_low_gbp,
       price_estimate_high_gbp: estimate.estimate_high_gbp,
       price_estimate_reasoning: estimate.reasoning,
-      price_estimate_model: estimate.estimate_source === 'curve'
-        ? 'engine-b-curve'
-        : 'google/gemini-3.1-flash-lite-preview',
+      price_estimate_model: estimate.estimate_source === 'db_cache'
+        ? 'distributor_cascade_cache'
+        : estimate.estimate_source === 'curve'
+          ? 'engine-b-curve'
+          : 'google/gemini-3.1-flash-lite-preview',
       // Engine B attribution columns (new).
       engine_b_component_class: estimate.component_class,
       engine_b_curve_multiplier: estimate.curve_multiplier,
@@ -1058,6 +1326,9 @@ async function main() {
       engine_b_annual_volume: estimate.annual_volume,
       engine_b_classification_source: estimate.classification_source,
       engine_b_estimate_source: estimate.estimate_source,
+      // C5 sanity clamp attribution (undefined when not clamped — omitted from JSON)
+      ...(estimate.price_sanity_clamped ? { price_sanity_clamped: true } : {}),
+      ...(estimate.price_sanity_note ? { price_sanity_note: estimate.price_sanity_note } : {}),
     }
 
     if (existing) {
@@ -1085,11 +1356,20 @@ async function main() {
   }
 
   const noEstimate = results.filter((r) => !r.estimate).length
+  const sanityClamped = results.filter((r) => r.estimate?.price_sanity_clamped).length
   console.log(
     `[estimate] updated ${updated} existing, synthesised ${synthesised} new, ${noEstimate} failed`,
   )
-  console.log(`[estimate] classification source: corpus=${bySource.corpus} flash_lite=${bySource.flash_lite} fallback=${bySource.fallback} curated=${bySource.curated}`)
-  console.log(`[estimate] estimate source: curve=${byEstimate.curve} flash_lite_unknown=${byEstimate.flash_lite_unknown_class}`)
+  if (dbCacheHits > 0) {
+    console.log(`[estimate] C3 DB cache: ${dbCacheHits} parts priced from distributor_cascade_cache (0 live API calls)`)
+  } else {
+    console.log(`[estimate] C3 DB cache: 0 hits — run scripts/ingest/* to populate the cache for better pricing accuracy`)
+  }
+  if (sanityClamped > 0) {
+    console.log(`[estimate] C5 sanity clamp: ${sanityClamped} parts clamped to class sanity band (check price_sanity_note in partVerifications)`)
+  }
+  console.log(`[estimate] classification source: corpus=${bySource.corpus} rule_based=${ruleClassifiedCount} flash_lite=${bySource.flash_lite} fallback=${bySource.fallback} curated=${bySource.curated} db_cache=${bySource.db_cache ?? 0}`)
+  console.log(`[estimate] estimate source: db_cache=${byEstimate.db_cache ?? 0} curve=${byEstimate.curve} flash_lite_unknown=${byEstimate.flash_lite_unknown_class}`)
   const top = Object.entries(classCounts).sort((a, b) => b[1] - a[1]).slice(0, 8)
   console.log('[estimate] top classes in BoM:')
   for (const [k, v] of top) console.log(`  ${k}: ${v}`)

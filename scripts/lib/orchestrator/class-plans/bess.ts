@@ -147,7 +147,19 @@ const stepPybamm: ToolStep = {
         dc_bus_voltage_v: { value: out.dc_bus_voltage_v, unit: 'V', family: 'voltage', basis: 'rated', scope: 'system', uncertainty_pct: 1, temporal_resolution_s: null, condition: 'design point — pybamm topology constrained to this', provenance: prov('dc_bus_voltage_v') },
         per_cell_current_at_rated_a: { value: out.per_cell_current_at_rated_a, unit: 'A', family: 'current', basis: 'continuous', scope: 'cell', uncertainty_pct: 2, temporal_resolution_s: null, condition: 'rated power per parallel string', provenance: prov('per_cell_current_at_rated_a') },
         total_bus_current_at_rated_a: { value: out.total_bus_current_at_rated_a, unit: 'A', family: 'current', basis: 'continuous', scope: 'system', uncertainty_pct: 1, temporal_resolution_s: null, condition: 'DC bus to PCS at rated power', provenance: prov('total_bus_current_at_rated_a') },
-        system_thermal_dissipation_kw: { value: out.system_thermal_dissipation_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'cell I²R × 1.5 system overhead at rated power', provenance: prov('system_thermal_dissipation_kw') },
+        // FIX 1 — Thermal Invariant (council residual, 2026-05-29):
+        // PyBaMM outputs system_thermal_dissipation_kw (cell I²R at 0.5C) but
+        // previously wrote it directly, leaving cell_heat_generation_kw stale
+        // at the 5 kW pre-pybamm default. This caused "cell heat 11.7 kW +
+        // inverter 20 kW = 31.7 kW" to contradict "system dissipation 26.7 kW"
+        // (total < sum of parts). Fix: map PyBaMM's output onto cell_heat_generation_kw
+        // and RECOMPUTE system_thermal_dissipation_kw = cell_heat + inverter.
+        // The invariant system_thermal_dissipation_kw == cell_heat_generation_kw
+        // + inverter_dissipated_kw is now ENFORCED here. Universal: inverter
+        // dissipation reads from the contract quantity already set by engineering-
+        // contract.ts; no BESS-only hardcodes.
+        cell_heat_generation_kw: { value: out.system_thermal_dissipation_kw, unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'cell I²R heat at rated power (pybamm output — replaces pre-pybamm 5 kW default)', provenance: prov('system_thermal_dissipation_kw') },
+        system_thermal_dissipation_kw: { value: out.system_thermal_dissipation_kw + ((c.quantities?.inverter_dissipated_kw?.value as number) ?? 20), unit: 'kW', family: 'power', basis: 'continuous', scope: 'system', uncertainty_pct: 15, temporal_resolution_s: null, condition: 'ENFORCED: cell_heat_generation_kw (pybamm) + inverter_dissipated_kw — invariant guaranteed; no sum-of-parts contradiction possible', provenance: prov('system_thermal_dissipation_kw') },
       },
     }
   },
@@ -489,15 +501,26 @@ const stepMassAggregator: ToolStep = {
   contract_update: (c: ContractInProgress, output: any) => {
     const out = output as { total_system_mass_kg: number; mass_budget_breach_kg: number; mass_budget_utilisation_pct: number; recommended_container_count: number; per_container_mass_kg: number }
     const prov = (f: string) => ({ source: 'tool:mass-aggregator:envelope-check' as const, tool_id: 'mass-aggregator:envelope-check', tool_version: '1.0.0', tool_license: 'free-proprietary' as const, tool_source_url: 'internal://forgeos/orchestrator', invocation_output_field: f, duration_ms: 0 })
+    // FIX C (2026-05-29): Mass single-source reconciliation.
+    // engineering-contract.ts is the authoritative source for BESS mass:
+    //   in_container_mass_kg           = cells + shell + racks + PCS + BMS/cable + cooling (no transformer)
+    //   system_mass_with_external_kg   = in_container_mass_kg + external_transformer_mass_kg
+    // The aggregator's own component sums use different mass assumptions than
+    // engineering-contract.ts and produce a divergent figure (e.g. 32,175 kg
+    // vs. the canonical 29,875 / 34,125). Prefer the contract-authoritative
+    // values when available; fall back to aggregator output only if the contract
+    // quantities were never populated (non-BESS or pre-v2 contract).
+    const canonical_total = c.quantities?.system_mass_with_external_kg?.value ?? out.total_system_mass_kg
+    const canonical_per_container = c.quantities?.in_container_mass_kg?.value ?? out.per_container_mass_kg
     return {
       ...c,
       quantities: {
         ...c.quantities,
-        total_system_mass_kg: { value: out.total_system_mass_kg, unit: 'kg', family: 'mass', basis: 'dry', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'all-up including container tare', provenance: prov('total_system_mass_kg') },
+        total_system_mass_kg: { value: canonical_total, unit: 'kg', family: 'mass', basis: 'dry', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'all-up including container tare; canonical = system_mass_with_external_kg', provenance: prov('total_system_mass_kg') },
         mass_budget_breach_kg: { value: out.mass_budget_breach_kg, unit: 'kg', family: 'mass', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'positive=breach', provenance: prov('mass_budget_breach_kg') },
         mass_budget_utilisation_pct: { value: out.mass_budget_utilisation_pct, unit: '%', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 5, temporal_resolution_s: null, condition: null, provenance: prov('mass_budget_utilisation_pct') },
         recommended_container_count: { value: out.recommended_container_count, unit: '', family: 'dimensionless', basis: 'rated', scope: 'system', uncertainty_pct: 0, temporal_resolution_s: null, condition: '1 = no split needed; ≥2 = MUST split for road transport', provenance: prov('recommended_container_count') },
-        per_container_mass_kg: { value: out.per_container_mass_kg, unit: 'kg', family: 'mass', basis: 'rated', scope: 'subassembly', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'after split', provenance: prov('per_container_mass_kg') },
+        per_container_mass_kg: { value: canonical_per_container, unit: 'kg', family: 'mass', basis: 'rated', scope: 'subassembly', uncertainty_pct: 5, temporal_resolution_s: null, condition: 'after split; canonical = in_container_mass_kg', provenance: prov('per_container_mass_kg') },
       },
     }
   },

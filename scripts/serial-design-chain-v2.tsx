@@ -74,12 +74,14 @@ import { queryLibraryCandidates, renderCandidateBlock } from './lib/orchestrator
 // Hard-fails with exit code 22 if any HARD-required slot is still missing.
 import { lockEngineering } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 import { runEmitterCompletenessGate } from '../src/lib/pdf-engine-v2/lib/emitter-completeness-gate'
+import { snapshotEmitterIdentity, reassertEmitterIdentity, isLockedKind, type EmitterIdentitySnapshot } from '../src/lib/pdf-engine-v2/lib/emitter-identity-lock'
 import { runSharedQuantityConsistencyAudit } from '../src/lib/pdf-engine-v2/lib/shared-quantity-consistency-audit'
 import { runPerRackQuantityAudit } from '../src/lib/pdf-engine-v2/lib/per-rack-quantity-audit'
 import { runManufacturerAttributionAudit } from '../src/lib/pdf-engine-v2/lib/manufacturer-attribution-audit'
 import { scanMultipleFilesForBriefLiterals } from './lib/brief-value-literal-scanner'
 import { runStateParseGuard } from '../src/lib/pdf-engine-v2/lib/state-parse-guard'
 import { runSubModuleDomainGuard } from '../src/lib/pdf-engine-v2/lib/submodule-domain-guard'
+import { runPayloadRatingAudit } from '../src/lib/pdf-engine-v2/lib/payload-rating-audit'
 import { MODULE_DECOMPOSITION_TAXONOMY_PROMPT, getSpecialistPrompt } from '../src/lib/pdf-engine-v2/prompts'
 import { buildNaturalLanguageLayer, ensureSubmoduleProseCoversWords, refreshModulesRadSyntax } from '../src/lib/pdf-engine-v2/radical/sentence-generator'
 import { applyJurisdictionFilterToModules, applyJurisdictionFilterToNlLayer, applyJurisdictionFilterToBriefProse } from './lib/jurisdiction-prose-filter'
@@ -593,27 +595,20 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
     try {
       const op = p.op
       if (op === 'add_sub_module') {
-        const m = design.modules.find((x: any) => x.module === p.module)
-        if (!m) { skipped++; reasons.push(`skip add_sub_module: module "${p.module}" not found`); continue }
-        if (!Array.isArray(m.sub_modules)) m.sub_modules = []
-        if (m.sub_modules.some((s: any) => s.id === p.sub_module?.id)) {
-          skipped++; reasons.push(`skip add_sub_module: ${p.module}.${p.sub_module?.id} already exists`); continue
-        }
-        // Build #19c content validator (2026-05-22, Loop 28 Bugs 2 + 3) — scan
-        // the new sub-module's prose fields (english_sentence, topology_clause,
-        // description, narrative, rationale) for the forbidden phrases.
-        const proseFields = ['english_sentence', 'topology_clause', 'description', 'narrative', 'rationale', 'name_human']
-        let cvFail: ContentValidationResult | null = null
-        for (const f of proseFields) {
-          const cv = validateProseContent(p.sub_module?.[f])
-          if (!cv.ok) { cvFail = cv; break }
-        }
-        if (cvFail) {
-          skipped++; reasons.push(`REJECT add_sub_module ${p.module}.${p.sub_module?.id}: forbidden phrase (${cvFail.pattern_name}) "${cvFail.matched_phrase}" in sub-module prose`)
-          continue
-        }
-        m.sub_modules.push(p.sub_module)
-        applied++; reasons.push(`+sub_module ${p.module}.${p.sub_module?.id} (${p.reason ?? ''})`)
+        // 2026-05-28 deterministic-generation (anchor A1 — STRUCTURE determinism):
+        // reviewers may NOT add sub_modules. The design STRUCTURE is owned solely
+        // by the deterministic emitter. Reviewer-added sub_modules were the
+        // run-to-run structure-variance + gate-23 whack-a-mole source: iter-61 had
+        // 2 empty reviewer sub_modules (watchdog_timer, emergency_stop_chain), and
+        // iter-62 had 4 entirely DIFFERENT ones (cell_voltage_wire_upgrade,
+        // coolant_return_manifold, coolant_heater, gas_vent_interlock) — proof the
+        // additions are non-deterministic and would defeat the determinism test.
+        // The A2 word-stripping (which left an empty sub_module → gate-23 halt) is
+        // superseded by this hard block. Reviewers are prose-only; if the emitter
+        // is genuinely missing a sub_module, add it to deterministic-emitter.ts.
+        skipped++
+        reasons.push(`REJECT [structure-locked] add_sub_module ${p.module}.${p.sub_module?.id}: design structure is emitter-owned; reviewers may not add sub_modules`)
+        continue
       } else if (op === 'add_grammar_link') {
         const m = design.modules.find((x: any) => x.module === p.module)
         if (!m) { skipped++; reasons.push(`skip add_grammar_link: module "${p.module}" not found`); continue }
@@ -712,9 +707,26 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
             // downgrade an existing safety spec.
             const SAFETY_PROTECTED_KINDS = new Set(['capacity', 'regulatory', 'dimension', 'part_number', 'form', 'material'])
             const existingKinds = new Set(existing.modifier_characters.map((em: any) => em.kind))
+            // A3 identity-lock (2026-05-28, deterministic-generation anchor A1):
+            // if the word is emitter-pinned (carries a part_number), reviewers
+            // may NOT add or alter ANY identity/spec modifier — only prose. The
+            // pre-existing SAFETY_PROTECTED_KINDS guard blocked only same-kind
+            // OVERWRITES; it freely accepted NET-NEW manufacturer / rating_*,
+            // which is the mismatched-(manufacturer,MPN)-pair leak (a
+            // reviewer-added manufacturer on an emitter-pinned MPN = wrong part
+            // attribution). Lock the full identity/spec set on pinned words.
+            // emitter-pinned = carries ANY locked-kind modifier (same definition
+            // as the absorption layer; isLockedKind normalises so partNumber /
+            // part-number / Part_Number variants are all caught — the raw-string
+            // bypass the coding-council flagged 2026-05-28).
+            const isEmitterPinned = existing.modifier_characters.some((em: any) => isLockedKind(em?.kind))
             for (const inMod of incoming.modifier_characters) {
               const dupe = existing.modifier_characters.some((em: any) => em.kind === inMod.kind && em.value === inMod.value)
               if (dupe) continue
+              if (isEmitterPinned && isLockedKind(inMod?.kind)) {
+                reasons.push(`skip merge [identity-locked A3]: ${p.module}.${p.sub_module_id}.${p.word?.id} ${inMod.kind}="${inMod.value}" rejected — word is emitter-pinned; reviewers may enrich prose only`)
+                continue
+              }
               // Synonym guard: rating_primary is the LLM's preferred kind for
               // voltage / current rating; reject if capacity already pins it.
               if (inMod.kind === 'rating_primary' && existingKinds.has('capacity')) {
@@ -743,8 +755,28 @@ function applyReviewerPatches(design: any, patches: any[]): { applied: number; s
           }
           applied++; reasons.push(`~enriched word ${p.module}.${p.sub_module_id}.${p.word?.id} (+${(incoming.modifier_characters ?? []).length} modifiers)`)
         } else {
+          // A2 identity-lock (2026-05-28, deterministic-generation anchor A1):
+          // reviewers (R1/R4/R4.5) may add prose-supporting words for
+          // densification, but NEVER a word carrying part identity — that is
+          // emitter-owned. This mirrors the universal-repair.ts applyPatches
+          // [allowlist-strict] guard, which previously protected ONLY the
+          // Phase-2 path; this reviewer path pushed new words verbatim with no
+          // check — the run-to-run MPN-variance leak. Reject any new word with
+          // a part_number or manufacturer modifier (emitter must seed those;
+          // gate 23 enforces every sub_module already has ≥1 emitter MPN word).
+          const newMods = Array.isArray(p.word?.modifier_characters) ? p.word.modifier_characters : []
+          // Full locked set, normalised (coding-council 2026-05-28): a new word
+          // carrying ANY emitter-owned identity/spec modifier is rejected — not
+          // just part_number/manufacturer (an LLM could add capacity/rating/
+          // quantity/form on a brand-new word that the absorption layer never
+          // snapshotted). Prose-only words for densification still pass.
+          const carriesIdentity = newMods.some((mc: any) => isLockedKind(mc?.kind))
+          if (carriesIdentity) {
+            skipped++; reasons.push(`REJECT [identity-locked A2] +word ${p.module}.${p.sub_module_id}.${p.word?.id}: reviewers may not add words carrying part identity/spec modifiers (emitter-owned)`)
+            continue
+          }
           sm.words.push(p.word)
-          applied++; reasons.push(`+word ${p.module}.${p.sub_module_id}.${p.word?.id}`)
+          applied++; reasons.push(`+word ${p.module}.${p.sub_module_id}.${p.word?.id} (prose-only)`)
         }
       } else if (op === 'append_to_overview') {
         const m = design.modules.find((x: any) => x.module === p.module)
@@ -2896,6 +2928,16 @@ async function main() {
         .join('\n')}\n`
     : ''
 
+  // ── A1 absorption layer (2026-05-28, deterministic-generation, anchor A1):
+  // snapshot the emitter's pinned-part identity NOW, while `design` is still
+  // pure emitter output (the skeleton critic above is read-only; the reviewers
+  // below are the first stage that can mutate part identity). The matching
+  // reassertEmitterIdentity() call after Phase-2 restores it before the gates,
+  // so no LLM mutation path (reviewer / physics-repair / Phase-2) can leave a
+  // changed part_number / manufacturer / spec / quantity on an emitter word.
+  const emitterIdentitySnapshot: EmitterIdentitySnapshot = snapshotEmitterIdentity(design.modules ?? [])
+  logAction({ step: 'emitter_identity_snapshot', pinned_words: emitterIdentitySnapshot.pinnedWordCount })
+
   // ── Build #19a (2026-05-22): COLLAPSED R1+R2+R3 cascade → single reviewer.
   // Per Tristan's plan: 3-reviewer cascade adds ~30 min wall + ~£0.30 cost
   // and only adds 1-2 score points over a single strong reviewer. Replaced
@@ -3395,6 +3437,21 @@ async function main() {
   let finalGrammar: ReturnType<typeof runGrammarGates> | null = null
   let finalIters = 0
   while (repairIter < PHASE2_MAX_ITERS && !allPassed) {
+    // A1 in-loop re-assert (2026-05-28 coding-council, Gemini "single biggest
+    // risk"): restore emitter part identity at the TOP of every Phase-2 iter,
+    // BEFORE translate() feeds the gates. Without this, Phase-2 "converges" by
+    // swapping a part to satisfy a gate, then the once-after re-assert reverts the
+    // swap → the final 29 gates fail with no repair budget left. Re-asserting here
+    // forces Phase-2 to find legitimate prose/derived fixes; a genuine emitter
+    // sizing bug surfaces as a persistent gate failure (Phase D handles it via
+    // deterministic re-emission). Also covers iter-0 (reviewer + physics-repair
+    // mutations) since it runs before the first gate eval.
+    {
+      const inLoopReassert = reassertEmitterIdentity((design.modules ?? []) as any, emitterIdentitySnapshot)
+      if (inLoopReassert.words_corrected > 0) {
+        console.error(`[chain] Phase 2 iter ${repairIter}: emitter-identity re-assert corrected ${inLoopReassert.words_corrected} word(s) before gate eval`)
+      }
+    }
     const t = translate(design.modules ?? [], design.cross_module_grammar_links ?? [])
     // 2026-05-20 iter-9 Step 3: stamp brief constraints onto the translated
     // modules array so the briefConstraintPropagationGate can compare
@@ -3508,6 +3565,23 @@ async function main() {
     console.error(`[chain] post-Phase-2 modifier dedup: collapsed ${postDedup.modifiers_collapsed} cosmetic-dupe modifier(s)`)
   }
   logAction({ step: 'post_phase2_normalise', sub_modules_rewritten: postProse.sub_modules_rewritten, modifiers_collapsed: postDedup.modifiers_collapsed })
+
+  // ── A1 absorption layer re-assert (2026-05-28, deterministic-generation, anchor A1):
+  // ALL LLM mutation (reviewers + physics-repair + Phase-2) is now complete.
+  // Restore every emitter-pinned word's LOCKED identity/spec modifiers +
+  // character_id to the emitter snapshot — dropping any LLM-added/changed part
+  // identity (the dominant run-to-run part_realism variance + the Module-8 MPN
+  // smear). Non-locked modifiers (regulatory — owned by the jurisdiction filter
+  // that runs later, before gate 19) and prose (name_human, NL layer) are
+  // preserved. This is the airtight guarantee; the per-stage patch guards are
+  // defence-in-depth.
+  {
+    const reassert = reassertEmitterIdentity(design.modules ?? [], emitterIdentitySnapshot)
+    if (reassert.words_corrected > 0 || reassert.words_missing_post_mutation > 0) {
+      console.error(`[chain] emitter-identity re-assert: corrected ${reassert.words_corrected}/${reassert.words_matched} pinned words; ${reassert.words_missing_post_mutation} emitter word(s) missing post-mutation`)
+    }
+    logAction({ step: 'emitter_identity_reassert', pinned_words: reassert.pinned_words_in_snapshot, words_matched: reassert.words_matched, words_corrected: reassert.words_corrected, words_missing: reassert.words_missing_post_mutation, corrections: reassert.corrections })
+  }
 
   // ── Gate 24: Shared-Quantity Consistency Audit (exit 24, 2026-05-26, class-killer A) ──────────
   // Runs AFTER Phase 2 so we check the FINAL emitted state (Phase 2 can
@@ -3827,6 +3901,51 @@ async function main() {
       }
       writeFileSync(resolve(outDir, 'state.json'), JSON.stringify(g29State, null, 2))
       process.exit(29)
+    }
+  }
+
+  // ── Gate 30: Payload Rating Audit (exit 30, 2026-05-29, council residual fix #3c) ─
+  // HARD FAIL: asserts in_container_mass_kg ≤ container_payload_rating_kg.
+  // The contract emits container_payload_rating_kg = brief_mass_cap_kg for
+  // containerised classes (currently BESS). A breach means the design is
+  // heavier than the enclosure's stated gross-mass rating. Skips silently
+  // when container_payload_rating_kg is absent (non-containerised classes).
+  // Universal: no BESS-only code here — the gate reads generic contract fields.
+  {
+    const tGate30 = Date.now()
+    // Use orchEngineeringContract (post-tool-run) so pybamm-updated quantities
+    // (e.g. cell_count, total_cell_mass_kg, and the contract-computed
+    // in_container_mass_kg) are visible. Falls back to empty object when the
+    // orchestrator did not run (gate skips via container_payload_rating_kg absent).
+    const orchQuantities = (
+      (orchEngineeringContract as Record<string, unknown> | null)?.quantities ?? {}
+    ) as Record<string, any>
+    const gate30Result = runPayloadRatingAudit(orchQuantities)
+    console.error(
+      `[chain] gate-30 payload-rating-audit: ${gate30Result.passed ? 'PASS' : 'FAIL'} — ` +
+      gate30Result.message
+    )
+    logAction({
+      step: 'gate_30_payload_rating_audit',
+      passed: gate30Result.passed,
+      in_container_mass_kg: gate30Result.in_container_mass_kg,
+      container_payload_rating_kg: gate30Result.container_payload_rating_kg,
+      breach_kg: gate30Result.breach_kg,
+      message: gate30Result.message,
+      latency_ms: Date.now() - tGate30,
+    })
+    if (!gate30Result.passed) {
+      console.error(`\n[chain] === FATAL GATE 30 ===\n${gate30Result.message}`)
+      const g30State = {
+        projectId: 'chain-v2-' + Date.now(),
+        parsedBrief: parsedResult.data,
+        moduleDecomposition: design,
+        haltReason: `Gate 30 payload-rating-audit FAIL: ${gate30Result.message}`,
+        gate30Result,
+        savedAt: new Date().toISOString(),
+      }
+      writeFileSync(resolve(outDir, 'state.json'), JSON.stringify(g30State, null, 2))
+      process.exit(30)
     }
   }
 
@@ -4575,14 +4694,19 @@ async function main() {
     console.error('[chain] CHAIN_SKIP_ENGINE_C=1 — skipping Engine C reference-anchor step')
   }
 
-  // ── Cost Repair Loop (Sprint 1B, Tristan 2026-05-20 fifth review):
-  // Engine C flags >2x / <.5x outliers but does NOT correct. This step
-  // closes the loop — asks a fixer model (Grok 4.3 by default) to either
-  // (a) correct the price with cited source, (b) declare manual sourcing
-  // required, or (c) declare the corpus comparison misleading.
-  // Universal across product classes. Fail-soft.
-  // Skip via CHAIN_SKIP_COST_REPAIR=1.
-  if (process.env.CHAIN_SKIP_COST_REPAIR !== '1') {
+  // ── Cost Repair Loop — DISABLED BY DEFAULT (2026-05-29, deterministic-generation).
+  // The iter-63/64 determinism test proved this LLM stage (Grok 4.3) was the
+  // dominant PRICE non-determinism source: it "corrected" a DIFFERENT subset of
+  // flagged outliers each run (chiller £10k vs £6.85k; container 40HC £45 vs
+  // £4,850; STM32 £185 vs £12; lifting point £0.45 vs £35), so two runs of the
+  // same brief produced 40 differing prices — defeating the determinism
+  // guarantee AND the variance fix. Pricing is now deterministic-by-construction:
+  // emitter list_price pin → DB cascade cache (db-only-cascade) → deterministic
+  // curve estimate + per-class sanity bounds (component-classes.ts
+  // CLASS_PRICE_SANITY_BOUNDS). That path clamps over/under outliers WITHOUT an
+  // LLM and is byte-stable run-to-run. Re-enable only for diagnostics via
+  // CHAIN_ENABLE_COST_REPAIR=1.
+  if (process.env.CHAIN_ENABLE_COST_REPAIR === '1') {
     const tCostRepair = Date.now()
     try {
       execFileSync('npx', ['tsx', resolve(__dirname, 'cost-repair.tsx'), statePath, '--write'], {
@@ -4595,7 +4719,7 @@ async function main() {
       logAction({ step: 'cost_repair_loop', latency_ms: Date.now() - tCostRepair, ok: false, error: String(err).slice(0, 200) })
     }
   } else {
-    console.error('[chain] CHAIN_SKIP_COST_REPAIR=1 — skipping cost-repair step')
+    console.error('[chain] cost-repair DISABLED by default (deterministic pricing is the source of truth; set CHAIN_ENABLE_COST_REPAIR=1 for diagnostics)')
   }
 
   // ── Engine D (suppliers, 2026-05-19): spawn enrich-state-with-suppliers.tsx
@@ -5583,7 +5707,7 @@ async function main() {
       console.error('  CHAIN HARD-EXIT - Cross-page numeric consistency audit FAILED (18)')
       console.error('  The rendered PDF contains conflicting scalar values for the same')
       console.error('  engineering quantity across two or more pages (e.g. cover headline')
-      console.error('  3.5 MWh usable energy vs Mission paragraph 2.69 MWh usable energy).')
+      console.error('  e.g. brief-target headline energy vs mission paragraph achieved energy).')
       console.error('  The reader cannot reconcile contradicting numbers within a few pages.')
       console.error('  PDF + state.json saved to disk for inspection but chain is BLOCKED.')
       console.error('  See AUDIT-CONSISTENCY.md for the offending clusters + occurrences.')

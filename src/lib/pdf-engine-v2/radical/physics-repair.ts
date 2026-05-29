@@ -56,7 +56,14 @@ export interface PhysicsRepairResult {
   final_critique: CritiqueReport | null
 }
 
-const REPAIR_SYSTEM = `You are an expert engineering reviewer with deep manufacturer-catalogue knowledge across HVAC, electrical, fluid, refrigeration, structural, and control domains. Your job: take a physics-critic finding about a wrong component or wrong sizing in an engineering design, and emit a structured patch that swaps the wrong component for a real one that meets the requirement.
+const REPAIR_SYSTEM = `You are an expert engineering reviewer with deep manufacturer-catalogue knowledge across HVAC, electrical, fluid, refrigeration, structural, and control domains. Your job: take a physics-critic finding about a wrong component or wrong sizing in an engineering design, and respond with the smallest correct fix.
+
+⚠️ ARCHITECTURAL RESTRICTION (2026-05-28) — READ FIRST, OVERRIDES EVERYTHING BELOW:
+Part identity, specifications, and bill-of-materials membership are owned EXCLUSIVELY by the deterministic emitter. You may therefore ONLY emit:
+  • set_derived_parameter (on non-brief-pinned fields), and
+  • edit_word with field="name_human" (prose clarification only),
+  • plus flag_for_manual_sourcing or { "patches": [], "unfixable_reason": "…" }.
+replace_modifier and add_word_to_sub_module patches WILL BE REJECTED by the chain. If a component is wrong, undersized, or missing, DO NOT try to swap or add it — emit flag_for_manual_sourcing describing exactly what to fix, so the deterministic emitter is corrected upstream. Never patch part identity here.
 
 Output JSON ONLY, no prose preamble.
 
@@ -414,6 +421,34 @@ function applyPhysicsRepairPatch(modules: ModuleSpec[], p: RepairPatchOut, brief
     log.push(`flag_for_manual_sourcing word_id=${p.word_id ?? '?'} reason=${p.reason ?? ''}`)
     return false
   }
+
+  // A1 identity-lock (2026-05-28, deterministic-generation plan, anchor A1).
+  // Part identity, specs, and BoM membership are owned SOLELY by the
+  // deterministic emitter. Physics-repair was the dominant run-to-run variance
+  // source + the "Module-8 MPN smear" vector: it bypasses the verified-parts
+  // allowlist (this function is deliberately outside universal-repair.ts
+  // applyPatches) and a replace_modifier on a non-existent kind silently ADDS
+  // it (see below), so a critic mis-attribution lands a wrong manufacturer/MPN
+  // on the wrong part with no validation. Physics-repair is now restricted to
+  // derived-parameter numbers + name_human prose. A wrong/undersized part is
+  // fixed in the emitter (surfaced by sizing gates 6/13/14/16 → deterministic
+  // re-emission, Phase D), never by a free-hand LLM patch.
+  // Whitelist (not blacklist — tightened per coding-council 2026-05-28: a
+  // blacklist let unexpected ops e.g. delete_word / set_modifier / change_word_id
+  // through). Physics-repair may ONLY touch derived-parameter numbers +
+  // name_human prose. Everything else is rejected: part identity / specs / BoM
+  // membership are emitter-owned. (flag_for_manual_sourcing is handled above and
+  // routes a wrong/undersized part back to the emitter for a deterministic fix.)
+  const PHYSICS_REPAIR_ALLOWED_OPS = new Set(['set_derived_parameter', 'edit_word'])
+  if (!PHYSICS_REPAIR_ALLOWED_OPS.has(p.op)) {
+    log.push(`REJECT (identity-locked A1): physics-repair op="${p.op}" not allowed — only set_derived_parameter + edit_word(name_human); part identity is emitter-owned`)
+    return false
+  }
+  if (p.op === 'edit_word' && p.field !== 'name_human') {
+    log.push(`REJECT (identity-locked A1): physics-repair edit_word restricted to name_human prose; got field=${p.field}`)
+    return false
+  }
+
   const m = modules.find(mm => mm.module === p.module)
   if (!m) { log.push(`skip module-not-found: ${p.module}`); return false }
 

@@ -2057,6 +2057,8 @@ function hasK10ShadowFail(state: any): boolean {
  */
 function ProvisionalClassRegistryAppendixBlock({
   entry,
+  productClass,
+  briefStandards,
 }: {
   entry: {
     flag: boolean
@@ -2066,6 +2068,10 @@ function ProvisionalClassRegistryAppendixBlock({
     audit?: any
     payload?: any
   }
+  /** Product class string — used by mergeBriefAndClassStandards for the canonical count. */
+  productClass?: string
+  /** Brief-declared safety standards — merged with class baseline for the count. */
+  briefStandards?: Array<any> | null
 }) {
   const payload = entry.payload
   const audit = entry.audit
@@ -2075,7 +2081,15 @@ function ProvisionalClassRegistryAppendixBlock({
   const subModuleCount: number = payload?.modules
     ? payload.modules.reduce((acc: number, m: any) => acc + (Array.isArray(m.sub_modules) ? m.sub_modules.length : 0), 0)
     : 0
-  const standardsCount: number = Array.isArray(payload?.standards) ? payload.standards.length : 0
+  // Phase B fix (2026-05-28, issue #4): use the same merged set that the
+  // CompliancePage uses — mergeBriefAndClassStandards gives brief + curated
+  // class baseline, so the count is never zero for a known class.
+  // Fall back to the auto-generated payload.standards when both productClass
+  // is unknown AND no brief standards exist (graceful degradation for
+  // fully-novel classes with no curated baseline).
+  const standardsCount: number = productClass
+    ? mergeBriefAndClassStandards(productClass, briefStandards ?? null).length
+    : (Array.isArray(payload?.standards) ? payload.standards.length : 0)
   const hazardCount: number = Array.isArray(payload?.hazards) ? payload.hazards.length : 0
   const connectionCount: number = Array.isArray(payload?.connections) ? payload.connections.length : 0
   return (
@@ -2750,6 +2764,87 @@ function CoverPage({
               so the cover layout is unchanged for classes without a MARKET_BANDS
               entry. */}
           <IndustryBandBlock state={state} costStack={costStack} />
+          {/* FIX 4 — Cost reconciliation annotation (council residual, 2026-05-29):
+              Compare achieved ex-works (OEM transfer price) against the brief's
+              cost ceiling and any band text in additional_constraints. This is a
+              UNIVERSAL annotation — it reads from parsedBrief.constraints so it
+              works for all product classes. Does NOT fabricate cost; only
+              reconciles the design's already-computed ex-works price against what
+              the brief states. Shows nothing when costStack or brief ceiling absent. */}
+          {(() => {
+            if (!costStack) return null
+            const pb = state?.parsedBrief ?? {}
+            const briefCeiling: number | null =
+              typeof pb.constraints?.unit_cost_ceiling?.value === 'number'
+                ? (pb.constraints.unit_cost_ceiling.value as number)
+                : null
+            const briefBandText: string | null =
+              (Array.isArray(pb.constraints?.additional_constraints)
+                ? (pb.constraints.additional_constraints as string[]).find(
+                    (s: string) => /£|cost|price|capex|budget|ceiling/i.test(s)
+                  ) ?? null
+                : null)
+            // Achieved ex-works = OEM transfer price (pre-channel-margin, same
+            // conceptual basis as "ex-works" in the brief). Fall back to installed
+            // ASP only when transfer price absent (legacy classes without markup).
+            const achievedExWorks: number =
+              costStack.oem_transfer_price_gbp > 0
+                ? costStack.oem_transfer_price_gbp
+                : costStack.installed_asp_gbp
+            if (achievedExWorks <= 0) return null
+            if (briefCeiling === null && !briefBandText) return null
+            const fmt = (n: number) => `£${Math.round(n).toLocaleString('en-GB')}`
+            const pctDiff = briefCeiling != null
+              ? Math.round(((achievedExWorks - briefCeiling) / briefCeiling) * 100)
+              : null
+            const belowCeiling = pctDiff != null && pctDiff < 0
+            const aboveCeiling = pctDiff != null && pctDiff > 0
+            const onCeiling = pctDiff != null && pctDiff === 0
+            const labelColour = aboveCeiling ? '#9b1c1c' : belowCeiling ? '#065f46' : '#92400e'
+            const bgColour = aboveCeiling ? '#fee2e2' : belowCeiling ? '#d1fae5' : '#fef3c7'
+            return (
+              <View style={{ marginTop: 8, padding: 8, backgroundColor: '#f1f5f9', borderRadius: 3, borderLeftWidth: 2, borderLeftColor: labelColour }}>
+                <Text style={{ fontSize: 7.5, color: '#334155', letterSpacing: 1.0, marginBottom: 5 }}>
+                  EX-WORKS COST VS BRIEF TARGET
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  <Text style={{ fontSize: 8, color: '#64748b', width: 120 }}>Achieved ex-works</Text>
+                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: '#0f172a', flex: 1 }}>{fmt(achievedExWorks)}</Text>
+                </View>
+                {briefCeiling != null ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                    <Text style={{ fontSize: 8, color: '#64748b', width: 120 }}>Brief ceiling</Text>
+                    <Text style={{ fontSize: 8, color: '#334155', flex: 1 }}>{fmt(briefCeiling)}</Text>
+                  </View>
+                ) : null}
+                {pctDiff != null ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: belowCeiling ? 0 : 4 }}>
+                    <Text style={{ fontSize: 8, color: '#64748b', width: 120 }}>Position</Text>
+                    <View style={{ paddingHorizontal: 5, paddingVertical: 2, backgroundColor: bgColour, borderRadius: 3 }}>
+                      <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Bold', color: labelColour }}>
+                        {belowCeiling
+                          ? `${Math.abs(pctDiff)}% below ceiling (headroom ${fmt(briefCeiling! - achievedExWorks)})`
+                          : aboveCeiling
+                            ? `${pctDiff}% above ceiling — cost reconciliation required`
+                            : 'on ceiling'}
+                      </Text>
+                    </View>
+                  </View>
+                ) : null}
+                {briefBandText ? (
+                  <Text style={{ fontSize: 7, color: '#475569', marginTop: 3, fontStyle: 'italic' }}>
+                    {`Brief note: "${briefBandText.slice(0, 160)}${briefBandText.length > 160 ? '…' : ''}"`}
+                  </Text>
+                ) : null}
+                {onCeiling || belowCeiling ? null : (
+                  <Text style={{ fontSize: 7.5, color: '#475569', marginTop: 4, lineHeight: 1.4 }}>
+                    {`Achieved ex-works ${fmt(achievedExWorks)} exceeds the brief's stated ceiling ${fmt(briefCeiling!)}. ` +
+                     `See Brief Compliance table for trade-off narrative and lever options.`}
+                  </Text>
+                )}
+              </View>
+            )
+          })()}
           </>
         ) : bomTotals ? (
           // Fallback when no cost-stack ratios resolve — show the legacy
@@ -3185,7 +3280,7 @@ function BriefRevisionNoticePage({ state, project }: { state: any; project: stri
  * Renders only the fields that exist; classes with sparse derived_parameters
  * just show fewer rows. No financial fields surfaced (Q4 directive).
  */
-function PhysicalSpecBlock({ modules, deploymentEnvelope }: { modules: any[]; deploymentEnvelope?: any }) {
+function PhysicalSpecBlock({ modules, deploymentEnvelope, quantities }: { modules: any[]; deploymentEnvelope?: any; quantities?: Record<string, any> }) {
   const struct = (modules ?? []).find((m: any) => m.module === 'structure_containment')
   const dp = (struct?.derived_parameters as any) ?? {}
   // Allow the block to render with only a deployment envelope (no struct dp).
@@ -3279,7 +3374,22 @@ function PhysicalSpecBlock({ modules, deploymentEnvelope }: { modules: any[]; de
         value: `${ext.length} × ${ext.width} × ${ext.height} mm (L × W × H)`,
       })
     }
-    if (typeof env.max_payload_kg === 'number') {
+    // FIX 3b — Payload display (council CRITICAL, 2026-05-29): when the contract
+    // emits container_payload_rating_kg (bespoke enclosure rated to brief's
+    // gross-mass cap), use that value with a note explaining the bespoke rating.
+    // Only fall back to env.max_payload_kg (ISO-668 standard payload) when the
+    // contract doesn't carry a bespoke rating. Universal: non-containerised
+    // classes never emit container_payload_rating_kg so the standard envelope
+    // value is used unchanged. This prevents displaying "26,580 kg ISO payload"
+    // for a design whose bespoke enclosure is rated to 35,000 kg by spec.
+    const contractPayloadRating = (quantities?.container_payload_rating_kg?.value as number | undefined)
+    if (typeof contractPayloadRating === 'number') {
+      rows.push({
+        label: 'Enclosure payload rating',
+        value: `${contractPayloadRating.toLocaleString('en-GB')} kg gross`,
+        note: 'bespoke heavy-duty enclosure rated to brief gross-mass cap; road-transportable with route notification / specialist trailer per brief',
+      })
+    } else if (typeof env.max_payload_kg === 'number') {
       rows.push({ label: 'Envelope payload limit', value: `${env.max_payload_kg.toLocaleString()} kg max payload` })
     }
     if (env.reference_standard) {
@@ -3380,7 +3490,7 @@ function BriefPage({ state, project, manualReviewBadges }: { state: any; project
       {/* ITER-10.5 fifth review (Tristan 2026-05-20): Manual Review
           callouts removed from non-cover pages. */}
 
-      <PhysicalSpecBlock modules={modules} deploymentEnvelope={state.deploymentEnvelope ?? null} />
+      <PhysicalSpecBlock modules={modules} deploymentEnvelope={state.deploymentEnvelope ?? null} quantities={state?.orchestratorContract?.quantities ?? {}} />
 
       {overview ? (<><SubHeading>Overview</SubHeading><Paragraph>{overview}</Paragraph></>) : null}
 
@@ -3900,18 +4010,33 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack
     })
   }
 
-  // 2) Max gross mass. Total mass is the right comparator — some classes
-  //    split mass between in-container and external sub-systems but the
-  //    brief constraint is total. Read in priority: total_system_mass_kg
-  //    (universal) → system_mass_with_external_kg (BESS w/ external tx) →
-  //    in_container_mass_kg → total_mass_kg.
+  // 2) Max gross mass. For brief compliance, compare the mass that drives the
+  //    brief constraint: for BESS the brief max_mass_kg is the containerised
+  //    transport limit; the external transformer is pad-mounted and NOT counted
+  //    against that limit per IEC 62933-5-2 §6.4. Priority order:
+  //      BESS classes: in_container_mass_kg (canonical — excludes external txfr)
+  //                    → system_mass_with_external_kg (informational, for note)
+  //      Other classes: total_system_mass_kg (universal) → in_container_mass_kg
+  //                     → total_mass_kg
+  //    Phase B fix (2026-05-28, issue #3): the mass-aggregator tool emits
+  //    total_system_mass_kg which INCLUDES the external transformer (34 125 kg)
+  //    — using that against the 28 000 kg container cap overstates the breach by
+  //    ~4 250 kg and mis-identifies the right lever (transformer is already
+  //    external; removing it again would not help). The correct comparator is
+  //    in_container_mass_kg (29 875 kg) — still a breach, but the correct one.
   const massCap = constraints.max_mass_kg
   if (massCap && typeof massCap.value === 'number' && Number.isFinite(massCap.value)) {
     const target = massCap.value
-    const totalMass = _qtyFromOrch(quantities, 'total_system_mass_kg')
-      ?? _qtyFromOrch(quantities, 'system_mass_with_external_kg')
-      ?? _qtyFromOrch(quantities, 'in_container_mass_kg')
-      ?? _qtyFromOrch(quantities, 'total_mass_kg')
+    const isBessClass = productClass.includes('bess') || productClass.includes('battery') || productClass.includes('energy_storage')
+    const totalMass = isBessClass
+      ? (_qtyFromOrch(quantities, 'in_container_mass_kg')
+          ?? _qtyFromOrch(quantities, 'system_mass_with_external_kg')
+          ?? _qtyFromOrch(quantities, 'total_system_mass_kg')
+          ?? _qtyFromOrch(quantities, 'total_mass_kg'))
+      : (_qtyFromOrch(quantities, 'total_system_mass_kg')
+          ?? _qtyFromOrch(quantities, 'system_mass_with_external_kg')
+          ?? _qtyFromOrch(quantities, 'in_container_mass_kg')
+          ?? _qtyFromOrch(quantities, 'total_mass_kg'))
     if (totalMass) {
       const status: ComplianceStatus = totalMass.value <= target * 1.05 ? 'pass' : 'fail'
       const delta = _formatDelta(target, totalMass.value, 'mass')
@@ -4315,9 +4440,15 @@ function _generateBriefRewrites(
     const briefMassKg = constraints.max_mass_kg?.value ?? null
     const briefEnergyMwh = _metricFromBrief(constraints.target_performance?.metrics, 'nameplate_capacity_mwh')?.value ?? null
     const designCost = bomTotals?.grandTotal_gbp ?? null
-    const designMassKg = (_qtyFromOrch(quantities, 'total_system_mass_kg')
+    // FIX 2 — Mass single-source (council residual, 2026-05-29): always read
+    // in_container_mass_kg (canonical contract field, excludes external pad-mount
+    // transformer) as the primary mass. The mass-aggregator total_system_mass_kg
+    // includes the external transformer and must NEVER surface here as the BESS
+    // mass total. Universal: non-BESS classes don't emit in_container_mass_kg so
+    // the fallback cascade naturally skips to their total_system_mass_kg.
+    const designMassKg = (_qtyFromOrch(quantities, 'in_container_mass_kg')
       ?? _qtyFromOrch(quantities, 'system_mass_with_external_kg')
-      ?? _qtyFromOrch(quantities, 'in_container_mass_kg')
+      ?? _qtyFromOrch(quantities, 'total_system_mass_kg')
       ?? _qtyFromOrch(quantities, 'total_mass_kg'))?.value ?? null
     const designEnergyKwh = _qtyFromOrch(quantities, 'usable_capacity_kwh')?.value ?? null
     const designEnergyMwh = designEnergyKwh != null ? designEnergyKwh / 1000 : null

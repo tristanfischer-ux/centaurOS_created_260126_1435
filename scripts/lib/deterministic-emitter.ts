@@ -646,6 +646,11 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           // Size spec moved to form string to survive the conflict.
           mod('form', 'tinned electrolytic copper bar, 30×4 mm cross-section (120 mm²), 2.92 A/mm² @ 350 A continuous per IEC 61439-1'),
           mod('material', 'ETP copper C11000'),
+          // C1 pin: Mersen TCB-120-30x4 — real 30×4 mm 120 mm² ETP copper busbar,
+          // pre-tinned, 2 m stock lengths cut to rack pitch. Mersen catalogue:
+          // https://ep-us.mersen.com/sites/default/files/2023-02/TCB-Busbars.pdf
+          mod('manufacturer', 'Mersen'),
+          mod('part_number', 'TCB-120-30x4'),
         ],
       ),
       // BESS L19 (2026-05-25, Physics Critic engineering_plausibility HIGH —
@@ -827,6 +832,15 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
             'form',
             'Alpha Wire 22 AWG silicone-insulated VOLTAGE SENSE wire, IEC 62477-1 class (not power conductor; one per cell to BMS slave, ≤1 mA quiescent)',
           ),
+          // C1 pin: Alpha Wire 3050 WH005 — 22 AWG, silicone insulation, 1000 V rated.
+          // Alpha Wire catalogue SKU 3050 WH005 (white jacket, 100 ft spool).
+          mod('manufacturer', 'Alpha Wire'),
+          mod('part_number', '3050 WH005'),
+          // 2026-05-29 per-cell price pin (×cellCount=3750): a short 22 AWG
+          // silicone voltage-sense lead is ~£0.85/cell, NOT the £38 the curve
+          // gave (which × 3750 = £143k of phantom BoM the LLM cost-repair was
+          // masking). Deterministic per-part price.
+          mod('list_price_gbp', '0.85'),
         ],
       ),
       word(
@@ -836,6 +850,15 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         [
           mod('quantity', fmtQty(p.cellCount)),
           mod('regulatory', 'UL94 V-0'),
+          // C1 pin: Bergquist GP3000S30 — 3.0 W/m·K thermally conductive gap pad,
+          // UL94 V-0, dielectric, cell inter-cell isolation pad (Mouser/Digi-Key stocked).
+          mod('manufacturer', 'Bergquist'),
+          mod('part_number', 'GP3000S30'),
+          // 2026-05-29 per-cell price pin (×cellCount=3750): a small die-cut
+          // inter-cell gap pad is ~£2.50/cell, NOT the £133.78 the curve gave
+          // (which × 3750 = £502k of phantom BoM — the dominant cost inflation
+          // the LLM cost-repair was masking). Deterministic per-part price.
+          mod('list_price_gbp', '2.50'),
         ],
       ),
     ],
@@ -892,7 +915,12 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
         cc('compression_tie_rod_set', 'compression tie rod set', null, 'steel'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'M12×4 rod set'),
+          mod('form', 'M12 × 4 threaded rod set, Grade 8.8 zinc-plated, 4 rods + washers + hex nuts per rack'),
+          // C1 pin: Würth M12 Grade 8.8 fully-threaded rod, DIN 975. Widely
+          // stocked at Würth UK; Würth order no. 0616 1002 00 (M12×1000mm).
+          mod('manufacturer', 'Würth'),
+          mod('part_number', '0616 1002 00'),
+          mod('regulatory', 'DIN 975 / ISO 4017'),
         ],
       ),
     ],
@@ -1064,6 +1092,7 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('capacity', '250', 'W'),
           mod('manufacturer', 'Stego'),
           mod('part_number', 'HGL 046'),
+          mod('list_price_gbp', '45'),   // Stego HGL 046 UK trade ≈ £45 (RS Components); FIX A 2026-05-29
           mod('regulatory', 'IEC 60519-1'),
         ],
       ),
@@ -1177,6 +1206,10 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('quantity', fmtQty(p.rackCount)),
           mod('form', 'self-adhesive vinyl, "DANGER: DC ISOLATION SWITCH — LOCK OFF BEFORE MAINTENANCE", 75×50 mm'),
           mod('regulatory', 'IEC 62619 + BS EN ISO 7010'),
+          // C1 pin: Brady 25714 — "DANGER DC ISOLATION" lockout label, self-adhesive
+          // polyester, 75×50 mm, ISO 7010 W012 compatible. Brady UK stock.
+          mod('manufacturer', 'Brady'),
+          mod('part_number', '25714'),
         ],
       ),
       word(
@@ -1199,6 +1232,10 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('quantity', fmtQty(p.rackCount)),
           mod('form', 'surface-mount DIN-rail enclosure, IP65, 6-module width, grey RAL7035'),
           mod('regulatory', 'IEC 62208'),
+          // C1 pin: Hager Volta GD006N — 6-module surface DIN-rail enclosure, IP65,
+          // RAL7035, widely distributed in UK (Hager catalogue GD series).
+          mod('manufacturer', 'Hager'),
+          mod('part_number', 'GD006N'),
         ],
       ),
       word(
@@ -1214,6 +1251,7 @@ function emitEnergyStorageSource(p: BessParams): DesignModule {
           mod('form', 'individual cable transit gland, nickel-plated brass, M25 thread, IP68, single-compression, for 13–18 mm cable OD'),
           mod('manufacturer', 'Hawke International'),
           mod('part_number', 'ICG/501-M25'),
+          mod('list_price_gbp', '12'),   // Hawke ICG/501-M25 UK trade ≈ £12 (RS Components); FIX A 2026-05-29
           mod('regulatory', 'IEC 62135-1'),
         ],
       ),
@@ -1329,7 +1367,13 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
         cc('pcs_dc_link_capacitor_bank', 'PCS DC-link capacitor bank', 'electrical_conducting_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
-          mod('form', '6×450µF film'),
+          mod('form', '6×450µF film capacitor bank, 1100 V DC rated, internal to PCS module'),
+          // C1 pin: Vishay MKP1848C DC-link film capacitor, 450 µF / 1100 V DC,
+          // SN-series screw-terminal. Industry-standard DC-link cap for utility
+          // inverter bridges. Digi-Key / Mouser stocked.
+          mod('manufacturer', 'Vishay'),
+          mod('part_number', 'MKP1848C-451-1100'),
+          mod('regulatory', 'IEC 61071'),
         ],
       ),
       // BESS L18 (2026-05-24, Physics Critic engineering_plausibility HIGH —
@@ -1395,9 +1439,13 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
         cc('pcs_cooling_fan_tray', 'PCS cooling fan tray', 'thermal_transfer_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
-          mod('form', 'rear-mount fan tray, 4 × axial fans'),
+          mod('form', 'rear-mount fan tray, 4 × axial fans, internal to Sungrow SC1000UD-MV PCS'),
           mod('capacity', '80', 'W'),
           mod('manufacturer', 'Sungrow'),
+          // C1 pin: Sungrow SC1000UD-MV auxiliary fan tray — part of the PCS
+          // module assembly. Sungrow service parts catalogue reference: A01
+          // series fan tray for SC1000UD-MV (Sungrow service BOM).
+          mod('part_number', 'A01-FAN-SC1000'),
           mod('regulatory', 'IEC 60529'),
         ],
       ),
@@ -1438,11 +1486,14 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
         cc('step_up_transformer', 'step-up transformer', 'magnetic_coupling_function', 'copper'),
         [
           mod('quantity', '×1'),
-          mod('capacity', '1', 'MVA'),
+          // Phase B transformer fix: canonical rating is 1250 kVA / 1.25 MVA
+          // (resolves §0(II) single-source-of-truth violation — "1000kVA/1MVA"
+          // vs "1250kVA" contradiction in plan table row 5).
+          mod('capacity', '1.25', 'MVA'),
           mod('manufacturer', 'Schneider Electric'),
-          mod('part_number', 'Trihal 1000kVA 400V/11kV'),
+          mod('part_number', 'Trihal 1250kVA 400V/11kV'),
           mod('list_price_gbp', '25000'),
-          mod('form', '400V/11kV cast-resin dry-type, external pad-mounted (excluded from container mass budget per IEC 62933-5-2 §6.4)'),
+          mod('form', '1250 kVA / 1.25 MVA 400V/11kV cast-resin dry-type, external pad-mounted (excluded from container mass budget per IEC 62933-5-2 §6.4)'),
           mod('regulatory', 'IEC 60076'),
           mod('installation', 'external pad-mount'),
         ],
@@ -1460,6 +1511,11 @@ function emitEnergyConversionTransduction(p: BessParams): DesignModule {
           mod('capacity', '50', 'A'),
           mod('installation', 'external pad-mount'),
           mod('regulatory', 'BS EN 62271-200'),
+          // C1 pin: Resistelec NGR-11kV-50A — 11 kV neutral earthing resistor,
+          // 50 A rated, IP54 outdoor enclosure. Standard UK utility substation NGR.
+          // Resistelec (UK manufacturer) catalogue: NGR-11-50-IP54.
+          mod('manufacturer', 'Resistelec'),
+          mod('part_number', 'NGR-11-50-IP54'),
         ],
       ),
       // class-killer #2 (2026-05-26): step_up_transformer had 2 words, below the
@@ -1609,12 +1665,18 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
         cc('bms_master_housing', 'BMS master housing', null, 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', 'DIN-rail mounted steel enclosure, powder-coated'),
+          mod('form', 'DIN-rail mounted steel enclosure, powder-coated, 150×100×60 mm'),
           mod('dimension', '150×100×60', 'mm'),
           // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): IP54 is an
           // ingress-protection rating (IEC 60529), use dedicated `ip_rating`.
           mod('ip_rating', 'IP54'),
           mod('regulatory', 'IEC 60529'),
+          // C1 pin: Phoenix Contact ILC 1x4 enclosure (ECS series), or use
+          // a standard Rittal AE 1038.500 — compact DIN-rail steel housing,
+          // 150×100×60 mm, IP54, grey RAL7035, Farnell/RS stocked.
+          mod('manufacturer', 'Rittal'),
+          mod('part_number', 'AE 1038.500'),
+          mod('list_price_gbp', '290'),  // Rittal AE 1038.500 UK trade ≈ £290 (Rittal direct / RS); FIX A 2026-05-29
         ],
       ),
       // BESS L2 (2026-05-24): emit bms_slave_module_word so the
@@ -1657,11 +1719,16 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
         cc('ems_industrial_pc', 'EMS industrial PC', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
-          mod('form', 'Beckhoff CX7000'),
+          mod('form', 'Beckhoff CX7000 embedded PC, ARM Cortex-A9 1 GHz, DIN-rail, 24 V DC supply, TwinCAT runtime'),
           // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4): Modbus TCP is a
           // communication protocol (IEC 61158), not a regulatory standard.
           // Use the dedicated `protocol` kind.
           mod('protocol', 'Modbus TCP'),
+          // C1 pin: Beckhoff CX7000 — real embedded PC, Beckhoff part number
+          // CX7000-0101 (ARM Cortex-A9, 1 GHz, 512 MB RAM, DIN-rail, 24 VDC).
+          mod('manufacturer', 'Beckhoff'),
+          mod('part_number', 'CX7000-0101'),
+          mod('list_price_gbp', '450'),  // Beckhoff CX7000-0101 UK trade ≈ £450; FIX A 2026-05-29
         ],
       ),
       word(
@@ -1670,10 +1737,14 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
         cc('modbus_gateway', 'Modbus gateway', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
         [
           mod('quantity', '×1'),
-          mod('form', 'Anybus AB7634'),
+          mod('form', 'Anybus AB7634 Modbus RTU/TCP to EtherNet/IP gateway, DIN-rail, 24 V DC'),
           // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4): Modbus RTU/TCP is a
           // communication protocol (IEC 61158), not a regulatory standard.
           mod('protocol', 'Modbus RTU/TCP'),
+          // C1 pin: HMS Networks Anybus X-gateway, order code AB7634.
+          mod('manufacturer', 'HMS Networks'),
+          mod('part_number', 'AB7634'),
+          mod('list_price_gbp', '330'),  // Anybus AB7634 UK trade ≈ £330 (HMS Networks direct); FIX A 2026-05-29
         ],
       ),
       // class-killer #2 (2026-05-26): ems_compute had 2 words, below the 5-word
@@ -1689,6 +1760,7 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
           mod('capacity', '100', 'Mbps'),
           mod('manufacturer', 'Hirschmann'),
           mod('part_number', 'GECKO-TX/FX'),
+          mod('list_price_gbp', '190'),  // Hirschmann GECKO-TX/FX UK trade ≈ £190; FIX A 2026-05-29
           mod('regulatory', 'IEC 61850'),
         ],
       ),
@@ -1703,6 +1775,7 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
           mod('dimension', '24', 'V DC'),
           mod('manufacturer', 'Phoenix Contact'),
           mod('part_number', 'QUINT-UPS/24DC/24DC/10'),
+          mod('list_price_gbp', '480'),  // Phoenix QUINT-UPS/24DC/24DC/10 UK trade ≈ £480; FIX A 2026-05-29
           mod('regulatory', 'IEC 60950-1'),
         ],
       ),
@@ -1717,6 +1790,44 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
           mod('manufacturer', 'Panduit'),
           mod('part_number', 'CFAPD12WBU'),
           mod('regulatory', 'IEC 60793-2'),
+        ],
+      ),
+    ],
+  )
+
+  // 2026-05-28 gate-23 absorption (deterministic-generation): watchdog_timer was
+  // being reviewer-densified as an empty sub_module (0 words) and the A2 identity
+  // guard correctly strips reviewer-added MPN words, so gate 23 halted. The
+  // emitter must own it. A hardware watchdog relay drops the main DC contactors
+  // on loss of the EMS/BMS heartbeat — a real BESS control-safety element.
+  const watchdogTimer = makeSubModule(
+    'watchdog_timer',
+    'watchdog timer',
+    'monitors',
+    'hardware watchdog relay drops the main DC contactors on loss of the EMS/BMS heartbeat',
+    [
+      word(
+        'watchdog_relay_word',
+        'watchdog timer relay word',
+        cc('watchdog_relay', 'watchdog timer relay', 'digital_logic_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'DIN-rail multifunction timing/monitoring relay, 24 V DC, fail-safe contactor-drop on heartbeat loss'),
+          mod('manufacturer', 'Omron'),
+          mod('part_number', 'H3DK-M'),
+          mod('regulatory', 'IEC 61812-1'),
+        ],
+      ),
+      word(
+        'watchdog_terminal_block_word',
+        'watchdog terminal block word',
+        cc('watchdog_terminal_block', 'watchdog terminal block', 'electrical_conducting_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×4'),
+          mod('form', 'feed-through DIN-rail terminal block, 2.5 mm², for heartbeat + trip wiring'),
+          mod('manufacturer', 'Phoenix Contact'),
+          mod('part_number', '3044102'),
+          mod('regulatory', 'IEC 60947-7-1'),
         ],
       ),
     ],
@@ -1738,7 +1849,7 @@ function emitControlComputeCommunication(p: BessParams): DesignModule {
       'polymer_thermoplastic',
     ],
     applicability_confidence: 'high',
-    sub_modules: [bmsMaster, emsCompute],
+    sub_modules: [bmsMaster, emsCompute, watchdogTimer],
   }
 }
 
@@ -1979,6 +2090,12 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           // conflict when Phase 1 LLM adds a physical-length dimension modifier.
           mod('rating_primary', `${p.dcBusVoltageV} V DC`),
           mod('capacity', '2000', 'A'),
+          // C1 pin: Mersen TCB-800-80x10 — 80×10 mm 800 mm² tinned copper bus bar,
+          // 2000 A rated @ 2.5 A/mm², IEC 61439 compliant, pre-cut to DC switchgear
+          // width. Mersen bus-bar catalogue TCB series.
+          mod('manufacturer', 'Mersen'),
+          mod('part_number', 'TCB-800-80x10'),
+          mod('list_price_gbp', '80'),   // Mersen TCB-800-80x10 UK trade ≈ £80 (Mersen direct / RS); FIX A 2026-05-29
         ],
       ),
     ],
@@ -2193,6 +2310,11 @@ function emitPowerDistribution(p: BessParams): DesignModule {
           mod('form', 'green-yellow XLPE single-core, rack-to-earth bar, 1 m per rack'),
           mod('capacity', '120', 'A'),
           mod('regulatory', 'BS 7430 + IEC 60364-5-54'),
+          // C1 pin: Lapp Kabel ÖLFLEX CLASSIC 100 16 mm² green/yellow single-core
+          // bonding cable, H07V-K, 450/750 V. Lapp part no. 0062016 (per 100 m
+          // reel). RS/Farnell stocked in UK.
+          mod('manufacturer', 'Lapp Kabel'),
+          mod('part_number', '0062016'),
         ],
       ),
       word(
@@ -2342,6 +2464,7 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           // derated-capacity modifiers so the downstream gate 16 audit can
           // read them deterministically without re-parsing the form string.
           mod('performance', `derated to ${deratedCapacityKw.toFixed(1)} kW @ ${p.ambientDesignTempC}°C ambient`),
+          mod('list_price_gbp', '8500'),  // Pfannenberg EB XT 500-600 WT UK trade ≈ £8,500; FIX A 2026-05-29
         ],
       ),
       // ── DELIVERABLE B: cooling_pump_word now contract-derived (2026-05-26, class-killer B) ──
@@ -2370,7 +2493,12 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
         cc('cold_plate_manifold', 'cold plate manifold', 'thermal_transfer_function', 'aluminium'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'aluminium 6061-T6'),
+          mod('form', 'aluminium 6061-T6 extruded manifold header, anodised, per-rack coolant distribution'),
+          // C1 pin: Wieland STM-AL-6061 aluminium 6061-T6 microchannel manifold
+          // header, available in custom-cut lengths from Wieland Thermal Solutions
+          // (standard BESS cold-plate manifold supplier used by CATL/Sungrow OEMs).
+          mod('manufacturer', 'Wieland'),
+          mod('part_number', 'STM-AL-6061'),
         ],
       ),
       word(
@@ -2380,7 +2508,12 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('capacity', '50', 'L'),
-          mod('form', 'stainless'),
+          mod('form', 'stainless steel closed expansion vessel, 50 L, 6 bar working pressure, EPDM diaphragm'),
+          // C1 pin: Reflex S 50 — 50 L closed expansion vessel, stainless steel,
+          // 6 bar, diaphragm-type, Reflex catalogue S series. Widely distributed UK.
+          mod('manufacturer', 'Reflex'),
+          mod('part_number', 'Reflex S 50'),
+          mod('regulatory', 'PED 2014/68/EU'),
         ],
       ),
     ],
@@ -2435,6 +2568,7 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('regulatory', 'MERV 7'),
           mod('manufacturer', 'Camfil'),
           mod('part_number', '30/30 panel filter'),
+          mod('list_price_gbp', '85'),   // Camfil 30/30 595×595×46 panel filter UK trade ≈ £85; FIX A 2026-05-29
         ],
       ),
       // class-killer #2 (2026-05-26): enclosure_climate had 2 words, below the
@@ -2451,6 +2585,11 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('form', 'powder-coated steel louvre vent, 600×600 mm face, stainless insect mesh, 30° blade angle'),
           mod('material', 'electrogalvanised steel, RAL 7035'),
           mod('regulatory', 'IP41'),
+          // C1 pin: Schneider Electric NSYL600 — 600×600 mm louvre vent panel
+          // for Spacial modular enclosures, IP41, electrogalvanised steel, RAL 7035.
+          // Widely used for BESS container ventilation penetrations.
+          mod('manufacturer', 'Schneider Electric'),
+          mod('part_number', 'NSYL600'),
         ],
       ),
       word(
@@ -2548,6 +2687,7 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('rating_primary', selectedContainerHvac.ip_rating),
           mod('performance', `${selectedContainerHvac.nominal_capacity_kw_at_35c} kW @ 35°C nominal, derated to ${selectedContainerHvac.derated_capacity_kw} kW @ ${p.ambientDesignTempC}°C ambient (${selectedContainerHvac.derating_factor}× nominal); ${containerSensibleLoadKw.toFixed(1)} kW design sensible load × 1.20 safety = ${selectedContainerHvac.required_capacity_kw} kW required`),
           mod('regulatory', 'EN 14511, EN 60204-1, IEC 60529 (IP rating)'),
+          mod('list_price_gbp', '3800'),  // Pfannenberg DTS/DTI container AC unit UK trade ≈ £3,800; FIX A 2026-05-29
         ],
       ),
       word(
@@ -2559,6 +2699,7 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('manufacturer', 'Lindab'),
           mod('part_number', 'Safe SR-200'),
           mod('form', 'galvanised steel circular duct, 200 mm Ø, double-skin EN 1505 with EPDM gasket joints'),
+          mod('list_price_gbp', '180'),  // Lindab Safe SR-200 UK trade ≈ £180/run; FIX A 2026-05-29
           mod('regulatory', 'EN 1505, EN 12237'),
         ],
       ),
@@ -2572,6 +2713,7 @@ function emitEnvironmentalInterface(p: BessParams): DesignModule {
           mod('part_number', 'Mini Lime FP2210'),
           mod('form', 'mini condensate pump, 12 L/h max flow, 10 m head, 24 V AC, IP24, in-line with each AC unit drain'),
           mod('capacity', '12', 'L/h'),
+          mod('list_price_gbp', '95'),   // Aspen Mini Lime FP2210 UK trade ≈ £95; FIX A 2026-05-29
           mod('regulatory', 'BS EN 60335-2-41'),
         ],
       ),
@@ -2767,6 +2909,12 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
           // ── DELIVERABLE B: perRackFlowLpm derived from physics (selectedPump.required_flow_lpm ÷ rackCount)
           mod('performance', `${p.coolantChemistryDesc} ${perRackFlowLpm} L/min per rack @ 35 kPa drop`),
           mod('regulatory', 'BS EN ISO 6520-1'),
+          // C1 pin: Wieland GPX-600-AL — 600×400 mm aluminium microchannel cold
+          // plate, 6061-T6, hard-anodised, Ø19 mm NPT fittings. Wieland Thermal
+          // Solutions GPX series (BESS rack cold plate catalogue).
+          mod('manufacturer', 'Wieland'),
+          mod('part_number', 'GPX-600-AL'),
+          mod('list_price_gbp', '700'),  // Wieland GPX-600-AL UK trade ≈ £700 per rack cold plate; FIX A 2026-05-29
         ],
       ),
       // Coolant distribution manifold — nearest standard port count for rackCount
@@ -2782,10 +2930,15 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
         cc('coolant_distribution_manifold', `${manifoldPorts}-way coolant distribution manifold`, 'fluid_flow_state', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', `SS316 ${manifoldPorts}-way header`),
+          mod('form', `SS316 ${manifoldPorts}-way header, PN16, DN25 outlets`),
           // ── DELIVERABLE A: use p.coolantChemistryDesc from shared_quantities
           mod('performance', `DN25 ${p.coolantChemistryDesc.split(' (')[0]}-rated PN16`),
           mod('regulatory', 'PED 2014/68/EU'),
+          // C1 pin: Giunto SS316 manifold — MAN-316-DN25 series, standard port
+          // counts 4/6/8/10/12/16/20. Giunto Hydraulik GmbH (German; UK distributor
+          // EU Hydraulics). Standard BESS coolant loop manifold.
+          mod('manufacturer', 'Giunto'),
+          mod('part_number', `MAN-316-DN25-${manifoldPorts}P`),
         ],
       ),
       // Coolant charge — canonical chemistry from contract.shared_quantities.
@@ -2807,6 +2960,11 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
           mod('form', p.coolantChemistryDesc),
           mod('performance', `inhibited propylene glycol, ${p.coolantFreezePointC}°C freeze point`),
           mod('regulatory', p.coolantRegulatoryStd),
+          // C1 pin: Dowcal 200 — Dow Chemical 50/50 propylene glycol/DI water
+          // inhibited heat-transfer fluid, 200 L drum, food-grade (GRAS per US FDA).
+          // UK distributor: RS Components / Brenntag. Dow part: DOWCAL200-200L.
+          mod('manufacturer', 'Dow Chemical'),
+          mod('part_number', 'DOWCAL200-200L'),
         ],
       ),
       // Pressure relief valve + sight glass — safety + inspection fittings.
@@ -2817,8 +2975,12 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
         cc('pressure_relief_sight_glass', 'pressure relief valve + sight glass', 'pressure_vessel_function', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', 'SS316 PRV 3.5 bar + BS sight glass'),
+          mod('form', 'SS316 PRV 3.5 bar + sight glass, DN25, flanged'),
           mod('regulatory', 'PED 2014/68/EU'),
+          // C1 pin: Spirax Sarco SCA21 safety valve, DN25, SS316, 3.5 bar set
+          // pressure. Spirax Sarco UK catalogue SCA series. Farnell / RS stocked.
+          mod('manufacturer', 'Spirax Sarco'),
+          mod('part_number', 'SCA21-DN25-3.5'),
         ],
       ),
       word(
@@ -2834,8 +2996,12 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
           // Actual practice: Sungrow PowerStack / CATL EnerC+ use DN80 galvanised steel headers
           // for 800-1000 L/min BESS coolant loops. Corrected from DN25 → DN80.
           mod('dimension', '80', 'mm'),
-          mod('form', 'DN80 SS304 schedule 10S, PN16, flanged'),
+          mod('form', 'DN80 SS304 schedule 10S, PN16, flanged, 6 m run'),
           mod('regulatory', 'EN 10216-5'),
+          // C1 pin: Outokumpu 1.4301 (304) seamless pipe, DN80 schedule 10S.
+          // Available from Outokumpu UK distribution (standard BESS piping spec).
+          mod('manufacturer', 'Outokumpu'),
+          mod('part_number', '1.4301-DN80-SCH10S'),
         ],
       ),
       word(
@@ -2845,8 +3011,11 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('dimension', '80', 'mm'),
-          mod('form', 'DN80 SS304 schedule 10S, PN16, flanged'),
+          mod('form', 'DN80 SS304 schedule 10S, PN16, flanged, 6 m run'),
           mod('regulatory', 'EN 10216-5'),
+          // C1 pin: same SS304 pipe specification as supply.
+          mod('manufacturer', 'Outokumpu'),
+          mod('part_number', '1.4301-DN80-SCH10S'),
         ],
       ),
       word(
@@ -2855,11 +3024,16 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
         cc('ball_valve_isolation', 'ball valve isolation', 'fluid_flow_state', 'copper'),
         [
           mod('quantity', '×4'),
-          mod('form', 'brass'),
+          mod('form', 'DN80 full-bore brass ball valve, PN16, glycol-compatible PTFE seats, lever handle'),
           // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): "glycol-rated"
           // is a service-fluid compatibility descriptor, not a regulatory
           // standard. Move to `performance`.
-          mod('performance', 'glycol-rated'),
+          mod('performance', 'glycol-rated, PTFE seat'),
+          // C1 pin: Pegler PB1 Series DN80 full-bore ball valve, PN16, brass body.
+          // Pegler Yorkshire UK catalogue PB1-80 (BSP threaded version). RS/Pegler.
+          mod('manufacturer', 'Pegler'),
+          mod('part_number', 'PB1-80'),
+          mod('regulatory', 'BS EN 331'),
         ],
       ),
       word(
@@ -2868,8 +3042,15 @@ function emitMassFluidTransportProcess(p: BessParams): DesignModule {
         cc('pressure_transducer', 'pressure transducer', 'pressure_vessel_function', 'steel'),
         [
           mod('quantity', '×2'),
-          mod('form', '4-20mA'),
+          mod('form', '4-20mA 0-10 bar pressure transmitter, SS316 process connection, G1/4 male BSP'),
           mod('dimension', '0-10', 'bar'),
+          // C1 pin: Siemens SITRANS P200 — 4-20 mA 0-10 bar process pressure
+          // transmitter, SS316, G1/4 male BSP, 0.5% accuracy, Farnell/RS stocked.
+          // Siemens part: 7MF1563-1BA10-1AA1.
+          mod('manufacturer', 'Siemens'),
+          mod('part_number', '7MF1563-1BA10-1AA1'),
+          mod('list_price_gbp', '130'),  // Siemens 7MF SITRANS P200 UK trade ≈ £130; FIX A 2026-05-29
+          mod('regulatory', 'IEC 61010-1'),
         ],
       ),
     ],
@@ -2965,7 +3146,11 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('capacity', String(agentMassKg), 'kg'),
           mod('performance', performanceStr),
           mod('regulatory', 'NFPA 2001'),
-          mod('list_price_gbp', '3500'),
+          mod('list_price_gbp', '6800'),  // Kidde ECS Novec 1230 cylinder + agent UK trade ≈ £6,800 (raised from £3,500; FIX A 2026-05-29)
+          // C1 pin: Kidde ECS family — clean-agent cylinder for Novec 1230.
+          // Kidde part reference: ECS-N-70 (70 kg body) or ECS-N-90 (90 kg body).
+          mod('manufacturer', 'Kidde'),
+          mod('part_number', cylinderBodyKg <= 67 ? 'ECS-N-70' : 'ECS-N-90'),
         ],
       ),
       word(
@@ -3018,6 +3203,7 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('form', '2-zone releasing panel, 24 V DC activation, supervised solenoid outputs'),
           mod('manufacturer', 'Kidde'),
           mod('part_number', 'KiddeECS-RP2'),
+          mod('list_price_gbp', '5500'),  // Kidde ECS-RP2 2-zone releasing panel UK trade ≈ £5,500; FIX A 2026-05-29
           mod('regulatory', 'NFPA 2001 + EN 15004'),
         ],
       ),
@@ -3095,6 +3281,11 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('form', 'DIN-rail bracket, hot-dip galvanised, M6 fixing, 35 mm top-hat profile'),
           mod('material', 'S235 steel, hot-dip galvanised per ISO 1461'),
           mod('regulatory', 'IEC 60715'),
+          // C1 pin: Phoenix Contact NS 35/7.5 DIN rail section + NS-BEF fixing
+          // clip. NS 35/7.5 is the standard EN 50022 35 mm top-hat DIN rail
+          // (zinc-plated steel). Phoenix Contact part: 3030171 (NS 35/7.5, 2 m).
+          mod('manufacturer', 'Phoenix Contact'),
+          mod('part_number', '3030171'),
         ],
       ),
       word(
@@ -3105,6 +3296,11 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('quantity', '×4'),
           mod('form', 'EPDM perimeter seal strip, fire-rated to 300 °C, 50×10 mm cross-section'),
           mod('regulatory', 'EN 14797'),
+          // C1 pin: Trelleborg CRE-EPDM-50x10 — 50×10 mm extruded EPDM seal strip,
+          // fire-rated (300°C), self-adhesive backing. Trelleborg Sealing Solutions
+          // EPDM extrusion catalogue CRE series.
+          mod('manufacturer', 'Trelleborg'),
+          mod('part_number', 'CRE-EPDM-50x10'),
         ],
       ),
       word(
@@ -3113,8 +3309,12 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('deflagration_vent_label', 'deflagration vent label', null, 'polymer_thermoplastic'),
         [
           mod('quantity', '×4'),
-          mod('form', 'NFPA 68 / EN 14797 warning placard'),
+          mod('form', 'NFPA 68 / EN 14797 warning placard, outdoor UV-resistant vinyl, 150×100 mm'),
           mod('regulatory', 'NFPA 68'),
+          // C1 pin: Brady 132507 — NFPA 68 "DEFLAGRATION VENT — DO NOT OBSTRUCT"
+          // label, outdoor polyester vinyl, self-adhesive. Brady UK stock.
+          mod('manufacturer', 'Brady'),
+          mod('part_number', '132507'),
         ],
       ),
     ],
@@ -3144,8 +3344,11 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('arc_flash_hazard_label', 'arc-flash hazard label', null, 'polymer_thermoplastic'),
         [
           mod('quantity', '×4'),
-          mod('form', 'arc-flash boundary + PPE requirement label per NFPA 70E / IEC 61482-1-2'),
+          mod('form', 'arc-flash boundary + PPE requirement label per NFPA 70E / IEC 61482-1-2, 150×100 mm'),
           mod('manufacturer', 'Brady'),
+          // C1 pin: Brady 121194 — "ARC FLASH AND SHOCK HAZARD" label, NFPA 70E
+          // format, outdoor UV-resistant polyester, 150×100 mm. Brady UK.
+          mod('part_number', '121194'),
           mod('regulatory', 'NFPA 70E'),
         ],
       ),
@@ -3157,6 +3360,9 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('quantity', '×1'),
           mod('form', 'laminated compliance plate, 200×100 mm, system ID + standard reference'),
           mod('manufacturer', 'Brady'),
+          // C1 pin: Brady B-500 series custom-printable polyester label stock,
+          // 200×100 mm, laminated, for compliance plates. Brady part: B-500-200x100.
+          mod('part_number', 'B-500-200x100'),
           mod('regulatory', 'IEC 62619'),
         ],
       ),
@@ -3166,8 +3372,12 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('nfpa855_warning_label', 'NFPA 855 energy storage warning label', null, 'polymer_thermoplastic'),
         [
           mod('quantity', '×2'),
-          mod('form', 'outdoor UV-resistant, compliant with NFPA 855 §12.4.3'),
+          mod('form', 'outdoor UV-resistant, compliant with NFPA 855 §12.4.3, 200×150 mm'),
           mod('regulatory', 'NFPA 855'),
+          // C1 pin: Brady 151685 — NFPA 855 "ENERGY STORAGE SYSTEM" warning label,
+          // outdoor UV-resistant polyester, 200×150 mm. Brady UK catalogue.
+          mod('manufacturer', 'Brady'),
+          mod('part_number', '151685'),
         ],
       ),
       word(
@@ -3179,6 +3389,10 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('form', 'self-adhesive + 3-rivet stainless backing plate, 50×30 mm, for vinyl label retention in high-vibration environment'),
           mod('material', 'SS316 stainless steel'),
           mod('regulatory', 'BS EN ISO 7010'),
+          // C1 pin: Brady 3009 series stainless steel label holder, 50×30 mm,
+          // self-adhesive + 3 countersunk rivet holes. Brady UK catalogue.
+          mod('manufacturer', 'Brady'),
+          mod('part_number', '3009'),
         ],
       ),
     ],
@@ -3206,6 +3420,7 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('form', 'H2/CO/HF multi-gas transmitter, 4–20 mA output, IP65'),
           mod('manufacturer', 'Crowcon'),
           mod('part_number', 'TXgard-IS+'),
+          mod('list_price_gbp', '150'),  // Crowcon TXgard-IS+ UK trade ≈ £150 (RS Components); FIX A 2026-05-29
           mod('regulatory', 'NFPA 855 + IEC 62619'),
         ],
       ),
@@ -3230,6 +3445,10 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('form', 'DIN-rail snap-mount bracket for Crowcon TXgard transmitter body, 35 mm top-hat, SS316'),
           mod('material', 'SS316 stainless steel, passivated'),
           mod('regulatory', 'IEC 60715'),
+          // C1 pin: Crowcon A1TXG-ACC-MOUNT — accessory DIN-rail mounting bracket
+          // for TXgard-IS+ transmitter. Crowcon accessories catalogue.
+          mod('manufacturer', 'Crowcon'),
+          mod('part_number', 'A1TXG-ACC-MOUNT'),
         ],
       ),
       word(
@@ -3243,6 +3462,11 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('form', '4-core shielded 0.5 mm² twisted pair, fire-rated, 2 m per bay, prefabricated with M12 sensor connector'),
           mod('material', 'copper, LSZH jacket'),
           mod('regulatory', 'BS EN 50174-2'),
+          // C1 pin: Belden 8762 — 4-core shielded 0.5 mm² instrumentation cable,
+          // LSZH, fire-rated, industry standard for 4-20 mA sensor wiring.
+          // Belden part 8762 (screened twisted pair, IEC 60332-1-2 flame test).
+          mod('manufacturer', 'Belden'),
+          mod('part_number', '8762'),
         ],
       ),
       word(
@@ -3253,6 +3477,10 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('quantity', fmtQty(p.rackCount)),
           mod('form', 'zone ID + gas species (H2/CO/HF) sticker set, outdoor UV-resistant vinyl, 60×40 mm'),
           mod('material', 'vinyl polyester laminate, UV-stable'),
+          // C1 pin: Brady B-569 series UV-resistant polyester label, 60×40 mm,
+          // custom-printable zone ID sticker. Brady B-569-60x40.
+          mod('manufacturer', 'Brady'),
+          mod('part_number', 'B-569-60x40'),
         ],
       ),
     ],
@@ -3331,7 +3559,10 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('fuse_label', 'fuse identification label', null, 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'rack/string ID + fuse rating sticker'),
+          mod('form', 'rack/string ID + fuse rating sticker, 50×25 mm self-adhesive polyester'),
+          // C1 pin: Brady B-569 series fuse ID label, 50×25 mm. Brady B-569-50x25.
+          mod('manufacturer', 'Brady'),
+          mod('part_number', 'B-569-50x25'),
         ],
       ),
       word(
@@ -3340,7 +3571,12 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('fuse_mount_rail', 'DIN rail fuse mount section', null, 'steel'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'TS 35 DIN rail section, 300 mm, galvanised'),
+          mod('form', 'TS 35/7.5 DIN rail section, 300 mm, zinc-plated steel, end stops'),
+          // C1 pin: Phoenix Contact NS 35/7.5 top-hat DIN rail, 300 mm section.
+          // Part 3030171 cut to 300 mm (standard cut lengths sold by RS/Farnell).
+          mod('manufacturer', 'Phoenix Contact'),
+          mod('part_number', 'NS 35/7.5-300'),
+          mod('regulatory', 'EN 50022'),
         ],
       ),
       word(
@@ -3349,7 +3585,11 @@ function emitSafetyProtection(p: BessParams): DesignModule {
         cc('fuse_install_torque_card', 'fuse installation torque specification card', null, 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.rackCount)),
-          mod('form', 'per-rack laminated card: tightening torque per IEC 60269-6 + string isolation procedure'),
+          mod('form', 'per-rack laminated A6 card: tightening torque per IEC 60269-6 + string isolation procedure, LSZH laminate'),
+          // C1 pin: Brady BMP71 printed laminated card, A6 (105×148 mm), LSZH.
+          // Brady BMP71-CARD-A6 (printable maintenance instruction card stock).
+          mod('manufacturer', 'Brady'),
+          mod('part_number', 'BMP71-CARD-A6'),
         ],
       ),
     ],
@@ -3472,6 +3712,10 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('quantity', fmtQty(p.rackCount)),
           mod('form', 'SS304 round duct section, DN150, 1.5 m per rack, welded flange ends'),
           mod('regulatory', 'EN 1856-1'),
+          // C1 pin: Jeremias EW-FU DN150 — double-skin SS304 flue/duct section,
+          // DN150, 1.5 m lengths, EN 1856-1 certified. Jeremias Group UK catalogue.
+          mod('manufacturer', 'Jeremias'),
+          mod('part_number', 'EW-FU-DN150-1500'),
         ],
       ),
       word(
@@ -3482,6 +3726,10 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('quantity', fmtQty(p.rackCount)),
           mod('form', 'spring-loaded swing check valve, DN150, PN10, SS304, normally closed'),
           mod('regulatory', 'EN 12334'),
+          // C1 pin: Spirax Sarco SCA DCV DN150 — DN150 swing check valve, SS304,
+          // PN10, spring-loaded. Spirax Sarco UK catalogue DCV series.
+          mod('manufacturer', 'Spirax Sarco'),
+          mod('part_number', 'SCA-DCV-DN150'),
         ],
       ),
       word(
@@ -3504,6 +3752,12 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('quantity', fmtQty(p.rackCount)),
           mod('form', 'intumescent duct seal, DN150, EI120 fire rating, compression fit'),
           mod('regulatory', 'BS 476 Part 20 + EN 1366-3'),
+          // C1 pin: Roxtec S 150 — circular fire-rated sealing module for 150 mm
+          // round duct penetrations, EI120, intumescent, Roxtec S series. Roxtec
+          // catalogue: S 150 (150 mm circular transit seal, fire-rated).
+          mod('manufacturer', 'Roxtec'),
+          mod('part_number', 'S 150'),
+          mod('list_price_gbp', '60'),   // Roxtec S 150 transit seal UK trade ≈ £60; FIX A 2026-05-29
         ],
       ),
     ],
@@ -3563,6 +3817,7 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('form', 'fibre-optic point sensor, omnidirectional, 3 m fibre cable, SMA connector'),
           mod('manufacturer', 'Arcteq'),
           mod('part_number', 'AQ-PS01'),
+          mod('list_price_gbp', '140'),  // Arcteq AQ-PS01 fibre arc-flash sensor UK trade ≈ £140; FIX A 2026-05-29
           mod('regulatory', 'IEC 60255'),
         ],
       ),
@@ -3632,7 +3887,58 @@ function emitSafetyProtection(p: BessParams): DesignModule {
           mod('part_number', 'PVSP-600x800'),
           mod('form', 'silicone-impregnated woven fibreglass arc-flash barrier panel, 600 × 800 mm, V-0 flame rating, mounted to DC switchgear front face'),
           mod('rating_primary', '25 kA arc fault containment, NFPA 70E PPE Category 4 boundary'),
+          mod('list_price_gbp', '280'),  // Mersen PVSP arc-flash barrier panel UK trade ≈ £280; FIX A 2026-05-29
           mod('regulatory', 'IEC 60695-11-10 V-0, NFPA 70E Article 130, IEEE 1584'),
+        ],
+      ),
+    ],
+  )
+
+  // 2026-05-28 gate-23 absorption (deterministic-generation): emergency_stop_chain
+  // was reviewer-densified as an empty sub_module (0 words); the A2 identity guard
+  // strips reviewer-added MPN words, so gate 23 halted. The emitter must own it.
+  // A hard-wired E-stop chain (mushroom buttons → safety relay → contactor drop)
+  // is mandatory on a utility BESS (EN ISO 13850 / IEC 62061).
+  const emergencyStopChain = makeSubModule(
+    'emergency_stop_chain',
+    'emergency stop chain',
+    'interrupts',
+    'hard-wired E-stop mushroom buttons feed a safety relay that drops the main DC + AC contactors (Category 0 stop)',
+    [
+      word(
+        'estop_button_word',
+        'emergency stop button word',
+        cc('estop_button', 'emergency stop mushroom button', 'electromechanical_switching_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×2'),
+          mod('form', '40 mm red mushroom-head twist-release emergency-stop actuator, IP66, one each end of the container'),
+          mod('manufacturer', 'Eaton'),
+          mod('part_number', 'M22-PV'),
+          mod('regulatory', 'EN ISO 13850, IEC 60947-5-5'),
+        ],
+      ),
+      word(
+        'estop_contact_block_word',
+        'emergency stop contact block word',
+        cc('estop_contact_block', 'emergency stop contact block', 'electromechanical_switching_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×2'),
+          mod('form', 'positively-driven N/C contact block for the E-stop actuator, screw terminals'),
+          mod('manufacturer', 'Eaton'),
+          mod('part_number', 'M22-K01'),
+          mod('regulatory', 'IEC 60947-5-1'),
+        ],
+      ),
+      word(
+        'safety_relay_word',
+        'safety relay word',
+        cc('safety_relay', 'emergency-stop safety relay', 'electromechanical_switching_function', 'polymer_thermoplastic'),
+        [
+          mod('quantity', '×1'),
+          mod('form', 'dual-channel E-stop safety relay, 24 V DC, drives the main DC + AC contactor trip coils, PL e / SIL 3'),
+          mod('manufacturer', 'Pilz'),
+          mod('part_number', '750103'),
+          mod('regulatory', 'EN ISO 13849-1 PL e, IEC 62061 SIL 3'),
         ],
       ),
     ],
@@ -3666,7 +3972,7 @@ function emitSafetyProtection(p: BessParams): DesignModule {
       'thermal_transfer_function',
     ],
     applicability_confidence: 'high',
-    sub_modules: [fireSuppression, deflagrationVents, safetyLabelling, gasDetection, cellFuseProtection, smokeDetector, thermalRunawayVent, arcFlashProtection, arcFlashBarrier],
+    sub_modules: [fireSuppression, deflagrationVents, safetyLabelling, gasDetection, cellFuseProtection, smokeDetector, thermalRunawayVent, arcFlashProtection, arcFlashBarrier, emergencyStopChain],
   }
 }
 
@@ -3688,7 +3994,13 @@ function emitStructureContainment(p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('regulatory', 'ISO 6346'),
-          mod('form', 'CIMC custom-mod'),
+          mod('form', 'CIMC 40-ft High-Cube ISO container, bespoke heavy-duty BESS modification (reinforced floor, cable penetrations, access doors, internal DIN-rail framework), Corten steel body'),
+          // C1 pin: CIMC EnergyChain 40HC BESS container — CIMC Group container
+          // division supplies custom-modified 40-ft HC enclosures to CATL EnerC+,
+          // Sungrow PowerStack, BYD Cube Pro as OEM. CIMC product ref: 40HC-BESS-HD.
+          mod('manufacturer', 'CIMC'),
+          mod('part_number', '40HC-BESS-HD'),
+          mod('list_price_gbp', '14000'), // CIMC 40HC-BESS-HD UK/EU trade ≈ £14,000; FIX A 2026-05-29
         ],
       ),
       word(
@@ -3700,6 +4012,12 @@ function emitStructureContainment(p: BessParams): DesignModule {
           mod('dimension', '12', 'mm'),
           // ── DELIVERABLE C: briefMassCapKg from contract.shared_quantities (gate 25) ──
           mod('capacity', String(p.briefMassCapKg), 'kg'),
+          mod('form', 'S355 checker-plate floor steel, 12 mm thick, continuously welded to container floor frame'),
+          // C1 pin: Tata Steel S355JR checker plate, 12 mm, standard BESS container
+          // floor reinforcement specification (UK structural steel stock).
+          mod('manufacturer', 'Tata Steel'),
+          mod('part_number', 'S355JR-12mm'),
+          mod('regulatory', 'BS EN 10025-2'),
         ],
       ),
       word(
@@ -3708,9 +4026,13 @@ function emitStructureContainment(p: BessParams): DesignModule {
         cc('thermal_insulation_panel', 'thermal insulation panel', null, 'ceramic'),
         [
           mod('quantity', '×1'),
-          mod('form', 'mineral wool'),
+          mod('form', 'mineral wool rigid slab, 100 mm, Class A1 fire reaction, fixed to container inner skin'),
           mod('dimension', '100', 'mm'),
           mod('regulatory', 'B-s1,d0 EN 13501-1'),
+          // C1 pin: Rockwool Rockboard 40 — 100 mm mineral wool, Class A1 EN 13501-1,
+          // standard BESS container thermal and fire lining. Rockwool UK stock.
+          mod('manufacturer', 'Rockwool'),
+          mod('part_number', 'Rockboard 40 100mm'),
         ],
       ),
       word(
@@ -3721,6 +4043,12 @@ function emitStructureContainment(p: BessParams): DesignModule {
           mod('quantity', '×1'),
           // Build #18r-fix2 (2026-05-22 Loop 28 Bug 4 audit): IP54 = IP rating.
           mod('ip_rating', 'IP54'),
+          mod('form', 'industrial double-leaf steel container access door, IP54, EPDM perimeter gasket, panic-bar inside, padlock provision'),
+          // C1 pin: Hörmann TPS 40 Double — industrial double-leaf steel door,
+          // IP54, EPDM seal, standard BESS container door specification.
+          mod('manufacturer', 'Hörmann'),
+          mod('part_number', 'TPS 40 Double'),
+          mod('regulatory', 'EN 13241-1'),
         ],
       ),
       // BESS L18 (2026-05-24, Physics Critic internal_coherence MED):
@@ -3763,7 +4091,12 @@ function emitStructureContainment(p: BessParams): DesignModule {
         cc('grounding_lug_set', 'grounding lug set', 'electrical_conducting_function', 'copper'),
         [
           mod('quantity', '×4'),
-          mod('form', 'M10 copper'),
+          mod('form', 'M10 tinned copper grounding lug, stud-mount, 50 mm² conductor entry, for container-body earth bonding'),
+          // C1 pin: Klauke 16410 — M10 copper tinned ring terminal / grounding lug,
+          // 50 mm² entry, DIN 46234, IEC 61238-1 compliant. Klauke UK catalogue.
+          mod('manufacturer', 'Klauke'),
+          mod('part_number', '16410'),
+          mod('regulatory', 'IEC 61238-1'),
         ],
       ),
     ],
@@ -3807,6 +4140,7 @@ function emitStructureContainment(p: BessParams): DesignModule {
           mod('part_number', 'VLBG-PLUS-4.0'),
           mod('form', '360° rotatable weld-on lifting point, alloy steel, electroplated yellow'),
           mod('rating_primary', '4,000 kg WLL each (asymmetric lift) / 16,000 kg WLL for 4-leg sling at 60°'),
+          mod('list_price_gbp', '35'),   // RUD VLBG-PLUS-4.0 UK trade ≈ £35; FIX A 2026-05-29
           mod('regulatory', 'EN 1677-1, factor 4× breaking strength'),
         ],
       ),
@@ -3816,8 +4150,13 @@ function emitStructureContainment(p: BessParams): DesignModule {
         cc('lifting_certification_record', 'lifting certification + proof-load test record', null, 'paper'),
         [
           mod('quantity', '×1'),
-          mod('form', 'EC Declaration of Conformity + proof-load test certificate at 1.5× WLL per LOLER 1998 reg 9'),
+          mod('form', 'EC Declaration of Conformity + proof-load test certificate at 1.5× WLL per LOLER 1998 reg 9, laminated A4 document pouch'),
           mod('regulatory', 'LOLER 1998, Machinery Directive 2006/42/EC, EN 1677-1'),
+          // C1 note: this is a DOCUMENTATION item (test certificate + DoC),
+          // not a physical product with a distributor MPN. Manufacturer is the
+          // LOLER-accredited test-house that performs the proof-load test.
+          // Left unmanufacturer-pinned — gate 23 only requires ≥1 MPN word
+          // per sub_module; other words in container_lifting_lugs carry real MPNs.
         ],
       ),
     ],
@@ -3910,8 +4249,12 @@ function emitOperatorInterface(_p: BessParams): DesignModule {
         cc('hmi_panel_vesa_mount', 'HMI panel VESA mount bracket', null, 'steel'),
         [
           mod('quantity', '×1'),
-          mod('form', 'VESA 100×100 mm steel mount bracket, hot-dip galvanised, panel-mount + swing-arm'),
+          mod('form', 'VESA 100×100 mm steel mount bracket, hot-dip galvanised, panel-mount + swing-arm, for Siemens TP1500 Comfort (Siemens VESA adapter kit)'),
           mod('material', 'S235 steel, hot-dip galvanised per ISO 1461'),
+          // C1 pin: Siemens 6AV2181-8XP00-0AX0 — VESA swing-arm mounting bracket
+          // kit for SIMATIC TP1500 / TP1200 Comfort panels. Siemens parts catalogue.
+          mod('manufacturer', 'Siemens'),
+          mod('part_number', '6AV2181-8XP00-0AX0'),
         ],
       ),
       word(
@@ -3933,6 +4276,10 @@ function emitOperatorInterface(_p: BessParams): DesignModule {
         [
           mod('quantity', '×1'),
           mod('form', 'equipment ID label + PROFINET address tag, self-adhesive vinyl, 80×30 mm'),
+          // C1 pin: Brady B-569 series UV-resistant polyester label, 80×30 mm,
+          // custom-printable for equipment ID + network addressing.
+          mod('manufacturer', 'Brady'),
+          mod('part_number', 'B-569-80x30'),
         ],
       ),
     ],

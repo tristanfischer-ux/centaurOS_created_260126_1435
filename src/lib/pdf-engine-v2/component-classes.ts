@@ -75,6 +75,12 @@ export type ComponentClass =
   | 'fluid_path'              // pipes, valves, manifolds, fittings, hoses
   | 'safety_consumable'       // fuses, breakers, fire-suppression cartridges
   | 'oem_subsystem'           // pre-built modules: inverter, PSU, GPU board, compressor
+  // ── C4 (2026-05-28): oem_subsystem sub-classes split out so distinct reference
+  //    costs replace the single £10k BESS override that conflated chillers, AC
+  //    units, and aspirating smoke detectors into the same price band.
+  | 'oem_hvac_chiller'        // liquid chiller / air-handling unit (Pfannenberg EB XT, Stulz, Emerson): £2k-£25k
+  | 'oem_fire_safety'         // fire panel, aspirating smoke detection controller, gas suppression cabinet: £800-£8k
+  | 'oem_smoke_detection'     // aspirating smoke detector head / point detector panel — Hochiki, Apollo, Vesda VLF: £150-£2,500
 
 export type CostCurvePoint = {
   // Annual production volume of the FINAL PRODUCT (the brief value), not the
@@ -437,6 +443,72 @@ export const COMPONENT_CURVES: Record<ComponentClass, ComponentCostCurve> = {
       { annual_volume: 1000000, unit_cost_multiplier: 0.48 },
     ],
   },
+
+  // ── C4 sub-classes (2026-05-28) ────────────────────────────────────────────
+  // These decompose the £10k BESS `oem_subsystem` override that was conflating
+  // three completely different product categories (liquid-cooling chiller, AC
+  // unit, aspirating smoke detector) into a single price point. Each sub-class
+  // now has its own calibrated reference cost and inelastic curve (they are all
+  // vendor-supplied, low-volume bespoke industrial purchases).
+
+  oem_hvac_chiller: {
+    class: 'oem_hvac_chiller',
+    reference_unit_cost_gbp: 8000.0,
+    source: 'grok_4_3_spot_check',
+    notes:
+      'Liquid chillers and air-handling units for industrial / BESS thermal ' +
+      'management — Pfannenberg EB XT / CC series, Stulz CyberCool, Emerson ' +
+      'Liebert. Typical range £2,000-£25,000 depending on rated cooling kW. ' +
+      'Extremely inelastic (vendor-bound, low-rate industrial purchase). ' +
+      'Anchor £8,000 (covers 20-50 kW utility-BESS class — EB XT 500 WT). ' +
+      'Replaces the £10k oem_subsystem override that mis-priced chillers at ' +
+      'the same value as full BMS masters.',
+    curve: [
+      { annual_volume: 1, unit_cost_multiplier: 1.0 },
+      { annual_volume: 100, unit_cost_multiplier: 0.92 },
+      { annual_volume: 10000, unit_cost_multiplier: 0.75 },
+      { annual_volume: 1000000, unit_cost_multiplier: 0.55 },
+    ],
+  },
+
+  oem_fire_safety: {
+    class: 'oem_fire_safety',
+    reference_unit_cost_gbp: 3500.0,
+    source: 'grok_4_3_spot_check',
+    notes:
+      'Fire panels, aspirating smoke detection (ASD) controllers, gas ' +
+      'suppression cabinets — Hochiki, Notifier, Gent, Fike, Minimax. ' +
+      'Fire panel + ASD controller for a BESS container is typically ' +
+      '£1,500-£8,000 depending on zone count. Replaces £10k oem_subsystem ' +
+      'override. Inelastic (approval-bound, certification costs dominate).',
+    curve: [
+      { annual_volume: 1, unit_cost_multiplier: 1.0 },
+      { annual_volume: 100, unit_cost_multiplier: 0.90 },
+      { annual_volume: 10000, unit_cost_multiplier: 0.72 },
+      { annual_volume: 1000000, unit_cost_multiplier: 0.55 },
+    ],
+  },
+
+  oem_smoke_detection: {
+    class: 'oem_smoke_detection',
+    reference_unit_cost_gbp: 400.0,
+    source: 'grok_4_3_spot_check',
+    notes:
+      'Individual aspirating smoke detector heads / point detector panels — ' +
+      'Apollo Intelligent Series, Hochiki CHQ-ASD, VESDA VLF-500. A single ' +
+      'addressable point detector is £40-£120; an ASD sampling head (the ' +
+      'device that draws air over a laser chamber) is £300-£600; a full VESDA ' +
+      'VLP is £1,500-£2,200. Anchor £400 (weighted toward ASD heads, the most ' +
+      'common BESS BoM entry after the fire panel). The keyword floor table ' +
+      '(CATEGORY_KEYWORD_FLOORS_GBP) provides further fine-grained floors ' +
+      'within this class (VESDA/aspirating → £1,500; point detector → £45).',
+    curve: [
+      { annual_volume: 1, unit_cost_multiplier: 1.0 },
+      { annual_volume: 100, unit_cost_multiplier: 0.88 },
+      { annual_volume: 10000, unit_cost_multiplier: 0.70 },
+      { annual_volume: 1000000, unit_cost_multiplier: 0.50 },
+    ],
+  },
 }
 
 // ---------------------------------------------------------------------------
@@ -583,11 +655,22 @@ export const PRODUCT_CLASS_REFERENCE_OVERRIDES: Record<string, Partial<Record<Co
   // I=0.45 (heavy-EPC, civils + grid + commissioning).
   bess: {
     battery_cell: 100.0,            // 280 Ah LFP prismatic, ~£0.08-0.11/Wh × 0.9 kWh/cell at 100/yr OEM
-    oem_subsystem: 10000.0,         // BMS master + EMS PC + LV panels + meter etc. (£2k-£20k mixed)
+    // C4 (2026-05-28): oem_subsystem ref kept at £10k for GENUINE large subsystems
+    // (BMS master board, EMS/SCADA PC, LV distribution panel, revenue meter, string
+    // inverter controller rack — all legitimately £2k-£20k). Smoke detectors,
+    // chillers, and AC units must NOT be classified as oem_subsystem for BESS; they
+    // now have their own classes (oem_smoke_detection, oem_hvac_chiller) whose
+    // refs are calibrated below. The rule-based classifier (C4) prevents
+    // smoke/detector/chiller keywords from routing to oem_subsystem.
+    oem_subsystem: 10000.0,
     electronic_power_module: 1000.0,// 1700 V IGBT half-bridge for BESS PCS (£600-£1500 @ 100/yr)
     structural_polymer: 0.50,       // dominated by cell-insulation pads (qty 3920, real cost £0.10-£0.30)
     electronic_connector: 0.40,     // dominated by cell-to-cell busbar strips (qty 3808, real cost £0.20-£0.50)
     sensor: 1.00,                   // dominated by NTC thermistors (qty 896, real cost £0.30-£0.50)
+    // C4 sub-class refs for BESS context
+    oem_hvac_chiller: 8500.0,       // Pfannenberg EB XT 500 WT class (47 kW liquid chiller): £8k-£15k @ 100/yr; was £10k but emitter pins chiller (£8,500) and AC unit (£3,800) explicitly — reference lowered to match chiller mid-point so unpinned cascade-miss HVAC parts don't over-anchor (FIX B 2026-05-29)
+    oem_fire_safety: 3500.0,        // Fire panel + ASD controller for BESS container: £1.5k-£8k
+    oem_smoke_detection: 350.0,     // ASD sampling head (Hochiki/Hochiki-CHQ): £150-£600; point detector £40-£120
   },
   energy_storage: {
     battery_cell: 100.0,
@@ -596,6 +679,9 @@ export const PRODUCT_CLASS_REFERENCE_OVERRIDES: Record<string, Partial<Record<Co
     structural_polymer: 0.50,
     electronic_connector: 0.40,
     sensor: 1.00,
+    oem_hvac_chiller: 8500.0,
+    oem_fire_safety: 3500.0,
+    oem_smoke_detection: 350.0,
   },
   'bess-utility-scale': {
     battery_cell: 100.0,
@@ -604,6 +690,9 @@ export const PRODUCT_CLASS_REFERENCE_OVERRIDES: Record<string, Partial<Record<Co
     structural_polymer: 0.50,
     electronic_connector: 0.40,
     sensor: 1.00,
+    oem_hvac_chiller: 8500.0,
+    oem_fire_safety: 3500.0,
+    oem_smoke_detection: 350.0,
   },
 
   // -------------------------------------------------------------------------
@@ -970,12 +1059,12 @@ export const COMPONENT_CLASS_FLOORS_GBP: Partial<Record<ComponentClass, number>>
   electronic_connector: 0.8,    // Industrial connector minimum
   electronic_cable: 1.5,        // Industrial cable per metre, even at 10k/yr
   electronic_power_module: 35,  // IGBT/MOSFET module minimum
-  sensor: 4,                    // Cheapest industrial sensor
+  sensor: 30,                   // Cheapest real industrial sensor (NTC thermistors are pinned in emitter; cascade-miss sensors are gas/pressure/arc-flash class, real floor £30-£130)
   motor_actuator: 25,           // Smallest industrial motor/actuator
   magnetic: 15,                 // Transformer, choke, contactor coil
   optical: 6,                   // LED / display / lens / photodiode minimum
   structural_metal: 40,         // Bare custom-fab steel piece minimum
-  structural_polymer: 0.8,      // Plastic enclosure / pad / spacer
+  structural_polymer: 1.0,      // Label / pad / spacer / grommet — label floor ≥ £1 (Brady / HellermannTyton)
   mechanical_fastener: 0.05,    // Bolt / nut / washer high-volume minimum
   mechanical_assembly: 15,      // Industrial assembly/bracket minimum
   battery_cell: 25,             // LFP prismatic floor at 50k+/yr — never £0.10
@@ -983,10 +1072,106 @@ export const COMPONENT_CLASS_FLOORS_GBP: Partial<Record<ComponentClass, number>>
   fluid_path: 2,                // Industrial fitting/valve minimum
   safety_consumable: 3,         // E-stop button, gasket, fire cartridge
   oem_subsystem: 150,           // "OEM subsystem" implies a complete sub-assembly
+  // C4 sub-class floors (2026-05-28)
+  oem_hvac_chiller: 1500,       // Smallest viable industrial chiller unit
+  oem_fire_safety: 500,         // Fire panel / suppression cabinet minimum
+  oem_smoke_detection: 40,      // Cheapest addressable point detector
 }
 
 export function componentClassFloorGbp(componentClass: ComponentClass): number {
   return COMPONENT_CLASS_FLOORS_GBP[componentClass] ?? 0
+}
+
+// ---------------------------------------------------------------------------
+// C5 — PER-CLASS PRICE SANITY BOUNDS (2026-05-28)
+//
+// BLOCKER per council (GLM/Kimi). Every estimate or curve price that falls
+// outside [min_gbp, max_gbp] for its component class is clamped to the band
+// AND flagged with `price_sanity_clamped: true` in the partVerification row.
+// This is the UNIVERSAL backstop that runs AFTER keyword floors/ceilings; it
+// catches residual implausibles that individual keyword rules missed.
+//
+// Root cause it fixes: the `oem_subsystem` BESS override (£10,000 ref) has no
+// ceiling at all, so a liquid-cooling chiller, a container AC unit, AND an
+// aspirating smoke detector all render £10,000. The `sensor` class curves to
+// ~£1 for a single thermistor at 100k+/yr volume — real smoke/aspirating
+// detection heads start at £40. Both are clamped by these bounds.
+//
+// DESIGN RULES
+// • min = the absolute real-world floor for a SINGLE UNIT of this class in
+//   any context (not zero — that would allow the £1 sensor bug).
+// • max = the highest plausible single-line-item price for this class.
+//   For oem_subsystem it is £50,000 (a large transformer or complete BMS
+//   rack). For sensor it is £5,000 (a VESDA LaserFOCUS or high-spec INS
+//   module). Setting max too low clips legitimate high-value parts; setting
+//   it too high defeats the purpose.
+// • Omitting a class means "no bound" — the keyword floors/ceilings still apply.
+// • The bounds are independent of product class (BESS vs heatpump vs drone).
+//   Product-class overrides shift the REFERENCE cost but must never push the
+//   ESTIMATE outside these physics-of-procurement bounds.
+//
+// CLAMPING CONTRACT (enforced in curveEstimateFor in estimate-missing-prices.tsx)
+// 1. Apply per-class floor from COMPONENT_CLASS_FLOORS_GBP first (raises low).
+// 2. Apply keyword floor (may raise further).
+// 3. Apply keyword ceiling (may reduce).
+// 4. Apply CLASS_PRICE_SANITY_BOUNDS min/max as the final clamp (universal backstop).
+// 5. If clamped → set `price_sanity_clamped: true` + log the breach.
+// ---------------------------------------------------------------------------
+
+export type ClassSanityBand = { min_gbp: number; max_gbp: number }
+
+export const CLASS_PRICE_SANITY_BOUNDS: Partial<Record<ComponentClass, ClassSanityBand>> = {
+  // Electronics
+  electronic_ic:           { min_gbp: 0.10,    max_gbp: 5_000 },
+  electronic_passive:      { min_gbp: 0.005,   max_gbp: 500 },
+  electronic_discrete:     { min_gbp: 0.05,    max_gbp: 2_000 },
+  electronic_pcb:          { min_gbp: 5,       max_gbp: 10_000 },
+  electronic_connector:    { min_gbp: 0.10,    max_gbp: 2_000 },
+  electronic_cable:        { min_gbp: 0.50,    max_gbp: 5_000 },
+  electronic_power_module: { min_gbp: 10,      max_gbp: 20_000 },
+  sensor:                  { min_gbp: 0.30,    max_gbp: 5_000 },
+  // Electro-mechanical
+  motor_actuator:          { min_gbp: 5,       max_gbp: 25_000 },
+  magnetic:                { min_gbp: 2,       max_gbp: 50_000 },
+  optical:                 { min_gbp: 0.50,    max_gbp: 20_000 },
+  // Structural
+  structural_metal:        { min_gbp: 5,       max_gbp: 50_000 },
+  structural_polymer:      { min_gbp: 0.05,    max_gbp: 5_000 },
+  mechanical_fastener:     { min_gbp: 0.01,    max_gbp: 200 },
+  mechanical_assembly:     { min_gbp: 5,       max_gbp: 20_000 },
+  // Cells / thermal / fluid
+  battery_cell:            { min_gbp: 5,       max_gbp: 5_000 },
+  thermal:                 { min_gbp: 5,       max_gbp: 15_000 },
+  fluid_path:              { min_gbp: 0.50,    max_gbp: 10_000 },
+  safety_consumable:       { min_gbp: 0.50,    max_gbp: 5_000 },
+  // OEM subsystems — max_gbp = 50k covers the largest single catalogue unit
+  // (large transformer, top-tier BMS master). The £10k BESS per-product-class
+  // reference sits inside the band; the C4 sub-classes have their own tighter bands.
+  oem_subsystem:           { min_gbp: 50,      max_gbp: 50_000 },
+  // C4 sub-classes
+  oem_hvac_chiller:        { min_gbp: 800,     max_gbp: 80_000 },
+  oem_fire_safety:         { min_gbp: 300,     max_gbp: 20_000 },
+  oem_smoke_detection:     { min_gbp: 20,      max_gbp: 3_000 },
+}
+
+/**
+ * Clamp an estimated price to the per-class sanity band [min_gbp, max_gbp].
+ * Returns the (possibly clamped) price and a flag indicating whether clamping occurred.
+ * Never returns a non-positive number.
+ */
+export function clampToSanityBand(
+  price_gbp: number,
+  componentClass: ComponentClass,
+): { price_gbp: number; clamped: boolean; breach: 'below_min' | 'above_max' | null } {
+  const band = CLASS_PRICE_SANITY_BOUNDS[componentClass]
+  if (!band) return { price_gbp, clamped: false, breach: null }
+  if (price_gbp < band.min_gbp) {
+    return { price_gbp: band.min_gbp, clamped: true, breach: 'below_min' }
+  }
+  if (price_gbp > band.max_gbp) {
+    return { price_gbp: band.max_gbp, clamped: true, breach: 'above_max' }
+  }
+  return { price_gbp, clamped: false, breach: null }
 }
 
 // ---------------------------------------------------------------------------
@@ -1236,6 +1421,29 @@ export const CATEGORY_KEYWORD_CEILINGS_GBP: CategoryKeywordCeiling[] = [
   // never pushes below the floor, so an aspirating head stays at £1,500.)
   { pattern: /^(?!.*\b(aspirating|aspiration|asd|vesda|titanus)\b)(.*\b(smoke|heat|flame|optical)\b.*\bdetector\b|.*\bdetector\b.*\b(smoke|heat|flame)\b)/i,
     ceiling_gbp: 250, note: 'conventional point detector — ceiling £250 (aspirating ASD heads excluded)' },
+
+  // ── C5 backstop ceilings for oem_subsystem mis-classification (2026-05-28) ─
+  // These fire when the rule-based classifier fails to route a chiller or
+  // smoke detector to its correct sub-class and it lands in oem_subsystem,
+  // inheriting the BESS £10k per-product-class override. The ceiling prevents
+  // the worst-case £10k price on parts that genuinely cost £200-£2,500.
+  //
+  // Aspirating smoke detection head / VESDA — never more than ~£2,500 for
+  // the detector head alone (control panel would be oem_fire_safety separately).
+  { pattern: /\b(aspirating|aspiration|asd)\b.*\b(smoke|detector|detection)\b|\b(vesda|titanus)\b/i,
+    ceiling_gbp: 2500, note: 'aspirating smoke detection head — ceiling £2,500 (oem_subsystem backstop)' },
+  // Any smoke / heat / flame / optical detector that survived to this point.
+  // Hard cap £300 — a £10k smoke detector is impossible regardless of class.
+  { pattern: /\b(smoke|heat|flame|optical)\b.*\bdetector\b|\bdetector\b.*\b(smoke|heat|flame)\b/i,
+    ceiling_gbp: 300, note: 'smoke/heat/flame detector — ceiling £300 (oem_subsystem mis-classification backstop)' },
+  // Liquid chiller / air-handling unit — a 50 kW industrial chiller is
+  // ~£8-£15k; the biggest BESS-class units reach ~£25k. Cap £30,000.
+  { pattern: /\b(chiller|liquid.?cool|air.?conditioning|hvac|cooling.?unit|air.?handl)\b/i,
+    ceiling_gbp: 30_000, note: 'industrial chiller / AC unit — ceiling £30,000 (prevents oem_subsystem £10k ref from cascading to £28k via curve)' },
+  // Container / enclosure AC unit — a standalone rooftop AC for a BESS
+  // container is £1,500-£8,000. Hard cap £10,000.
+  { pattern: /\b(container.?ac|rooftop.?ac|cabinet.?ac|enclosure.?ac|split.?ac)\b|\b(stulz|emerson.?precision|airedale)\b/i,
+    ceiling_gbp: 10_000, note: 'container / cabinet AC unit — ceiling £10,000' },
 ]
 
 /**
@@ -1315,6 +1523,10 @@ export const COMPONENT_CLASS_ORDER: ComponentClass[] = [
   'fluid_path',
   'safety_consumable',
   'oem_subsystem',
+  // C4 sub-classes (2026-05-28)
+  'oem_hvac_chiller',
+  'oem_fire_safety',
+  'oem_smoke_detection',
 ]
 
 // ---------------------------------------------------------------------------
