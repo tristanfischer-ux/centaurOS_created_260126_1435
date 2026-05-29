@@ -24,6 +24,7 @@ Methodology:
 
 import argparse
 import base64
+import importlib.util
 import json
 import os
 import subprocess
@@ -32,8 +33,30 @@ import tempfile
 import time
 import urllib.request
 import urllib.error
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+
+
+# ─── Recorder bootstrap ───────────────────────────────────────────────────
+# Load council-score-log.py via importlib because the filename contains a
+# hyphen (not valid as a Python module identifier).
+def _load_recorder():
+    _lib_path = Path(__file__).parent / "lib" / "council-score-log.py"
+    if not _lib_path.exists():
+        print(
+            f"[WARN] council-score-log.py not found at {_lib_path} — "
+            "scores will NOT be persisted to the canonical log.",
+            file=sys.stderr,
+        )
+        return None
+    spec = importlib.util.spec_from_file_location("council_score_log", _lib_path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.record_council_score
+
+
+_record_council_score = _load_recorder()
 
 # ─── Config ────────────────────────────────────────────────────────────────
 
@@ -522,6 +545,63 @@ def run(args):
                 slug_results[section][mid] = val if isinstance(val, int) else None
 
         all_results[slug] = slug_results
+
+        # ── Permanent score log ──────────────────────────────────────────
+        # Compute per-PDF mean NOW (before the markdown pass) so we can
+        # record it to the canonical log immediately. Mirrors the per-class
+        # average logic used later in the markdown report.
+        if _record_council_score is not None:
+            section_means: list[float] = []
+            for section in SECTIONS:
+                by_model = slug_results.get(section, {})
+                m = calibrate_section(by_model)
+                if m is not None:
+                    section_means.append(m)
+            pdf_mean = sum(section_means) / len(section_means) if section_means else 0.0
+
+            # Seat scores: mean of calibrated sections per model
+            seat_scores: dict[str, float] = {}
+            for mc in MODELS:
+                mid = mc["id"]
+                model_section_scores = [
+                    slug_results[s].get(mid)
+                    for s in SECTIONS
+                    if isinstance(slug_results.get(s, {}).get(mid), int)
+                ]
+                if model_section_scores:
+                    seat_scores[mc["label"]] = round(
+                        sum(model_section_scores) / len(model_section_scores), 2
+                    )
+
+            # Attempt to read the current git commit SHA for traceability
+            try:
+                sha = subprocess.check_output(
+                    ["git", "rev-parse", "--short", "HEAD"],
+                    cwd=str(Path(__file__).parent.parent),
+                    stderr=subprocess.DEVNULL,
+                    text=True,
+                ).strip() or None
+            except Exception:
+                sha = None
+
+            run_tag = getattr(args, "run_tag", None) or ""
+            product_class = getattr(args, "product_class", None) or slug
+
+            _record_council_score({
+                "ts": datetime.now(timezone.utc).isoformat(),
+                "product_class": product_class,
+                "run_tag": run_tag,
+                "pdf_path": str(pdf_path),
+                "chain_commit_sha": sha,
+                "seats": seat_scores,
+                "mean": round(pdf_mean, 4),
+                "gate": 8.0,
+                "pass": pdf_mean >= 8.0,
+                "notes": "",
+                "backfilled": False,
+            })
+            print(f"  [log] Recorded {slug} mean={pdf_mean:.2f} → council-scores.jsonl")
+
         time.sleep(1)  # Brief pause between PDFs
 
     # Build markdown report
@@ -683,16 +763,206 @@ def run(args):
     print(f"  Target (≥65): {'MET' if target_met else 'NOT MET'}")
 
 
+# ─── Single-PDF mode ──────────────────────────────────────────────────────
+
+def run_single_pdf(args) -> None:
+    """
+    Score ONE arbitrary PDF at --pdf <path> and record the result.
+
+    Bypasses the hardcoded SLUG_LABEL map and the batch-dir / symlink dance
+    that the batch mode requires. Feeds the PDF directly into pdf_to_pngs +
+    score_pdf_with_model + calibrate, then records to the canonical log.
+
+    Usage:
+        python score-radical-pdfs-multimodal.py \\
+            --pdf ~/Downloads/engine-evidence/my-run/radical.pdf \\
+            --class bess \\
+            --run-tag iter-67
+    """
+    pdf_path = Path(args.pdf).expanduser().resolve()
+    if not pdf_path.exists():
+        print(f"ERROR: PDF not found: {pdf_path}", file=sys.stderr)
+        sys.exit(1)
+
+    product_class = args.product_class
+    run_tag = args.run_tag
+    output_path = Path(args.output).expanduser() if args.output else None
+
+    print(f"[single-PDF] Scoring: {pdf_path}")
+    print(f"  product_class={product_class}  run_tag={run_tag}")
+
+    # Convert to PNGs
+    print("  Converting to PNGs...")
+    pngs = pdf_to_pngs(pdf_path)
+    print(f"  {len(pngs)} pages")
+    if not pngs:
+        print("ERROR: No pages extracted.", file=sys.stderr)
+        sys.exit(1)
+
+    # Use pdf stem as the label identifier for prompts
+    label = pdf_path.stem  # e.g. "radical" or whatever the file is named
+
+    slug_results: dict[str, dict[str, Optional[int]]] = {s: {} for s in SECTIONS}
+    for model_cfg in MODELS:
+        mid = model_cfg["id"]
+        model_scores = score_pdf_with_model(model_cfg, pngs, label)
+        for section in SECTIONS:
+            val = model_scores.get(section)
+            slug_results[section][mid] = val if isinstance(val, int) else None
+
+    # Compute section means and overall mean
+    section_means: list[float] = []
+    print("\n  Section scores (calibrated):")
+    for section in SECTIONS:
+        by_model = slug_results.get(section, {})
+        m = calibrate_section(by_model)
+        if m is not None:
+            section_means.append(m)
+            flag = " ✅" if m >= 8.0 else ""
+            print(f"    {section:<30} {m:.2f}{flag}")
+        else:
+            print(f"    {section:<30} —")
+
+    pdf_mean = sum(section_means) / len(section_means) if section_means else 0.0
+    passed = pdf_mean >= 8.0
+
+    print(f"\n  Overall mean: {pdf_mean:.2f}/10  gate=8.0  {'PASS ✅' if passed else 'FAIL ❌'}")
+
+    # Seat scores: mean of calibrated section scores per model
+    seat_scores: dict[str, float] = {}
+    for mc in MODELS:
+        mid = mc["id"]
+        model_section_scores = [
+            slug_results[s].get(mid)
+            for s in SECTIONS
+            if isinstance(slug_results.get(s, {}).get(mid), int)
+        ]
+        if model_section_scores:
+            seat_scores[mc["label"]] = round(
+                sum(model_section_scores) / len(model_section_scores), 2
+            )
+
+    # Attempt to read current git commit SHA
+    try:
+        sha = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(Path(__file__).parent.parent),
+            stderr=subprocess.DEVNULL,
+            text=True,
+        ).strip() or None
+    except Exception:
+        sha = None
+
+    # Record permanently
+    _log_path = Path("~/Downloads/engine-evidence/council-scores.jsonl").expanduser()
+    if _record_council_score is not None:
+        _record_council_score({
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "product_class": product_class,
+            "run_tag": run_tag,
+            "pdf_path": str(pdf_path),
+            "chain_commit_sha": sha,
+            "seats": seat_scores,
+            "mean": round(pdf_mean, 4),
+            "gate": 8.0,
+            "pass": passed,
+            "notes": "",
+            "backfilled": False,
+        })
+        print(f"  [log] Recorded → {_log_path}")
+    else:
+        print("  [WARN] Recorder not available — score was NOT persisted.", file=sys.stderr)
+
+    # Optional markdown output
+    if output_path:
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        md_lines = [
+            f"# Council Scores — {product_class} / {run_tag}",
+            "",
+            f"**PDF:** `{pdf_path}`  ",
+            f"**run_tag:** `{run_tag}`  ",
+            f"**product_class:** `{product_class}`  ",
+            f"**commit:** `{sha or 'unknown'}`",
+            "",
+            "| Section | Gemini | Claude | Qwen | **Mean** |",
+            "|---|---|---|---|---|",
+        ]
+        for section in SECTIONS:
+            by_model = slug_results.get(section, {})
+            g = by_model.get("gemini")
+            c = by_model.get("claude")
+            q = by_model.get("qwen")
+            m = calibrate_section(by_model)
+            g_s = str(g) if g is not None else "—"
+            c_s = str(c) if c is not None else "—"
+            q_s = str(q) if q is not None else "—"
+            m_s = f"**{m:.2f}**{'  ✅' if m is not None and m >= 8 else ''}" if m is not None else "**—**"
+            md_lines.append(f"| {build_section_label(section)} | {g_s} | {c_s} | {q_s} | {m_s} |")
+        md_lines += [
+            "",
+            f"**Overall mean: {pdf_mean:.2f}/10** — {'PASS ✅' if passed else 'FAIL ❌'}",
+            "",
+            "_Generated by `scripts/score-radical-pdfs-multimodal.py --pdf`_",
+        ]
+        output_path.write_text("\n".join(md_lines))
+        print(f"  Report written to {output_path}")
+
+
+# ─── Entry point ──────────────────────────────────────────────────────────
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Multimodal council scorer for Radical PDFs")
-    parser.add_argument("--batch-dir", required=True, help="Path to shadow batch directory")
-    parser.add_argument("--output", required=True, help="Output markdown file path")
-    parser.add_argument("--v1-file", help="V1 scores file for delta comparison")
-    parser.add_argument("--slugs", nargs="+", help="Limit to specific slugs (e.g. rs-drone rs-cgm)")
+    parser = argparse.ArgumentParser(
+        description="Multimodal council scorer for Radical PDFs",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Modes:
+
+  Batch mode (score 10 baseline slugs from a shadow-batch dir):
+    python score-radical-pdfs-multimodal.py \\
+        --batch-dir ~/Downloads/engine-evidence/radical-shadow-20260510T2109 \\
+        --output eval-harness/COUNCIL-SCORES-V2.md
+
+  Single-PDF mode (score any arbitrary PDF, no symlink dance):
+    python score-radical-pdfs-multimodal.py \\
+        --pdf ~/Downloads/engine-evidence/my-run/rs-bess/radical.pdf \\
+        --class bess \\
+        --run-tag iter-67
+""",
+    )
+
+    # ── Shared optional args ──────────────────────────────────────────────
+    parser.add_argument("--output", help="Output markdown report path (optional in single-PDF mode)")
+    parser.add_argument("--run-tag", default="", help="Tag for this scoring run, e.g. iter-67 (used in log)")
+    parser.add_argument("--product-class", dest="product_class", help="Product class slug, e.g. bess (single-PDF mode)")
+
+    # ── Batch-mode args ───────────────────────────────────────────────────
+    parser.add_argument("--batch-dir", help="[Batch mode] Path to shadow batch directory")
+    parser.add_argument("--v1-file", help="[Batch mode] V1 scores file for delta comparison")
+    parser.add_argument("--slugs", nargs="+", help="[Batch mode] Limit to specific slugs (e.g. rs-drone rs-cgm)")
+
+    # ── Single-PDF mode arg ───────────────────────────────────────────────
+    parser.add_argument("--pdf", help="[Single-PDF mode] Path to a PDF to score directly")
+
     args = parser.parse_args()
 
-    if args.slugs:
-        SLUG_LABEL_FILTERED = {k: v for k, v in SLUG_LABEL.items() if k in args.slugs}
-        globals()["SLUG_LABEL"] = SLUG_LABEL_FILTERED
+    # ── Mode dispatch ─────────────────────────────────────────────────────
+    if args.pdf:
+        # Single-PDF mode
+        if not args.product_class:
+            parser.error("--class is required in single-PDF mode (e.g. --class bess)")
+        if not args.run_tag:
+            parser.error("--run-tag is required in single-PDF mode (e.g. --run-tag iter-67)")
+        # Map --product-class → args.product_class already handled by dest=
+        run_single_pdf(args)
+    else:
+        # Batch mode
+        if not args.batch_dir:
+            parser.error("--batch-dir is required in batch mode (or use --pdf for single-PDF mode)")
+        if not args.output:
+            parser.error("--output is required in batch mode")
 
-    run(args)
+        if args.slugs:
+            SLUG_LABEL_FILTERED = {k: v for k, v in SLUG_LABEL.items() if k in args.slugs}
+            globals()["SLUG_LABEL"] = SLUG_LABEL_FILTERED
+
+        run(args)
