@@ -4305,6 +4305,13 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack
       total_growing_area_m2:       { qtyKey: 'canopy_area_m2',            label: 'Total growing area',     unit: 'm²', tolerancePct: 5, kind: 'floor' },
       trolley_count:               { qtyKey: 'trolley_count',             label: 'Grow trolleys',          unit: '',   tolerancePct: 2, kind: 'exact' },
       max_plant_height_cm:         { qtyKey: 'tier_canopy_clearance_cm',  label: 'Max plant height (tier clearance)', unit: 'cm', tolerancePct: 5, kind: 'floor' },
+      // The brief parser is non-deterministic on units: the same "~25 cm tall"
+      // brief parses as max_plant_height_cm one run and max_plant_height_mm the
+      // next (iter-vf5 vs iter-vf6). Achieved tier_canopy_clearance_cm is in cm,
+      // so the _mm variant converts the achieved cm -> mm (×10) to compare like
+      // for like against the brief's mm value. (Same alias pattern as the BESS
+      // kWh/MWh + cycle_life/_cycles entries above.)
+      max_plant_height_mm:         { qtyKey: 'tier_canopy_clearance_cm',  label: 'Max plant height (tier clearance)', unit: 'mm', convert: (v) => v * 10, tolerancePct: 5, kind: 'floor' },
     }
     for (const m of briefMetrics) {
       const km = String(m?.key_metric ?? '')
