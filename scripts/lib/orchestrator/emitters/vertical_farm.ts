@@ -534,39 +534,16 @@ function emitLightingArray(p: VfParams) {
           mod('manufacturer', 'Heliospectra'),
           mod('part_number', 'MITRA X'),
           mod('capacity', String(ledFixtureWatts.toFixed(0)), 'W'),
-          mod('form', 'Heliospectra MITRA X / Fluence SPYDR class, tunable RB+W'),
+          mod('form', 'Heliospectra MITRA X / Fluence SPYDR class — complete fixture with INTEGRAL constant-current driver, passive heatsink + reflective optics, tunable RB+W'),
           mod('regulatory', 'CE EN 60598-2-22'),
           mod('photometric', String(p.ledEfficacyUmolJ.toFixed(2)), 'µmol/J'),
         ],
       ),
-      word(
-        'led_dimming_driver_word',
-        'LED dimming driver word',
-        cc('led_dimming_driver', 'LED dimming driver', 'silicon_semiconductor_function', 'polymer_thermoplastic'),
-        [
-          mod('quantity', fmtQty(ledFixtureCount)),
-          mod('form', 'Mean Well HLG-150H constant-current, 0-10V dim'),
-          mod('regulatory', 'CE EMC EN 55015'),
-        ],
-      ),
-      word(
-        'led_thermal_heatsink_word',
-        'LED thermal heatsink word',
-        cc('led_thermal_heatsink', 'LED thermal heatsink', 'thermal_transfer_function', 'aluminium'),
-        [
-          mod('quantity', fmtQty(ledFixtureCount)),
-          mod('form', 'extruded aluminium passive fin pack'),
-        ],
-      ),
-      word(
-        'led_reflective_louver_word',
-        'LED reflective louver word',
-        cc('led_reflective_louver', 'LED reflective louver', 'optical_emission_function', 'aluminium'),
-        [
-          mod('quantity', fmtQty(ledFixtureCount)),
-          mod('form', 'specular aluminium 92% reflectivity'),
-        ],
-      ),
+      // U3 (integral-assembly de-double-count): the constant-current driver,
+      // passive heatsink and reflective optics are INTEGRAL to the MITRA X /
+      // SPYDR fixture above. Billing them as separate BoM lines double-counted
+      // ~£32k (80 × £146 driver + 80 × £146 louver + 80 × £112 heatsink). They
+      // are folded into the fixture word, not emitted as separate priced lines.
     ],
   )
 

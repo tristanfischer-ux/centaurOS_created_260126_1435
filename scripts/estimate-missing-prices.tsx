@@ -309,6 +309,11 @@ const MPN_PREFIX_RULES: RuleEntry[] = [
 // Ordered most-specific first. A match on ANY part of the part name / module
 // sub-module string wins. All patterns are case-insensitive.
 const NAME_KEYWORD_RULES: RuleEntry[] = [
+  // ── Growing media / consumables (per-cycle inputs — U2, NEVER capital) ──────
+  // Specific growing-media tokens ONLY; bare "rockwool"/"insulation" must stay
+  // structural/thermal (BESS Rockboard fire lining, 3D-printer chamber insulation
+  // are capital). A rockwool PROPAGATION CUBE / Grodan A-OK is growing media.
+  { pattern: /\b(propagation.cube|grodan|rockwool.cube|stonewool.cube|grow.plug|growing.media|growing.medium|growing.substrate|\bcoir\b|perlite|vermiculite|peat.plug)\b/i, cls: 'consumable' },
   // ── Fire / smoke / gas detection (NEVER oem_subsystem) ──────────────────
   { pattern: /\b(aspirating|aspiration|asd)\b.*\b(smoke|detect|sensor)\b|\b(vesda|titanus)\b/i, cls: 'oem_smoke_detection' },
   { pattern: /\b(smoke|heat|flame|optical)\b.*\bdetector\b|\bdetector\b.*\b(smoke|heat|flame)\b/i, cls: 'oem_smoke_detection' },
