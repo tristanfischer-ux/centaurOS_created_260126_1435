@@ -4312,6 +4312,12 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack
       // for like against the brief's mm value. (Same alias pattern as the BESS
       // kWh/MWh + cycle_life/_cycles entries above.)
       max_plant_height_mm:         { qtyKey: 'tier_canopy_clearance_cm',  label: 'Max plant height (tier clearance)', unit: 'mm', convert: (v) => v * 10, tolerancePct: 5, kind: 'floor' },
+      // Crop cycle (days): the brief states a cutting-to-finished cycle; the
+      // design's achieved crop_cycle_days should land within that window.
+      // Ceiling with a wide tolerance — a faster cycle is fine, and cultivar +
+      // environment legitimately move cycle length ±20%. Surfaces the design's
+      // assumed cycle so a divergence from the brief is visible, not hidden.
+      crop_cycle_days:             { qtyKey: 'crop_cycle_days',           label: 'Crop cycle', unit: 'days', tolerancePct: 20, kind: 'ceiling' },
     }
     for (const m of briefMetrics) {
       const km = String(m?.key_metric ?? '')
@@ -4369,9 +4375,12 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack
         }
       }
       const briefDisplay = `${briefVal} ${mapping.unit}`.trim()
+      // Integer-valued achieveds (counts like trolley_count) render without a
+      // spurious ".00"; non-integers keep 2 dp (0 dp at >=100 to avoid clutter).
+      const fmtAch = (v: number) => Number.isInteger(v) ? String(v) : v.toFixed(v >= 100 ? 0 : 2)
       const achievedDisplay = mapping.unit
-        ? `${achievedConverted.toFixed(achievedConverted >= 100 ? 0 : 2)} ${mapping.unit}`
-        : `${achievedConverted.toFixed(2)}`
+        ? `${fmtAch(achievedConverted)} ${mapping.unit}`
+        : `${fmtAch(achievedConverted)}`
       rows.push({
         constraint: mapping.label,
         briefTarget: briefDisplay,
@@ -5398,8 +5407,11 @@ function ModuleConnectionMapPage({
     title: module_title(m),
   }))
 
-  const W = 480
-  const H = 320
+  // 460 keeps the SVG inside the usable column (595.28 - 128 = 467pt) so
+  // react-pdf's height calc is exact and the legend doesn't spill to its own
+  // near-empty page (page-bloat fix, 2026-05-29). H scaled to keep the ratio.
+  const W = 460
+  const H = 307
   const cx = W / 2
   const cy = H / 2
   const r = Math.min(W, H) / 2 - 32
@@ -8628,7 +8640,7 @@ function CostByModulePage({ state, project, bomTotals }: { state: any; project: 
           {sortedClasses.map(([cls, amt]) => {
             const pct = grandTotal > 0 ? (amt / grandTotal) * 100 : 0
             return (
-              <View key={cls} style={{ flexDirection: 'row', paddingVertical: 4, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
+              <View key={cls} style={{ flexDirection: 'row', paddingVertical: 2, borderBottomWidth: 0.3, borderBottomColor: RULE_SOFT, alignItems: 'baseline' }} wrap={false}>
                 <Text style={{ flex: 1, fontSize: 10, color: INK }}>{toTitleCaseEng(humanise(cls))}</Text>
                 <Text style={{ width: 100, fontSize: 10, color: INK, textAlign: 'right' }}>
                   £{amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -9531,7 +9543,7 @@ function ToolsUsedPage({ state, project }: { state: any; project: string }) {
         // narrative + heading).
         const visibleClaims = claims
         const extraClaims: number = 0
-        const reserveHeight = 200 + claims.length * 12
+        const reserveHeight = 120 + claims.length * 10
         return (
           <View
             key={tool.tool_id || `tool-${ti}`}

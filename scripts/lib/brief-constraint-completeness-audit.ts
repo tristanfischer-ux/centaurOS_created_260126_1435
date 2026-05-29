@@ -124,6 +124,7 @@ const KNOWN_METRIC_MAP: Record<string, { qtyKey: string; label: string }> = {
   // Brief parser non-determinism: same "~25 cm tall" brief parses as _cm one run,
   // _mm the next (iter-vf6). Both map to the same achieved tier-clearance quantity.
   max_plant_height_mm: { qtyKey: 'tier_canopy_clearance_cm', label: 'Max plant height (tier clearance)' },
+  crop_cycle_days: { qtyKey: 'crop_cycle_days', label: 'Crop cycle' },
 }
 
 // HARD constraint categories — when a brief constraint falls into one of

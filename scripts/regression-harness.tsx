@@ -177,9 +177,12 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
         assertions.push(assertEq(
           'UNIVERSAL.market_band_renders_when_defined',
           `rendered PDF contains "${expectedString}" for product_class="${productClass}"`,
-          pdfText.includes(expectedString) || pdfText.includes(expectedString.replace(/£\//g, '£/')),
+          // The heading renders with letterSpacing:1.1, so pdftotext extracts it
+          // as "I N D U S T RY £ / M ²..." — compare with ALL whitespace stripped
+          // so the check tracks whether the band RENDERED, not its glyph spacing.
+          pdfText.replace(/\s+/g, '').includes(expectedString.replace(/\s+/g, '')),
           (found) => found,
-          () => `PDF did not contain "${expectedString}" — IndustryBandBlock may have returned null or the band was not resolved`,
+          () => `PDF did not contain "${expectedString}" (whitespace-normalised) — IndustryBandBlock returned null or the band was not resolved`,
         ))
       }
     }
