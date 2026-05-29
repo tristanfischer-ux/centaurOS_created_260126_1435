@@ -151,7 +151,17 @@ export async function orchestrateDesign(
   }
 
   // ── Step 7: Build Tools-Used page ───────────────────────────────────
-  const toolsUsedPage = buildToolsUsedPage(aggregatorOutcome.contract)
+  // U9-A: derive flow_edges from the plan's feeds_into declarations so
+  // the renderer can draw real tool→tool dependency arrows in the
+  // Engineering Tools Flow diagram (Section 1c), and so U9-B can
+  // replace "(none)" input_summary with actual feeder provenance.
+  const planFlowEdges: Array<{ from: string; to: string }> = []
+  for (const step of plan.tools) {
+    for (const downstream of step.feeds_into) {
+      planFlowEdges.push({ from: step.tool_id, to: downstream })
+    }
+  }
+  const toolsUsedPage = buildToolsUsedPage(aggregatorOutcome.contract, planFlowEdges)
 
   return {
     ok: true,
@@ -232,7 +242,9 @@ export {
 export {
   buildToolsUsedPage,
   renderToolsUsedPageAsText,
+  generatePhysicsNarrative,
 } from './attribution'
+export type { PhysicsNarrative } from './attribution'
 export type * from './types'
 
 /** Helper used by the chain orchestrator: was at least one quantity

@@ -84,6 +84,16 @@ export interface ToolsUsedPage {
   available_but_unused: Array<{ tool_id: string; name: string; version: string; license: License; source_url: string; domain: string; what_it_does: string }>
   /** Disclaimer text shown at end of page. */
   disclaimer: string
+  /**
+   * U9-A: tool→tool dependency edges derived from each ClassToolPlan
+   * tool step's `feeds_into` declaration. These represent the REAL
+   * causal data-flow graph — e.g. led-par:efficacy feeds_into
+   * hvac:load-sizing because LED heat load drives cooling duty.
+   * The Engineering Tools Flow diagram (Section 1c) draws these edges
+   * in addition to the flat brief→tool and tool→Contract fan-out.
+   * Absent when the orchestrator ran without a plan (legacy path).
+   */
+  flow_edges: Array<{ from: string; to: string }>
 }
 
 /** Human-readable description per tool_id for the "available but unused"
@@ -125,8 +135,29 @@ const DEFAULT_DISCLAIMER = (
  * it to the corresponding tool's claims list. Tools with zero claims
  * are omitted from the rendered page but listed in unused_tool_ids
  * for audit.
+ *
+ * @param planFlowEdges  Optional: edges derived from ClassToolPlan
+ *   tool steps' `feeds_into` declarations. When provided, each claim's
+ *   `input_summary` is replaced with a human-readable provenance string
+ *   listing the upstream feeder tools — e.g. "inputs from: led-par:efficacy,
+ *   plant-growth:yield, + brief" instead of "(none)". (U9-A / U9-B)
  */
-export function buildToolsUsedPage(contract: ContractInProgress): ToolsUsedPage {
+export function buildToolsUsedPage(
+  contract: ContractInProgress,
+  planFlowEdges?: Array<{ from: string; to: string }>,
+): ToolsUsedPage {
+  // U9-B: invert the feeds_into edges to get each tool's upstream feeders.
+  // e.g. if led-par:efficacy feeds_into ['hvac:load-sizing'], then
+  // hvac:load-sizing's upstreamFeeders includes 'led-par:efficacy'.
+  // Used to replace "(none)" with a real provenance string for each claim.
+  const upstreamFeeders = new Map<string, string[]>()
+  const normalised_edges: Array<{ from: string; to: string }> = planFlowEdges ?? []
+  for (const edge of normalised_edges) {
+    const existing = upstreamFeeders.get(edge.to) ?? []
+    if (!existing.includes(edge.from)) existing.push(edge.from)
+    upstreamFeeders.set(edge.to, existing)
+  }
+
   const byTool = new Map<string, ToolAttributionEntry>()
   for (const [field, q] of Object.entries(contract.quantities)) {
     if (!isToolSourced(q)) continue
@@ -169,11 +200,19 @@ export function buildToolsUsedPage(contract: ContractInProgress): ToolsUsedPage 
       }
       byTool.set(tid, entry)
     }
+    // U9-B: prefer feeder-derived input summary over invocation_input.
+    // If the plan declared feeds_into edges we know which upstream tools
+    // produced the inputs for this tool — list them explicitly so the
+    // Tools-Used appendix shows real dependencies instead of "(none)".
+    const feeders = upstreamFeeders.get(tid)
+    const inputSummary = feeders && feeders.length > 0
+      ? `inputs from: ${feeders.join(', ')}${feeders.length > 0 ? ' + brief' : ''}`
+      : summariseInput(q.provenance.invocation_input)
     entry.claims.push({
       field,
       value: q.value,
       unit: q.unit,
-      input_summary: summariseInput(q.provenance.invocation_input),
+      input_summary: inputSummary,
       output_field: q.provenance.invocation_output_field ?? field,
     })
     entry.total_duration_ms += q.provenance.duration_ms ?? 0
@@ -226,6 +265,7 @@ export function buildToolsUsedPage(contract: ContractInProgress): ToolsUsedPage 
     tools: Array.from(byTool.values()).sort((a, b) => a.tool_id.localeCompare(b.tool_id)),
     available_but_unused,
     disclaimer: DEFAULT_DISCLAIMER,
+    flow_edges: normalised_edges,
   }
 }
 
@@ -293,4 +333,185 @@ export function renderToolsUsedPageAsText(page: ToolsUsedPage): string {
   }
   lines.push(page.disclaimer)
   return lines.join('\n')
+}
+
+// ─── U11 · Deterministic physics narrative ──────────────────────────────────
+//
+// Generates a prose section titled "How the design was computed — the physics"
+// from ACTUAL contract quantities. Every sentence is emitted ONLY when all its
+// source quantities are present; no sentence is emitted when a quantity is
+// missing. No LLM is involved — this is a deterministic string built from
+// numbers, addressing the narrative-drift problem (exit-code gates 5/11/18).
+//
+// The generator is intentionally generic: a sentence template lists the
+// quantity keys it requires; the helper reads them from `quantities` and emits
+// the interpolated sentence only when all keys resolve. VF phrasing is the
+// first class; additional classes can add their own sentence lists.
+
+export interface PhysicsNarrativeSentence {
+  /** Required contract quantity keys. ALL must be present for the sentence to emit. */
+  requires: string[]
+  /** Tool id that produced the key quantities (cited in the sentence). */
+  source_tool: string
+  /** Render the sentence from resolved quantity values. */
+  render: (vals: Record<string, number>) => string
+}
+
+/** A complete physics narrative: a sequence of sentences with a heading. */
+export interface PhysicsNarrative {
+  heading: string
+  sentences: string[]  // only the emitted (non-skipped) sentences
+  /** Tools cited, in emission order, deduped. */
+  tools_cited: string[]
+}
+
+function fmt(n: number, dp = 1): string {
+  if (!Number.isFinite(n)) return String(n)
+  return n.toFixed(dp)
+}
+
+/**
+ * Vertical-farm physics causal chain — energy, moisture, cooling, electrical.
+ * Quantity keys are the EXACT keys emitted by vertical-farm.ts contract_update
+ * blocks, cross-checked against the class plan above.
+ */
+const VF_PHYSICS_SENTENCES: PhysicsNarrativeSentence[] = [
+  {
+    requires: ['canopy_area_m2', 'led_ppfd_umol_m2_s', 'led_installed_power_kw'],
+    source_tool: 'led-par:efficacy',
+    render: (v) => (
+      `The ${fmt(v.canopy_area_m2, 0)} m² canopy operates at ` +
+      `${fmt(v.led_ppfd_umol_m2_s, 0)} µmol/m²/s PPFD, ` +
+      `drawing ${fmt(v.led_installed_power_kw, 1)} kW of LED input ` +
+      `(led-par:efficacy).`
+    ),
+  },
+  {
+    requires: ['led_installed_power_kw', 'led_heat_load_kw'],
+    source_tool: 'led-par:efficacy',
+    render: (v) => {
+      const pct = Math.round((v.led_heat_load_kw / v.led_installed_power_kw) * 100)
+      return (
+        `About ${pct}% of that input (${fmt(v.led_heat_load_kw, 1)} kW) ` +
+        `becomes sensible heat the HVAC must reject.`
+      )
+    },
+  },
+  {
+    requires: ['plant_transpiration_kg_day', 'hvac_latent_load_kw'],
+    source_tool: 'plant-growth:yield',
+    render: (v) => (
+      `The crop transpires ${fmt(v.plant_transpiration_kg_day, 0)} kg/day ` +
+      `of moisture (plant-growth:yield), a ${fmt(v.hvac_latent_load_kw, 1)} kW ` +
+      `latent load on the HVAC.`
+    ),
+  },
+  {
+    requires: ['hvac_total_load_kw', 'hvac_chiller_capacity_kw'],
+    source_tool: 'hvac:load-sizing',
+    render: (v) => (
+      `Combined sensible + latent duty is ${fmt(v.hvac_total_load_kw, 1)} kW; ` +
+      `applying a 1.20 safety margin sizes the chiller at ` +
+      `${fmt(v.hvac_chiller_capacity_kw, 1)} kW cooling capacity ` +
+      `(hvac:load-sizing).`
+    ),
+  },
+  {
+    requires: ['chiller_cop_cooling', 'chiller_compressor_power_kw'],
+    source_tool: 'refrigeration-cycle:cop',
+    render: (v) => (
+      `The R290 vapour-compression cycle achieves COP ${fmt(v.chiller_cop_cooling, 2)} ` +
+      `(refrigeration-cycle:cop via CoolProp), consuming ` +
+      `${fmt(v.chiller_compressor_power_kw, 1)} kW at the compressor shaft.`
+    ),
+  },
+  {
+    requires: ['moisture_removed_kg_h'],
+    source_tool: 'dehumidification:sizing',
+    render: (v) => (
+      `Dehumidification removes ${fmt(v.moisture_removed_kg_h, 1)} kg/h of ` +
+      `vapour from the recirculated air stream ` +
+      `(dehumidification:sizing).`
+    ),
+  },
+  {
+    requires: ['chiller_compressor_power_kw', 'led_installed_power_kw', 'total_electrical_kw'],
+    source_tool: 'pandapower:grid-integration',
+    render: (v) => (
+      `The ${fmt(v.chiller_compressor_power_kw, 1)} kW compressor, ` +
+      `${fmt(v.led_installed_power_kw, 1)} kW lighting, and ancillaries ` +
+      `set the total connected load at ${fmt(v.total_electrical_kw, 1)} kW ` +
+      `(pandapower:grid-integration).`
+    ),
+  },
+  {
+    requires: ['annual_yield_kg'],
+    source_tool: 'plant-growth:yield',
+    render: (v) => (
+      `The crop model projects ${fmt(v.annual_yield_kg, 0)} kg/year of fresh ` +
+      `produce from this canopy area and DLI regime ` +
+      `(plant-growth:yield).`
+    ),
+  },
+]
+
+/**
+ * Resolve a quantity value from the contract. Returns undefined when absent.
+ */
+function resolveQty(quantities: Record<string, any>, key: string): number | undefined {
+  const q = quantities[key]
+  if (q && typeof q === 'object' && typeof q.value === 'number' && Number.isFinite(q.value)) {
+    return q.value
+  }
+  return undefined
+}
+
+/**
+ * Generate a deterministic physics narrative section from contract quantities.
+ *
+ * @param quantities   The `contract.quantities` map (Record<string, TypedQuantity>).
+ * @param productClass Optional product class — chooses the sentence set.
+ *                     Defaults to 'vertical-farm' (the only class currently wired).
+ *
+ * Returns null when no quantities are present (no orchestrator run for this
+ * chain) so the renderer can skip the section cleanly.
+ */
+export function generatePhysicsNarrative(
+  quantities: Record<string, any>,
+  productClass?: string,
+): PhysicsNarrative | null {
+  if (!quantities || typeof quantities !== 'object') return null
+
+  // Select sentence set. Currently only VF; fallback for other classes returns
+  // null so the renderer skips the section rather than emitting nothing.
+  const classKey = (productClass ?? '').toLowerCase()
+  const isVF = classKey.includes('vertical') || classKey.includes('farm')
+  if (!isVF) return null
+
+  const sentences: string[] = []
+  const toolsCited: string[] = []
+
+  for (const tpl of VF_PHYSICS_SENTENCES) {
+    // Resolve all required quantities.
+    const vals: Record<string, number> = {}
+    let allPresent = true
+    for (const key of tpl.requires) {
+      const v = resolveQty(quantities, key)
+      if (v === undefined) { allPresent = false; break }
+      vals[key] = v
+    }
+    if (!allPresent) continue  // skip sentence — no fabrication
+
+    const sentence = tpl.render(vals)
+    sentences.push(sentence)
+    if (!toolsCited.includes(tpl.source_tool)) toolsCited.push(tpl.source_tool)
+  }
+
+  if (sentences.length === 0) return null
+
+  return {
+    heading: 'How the design was computed — the physics',
+    sentences,
+    tools_cited: toolsCited,
+  }
 }
