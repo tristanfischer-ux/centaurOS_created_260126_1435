@@ -40,6 +40,7 @@ for (const envPath of [
 }
 
 import { runBriefParsing } from '../src/lib/pdf-engine-v2/stages/0-brief-generation'
+import { augmentBrief } from '../src/lib/pdf-engine-v2/brief-augment'
 import { runResearchSynthesis } from '../src/lib/pdf-engine-v2/stages/1-research'
 import { LLM_CONFIG } from '../src/lib/pdf-engine-v2/llm-config'
 import { classifyProduct } from '../src/lib/pdf-engine-v2/product-classifier'
@@ -2164,6 +2165,36 @@ async function main() {
   const parsedResult = { ok: true, data: currentParsed }
   const productClass = currentProductClass
   const classification = { productClass: currentProductClass, confidence: classificationOriginal.confidence }
+
+  // ── U5: Universal brief augmentation (HARD-field null-elimination) ────────
+  // Runs unconditionally — regardless of parser confidence — to fill every
+  // null HARD field with a class-aware inferred value before any downstream
+  // engine reads the brief.  User-stated values (source:"user") are never
+  // overwritten.  Provenance is tracked per-field in the augmentation log and
+  // written to disk so the PDF renderer can surface "stated vs inferred" in
+  // Section 1B.
+  const augResult = augmentBrief(parsedResult.data, productClass, currentBriefText)
+  console.error(`[chain] U5 brief augmentation: ${augResult.summary}`)
+  for (const aug of augResult.augmentations.filter(a => a.was_filled)) {
+    console.error(`  [U5] filled "${aug.field}": ${JSON.stringify(aug.new_value)} (${aug.rationale.slice(0, 120)})`)
+  }
+  if (augResult.still_missing.length > 0) {
+    console.error(`  [U5] still null after augmentation: ${augResult.still_missing.join(', ')}`)
+  }
+  writeFileSync(resolve(outDir, '1-parsed-brief-augmented.json'), JSON.stringify({
+    brief: parsedResult.data,
+    augmentations: augResult.augmentations,
+    still_missing: augResult.still_missing,
+    summary: augResult.summary,
+  }, null, 2))
+  logAction({
+    step: 'brief_augmentation_u5',
+    product_class: productClass,
+    fields_filled: augResult.augmentations.filter(a => a.was_filled).length,
+    still_missing: augResult.still_missing,
+    summary: augResult.summary,
+  })
+
   writeFileSync(resolve(outDir, '1-parsed-brief.json'), JSON.stringify(parsedResult.data, null, 2))
 
   // ── Build #19a: Engineering Contract construction NOW (post-brief-refinement,
