@@ -262,21 +262,35 @@ interface VfParams {
   co2TargetPpm: number
 }
 
+/**
+ * Container-fit trolley geometry (U7, access_strategy = EXTRACTION).
+ * Trolleys are the FULL container width and fill the floor with NO internal
+ * walkway; they roll out the END doors on full-length rails. A rear bay holds
+ * the air-handling + light-control electronics, reached by pulling all trolleys
+ * out (pull-out → harvest → re-insert). 40 HC interior ≈ 12.03 m × 2.35 m usable.
+ */
+const VF_INTERIOR_LENGTH_MM = 12_030
+const VF_INTERIOR_WIDTH_MM = 2_350
+const VF_REAR_BAY_MM = 1_200    // air-handling + light controls at the rear
+const VF_RAIL_CLEARANCE_MM = 50 // total side clearance for floor rails
+
+function vfTrolleyGeometry(trolleyCount: number): { widthMm: number; lengthMm: number; footprintM2: number } {
+  const widthMm = VF_INTERIOR_WIDTH_MM - VF_RAIL_CLEARANCE_MM
+  const lengthMm = Math.floor((VF_INTERIOR_LENGTH_MM - VF_REAR_BAY_MM) / Math.max(1, trolleyCount))
+  return { widthMm, lengthMm, footprintM2: (widthMm * lengthMm) / 1_000_000 }
+}
+
 function deriveVfParams(c: ContractInProgress): VfParams {
   const canopyAreaM2 = qScale(c, 'canopy_area_m2', 100)
   const trolleyCount = Math.max(1, Math.round(qScale(c, 'trolley_count', 8)))
-  // Derive tiersPerTrolley from the canopy target if not supplied by a tool:
-  // each tray is ~1200 mm wide × ~2000 mm deep (standard NFT grow tray),
-  // so tray area ≈ 2.4 m². Tiers needed = canopy / (trolleys × tray_area_m2).
-  // Ceiling-rounded so we always meet or exceed the canopy target.
-  // The contract's 'tiers_per_trolley' from the tool plan overrides this when present.
-  const TRAY_WIDTH_MM = 1200
-  const TRAY_DEPTH_MM = 2000
-  const DEFAULT_TRAY_AREA_M2 = (TRAY_WIDTH_MM * TRAY_DEPTH_MM) / 1_000_000  // 2.4 m²
+  // Container-fit geometry (U7, access_strategy = EXTRACTION; see vfTrolleyGeometry).
+  // Trolleys fill the full container width + floor and extract out the end doors;
+  // tiers chosen so total canopy ≈ brief target (round, not ceil → no overshoot).
+  const geom = vfTrolleyGeometry(trolleyCount)
   const contractTiers = q(c, 'tiers_per_trolley', 0)
   const tiersPerTrolley = Math.max(1, Math.round(
     contractTiers > 0 ? contractTiers
-      : Math.ceil(canopyAreaM2 / (trolleyCount * DEFAULT_TRAY_AREA_M2)),
+      : canopyAreaM2 / (trolleyCount * geom.footprintM2),
   ))
   const trayCount = Math.max(1, Math.round(q(c, 'tray_count', trolleyCount * tiersPerTrolley)))
   const ledInstalledKw = qScale(c, 'led_installed_power_kw', 12)
@@ -351,19 +365,21 @@ function deriveVfParams(c: ContractInProgress): VfParams {
 
 function emitGrowingCanopy(p: VfParams) {
   const trayAreaM2 = p.canopyAreaM2 / p.trayCount
-  // Tray dimension: fixed 1200 mm width (fits two rows in a 40 HC interior
-  // after 800 mm walkway; 2 × 1200 mm + 800 mm = 3200 mm < 2350 mm usable
-  // width — runs single-row along the 12 m length instead).
-  // Depth computed from the area target so emitted dimensions are always
-  // consistent with the brief's canopy_area_m2 (gate 25 / gate 12 compliance).
-  const trayWidthMm = 1200
+  // Full-width EXTRACTION trolleys (U7): each trolley is the full container
+  // interior width and rolls out the end doors on rails — NO internal walkway.
+  // Tray spans the trolley footprint width; depth derived from the canopy
+  // target so emitted dims stay consistent with canopy_area_m2 (gate 25 / 12).
+  const geom = vfTrolleyGeometry(p.trolleyCount)
+  const trolleyWidthMm = geom.widthMm
+  const trolleyLengthMm = geom.lengthMm
+  const trayWidthMm = trolleyWidthMm
   const trayDepthMm = Math.round((trayAreaM2 * 1_000_000) / trayWidthMm)
 
   const growingTrolleys = makeSubModule(
     'mobile_growing_trolleys',
     'mobile growing trolleys',
     'carries',
-    `${p.trolleyCount} mobile trolleys in a single row along the 12 m container axis × ${p.tiersPerTrolley} vertical tiers = ${p.trayCount} trays totalling ${p.canopyAreaM2.toFixed(0)} m² canopy; 800 mm walkway on the long side`,
+    `${p.trolleyCount} full-width mobile trolleys (${(trolleyWidthMm / 1000).toFixed(2)} m wide — the full container interior) × ${p.tiersPerTrolley} vertical tiers = ${p.trayCount} trays ≈ ${p.canopyAreaM2.toFixed(0)} m² canopy; trolleys fill the floor and roll out the end doors on rails (no internal walkway); rear bay houses air-handling + light controls`,
     [
       word(
         'mobile_growing_trolley_word',
@@ -373,14 +389,12 @@ function emitGrowingCanopy(p: VfParams) {
           mod('quantity', fmtQty(p.trolleyCount)),
           mod('manufacturer', 'Montel'),
           mod('part_number', 'GREENROLL mobile grow rack'),
-          // Geometry: 40 HC interior 12.03 m × 2.35 m usable. Trolleys oriented
-          // with 1200 mm DEPTH along the container width axis, 1500 mm LENGTH
-          // stepping along the 12 m axis. Single row of 8 trolleys occupies
-          // 8 × 1500 mm = 12 m along the container (fits). The remaining
-          // 2350 − 1200 mm = 1150 mm leaves 800 mm clear walkway beside the row
-          // plus 350 mm for guide rail + tray overhang.
-          mod('dimension', '1500×1200×2400', 'mm'),
-          mod('form', 'powder-coated steel chassis with castors + floor guide rails, single-row layout along 12 m axis'),
+          // EXTRACTION geometry: trolley = full container interior width
+          // (~2300 mm after rail clearance) × LENGTH stepping along the 12 m axis.
+          // trolleyCount trolleys fill (12.03 m − rear bay) of length and roll out
+          // the end doors on full-length rails. No internal walkway/corridor.
+          mod('dimension', `${trolleyLengthMm}×${trolleyWidthMm}×2400`, 'mm'),
+          mod('form', 'powder-coated steel chassis on floor guide rails, full container width, rolls out the end doors (extraction access — no internal walkway)'),
           mod('regulatory', 'BS EN 60204-1'),
         ],
       ),
@@ -412,11 +426,11 @@ function emitGrowingCanopy(p: VfParams) {
         'floor guide rail word',
         cc('floor_guide_rail', 'floor guide rail', 'mechanical_load_function', 'aluminium'),
         [
-          // Two continuous guide rails running the full 12 m container length
-          // (one per trolley side); trolleys slide/roll along the length axis.
+          // Two continuous floor rails running the full 12 m container length to
+          // the END doors; trolleys roll out along them for harvest (extraction).
           mod('quantity', '×2'),
           mod('dimension', '12000', 'mm'),
-          mod('form', 'extruded aluminium U-channel, full container length'),
+          mod('form', 'extruded aluminium U-channel, full container length to the end doors (trolley extraction)'),
         ],
       ),
       word(
@@ -1625,7 +1639,7 @@ function emitWorkerAccessSafety(p: VfParams) {
     'worker_access_route',
     'worker access route',
     'routes',
-    'entry vestibule + central walkway between trolleys + emergency egress',
+    'entry vestibule + end-door trolley extraction route + emergency egress (no internal walkway — trolleys fill the floor)',
     [
       word(
         'entry_vestibule_word',
@@ -1637,19 +1651,8 @@ function emitWorkerAccessSafety(p: VfParams) {
           mod('regulatory', 'BRCGS Agriculture / EN ISO 22000'),
         ],
       ),
-      word(
-        'central_walkway_word',
-        'central walkway word',
-        cc('central_walkway', 'central walkway', 'mechanical_load_function', 'steel'),
-        [
-          mod('quantity', '×1'),
-          // Single-row layout: walkway runs the full container length on the
-          // long side of the trolley row. 2350 mm usable width − 1200 mm
-          // trolley depth = 1150 mm; 800 mm clear walkway after guide rails.
-          mod('dimension', '800×12000', 'mm'),
-          mod('form', 'slip-resistant aluminium walkway beside single trolley row (long side)'),
-        ],
-      ),
+      // No central_walkway: extraction-access design — trolleys fill the full
+      // floor width and roll out the end doors (U7). There is no internal corridor.
       word(
         'emergency_egress_release_word',
         'emergency egress release word',
@@ -2075,7 +2078,7 @@ function emitCrossModuleGrammarLinks(_p: VfParams) {
     { from_module: 'automation_sensing', to_module: 'lighting_array', mechanism: 'control', type: 'directional' as const, detail: 'PLC drives DALI photoperiod schedule' },
     { from_module: 'data_compute_communication', to_module: 'automation_sensing', mechanism: 'data', type: 'mutual' as const, detail: 'edge PC ↔ PLC over Modbus TCP for telemetry + remote control' },
     { from_module: 'climate_control', to_module: 'irrigation_nutrient', mechanism: 'fluid_loop', type: 'directional' as const, detail: 'HVAC condensate recovery returns to fertigation tank' },
-    { from_module: 'growing_canopy', to_module: 'structure_containment', mechanism: 'mechanical', type: 'directional' as const, detail: 'trolleys roll on floor guide rails inside container' },
+    { from_module: 'growing_canopy', to_module: 'structure_containment', mechanism: 'mechanical', type: 'directional' as const, detail: 'trolleys roll out the end doors on full-length floor rails (extraction access — no internal walkway)' },
     { from_module: 'climate_control', to_module: 'structure_containment', mechanism: 'mechanical', type: 'directional' as const, detail: 'DX outdoor unit roof-mounted on container' },
     { from_module: 'worker_access_safety', to_module: 'structure_containment', mechanism: 'mechanical', type: 'directional' as const, detail: 'personnel door + maintenance panels in container shell' },
     { from_module: 'harvest_handling', to_module: 'growing_canopy', mechanism: 'mechanical', type: 'directional' as const, detail: 'mature trolleys roll to packing bench at harvest' },
