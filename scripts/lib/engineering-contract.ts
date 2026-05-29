@@ -1304,6 +1304,20 @@ registerArchetype('vertical_farm', (brief: any) => {
   const tiersPerTrolley = extractRange(/(\d)\s*-?\s*(\d)?\s*(?:vertical\s+)?tiers/i, 5)
   const trayCount = trolleyCount * tiersPerTrolley  // 40 typical
   const trayAreaM2 = canopyAreaM2 / trayCount
+  // Tier canopy clearance — live vertical headroom for plant growth on each
+  // tier. Honours the brief's max_plant_height_cm CEILING: every tier must
+  // clear the tallest plant the brief specifies. Derived from the container's
+  // internal stack height split across the trolley's tiers, less mechanical
+  // overhead. A 40-ft HC ISO container internal height is 2698 mm; if a
+  // non-standard envelope is given, take the brief external height minus 198 mm
+  // (ISO roof + floor structure). The trolley loses ~250 mm to its base frame +
+  // the ceiling clearance needed to roll it out the end doors; each tier loses
+  // ~180 mm to the tray + NFT channel + LED fixture + air plenum. What remains
+  // is the live canopy headroom the brief's max plant height must fit within.
+  const containerExtHeightMm = Number(brief?.constraints?.max_dimensions_mm?.h ?? 0) || 2896
+  const containerInternalHeightMm = containerExtHeightMm > 2800 ? 2698 : Math.max(2000, containerExtHeightMm - 198)
+  const tierPitchMm = (containerInternalHeightMm - 250) / Math.max(1, tiersPerTrolley)
+  const tierCanopyClearanceCm = Math.max(0, (tierPitchMm - 180) / 10)
   // PPFD target from brief: "200-300 µmol·m⁻²·s⁻¹"
   const ppfdTarget = extractRange(/(\d{2,4})\s*-?\s*(\d{2,4})?\s*(?:µmol|umol|μmol)/i, 250)
   // LED efficacy 2.5 µmol/J for SYSTEM-level horticultural LED (modern mixed
@@ -1387,6 +1401,10 @@ registerArchetype('vertical_farm', (brief: any) => {
     tiers_per_trolley: q(tiersPerTrolley, '', 'dimensionless', 'rated', 'rack', 'brief'),
     tray_count: q(trayCount, '', 'dimensionless', 'rated', 'system', 'calculator', { source_detail: 'trolley_count × tiers_per_trolley' }),
     tray_area_m2: q(trayAreaM2, 'm²', 'area', 'canopy', 'rack', 'calculator'),
+    // Live canopy headroom per tier — the achieved quantity the brief's
+    // max_plant_height_cm ceiling is audited against (gate 17). Floor compare:
+    // clearance must be ≥ the tallest plant the brief specifies.
+    tier_canopy_clearance_cm: q(tierCanopyClearanceCm, 'cm', 'length', 'min', 'rack', 'calculator', { source_detail: `(${containerInternalHeightMm} mm internal stack − 250 mm base-frame/extraction clearance) / ${tiersPerTrolley} tiers − 180 mm tray+NFT+LED+plenum = ${tierCanopyClearanceCm.toFixed(0)} cm live headroom per tier` }),
     ppfd_target_umol_m2_s: q(ppfdTarget, 'µmol/m²/s', 'photon_flux_density', 'rated', 'rack', 'brief'),
     led_efficacy_umol_per_j: q(ledEfficacyUmolPerJ, 'µmol/J', 'dimensionless', 'rated', 'system', 'physics_constant', { source_detail: 'Modern horticultural LED full-spectrum typical' }),
     led_installed_power_kw: q(ledPowerKw, 'kW', 'power', 'continuous', 'system', 'calculator', { source_detail: 'canopy × PPFD / efficacy / 1000' }),

@@ -58,6 +58,39 @@ def _load_recorder():
 
 _record_council_score = _load_recorder()
 
+
+# ─── .env.local auto-loader ──────────────────────────────────────────────────
+# Self-load the repo's .env.local so this scorer records a score REGARDLESS of
+# how it's invoked (direct shell, cron, subagent). The council needs
+# ANTHROPIC_API_KEY — an eval-tooling exception; the engine pipeline itself is
+# Anthropic-free — and that key lives in .env.local, NOT in ~/.claude/secrets/.
+# A run that can't find the key exits 1 and writes NOTHING to
+# council-scores.jsonl, which is exactly the "losing information" failure this
+# whole permanent-log feature exists to prevent. Removing the "forgot to source
+# .env.local" failure class entirely is the robust fix. Already-exported env
+# vars win (we only fill what's absent), preserving normal shell precedence.
+def _load_dotenv_local() -> None:
+    env_path = Path(__file__).parent.parent / ".env.local"
+    if not env_path.exists():
+        return
+    try:
+        for raw in env_path.read_text().splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            if line.startswith("export "):
+                line = line[len("export "):]
+            key, _, val = line.partition("=")
+            key = key.strip()
+            val = val.strip().strip('"').strip("'")
+            if key and key not in os.environ:
+                os.environ[key] = val
+    except Exception as e:
+        print(f"[WARN] could not parse .env.local: {e}", file=sys.stderr)
+
+
+_load_dotenv_local()
+
 # ─── Config ────────────────────────────────────────────────────────────────
 
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
@@ -933,7 +966,7 @@ Modes:
     # ── Shared optional args ──────────────────────────────────────────────
     parser.add_argument("--output", help="Output markdown report path (optional in single-PDF mode)")
     parser.add_argument("--run-tag", default="", help="Tag for this scoring run, e.g. iter-67 (used in log)")
-    parser.add_argument("--product-class", dest="product_class", help="Product class slug, e.g. bess (single-PDF mode)")
+    parser.add_argument("--product-class", "--class", dest="product_class", help="Product class slug, e.g. bess (single-PDF mode). --class is an accepted alias.")
 
     # ── Batch-mode args ───────────────────────────────────────────────────
     parser.add_argument("--batch-dir", help="[Batch mode] Path to shadow batch directory")

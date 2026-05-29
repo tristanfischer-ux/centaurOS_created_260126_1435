@@ -42,6 +42,7 @@ import { resolve, dirname } from 'path'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { MARKET_BANDS, computeDesignBandPosition } from '../src/lib/pdf-engine-v2/lib/market-bands'
 import { buildContract } from './lib/engineering-contract'
+import { auditBriefConstraintCompleteness } from './lib/brief-constraint-completeness-audit'
 import { HARD_REQUIRED_SLOTS } from '../src/lib/pdf-engine-v2/lib/engineering-lock-gate'
 
 interface Assertion {
@@ -827,25 +828,59 @@ function checkSnapshot(snapshotPath: string): SnapshotResult {
   // This invariant is the source-truth backstop: if a chain emits a metric
   // key the renderer doesn't know about, the harness fails fast so iter-N
   // catches iter-(N+1) regressions without waiting for council inspection.
-  const RENDERER_KNOWN_METRIC_KEYS = new Set([
-    'nameplate_capacity_mwh', 'rated_power_mw', 'peak_power_mw', 'cycle_life',
-    'dc_bus_voltage_v', 'ac_output_voltage_v', 'rated_power_kw',
-    'annual_energy_mwh', 'thermal_output_kw', 'cop', 'yield_kg_per_year',
-  ])
-  const briefMetricsArr: any[] = Array.isArray(state?.parsedBrief?.constraints?.target_performance?.metrics)
-    ? state.parsedBrief.constraints.target_performance.metrics
-    : []
-  const unmappedKeys: string[] = []
-  for (const m of briefMetricsArr) {
-    const k = typeof m?.key_metric === 'string' ? m.key_metric : ''
-    if (k && !RENDERER_KNOWN_METRIC_KEYS.has(k)) unmappedKeys.push(k)
+  // I12 (2026-05-29, refactor): run the REAL gate-17 audit against the snapshot
+  // and assert zero HIGH findings — authoritative, no re-derived mirror set to
+  // go stale. The old hardcoded RENDERER_KNOWN_METRIC_KEYS silently fell out of
+  // date (it never learned the VF scale/geometry keys), defeating the very
+  // desync this invariant exists to catch. auditBriefConstraintCompleteness is
+  // the same function the chain runs at Stage 49.11 (exit 17), so this fails
+  // fast on exactly what would block a production run.
+  let completenessHighIds: string[] = []
+  let completenessThrew = false
+  try {
+    const completeness = auditBriefConstraintCompleteness(state)
+    completenessHighIds = completeness.findings.filter((f) => f.severity === 'HIGH').map((f) => f.id)
+  } catch (err) {
+    completenessThrew = true
+    completenessHighIds = [`audit threw: ${(err as Error).message.slice(0, 60)}`]
   }
   assertions.push(assertEq(
-    'I12.brief_metric_keys_renderer_known',
-    'Every brief target_performance.metrics[] key is in the renderer METRIC_MAP (gate 17 prerequisite)',
-    unmappedKeys.length,
+    'I12.brief_constraint_completeness_no_high',
+    'Gate 17 (brief-constraint completeness) has zero HIGH findings against this snapshot',
+    completenessThrew ? -1 : completenessHighIds.length,
     (n) => n === 0,
-    (n) => `${n} brief metric key(s) not in renderer METRIC_MAP: ${unmappedKeys.join(', ')} — gate 17 will fail HIGH. Either add these keys to METRIC_MAP in scripts/render-minimal-pdf.tsx + scripts/lib/brief-constraint-completeness-audit.ts::KNOWN_METRIC_MAP, OR change the parser to emit a known synonym.`,
+    () => `gate 17 HIGH: ${completenessHighIds.join(', ')} — a HARD brief constraint is silently absent from the Brief Compliance table. Add the metric key to METRIC_MAP (scripts/render-minimal-pdf.tsx) AND the audit's KNOWN_METRIC_MAP, and ensure the achieved quantity is emitted in the contract.`,
+  ))
+
+  // I12b (2026-05-29): the renderer's METRIC_MAP and the audit's KNOWN_METRIC_MAP
+  // are hand-mirrored across two files; they MUST carry the same key set. A
+  // half-fix (edit one, forget the other) makes gate 17 either false-pass (audit
+  // believes the renderer will draw a row it actually skips) or false-fail.
+  // Parse both maps from source — the `<key>: { qtyKey: '...'` entry shape,
+  // which excludes the `Record<...>` type declaration (no quote after qtyKey:)
+  // — and assert the key sets are identical, so a desync can never ship silently.
+  const extractQtyKeyMapKeys = (relPath: string): Set<string> => {
+    try {
+      const src = readFileSync(resolve(__dirname, relPath), 'utf-8')
+      const keys = new Set<string>()
+      const re = /^\s*([a-z_][a-zA-Z_0-9]*)\s*:\s*\{\s*qtyKey:\s*'/gm
+      let mm: RegExpExecArray | null
+      while ((mm = re.exec(src)) !== null) keys.add(mm[1])
+      return keys
+    } catch {
+      return new Set<string>()
+    }
+  }
+  const rendererMapKeys = extractQtyKeyMapKeys('render-minimal-pdf.tsx')
+  const auditMapKeys = extractQtyKeyMapKeys('lib/brief-constraint-completeness-audit.ts')
+  const onlyRenderer = [...rendererMapKeys].filter((k) => !auditMapKeys.has(k))
+  const onlyAudit = [...auditMapKeys].filter((k) => !rendererMapKeys.has(k))
+  assertions.push(assertEq(
+    'I12b.metric_map_mirror_in_sync',
+    'renderer METRIC_MAP key set === audit KNOWN_METRIC_MAP key set (no dual-write desync)',
+    rendererMapKeys.size === 0 ? -1 : onlyRenderer.length + onlyAudit.length,
+    (n) => n === 0,
+    () => `METRIC_MAP mirror desync (or source parse failed) — only in renderer: [${onlyRenderer.join(', ')}]; only in audit: [${onlyAudit.join(', ')}]. Keep render-minimal-pdf.tsx::METRIC_MAP and brief-constraint-completeness-audit.ts::KNOWN_METRIC_MAP identical.`,
   ))
 
   // VF.scale_fallback_audit — P1-4 (2026-05-23): VF emitter logs

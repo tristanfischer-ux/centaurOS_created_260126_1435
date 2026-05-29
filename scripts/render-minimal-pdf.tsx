@@ -4293,6 +4293,18 @@ function _buildComplianceRows(state: any, bomTotals: BomTotals | null, costStack
       cop:                         { qtyKey: 'cop_seasonal',              label: 'COP (seasonal)',         unit: '',    tolerancePct: 5, kind: 'floor' },
       // Vertical-farm (FLOOR — yield ≥ brief target)
       yield_kg_per_year:           { qtyKey: 'yield_kg_per_year',         label: 'Annual yield',           unit: 'kg/yr', tolerancePct: 10, kind: 'floor' },
+      // Vertical-farm scale + geometry (gate 17, VF iter-vf5): the brief's
+      // headline scale metrics were silently absent from the compliance table
+      // because METRIC_MAP didn't know these keys, so the reader saw a green
+      // table that never audited the farm's actual size. total_growing_area →
+      // achieved canopy_area_m2 (FLOOR — deliver ≥ the target growing area);
+      // trolley_count → achieved trolley_count (EXACT — the bespoke trolley
+      // topology must match, it sets tray/canopy/extraction geometry);
+      // max_plant_height_cm → achieved tier_canopy_clearance_cm (FLOOR — each
+      // tier's live headroom must clear the tallest plant the brief specifies).
+      total_growing_area_m2:       { qtyKey: 'canopy_area_m2',            label: 'Total growing area',     unit: 'm²', tolerancePct: 5, kind: 'floor' },
+      trolley_count:               { qtyKey: 'trolley_count',             label: 'Grow trolleys',          unit: '',   tolerancePct: 2, kind: 'exact' },
+      max_plant_height_cm:         { qtyKey: 'tier_canopy_clearance_cm',  label: 'Max plant height (tier clearance)', unit: 'cm', tolerancePct: 5, kind: 'floor' },
     }
     for (const m of briefMetrics) {
       const km = String(m?.key_metric ?? '')
