@@ -6564,26 +6564,20 @@ function ModuleSection({
         })}
       </View>
 
-      <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 6, marginBottom: 8 }}>
-        Sub-modules
-      </Text>
-      {/* 2026-05-24 (bess-l7 audit-detector layout-overlap fix): the
-          sub-modules used to be wrapped in a parent View with `borderTopWidth`
-          for the cosmetic horizontal rule. That wrapper created a fresh
-          layout context where the FIRST sub-module had no prior siblings —
-          and react-pdf's `shouldBreak` heuristic (layout/lib/index.js:1633)
-          gates `minPresenceAhead`-driven page breaks on
-          `breakingImprovesPresence = previousElements.length > 0`. With zero
-          prior siblings inside the wrapper, the first sub-module would
-          ALWAYS render at the current Y regardless of `minPresenceAhead`,
-          collapsing into Yoga overflow + the multi-layer text smear we saw
-          on BESS L7 page 27. Fix: replace the wrapper with a sibling rule
-          View so each sub-module is now a direct sibling of the
-          "Sub-modules" header. `breakingImprovesPresence` becomes TRUE for
-          the first sub-module because it sees the header (and any prior
-          page-level content) as prior siblings. */}
-      <View style={{ borderTopWidth: 0.6, borderTopColor: RULE_SOFT, marginBottom: 0 }} />
-      {subModules.map(sm => {
+      {/* 2026-05-29 (orphaned-heading fix): the "Sub-modules" heading used to
+          be a standalone <Text> sibling followed by a rule <View> and then
+          the per-sub-module <View minPresenceAhead={...}> items. When the
+          remaining page height was less than `outerReserve` for the first
+          card, react-pdf broke the page AFTER the heading, leaving the
+          heading + rule orphaned at the bottom of the previous page with a
+          large blank gap before the first card on the new page.
+          Fix: the heading + rule are now rendered INSIDE the first
+          sub-module's outer <View minPresenceAhead={...}> so they always
+          travel with their card. Sub-modules 1-N (smIdx > 0) render without
+          the heading — the section boundary is already established.
+          No wrap={false} is introduced; minPresenceAhead already accounts
+          for the extra ~35pt of heading + rule via smIdx===0 reserve bump. */}
+      {subModules.map((sm, smIdx) => {
         const proseChunks = break_paragraph(sm.paragraph || '—')
         // ITER-10.5: clean Chain V2 BoM + numbered Notes block (Tristan ref
         // image #2). Replaces the cramped 3-deep numbering + 4-letter
@@ -6618,7 +6612,10 @@ function ModuleSection({
         const proseHeightEst = proseChunks.length * 55
         const bomHeightEst = subBomLines.length > 0 ? 70 + subBomLines.length * 18 + 30 : 0
         const notesHeightEst = notes.length * 28
-        const rawReserve = 25 + proseHeightEst + bomHeightEst + notesHeightEst
+        // For the first sub-module (smIdx===0), add ~35pt for the "Sub-modules"
+        // heading + rule that render inside this card to prevent orphaning.
+        const headingReserve = smIdx === 0 ? 35 : 0
+        const rawReserve = 25 + headingReserve + proseHeightEst + bomHeightEst + notesHeightEst
         const outerReserve = Math.min(rawReserve, 600)
         return (
           <View
@@ -6626,6 +6623,17 @@ function ModuleSection({
             style={{ paddingVertical: 11, borderBottomWidth: 0.6, borderBottomColor: RULE_SOFT }}
             minPresenceAhead={outerReserve}
           >
+            {/* Heading + rule rendered only for the first sub-module so that
+                the "Sub-modules" label always appears on the same page as
+                the first card (2026-05-29 orphaned-heading fix). */}
+            {smIdx === 0 ? (
+              <>
+                <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: INK, marginTop: 6, marginBottom: 6 }}>
+                  Sub-modules
+                </Text>
+                <View style={{ borderTopWidth: 0.6, borderTopColor: RULE_SOFT, marginBottom: 6 }} />
+              </>
+            ) : null}
             {/* 2026-05-23 fix (user-reported on windturbine-l5 page 18):
                 Earlier "wrap={false} around title + full first prose chunk"
                 caused overlapping-text smear when proseChunks[0] was 3+
@@ -9337,30 +9345,65 @@ function PhysicsNarrativePage({ state, project }: { state: any; project: string 
         section.
       </Text>
 
-      <View
-        style={{
-          padding: 16,
-          backgroundColor: '#f0f4f8',
-          borderLeftWidth: 3,
-          borderLeftColor: ACCENT,
-          borderRadius: 4,
-          marginBottom: 14,
-        }}
-      >
-        {narrative.sentences.map((sentence, i) => (
-          <Text
-            key={i}
+      {/* Render grouped domain paragraphs when available (VF_PHYSICS_GROUPS),
+          falling back to the flat sentence list for backward compatibility. */}
+      {narrative.groups && narrative.groups.length > 0 ? (
+        narrative.groups.map((group, gi) => (
+          <View
+            key={gi}
             style={{
-              fontSize: 10,
-              color: INK,
-              lineHeight: 1.65,
-              marginBottom: i < narrative.sentences.length - 1 ? 6 : 0,
+              padding: 14,
+              backgroundColor: '#f0f4f8',
+              borderLeftWidth: 3,
+              borderLeftColor: ACCENT,
+              borderRadius: 4,
+              marginBottom: gi < narrative.groups.length - 1 ? 10 : 14,
             }}
           >
-            {sentence}
-          </Text>
-        ))}
-      </View>
+            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK_SOFT, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 6 }}>
+              {group.label}
+            </Text>
+            {group.sentences.map((sentence, si) => (
+              <Text
+                key={si}
+                style={{
+                  fontSize: 10,
+                  color: INK,
+                  lineHeight: 1.65,
+                  marginBottom: si < group.sentences.length - 1 ? 5 : 0,
+                }}
+              >
+                {sentence}
+              </Text>
+            ))}
+          </View>
+        ))
+      ) : (
+        <View
+          style={{
+            padding: 16,
+            backgroundColor: '#f0f4f8',
+            borderLeftWidth: 3,
+            borderLeftColor: ACCENT,
+            borderRadius: 4,
+            marginBottom: 14,
+          }}
+        >
+          {narrative.sentences.map((sentence, i) => (
+            <Text
+              key={i}
+              style={{
+                fontSize: 10,
+                color: INK,
+                lineHeight: 1.65,
+                marginBottom: i < narrative.sentences.length - 1 ? 6 : 0,
+              }}
+            >
+              {sentence}
+            </Text>
+          ))}
+        </View>
+      )}
 
       {narrative.tools_cited.length > 0 ? (
         <View

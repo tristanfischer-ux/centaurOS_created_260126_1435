@@ -357,10 +357,20 @@ export interface PhysicsNarrativeSentence {
   render: (vals: Record<string, number>) => string
 }
 
+/** A domain group within the physics narrative — a labelled paragraph of sentences. */
+export interface PhysicsNarrativeGroup {
+  /** Short domain label, e.g. "Thermal & energy". */
+  label: string
+  /** Emitted (non-skipped) sentences for this domain. */
+  sentences: string[]
+}
+
 /** A complete physics narrative: a sequence of sentences with a heading. */
 export interface PhysicsNarrative {
   heading: string
-  sentences: string[]  // only the emitted (non-skipped) sentences
+  sentences: string[]  // only the emitted (non-skipped) sentences — flat, for backward compat
+  /** Domain-grouped paragraphs for richer rendering. Empty when no sentences emitted. */
+  groups: PhysicsNarrativeGroup[]
   /** Tools cited, in emission order, deduped. */
   tools_cited: string[]
 }
@@ -371,87 +381,249 @@ function fmt(n: number, dp = 1): string {
 }
 
 /**
- * Vertical-farm physics causal chain — energy, moisture, cooling, electrical.
- * Quantity keys are the EXACT keys emitted by vertical-farm.ts contract_update
- * blocks, cross-checked against the class plan above.
+ * Domain groupings for the VF physics narrative.  Each group lists the sentence
+ * templates that belong to that labelled paragraph.  Sentences are still emitted
+ * only when ALL required quantity keys are present — no fabrication.
  */
-const VF_PHYSICS_SENTENCES: PhysicsNarrativeSentence[] = [
+interface VFSentenceGroup {
+  label: string
+  sentences: PhysicsNarrativeSentence[]
+}
+
+/**
+ * Vertical-farm physics causal chain — grouped by engineering domain.
+ * Quantity keys are the EXACT keys present in orchestratorContract.quantities
+ * (verified against ~/Downloads/bess-iter/iter-vf4/vf-container/state.json).
+ */
+const VF_PHYSICS_GROUPS: VFSentenceGroup[] = [
+  // ── Thermal & energy ──────────────────────────────────────────────────────
   {
-    requires: ['canopy_area_m2', 'led_ppfd_umol_m2_s', 'led_installed_power_kw'],
-    source_tool: 'led-par:efficacy',
-    render: (v) => (
-      `The ${fmt(v.canopy_area_m2, 0)} m² canopy operates at ` +
-      `${fmt(v.led_ppfd_umol_m2_s, 0)} µmol/m²/s PPFD, ` +
-      `drawing ${fmt(v.led_installed_power_kw, 1)} kW of LED input ` +
-      `(led-par:efficacy).`
-    ),
+    label: 'Thermal & energy',
+    sentences: [
+      {
+        requires: ['canopy_area_m2', 'led_ppfd_umol_m2_s', 'led_installed_power_kw'],
+        source_tool: 'led-par:efficacy',
+        render: (v) => (
+          `The ${fmt(v.canopy_area_m2, 0)} m² canopy operates at ` +
+          `${fmt(v.led_ppfd_umol_m2_s, 0)} µmol/m²/s PPFD, ` +
+          `drawing ${fmt(v.led_installed_power_kw, 1)} kW of LED input ` +
+          `(led-par:efficacy).`
+        ),
+      },
+      {
+        requires: ['led_installed_power_kw', 'led_heat_load_kw'],
+        source_tool: 'led-par:efficacy',
+        render: (v) => {
+          const pct = Math.round((v.led_heat_load_kw / v.led_installed_power_kw) * 100)
+          return (
+            `About ${pct}% of that input (${fmt(v.led_heat_load_kw, 1)} kW) ` +
+            `becomes sensible heat the HVAC must reject.`
+          )
+        },
+      },
+      {
+        requires: ['plant_transpiration_kg_day', 'hvac_latent_load_kw'],
+        source_tool: 'plant-growth:yield',
+        render: (v) => (
+          `The crop transpires ${fmt(v.plant_transpiration_kg_day, 0)} kg/day ` +
+          `of moisture (plant-growth:yield), a ${fmt(v.hvac_latent_load_kw, 1)} kW ` +
+          `latent load on the HVAC.`
+        ),
+      },
+      {
+        requires: ['hvac_total_load_kw', 'hvac_chiller_capacity_kw'],
+        source_tool: 'hvac:load-sizing',
+        render: (v) => (
+          `Combined sensible + latent duty is ${fmt(v.hvac_total_load_kw, 1)} kW; ` +
+          `applying a 1.20 safety margin sizes the chiller at ` +
+          `${fmt(v.hvac_chiller_capacity_kw, 1)} kW cooling capacity ` +
+          `(hvac:load-sizing).`
+        ),
+      },
+      {
+        requires: ['chiller_cop_cooling', 'chiller_compressor_power_kw'],
+        source_tool: 'refrigeration-cycle:cop',
+        render: (v) => (
+          `The R290 vapour-compression cycle achieves COP ${fmt(v.chiller_cop_cooling, 2)} ` +
+          `(refrigeration-cycle:cop via CoolProp), consuming ` +
+          `${fmt(v.chiller_compressor_power_kw, 1)} kW at the compressor shaft.`
+        ),
+      },
+      {
+        requires: ['moisture_removed_kg_h'],
+        source_tool: 'dehumidification:sizing',
+        render: (v) => (
+          `Dehumidification removes ${fmt(v.moisture_removed_kg_h, 1)} kg/h of ` +
+          `vapour from the recirculated air stream ` +
+          `(dehumidification:sizing).`
+        ),
+      },
+      {
+        requires: ['hx_effectiveness', 'hx_heat_transfer_kw'],
+        source_tool: 'ht:ntu-heat-exchanger',
+        render: (v) => (
+          `A counter-flow heat exchanger achieves ${fmt(v.hx_effectiveness * 100, 0)}% ` +
+          `effectiveness, recovering ${fmt(v.hx_heat_transfer_kw, 1)} kW of exhaust heat ` +
+          `back into the supply air stream (ht:ntu-heat-exchanger).`
+        ),
+      },
+      {
+        requires: ['chiller_compressor_power_kw', 'led_installed_power_kw', 'total_electrical_kw'],
+        source_tool: 'pandapower:grid-integration',
+        render: (v) => (
+          `The ${fmt(v.chiller_compressor_power_kw, 1)} kW compressor, ` +
+          `${fmt(v.led_installed_power_kw, 1)} kW lighting, and ancillaries ` +
+          `set the total connected load at ${fmt(v.total_electrical_kw, 1)} kW ` +
+          `(pandapower:grid-integration).`
+        ),
+      },
+      {
+        requires: ['annual_yield_kg'],
+        source_tool: 'plant-growth:yield',
+        render: (v) => (
+          `The crop model projects ${fmt(v.annual_yield_kg, 0)} kg/year of fresh ` +
+          `produce from this canopy area and DLI regime ` +
+          `(plant-growth:yield).`
+        ),
+      },
+    ],
   },
+
+  // ── Water & nutrients ──────────────────────────────────────────────────────
   {
-    requires: ['led_installed_power_kw', 'led_heat_load_kw'],
-    source_tool: 'led-par:efficacy',
-    render: (v) => {
-      const pct = Math.round((v.led_heat_load_kw / v.led_installed_power_kw) * 100)
-      return (
-        `About ${pct}% of that input (${fmt(v.led_heat_load_kw, 1)} kW) ` +
-        `becomes sensible heat the HVAC must reject.`
-      )
-    },
+    label: 'Water & nutrients',
+    sentences: [
+      {
+        requires: ['irrigation_pump_flow_lpm', 'irrigation_pump_head_m', 'irrigation_pump_motor_kw'],
+        source_tool: 'irrigation:pump-sizing',
+        render: (v) => (
+          `The irrigation pump delivers ${fmt(v.irrigation_pump_flow_lpm, 1)} L/min ` +
+          `against ${fmt(v.irrigation_pump_head_m, 1)} m of head, ` +
+          `requiring a ${fmt(v.irrigation_pump_motor_kw, 2)} kW motor ` +
+          `(irrigation:pump-sizing).`
+        ),
+      },
+      {
+        requires: ['irrigation_pipe_pressure_drop_kpa'],
+        source_tool: 'fluids:pipe-sizing',
+        render: (v) => (
+          `Pipe-friction analysis gives a distribution pressure drop of ` +
+          `${fmt(v.irrigation_pipe_pressure_drop_kpa, 1)} kPa across the fertigation network ` +
+          `(fluids:pipe-sizing).`
+        ),
+      },
+      {
+        requires: ['nutrient_target_ec_ms_cm', 'nutrient_target_ph'],
+        source_tool: 'nutrient-solution:chemistry',
+        render: (v) => (
+          `The nutrient solution targets ${fmt(v.nutrient_target_ec_ms_cm, 1)} mS/cm ` +
+          `conductivity at pH ${fmt(v.nutrient_target_ph, 1)}, ` +
+          `sized by the crop's macro- and micro-nutrient uptake model ` +
+          `(nutrient-solution:chemistry).`
+        ),
+      },
+      {
+        requires: ['nutrient_dosing_rate_ml_min'],
+        source_tool: 'nutrient-solution:chemistry',
+        render: (v) => (
+          `Nutrient concentrate is dosed at ${fmt(v.nutrient_dosing_rate_ml_min, 1)} mL/min ` +
+          `to maintain target conductivity (nutrient-solution:chemistry).`
+        ),
+      },
+    ],
   },
+
+  // ── Biology & atmosphere ───────────────────────────────────────────────────
   {
-    requires: ['plant_transpiration_kg_day', 'hvac_latent_load_kw'],
-    source_tool: 'plant-growth:yield',
-    render: (v) => (
-      `The crop transpires ${fmt(v.plant_transpiration_kg_day, 0)} kg/day ` +
-      `of moisture (plant-growth:yield), a ${fmt(v.hvac_latent_load_kw, 1)} kW ` +
-      `latent load on the HVAC.`
-    ),
+    label: 'Biology & atmosphere',
+    sentences: [
+      {
+        requires: ['co2_consumption_kg_day', 'co2_tank_size_kg'],
+        source_tool: 'co2-enrichment:sizing',
+        render: (v) => (
+          `CO₂ enrichment consumes ${fmt(v.co2_consumption_kg_day, 2)} kg/day; ` +
+          `a ${fmt(v.co2_tank_size_kg, 0)} kg bulk tank provides the on-site buffer ` +
+          `(co2-enrichment:sizing).`
+        ),
+      },
+      {
+        requires: ['uvc_target_dose_mj_cm2', 'uvc_lamps_required'],
+        source_tool: 'pest-control:uvc-dose',
+        render: (v) => (
+          `Pathogen control requires a UV-C delivered dose of ` +
+          `${fmt(v.uvc_target_dose_mj_cm2, 0)} mJ/cm², achieved by ` +
+          `${Math.round(v.uvc_lamps_required)} lamps in the recirculation duct ` +
+          `(pest-control:uvc-dose).`
+        ),
+      },
+    ],
   },
+
+  // ── Structure, cost & compliance ──────────────────────────────────────────
   {
-    requires: ['hvac_total_load_kw', 'hvac_chiller_capacity_kw'],
-    source_tool: 'hvac:load-sizing',
-    render: (v) => (
-      `Combined sensible + latent duty is ${fmt(v.hvac_total_load_kw, 1)} kW; ` +
-      `applying a 1.20 safety margin sizes the chiller at ` +
-      `${fmt(v.hvac_chiller_capacity_kw, 1)} kW cooling capacity ` +
-      `(hvac:load-sizing).`
-    ),
-  },
-  {
-    requires: ['chiller_cop_cooling', 'chiller_compressor_power_kw'],
-    source_tool: 'refrigeration-cycle:cop',
-    render: (v) => (
-      `The R290 vapour-compression cycle achieves COP ${fmt(v.chiller_cop_cooling, 2)} ` +
-      `(refrigeration-cycle:cop via CoolProp), consuming ` +
-      `${fmt(v.chiller_compressor_power_kw, 1)} kW at the compressor shaft.`
-    ),
-  },
-  {
-    requires: ['moisture_removed_kg_h'],
-    source_tool: 'dehumidification:sizing',
-    render: (v) => (
-      `Dehumidification removes ${fmt(v.moisture_removed_kg_h, 1)} kg/h of ` +
-      `vapour from the recirculated air stream ` +
-      `(dehumidification:sizing).`
-    ),
-  },
-  {
-    requires: ['chiller_compressor_power_kw', 'led_installed_power_kw', 'total_electrical_kw'],
-    source_tool: 'pandapower:grid-integration',
-    render: (v) => (
-      `The ${fmt(v.chiller_compressor_power_kw, 1)} kW compressor, ` +
-      `${fmt(v.led_installed_power_kw, 1)} kW lighting, and ancillaries ` +
-      `set the total connected load at ${fmt(v.total_electrical_kw, 1)} kW ` +
-      `(pandapower:grid-integration).`
-    ),
-  },
-  {
-    requires: ['annual_yield_kg'],
-    source_tool: 'plant-growth:yield',
-    render: (v) => (
-      `The crop model projects ${fmt(v.annual_yield_kg, 0)} kg/year of fresh ` +
-      `produce from this canopy area and DLI regime ` +
-      `(plant-growth:yield).`
-    ),
+    label: 'Structure, cost & compliance',
+    sentences: [
+      {
+        requires: ['total_system_mass_kg', 'max_mass_kg', 'mass_budget_utilisation_pct'],
+        source_tool: 'mass-aggregator:envelope-check',
+        render: (v) => (
+          `All components aggregate to ${fmt(v.total_system_mass_kg, 0)} kg — ` +
+          `${fmt(v.mass_budget_utilisation_pct, 1)}% of the ` +
+          `${fmt(v.max_mass_kg, 0)} kg envelope allowance ` +
+          `(mass-aggregator:envelope-check).`
+        ),
+      },
+      {
+        requires: ['economics_npv_gbp', 'economics_payback_years', 'economics_capex_gbp'],
+        source_tool: 'yield-economics:npv',
+        render: (v) => (
+          `Net present value is £${Math.round(v.economics_npv_gbp).toLocaleString()} ` +
+          `on a £${Math.round(v.economics_capex_gbp).toLocaleString()} capital investment, ` +
+          `with a ${fmt(v.economics_payback_years, 1)}-year payback ` +
+          `(yield-economics:npv).`
+        ),
+      },
+      {
+        requires: ['economics_irr_pct'],
+        source_tool: 'yield-economics:npv',
+        render: (v) => (
+          `The internal rate of return is ${fmt(v.economics_irr_pct, 1)}% ` +
+          `(yield-economics:npv).`
+        ),
+      },
+      {
+        requires: ['lca_total_co2_kg', 'lca_co2_per_kg_product'],
+        source_tool: 'lifecycle-co2:assessment',
+        render: (v) => (
+          `Lifecycle carbon totals ${fmt(v.lca_total_co2_kg / 1000, 1)} t CO₂e ` +
+          `(${fmt(v.lca_co2_per_kg_product, 1)} kg CO₂e per kg of produce) ` +
+          `over the design life (lifecycle-co2:assessment).`
+        ),
+      },
+      {
+        requires: ['reliability_system_mtbf_hours'],
+        source_tool: 'reliability-fmea:system',
+        render: (v) => (
+          `System-level failure-mode analysis gives a mean time between failures of ` +
+          `${Math.round(v.reliability_system_mtbf_hours).toLocaleString()} hours ` +
+          `(reliability-fmea:system).`
+        ),
+      },
+      {
+        requires: ['transport_transit_days', 'transport_shipping_cost_gbp'],
+        source_tool: 'transport-logistics:routing',
+        render: (v) => {
+          const costStr = v.transport_shipping_cost_gbp > 0
+            ? ` at a shipping cost of £${Math.round(v.transport_shipping_cost_gbp).toLocaleString()}`
+            : ''
+          return (
+            `Logistics routing sets a ${Math.round(v.transport_transit_days)}-day transit window` +
+            `${costStr} to the delivery site ` +
+            `(transport-logistics:routing).`
+          )
+        },
+      },
+    ],
   },
 ]
 
@@ -488,30 +660,39 @@ export function generatePhysicsNarrative(
   const isVF = classKey.includes('vertical') || classKey.includes('farm')
   if (!isVF) return null
 
-  const sentences: string[] = []
+  const allSentences: string[] = []
   const toolsCited: string[] = []
+  const groups: PhysicsNarrativeGroup[] = []
 
-  for (const tpl of VF_PHYSICS_SENTENCES) {
-    // Resolve all required quantities.
-    const vals: Record<string, number> = {}
-    let allPresent = true
-    for (const key of tpl.requires) {
-      const v = resolveQty(quantities, key)
-      if (v === undefined) { allPresent = false; break }
-      vals[key] = v
+  for (const group of VF_PHYSICS_GROUPS) {
+    const groupSentences: string[] = []
+    for (const tpl of group.sentences) {
+      // Resolve all required quantities.
+      const vals: Record<string, number> = {}
+      let allPresent = true
+      for (const key of tpl.requires) {
+        const v = resolveQty(quantities, key)
+        if (v === undefined) { allPresent = false; break }
+        vals[key] = v
+      }
+      if (!allPresent) continue  // skip sentence — no fabrication
+
+      const sentence = tpl.render(vals)
+      groupSentences.push(sentence)
+      allSentences.push(sentence)
+      if (!toolsCited.includes(tpl.source_tool)) toolsCited.push(tpl.source_tool)
     }
-    if (!allPresent) continue  // skip sentence — no fabrication
-
-    const sentence = tpl.render(vals)
-    sentences.push(sentence)
-    if (!toolsCited.includes(tpl.source_tool)) toolsCited.push(tpl.source_tool)
+    if (groupSentences.length > 0) {
+      groups.push({ label: group.label, sentences: groupSentences })
+    }
   }
 
-  if (sentences.length === 0) return null
+  if (allSentences.length === 0) return null
 
   return {
     heading: 'How the design was computed — the physics',
-    sentences,
+    sentences: allSentences,
+    groups,
     tools_cited: toolsCited,
   }
 }
