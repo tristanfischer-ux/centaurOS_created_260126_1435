@@ -265,7 +265,19 @@ interface VfParams {
 function deriveVfParams(c: ContractInProgress): VfParams {
   const canopyAreaM2 = qScale(c, 'canopy_area_m2', 100)
   const trolleyCount = Math.max(1, Math.round(qScale(c, 'trolley_count', 8)))
-  const tiersPerTrolley = Math.max(1, Math.round(q(c, 'tiers_per_trolley', 5)))
+  // Derive tiersPerTrolley from the canopy target if not supplied by a tool:
+  // each tray is ~1200 mm wide × ~2000 mm deep (standard NFT grow tray),
+  // so tray area ≈ 2.4 m². Tiers needed = canopy / (trolleys × tray_area_m2).
+  // Ceiling-rounded so we always meet or exceed the canopy target.
+  // The contract's 'tiers_per_trolley' from the tool plan overrides this when present.
+  const TRAY_WIDTH_MM = 1200
+  const TRAY_DEPTH_MM = 2000
+  const DEFAULT_TRAY_AREA_M2 = (TRAY_WIDTH_MM * TRAY_DEPTH_MM) / 1_000_000  // 2.4 m²
+  const contractTiers = q(c, 'tiers_per_trolley', 0)
+  const tiersPerTrolley = Math.max(1, Math.round(
+    contractTiers > 0 ? contractTiers
+      : Math.ceil(canopyAreaM2 / (trolleyCount * DEFAULT_TRAY_AREA_M2)),
+  ))
   const trayCount = Math.max(1, Math.round(q(c, 'tray_count', trolleyCount * tiersPerTrolley)))
   const ledInstalledKw = qScale(c, 'led_installed_power_kw', 12)
   const ledHeatLoadKw = q(c, 'led_heat_load_kw', ledInstalledKw * 0.55)
@@ -339,12 +351,19 @@ function deriveVfParams(c: ContractInProgress): VfParams {
 
 function emitGrowingCanopy(p: VfParams) {
   const trayAreaM2 = p.canopyAreaM2 / p.trayCount
+  // Tray dimension: fixed 1200 mm width (fits two rows in a 40 HC interior
+  // after 800 mm walkway; 2 × 1200 mm + 800 mm = 3200 mm < 2350 mm usable
+  // width — runs single-row along the 12 m length instead).
+  // Depth computed from the area target so emitted dimensions are always
+  // consistent with the brief's canopy_area_m2 (gate 25 / gate 12 compliance).
+  const trayWidthMm = 1200
+  const trayDepthMm = Math.round((trayAreaM2 * 1_000_000) / trayWidthMm)
 
   const growingTrolleys = makeSubModule(
     'mobile_growing_trolleys',
     'mobile growing trolleys',
     'carries',
-    `${p.trolleyCount} mobile trolleys × ${p.tiersPerTrolley} vertical tiers = ${p.trayCount} trays totalling ${p.canopyAreaM2.toFixed(0)} m² canopy`,
+    `${p.trolleyCount} mobile trolleys in a single row along the 12 m container axis × ${p.tiersPerTrolley} vertical tiers = ${p.trayCount} trays totalling ${p.canopyAreaM2.toFixed(0)} m² canopy; 800 mm walkway on the long side`,
     [
       word(
         'mobile_growing_trolley_word',
@@ -354,8 +373,14 @@ function emitGrowingCanopy(p: VfParams) {
           mod('quantity', fmtQty(p.trolleyCount)),
           mod('manufacturer', 'Montel'),
           mod('part_number', 'GREENROLL mobile grow rack'),
-          mod('dimension', '1200×2000×2400', 'mm'),
-          mod('form', 'powder-coated steel chassis with castors + guide rails'),
+          // Geometry: 40 HC interior 12.03 m × 2.35 m usable. Trolleys oriented
+          // with 1200 mm DEPTH along the container width axis, 1500 mm LENGTH
+          // stepping along the 12 m axis. Single row of 8 trolleys occupies
+          // 8 × 1500 mm = 12 m along the container (fits). The remaining
+          // 2350 − 1200 mm = 1150 mm leaves 800 mm clear walkway beside the row
+          // plus 350 mm for guide rail + tray overhang.
+          mod('dimension', '1500×1200×2400', 'mm'),
+          mod('form', 'powder-coated steel chassis with castors + floor guide rails, single-row layout along 12 m axis'),
           mod('regulatory', 'BS EN 60204-1'),
         ],
       ),
@@ -365,8 +390,10 @@ function emitGrowingCanopy(p: VfParams) {
         cc('growing_tray', 'NFT growing tray', 'fluid_flow_state', 'polymer_thermoplastic'),
         [
           mod('quantity', fmtQty(p.trayCount)),
-          mod('dimension', '1200×1000', 'mm'),
-          mod('form', 'food-grade HDPE recirculating channel'),
+          // Dimensions derived from canopy target: trayAreaM2 = canopyAreaM2 / trayCount
+          // → depth = trayAreaM2 × 1 000 000 / 1200 mm width (brief-driven, not hardcoded)
+          mod('dimension', `${trayWidthMm}×${trayDepthMm}`, 'mm'),
+          mod('form', `food-grade HDPE recirculating channel, ${trayAreaM2.toFixed(2)} m² per tray`),
           mod('regulatory', 'EU 10/2011 food-contact'),
         ],
       ),
@@ -385,9 +412,11 @@ function emitGrowingCanopy(p: VfParams) {
         'floor guide rail word',
         cc('floor_guide_rail', 'floor guide rail', 'mechanical_load_function', 'aluminium'),
         [
-          mod('quantity', fmtQty(p.trolleyCount * 2)),
-          mod('dimension', '2400', 'mm'),
-          mod('form', 'extruded aluminium U-channel'),
+          // Two continuous guide rails running the full 12 m container length
+          // (one per trolley side); trolleys slide/roll along the length axis.
+          mod('quantity', '×2'),
+          mod('dimension', '12000', 'mm'),
+          mod('form', 'extruded aluminium U-channel, full container length'),
         ],
       ),
       word(
@@ -606,6 +635,25 @@ function emitClimateControl(p: VfParams) {
     'conditions',
     `${p.hvacCoolingKw.toFixed(1)} kW DX cooling + reheat, ${p.hvacAirflowCmh.toFixed(0)} m³/h supply, COP=${p.hvacCop.toFixed(2)}`,
     [
+      // dx_hvac_unit_word: the macro-anchor word for the £17,040 contract macro
+      // (word_name 'dx_hvac_unit' in engineering-contract.ts). Must have a
+      // character_id matching 'dx_hvac_unit' so the BoM renderer's fuzzy matcher
+      // can resolve the macro to this word and place the cost correctly.
+      word(
+        'dx_hvac_unit_word',
+        'DX HVAC unit word',
+        cc('dx_hvac_unit', 'DX HVAC split system', 'thermal_transfer_function', 'aluminium'),
+        [
+          mod('quantity', '×1'),
+          mod('manufacturer', 'Mitsubishi Electric'),
+          // PUMY-P140YKM2 = R32 40.0 kW DX split (outdoor condensing unit),
+          // pairs with indoor ceiling cassette FDUM indoor unit.
+          mod('part_number', 'PUMY-P140YKM2'),
+          mod('capacity', String(p.hvacCoolingKw.toFixed(1)), 'kW'),
+          mod('form', `Mitsubishi Electric PUMY-P140YKM2 R32 inverter outdoor unit, ${p.hvacCoolingKw.toFixed(1)} kW cooling capacity`),
+          mod('regulatory', 'EN 14511, F-Gas Regulation EU 517/2014, R32 A2L'),
+        ],
+      ),
       word(
         'dx_indoor_unit_word',
         'DX indoor unit word',
@@ -818,15 +866,23 @@ function emitClimateControl(p: VfParams) {
 }
 
 // ---------------------------------------------------------------------------
-// 4. irrigation_nutrient — fertigation tank + pumps + dosing + piping.
+// 4. irrigation_nutrient — EXTERNAL irrigation skid (tanks + dosing) +
+//    INTERNAL watering distribution (pipes + emitters to trolleys).
+//
+//    Brief constraint: the 1000 L nutrient tank, 200 L stock tanks, dosing
+//    pumps and pH correction tanks are on an EXTERNAL irrigation skid
+//    (customer-supplied, fed from outside the container). Only the internal
+//    watering distribution — manifold, drip emitters, return drainage, UV
+//    steriliser — lives inside the container envelope.
 // ---------------------------------------------------------------------------
 
 function emitIrrigationNutrient(p: VfParams) {
-  const fertigationTank = makeSubModule(
-    'fertigation_tank',
-    'fertigation tank',
-    'stores',
-    `${p.fertigationReservoirL.toFixed(0)} L recirculating nutrient solution at EC ${p.nutrientEcMsCm.toFixed(2)} mS/cm, pH ${p.nutrientPh.toFixed(2)}`,
+  // ── EXTERNAL SKID (sits outside the container, customer or supplier skid) ──
+  const externalIrrigationSkid = makeSubModule(
+    'external_irrigation_skid',
+    'external irrigation skid',
+    'supplies',
+    `External skid: ${p.fertigationReservoirL.toFixed(0)} L main reservoir + 2 × 200 L stock tanks + 4 dosing pumps + pH correction, located outside the container envelope per brief`,
     [
       word(
         'fertigation_reservoir_word',
@@ -837,7 +893,7 @@ function emitIrrigationNutrient(p: VfParams) {
           mod('manufacturer', 'Enduramaxx'),
           mod('part_number', '172810 1000 L vertical tank'),
           mod('capacity', String(p.fertigationReservoirL.toFixed(0)), 'L'),
-          mod('form', 'food-grade HDPE tank with light-tight lid'),
+          mod('form', 'food-grade HDPE tank with light-tight lid, external skid'),
           mod('regulatory', 'EN 1186 / EU 10/2011'),
         ],
       ),
@@ -848,7 +904,7 @@ function emitIrrigationNutrient(p: VfParams) {
         [
           mod('quantity', '×1'),
           mod('capacity', '200', 'L'),
-          mod('form', 'separate from tank B to prevent Ca-PO4-SO4 precipitation'),
+          mod('form', 'external skid — separate from tank B to prevent Ca-PO4-SO4 precipitation'),
         ],
       ),
       word(
@@ -858,18 +914,9 @@ function emitIrrigationNutrient(p: VfParams) {
         [
           mod('quantity', '×1'),
           mod('capacity', '200', 'L'),
-          mod('form', 'separate from tank A'),
+          mod('form', 'external skid — separate from tank A'),
         ],
       ),
-    ],
-  )
-
-  const dosingPumps = makeSubModule(
-    'dosing_pumps',
-    'dosing pumps',
-    'doses',
-    'A/B stock + pH down + pH up via peristaltic dosing into recirculation loop',
-    [
       word(
         'peristaltic_dosing_pump_word',
         'peristaltic dosing pump word',
@@ -879,7 +926,7 @@ function emitIrrigationNutrient(p: VfParams) {
           mod('manufacturer', 'Stenner'),
           mod('part_number', '45MPHP10'),
           mod('capacity', '8', 'L/h'),
-          mod('form', 'Hawkin GreenGuard / Stenner Classic peristaltic'),
+          mod('form', 'Hawkin GreenGuard / Stenner Classic peristaltic, external skid'),
           mod('regulatory', 'EN 60335-2-76'),
         ],
       ),
@@ -890,7 +937,7 @@ function emitIrrigationNutrient(p: VfParams) {
         [
           mod('quantity', '×1'),
           mod('capacity', '25', 'L'),
-          mod('form', 'phosphoric / nitric acid (10% v/v) day-tank'),
+          mod('form', 'phosphoric / nitric acid (10% v/v) day-tank, external skid'),
         ],
       ),
       word(
@@ -900,12 +947,13 @@ function emitIrrigationNutrient(p: VfParams) {
         [
           mod('quantity', '×1'),
           mod('capacity', '25', 'L'),
-          mod('form', 'potassium hydroxide (10% v/v) day-tank'),
+          mod('form', 'potassium hydroxide (10% v/v) day-tank, external skid'),
         ],
       ),
     ],
   )
 
+  // ── INTERNAL DISTRIBUTION LOOP (inside container envelope) ──
   const recirculationLoop = makeSubModule(
     'recirculation_loop',
     'recirculation loop',
@@ -971,10 +1019,11 @@ function emitIrrigationNutrient(p: VfParams) {
 
   return {
     module: 'irrigation_nutrient',
-    module_brief: `Recirculates ${p.fertigationReservoirL.toFixed(0)} L nutrient solution at EC ${p.nutrientEcMsCm.toFixed(2)} mS/cm, pH ${p.nutrientPh.toFixed(2)}, delivering ${p.irrigationFlowLpm.toFixed(1)} L/min via a ${p.irrigationPumpKw.toFixed(2)} kW Grundfos pump at ${p.irrigationHeadM.toFixed(1)} m head with split A/B dosing.`,
+    module_brief: `External irrigation skid: ${p.fertigationReservoirL.toFixed(0)} L main reservoir + 2 × 200 L stock tanks + 4 dosing pumps (outside container per brief). Internal distribution: ${p.irrigationFlowLpm.toFixed(1)} L/min via a ${p.irrigationPumpKw.toFixed(2)} kW Grundfos pump at ${p.irrigationHeadM.toFixed(1)} m head, EC ${p.nutrientEcMsCm.toFixed(2)} mS/cm, pH ${p.nutrientPh.toFixed(2)}.`,
     overview_paragraph_en: '',
     derived_parameters: {
       reservoir_l: p.fertigationReservoirL,
+      reservoir_location: 'external_skid',
       ec_ms_cm: p.nutrientEcMsCm,
       ph: p.nutrientPh,
       pump_kw: p.irrigationPumpKw,
@@ -988,7 +1037,7 @@ function emitIrrigationNutrient(p: VfParams) {
       'steel',
     ],
     applicability_confidence: 'high' as const,
-    sub_modules: [fertigationTank, dosingPumps, recirculationLoop],
+    sub_modules: [externalIrrigationSkid, recirculationLoop],
   }
 }
 
@@ -1594,8 +1643,11 @@ function emitWorkerAccessSafety(p: VfParams) {
         cc('central_walkway', 'central walkway', 'mechanical_load_function', 'steel'),
         [
           mod('quantity', '×1'),
-          mod('dimension', '800×10000', 'mm'),
-          mod('form', 'slip-resistant aluminium walkway between trolley rows'),
+          // Single-row layout: walkway runs the full container length on the
+          // long side of the trolley row. 2350 mm usable width − 1200 mm
+          // trolley depth = 1150 mm; 800 mm clear walkway after guide rails.
+          mod('dimension', '800×12000', 'mm'),
+          mod('form', 'slip-resistant aluminium walkway beside single trolley row (long side)'),
         ],
       ),
       word(

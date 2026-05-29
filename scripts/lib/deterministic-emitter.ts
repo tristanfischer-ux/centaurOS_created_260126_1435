@@ -4182,7 +4182,7 @@ function emitStructureContainment(p: BessParams): DesignModule {
           mod('manufacturer', 'CIMC'),
           mod('part_number', 'ISO-1161-CC-A'),
           mod('form', 'cast steel ISO 1161 top + bottom corner fittings, BIC-coded'),
-          mod('rating_primary', '30,480 kg vertical lift per fitting'),
+          mod('rating_primary', 'ISO 1161:2016 rated vertical lift (top corner 0A + 0D; stack load 192 t per corner)'),
           mod('regulatory', 'ISO 1161:2016, ISO 668'),
         ],
       ),
