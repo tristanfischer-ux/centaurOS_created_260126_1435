@@ -24,6 +24,7 @@ import type {
   ParsedConstraints,
 } from './types'
 import { splitDenseSubModulesByRadical } from './submodule-splitter'
+import { applyBriefScopeFilter } from './brief-scope-filter'
 
 export interface DesignJSON {
   modules: Array<DesignModule>
@@ -107,7 +108,10 @@ export async function assembleDesign(
   // that bundle 4-6 words into a single sub-module per top-level module.
   // VF/HAPS/quantum_computer already exceed the density floor and are
   // pass-through. See scripts/lib/orchestrator/submodule-splitter.ts.
-  const finalise = (design: DesignJSON): DesignJSON => splitDenseSubModulesByRadical(design)
+  // U6 brief-scope gating (drop OPTIONAL modules the brief doesn't signal) runs
+  // AFTER the density split, on every class's emitter output.
+  const finalise = (design: DesignJSON): DesignJSON =>
+    applyBriefScopeFilter(splitDenseSubModulesByRadical(design), brief, envelope)
 
   // ── 1. Try exact class/scale_tier match in registry ──
   const exactKey = `${envelope.class}/${envelope.scale_tier ?? 'default'}`
