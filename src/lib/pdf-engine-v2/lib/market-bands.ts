@@ -282,25 +282,34 @@ export const MARKET_BANDS: Record<string, MarketBand> = {
   },
 
   // ── Vertical Farm (container-scale) ───────────────────────────────────────
-  // AgFunder 2024 + LED manufacturer published installation benchmarks.
-  // Commodity = retrofitted shipping container + Chinese LED; Premium =
-  // purpose-built insulated structure + Signify Philips GreenPower LED.
+  // RECALIBRATED 2026-05-29 against Fischer Farms ACTUAL build cost ~£1,000/m²
+  // (incl. labour; incl. internal water/CO₂/humidity/air-handling + power
+  // electronics for lights & emitters; EXCL. the external irrigation skid and
+  // EXCL. per-cycle growing media). Ex-works / OEM-transfer basis (build cost +
+  // OEM margin), consistent with the engine-wide ex-works band convention
+  // (drawer: industry £/output-unit bands are ex-works, not installed ASP).
+  //
+  // SUPERSEDES the prior £4,000–£26,000/m² figures (AgFunder/Plenty/Gotham),
+  // which were WHOLE-FACILITY capex on an installed/turnkey basis and ran
+  // 4–26× too high for a single containerised unit — they produced a false
+  // "below commodity band → subsystems missing" signal on a unit that was in
+  // fact ~2.3× OVER on its (inflated) BoM. Container-unit reality:
   vertical_farm: {
     product_class: 'vertical_farm',
     output_unit: 'm²',
     tiers: {
       commodity: {
-        low_gbp: 4_000,
-        high_gbp: 9_000,
-        notes: 'Commodity container conversion (repurposed ISO container, Chinese LED panels, basic HVAC): minimal regulatory footprint, DIY build-out.',
+        low_gbp: 600,
+        high_gbp: 1_200,
+        notes: 'Commodity container conversion (repurposed ISO container, commodity LED, basic HVAC, minimal controls): DIY build-out, minimal regulatory footprint. Ex-works basis.',
       },
       premium: {
-        low_gbp: 11_000,
-        high_gbp: 26_000,
-        notes: 'Premium purpose-built (Signify GreenPower or Osram LED, chiller-cooled, CO₂ dosing, automated harvesting conveyors, full UK building-regs compliance).',
+        low_gbp: 1_400,
+        high_gbp: 3_500,
+        notes: 'Premium UK-built container farm (premium horticultural LED e.g. Signify/Heliospectra, chiller-cooled, CO₂ dosing, full controls + automation, internal watering distribution). Fischer Farms-class builds land ~£1,000/m² build (~£1,100/m² ex-works) at the lower end of this tier. Ex-works basis, excl. external irrigation skid + per-cycle media.',
       },
     },
-    source: 'AgFunder 2024 Agri-FoodTech Investment Report + Signify/Philips GreenPower installed-cost benchmarks + Plenty/Gotham Greens 2024 capital-cost disclosures. Per-canopy-m² basis.',
+    source: 'Fischer Farms 2026 actual build cost ~£1,000/m² (incl. labour, incl. internal water/CO₂/HVAC/power-electronics; excl. external skid + growing media). Ex-works/OEM-transfer basis. Supersedes AgFunder/Plenty/Gotham facility-capex figures (different basis). Per-canopy-m² basis.',
   },
 
   // ── Consumer Drone ────────────────────────────────────────────────────────
